@@ -37,10 +37,10 @@ An open-source, self-hostable DBaaS alternative to DigitalOcean Managed Database
 On a Linux server with at least 1 GB of memory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/databasifylabs/databasify/0.x/scripts/install.sh | sudo bash
+curl -fsSL https://get.databasify.io/install.sh | sudo bash
 ```
 
-Update or uninstall the same way with `scripts/update.sh` and `scripts/uninstall.sh`.
+Update or uninstall the same way with `https://get.databasify.io/update.sh` and `https://get.databasify.io/uninstall.sh`.
 
 ## Development
 

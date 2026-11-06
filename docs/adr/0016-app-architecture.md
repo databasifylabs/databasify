@@ -25,6 +25,7 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
     - A FrankenPHP/Caddy image (`docker/Dockerfile`), published to GHCR when a tag is pushed.
     - `docker/compose.yaml` runs that image (`DATABASIFY_VERSION`, `latest` by default) as web, Horizon, the scheduler and Reverb, plus a pinned Valkey, with SQLite by default ([0021](0021-app-state-sqlite-and-valkey.md)).
     - `scripts/install.sh` fetches the compose file, environment template and scripts from the `0.x` branch.
+    - `get.databasify.io` serves `scripts/` from the `0.x` branch through the Cloudflare Pages project `databasify-get`, so users run `curl -fsSL https://get.databasify.io/install.sh | sudo bash` (and `update.sh`, `uninstall.sh` the same way).
 - **License:** Apache-2.0 (relicensed from AGPL-3.0-only on 2026-11-06).
 
 ## Consequences
