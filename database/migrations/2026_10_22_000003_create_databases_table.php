@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('databases', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('name')->unique();
+            $table->string('engine');
+            $table->string('version_line', 20);
+            $table->string('mode');
+            $table->string('status')->default('creating');
+            $table->string('image_repository');
+            $table->string('image_digest', 80);
+            $table->string('image_release', 40);
+            $table->string('available_image_repository')->nullable();
+            $table->string('available_image_digest', 80)->nullable();
+            $table->string('available_image_release', 40)->nullable();
+            $table->timestamp('retune_needed_at')->nullable();
+            $table->unsignedTinyInteger('maintenance_day')->default(0);
+            $table->unsignedTinyInteger('maintenance_hour')->default(3);
+            $table->text('settings');
+            $table->foreignUuid('dns_zone_id')->nullable()->constrained()->restrictOnDelete();
+            $table->string('operation')->nullable();
+            $table->timestamp('operation_started_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('database_nodes', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('server_id')->constrained()->restrictOnDelete();
+            $table->string('name', 43)->nullable()->unique();
+            $table->unsignedSmallInteger('position');
+            $table->string('kind')->default('member');
+            $table->string('role')->default('unknown');
+            $table->string('engine_version', 40)->nullable();
+            $table->timestamps();
+            $table->unique(['database_id', 'server_id']);
+        });
+    }
+};

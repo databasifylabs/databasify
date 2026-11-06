@@ -1,0 +1,1 @@
+[ -d /srv/mysql/data/mysql ] || { echo 'the data directory is not initialised yet, the deploy step initialises it'; exit 0; }; rm -f /srv/mysql/run/mysqld.sock.lock /srv/mysql/run/mysqld.pid && exec mysqld --defaults-file=/srv/mysql/conf/my.cnf

@@ -1,0 +1,12 @@
+services:
+    web:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+        image: databasify:local
+    horizon:
+        image: databasify:local
+    scheduler:
+        image: databasify:local
+    reverb:
+        image: databasify:local
