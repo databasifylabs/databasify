@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
+    BookOpen,
     Cloud,
     DatabaseIcon,
     FolderGit2,
@@ -24,7 +25,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useRepositoryStars } from '@/hooks/use-repository-stars';
-import { repositoryUrl } from '@/lib/repository';
+import { documentationUrl, repositoryUrl } from '@/lib/repository';
 import { dashboard } from '@/routes';
 import { index as databasesIndex } from '@/routes/databases';
 import { index as dnsIndex } from '@/routes/dns';
@@ -81,6 +82,11 @@ export function AppSidebar() {
             href: repositoryUrl,
             icon: FolderGit2,
             badge: stars,
+        },
+        {
+            title: 'Documentation',
+            href: documentationUrl,
+            icon: BookOpen,
         },
     ];
     const navItems: NavItem[] = horizonUrl
