@@ -13,7 +13,7 @@
 [![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
 [![GitHub stars](https://img.shields.io/github/stars/databasifylabs/databasify?style=social)](https://github.com/databasifylabs/databasify)
 
-Databasify turns a few Linux servers you own into highly available MySQL, MariaDB, PostgreSQL, MongoDB, Valkey and Redis clusters, with one web UI to run them: the managed database experience, self-hosted, without the per-node markup.
+Databasify runs MySQL, MariaDB, PostgreSQL, MongoDB, Valkey and Redis on Linux servers you own, from a single node to a highly available cluster, with one web UI to run them: the managed database experience, self-hosted, without the per-node markup.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/dashboard-dark.png">
@@ -23,7 +23,7 @@ Databasify turns a few Linux servers you own into highly available MySQL, MariaD
 ## Features
 
 - MySQL 8.4 and 9.7, MariaDB 11.4 and 11.8, PostgreSQL 17 and 18, MongoDB 7.0, 8.0 and 9.0, Valkey 8 and 9, Redis 8
-- Primary with standbys, automatic failover and read-only nodes
+- A single primary, or a cluster with standbys, automatic failover and read-only nodes
 - Hostnames on your own domain and TLS everywhere
 - Connection pools, users, metrics, logs and email alerts
 - Migrations from an existing database
