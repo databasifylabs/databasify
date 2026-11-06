@@ -15,6 +15,8 @@
 
 Databasify runs MySQL, MariaDB, PostgreSQL, MongoDB, Valkey and Redis on Linux servers you own, from a single node to a highly available cluster, with one web UI to run them: the managed database experience, self-hosted, without the per-node markup.
 
+**[Read the documentation →](https://docs.databasify.io)**
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/dashboard-dark.png">
   <img alt="The Databasify dashboard" src=".github/assets/dashboard-light.png">
