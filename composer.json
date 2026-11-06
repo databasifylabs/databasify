@@ -2,7 +2,7 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "databasifylabs/databasify",
     "type": "project",
-    "description": "Open-source alternative to DigitalOcean Managed Databases, Amazon RDS and Aiven.",
+    "description": "Open-source, self-hostable DBaaS alternative to DigitalOcean Managed Databases, Amazon RDS & Aiven.",
     "keywords": [
         "laravel",
         "database",
