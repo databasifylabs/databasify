@@ -12,10 +12,13 @@ return new class extends Migration
     {
         Schema::create('server_providers', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name')->unique();
+            $table->foreignUuid('project_id');
+            $table->string('name');
             $table->string('type', 20);
             $table->text('credentials');
             $table->timestamps();
+
+            $table->unique(['project_id', 'name']);
         });
     }
 };

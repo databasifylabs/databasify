@@ -79,7 +79,7 @@ it('asks a busy database to stop from its page', function () {
     $database = idleDatabase('postgres', 1);
     $database->startOperation('Upgrade');
 
-    $this->post("/databases/{$database->id}/stop")->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/stop"))->assertSessionHasNoErrors();
 
     expect($database->fresh()->isStopRequested())->toBeTrue();
 });
@@ -88,5 +88,5 @@ it('has nothing to stop on an idle database', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('postgres', 1);
 
-    $this->post("/databases/{$database->id}/stop")->assertSessionHasErrors(['database' => 'main is not running anything.']);
+    $this->post(projectUrl("/databases/{$database->id}/stop"))->assertSessionHasErrors(['database' => 'main is not running anything.']);
 });

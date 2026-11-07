@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('connection_pools', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_id');
             $table->string('name', 63);
             $table->string('schema', 63);
             $table->string('mode', 16);

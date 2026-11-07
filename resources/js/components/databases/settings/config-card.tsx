@@ -47,9 +47,14 @@ function RetuneButton({
             description="Databasify reads the CPU and memory of every node again and resizes the auto values to match. Nodes restart one at a time, standbys first. Values you set yourself are kept."
             confirmLabel="Retune"
             onConfirm={() =>
-                runAction(DatabaseOperationController.retune(database.id), {
-                    success: 'Retuning started',
-                })
+                runAction(
+                    DatabaseOperationController.retune({
+                        database: database.id,
+                    }),
+                    {
+                        success: 'Retuning started',
+                    },
+                )
             }
         />
     );

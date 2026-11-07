@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
     Cloud,
     DatabaseIcon,
+    FolderKanban,
     Globe,
     LayoutGrid,
     Search,
@@ -21,6 +22,7 @@ import { dashboard, search } from '@/routes';
 import { index as databasesIndex } from '@/routes/databases';
 import { index as dnsIndex } from '@/routes/dns';
 import { edit as editProfile } from '@/routes/profile';
+import { index as projectsIndex } from '@/routes/projects';
 import { index as providersIndex } from '@/routes/providers';
 import { index as serversIndex } from '@/routes/servers';
 
@@ -33,39 +35,47 @@ type SearchResult = {
     url: string;
 };
 
-const pages: SearchResult[] = [
-    {
-        kind: 'page',
-        title: 'Dashboard',
-        subtitle: 'Page',
-        url: dashboard.url(),
-    },
-    {
-        kind: 'page',
-        title: 'Databases',
-        subtitle: 'Page',
-        url: databasesIndex.url(),
-    },
-    {
-        kind: 'page',
-        title: 'Servers',
-        subtitle: 'Page',
-        url: serversIndex.url(),
-    },
-    {
-        kind: 'page',
-        title: 'Providers',
-        subtitle: 'Page',
-        url: providersIndex.url(),
-    },
-    { kind: 'page', title: 'DNS', subtitle: 'Page', url: dnsIndex.url() },
-    {
-        kind: 'page',
-        title: 'Settings',
-        subtitle: 'Page',
-        url: editProfile.url(),
-    },
-];
+function navigationPages(): SearchResult[] {
+    return [
+        {
+            kind: 'page',
+            title: 'Dashboard',
+            subtitle: 'Page',
+            url: dashboard.url(),
+        },
+        {
+            kind: 'page',
+            title: 'Databases',
+            subtitle: 'Page',
+            url: databasesIndex.url(),
+        },
+        {
+            kind: 'page',
+            title: 'Servers',
+            subtitle: 'Page',
+            url: serversIndex.url(),
+        },
+        {
+            kind: 'page',
+            title: 'Providers',
+            subtitle: 'Page',
+            url: providersIndex.url(),
+        },
+        { kind: 'page', title: 'DNS', subtitle: 'Page', url: dnsIndex.url() },
+        {
+            kind: 'page',
+            title: 'Projects',
+            subtitle: 'Page',
+            url: projectsIndex.url(),
+        },
+        {
+            kind: 'page',
+            title: 'Settings',
+            subtitle: 'Page',
+            url: editProfile.url(),
+        },
+    ];
+}
 
 const pageIcons: Record<string, LucideIcon> = {
     Dashboard: LayoutGrid,
@@ -73,6 +83,7 @@ const pageIcons: Record<string, LucideIcon> = {
     Servers: Server,
     Providers: Cloud,
     DNS: Globe,
+    Projects: FolderKanban,
     Settings: Settings,
 };
 
@@ -101,7 +112,7 @@ function useRemoteResults(term: string): SearchResult[] {
 
         const controller = new AbortController();
         const timer = setTimeout(() => {
-            fetch(search.url({ query: { q: term } }), {
+            fetch(search.url({}, { query: { q: term } }), {
                 headers: { Accept: 'application/json' },
                 signal: controller.signal,
             })
@@ -130,7 +141,7 @@ export function SearchCommand() {
     const term = query.trim();
     const remote = useRemoteResults(term);
     const items = [
-        ...pages.filter((page) =>
+        ...navigationPages().filter((page) =>
             page.title.toLowerCase().includes(term.toLowerCase()),
         ),
         ...remote,

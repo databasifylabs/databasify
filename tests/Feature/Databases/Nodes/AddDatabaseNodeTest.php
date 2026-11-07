@@ -80,7 +80,7 @@ it('requires a unique DigitalOcean-style name for read-only nodes', function (st
     withReadOnlyNode($database, ['name' => 'reports']);
     Queue::fake([AddDatabaseNodeJob::class]);
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => Server::factory()->ready()->create()->id, 'kind' => 'read_only', 'name' => $name])
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => Server::factory()->ready()->create()->id, 'kind' => 'read_only', 'name' => $name])
         ->assertSessionHasErrors(['name' => $message]);
 
     Queue::assertNothingPushed();
@@ -103,7 +103,7 @@ it('adds a named read-only node from the database page', function () {
     Queue::fake([AddDatabaseNodeJob::class]);
     $server = Server::factory()->ready()->create();
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $server->id, 'kind' => 'read_only', 'name' => 'reports'])->assertRedirect();
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $server->id, 'kind' => 'read_only', 'name' => 'reports'])->assertRedirect();
 
     $reader = $database->nodes()->readOnly()->sole();
     expect($reader)->name->toBe('reports')->server_id->toBe($server->id)->position->toBe(1)
@@ -118,11 +118,11 @@ it('adds nodes only from the private network of the database', function () {
     $seed = $database->seed()->server;
     $elsewhere = Server::factory()->ready()->onNetwork(Network::factory()->create(['cidr' => '10.200.0.0/20']))->create(['name' => 'far']);
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $elsewhere->id, 'kind' => 'read_only'])
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $elsewhere->id, 'kind' => 'read_only'])
         ->assertSessionHasErrors(['server_id' => "far is not on {$seed->name}'s private network shared (10.0.0.0/8)."]);
 
     $seed->update(['network_id' => null]);
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => Server::factory()->ready()->create()->id])
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => Server::factory()->ready()->create()->id])
         ->assertSessionHasErrors(['server_id' => "{$seed->name} has no private network. Standby and read-only nodes need one shared with it."]);
 
     expect($database->nodes()->count())->toBe(1);
@@ -135,11 +135,11 @@ it('validates the server, kind and name of a new node', function () {
     Queue::fake([AddDatabaseNodeJob::class]);
     $free = Server::factory()->ready()->create();
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $database->seed()->server_id])->assertSessionHasErrors('server_id');
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => Server::factory()->create()->id])->assertSessionHasErrors('server_id');
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $free->id, 'kind' => 'witness'])->assertSessionHasErrors('kind');
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $free->id, 'name' => 'reports'])->assertSessionHasErrors('name');
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $free->id, 'kind' => 'read_only', 'name' => 'Reports'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $database->seed()->server_id])->assertSessionHasErrors('server_id');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => Server::factory()->create()->id])->assertSessionHasErrors('server_id');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $free->id, 'kind' => 'witness'])->assertSessionHasErrors('kind');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $free->id, 'name' => 'reports'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $free->id, 'kind' => 'read_only', 'name' => 'Reports'])->assertSessionHasErrors('name');
 
     expect($database->nodes()->count())->toBe(1);
     Queue::assertNothingPushed();
@@ -151,7 +151,7 @@ it('refuses to add a node while the database is busy', function () {
     Queue::fake([AddDatabaseNodeJob::class]);
     $database->startOperation('Upgrade');
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => Server::factory()->ready()->create()->id])->assertSessionHasErrors('database');
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => Server::factory()->ready()->create()->id])->assertSessionHasErrors('database');
 
     expect($database->nodes()->count())->toBe(1);
     Queue::assertNothingPushed();
@@ -165,13 +165,13 @@ it('adds standbys only when every member has 1 GB but allows small read-only nod
     $small = Server::factory()->ready()->create(['name' => 'small', 'memory_mb' => 480]);
     $large = Server::factory()->ready()->create(['name' => 'large', 'memory_mb' => 3925]);
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $small->id])
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $small->id])
         ->assertSessionHasErrors(['server_id' => 'small has 480 MB of memory. Every node of a database with standbys needs at least 1 GB, so it can only run a single-node database.']);
 
     $seed->update(['memory_mb' => 480]);
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $large->id])
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $large->id])
         ->assertSessionHasErrors(['server_id' => "{$seed->name} has 480 MB of memory. Every node of a database with standbys needs at least 1 GB, move it to a bigger server first."]);
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $small->id, 'kind' => 'read_only', 'name' => 'reports'])->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $small->id, 'kind' => 'read_only', 'name' => 'reports'])->assertSessionHasNoErrors();
     expect($database->nodes()->readOnly()->sole()->server_id)->toBe($small->id);
 });

@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('database_migrations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('database_node_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUuid('database_id')->index();
+            $table->foreignUuid('database_node_id')->nullable()->index();
             $table->string('mode');
             $table->string('status');
             $table->text('source');

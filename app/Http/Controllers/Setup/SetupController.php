@@ -27,6 +27,6 @@ class SetupController extends Controller
         Auth::login($create->handle($request->toOwner()));
         $request->session()->regenerate();
 
-        return to_route('dashboard');
+        return to_route('home');
     }
 }

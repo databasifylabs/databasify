@@ -31,7 +31,7 @@ it('raises one alert after five minutes above 90 percent and clears it when usag
     $alerts->handle($database);
     $alerts->handle($database);
     expect(NodeAlert::query()->open()->sole()->metric)->toBe(ResourceMetric::Cpu)
-        ->and($this->get("/databases/{$database->id}")->viewData('page')['props']['database']['data']['alerts'][0]['label'])->toBe('CPU');
+        ->and($this->get(projectUrl("/databases/{$database->id}"))->viewData('page')['props']['database']['data']['alerts'][0]['label'])->toBe('CPU');
 
     $this->travel(1)->minutes();
     sampleCpu($node, 40);

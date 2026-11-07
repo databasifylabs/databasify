@@ -8,7 +8,7 @@ export default function ServerDatabase({ server }: { server: Server }) {
     if (server.database) {
         return (
             <Link
-                href={DatabaseController.show(server.database.id)}
+                href={DatabaseController.show({ database: server.database.id })}
                 className="inline-flex items-center gap-2 whitespace-nowrap hover:underline"
             >
                 <BrandIcon

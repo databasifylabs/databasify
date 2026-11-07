@@ -22,6 +22,7 @@ import {
     versionOf,
 } from '@/components/databases/describe';
 import BrandIcon from '@/components/brand-icon';
+import StarPromptCard from '@/components/dashboard/star-prompt-card';
 import NodeDots from '@/components/databases/nodes/node-dots';
 import ReadOnlyRows from '@/components/databases/nodes/read-only-rows';
 import ReadOnlyToggle from '@/components/databases/nodes/read-only-toggle';
@@ -67,6 +68,7 @@ type Props = {
     servers: { data: Server[] };
     logs: { data: ServerLog[] };
     requirements: Requirements;
+    showStarPrompt: boolean;
 };
 
 type Requirements = {
@@ -275,9 +277,9 @@ function DatabasesPanel({
                                 <TableRow>
                                     <TableCell className="py-3 pl-6">
                                         <Link
-                                            href={DatabaseController.show(
-                                                database.id,
-                                            )}
+                                            href={DatabaseController.show({
+                                                database: database.id,
+                                            })}
                                             className="flex items-center gap-3"
                                         >
                                             <BrandIcon
@@ -377,7 +379,9 @@ function ServersPanel({
                             <TableRow key={server.id}>
                                 <TableCell className="py-3 pl-6">
                                     <Link
-                                        href={ServerController.show(server.id)}
+                                        href={ServerController.show({
+                                            server: server.id,
+                                        })}
                                         className="flex items-center gap-3"
                                     >
                                         <BrandIcon
@@ -443,7 +447,10 @@ function ServerLogsPanel({ logs }: { logs: ServerLog[] }) {
                                         {log.database && (
                                             <Link
                                                 href={DatabaseController.show.url(
-                                                    log.database.id,
+                                                    {
+                                                        database:
+                                                            log.database.id,
+                                                    },
                                                     {
                                                         query: {
                                                             tab: 'activity',
@@ -458,7 +465,7 @@ function ServerLogsPanel({ logs }: { logs: ServerLog[] }) {
                                         )}
                                         <Link
                                             href={ServerController.show.url(
-                                                log.server.id,
+                                                { server: log.server.id },
                                                 {
                                                     query: { tab: 'activity' },
                                                 },
@@ -494,6 +501,7 @@ export default function Dashboard({
     servers: { data: servers },
     logs: { data: logs },
     requirements,
+    showStarPrompt,
 }: Props) {
     usePoll(10000, { only: ['summary', 'databases', 'servers', 'logs'] });
 
@@ -525,6 +533,8 @@ export default function Dashboard({
                         </Button>
                     </div>
                 </div>
+
+                {showStarPrompt && <StarPromptCard />}
 
                 {(summary.servers.total === 0 ||
                     summary.databases.total === 0) && (
@@ -582,11 +592,11 @@ export default function Dashboard({
     );
 }
 
-Dashboard.layout = {
+Dashboard.layout = () => ({
     breadcrumbs: [
         {
             title: 'Dashboard',
             href: dashboard(),
         },
     ],
-};
+});

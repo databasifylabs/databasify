@@ -6,6 +6,8 @@ namespace App\Http\Requests\Databases;
 
 use App\DTOs\Recovery\RecoverySettings;
 use App\Http\Requests\Concerns\RecoveryScheduleRules;
+use App\Models\StorageProvider;
+use App\Rules\ExistsInProject;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -19,7 +21,7 @@ class EnableRecoveryRequest extends FormRequest
     public function rules(): array
     {
         return array_merge(
-            ['storage_provider_id' => ['required', 'uuid', 'exists:storage_providers,id']],
+            ['storage_provider_id' => ['required', 'uuid', new ExistsInProject(StorageProvider::class)]],
             $this->scheduleRules(),
         );
     }

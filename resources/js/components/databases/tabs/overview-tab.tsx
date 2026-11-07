@@ -76,7 +76,9 @@ function RetrySetup({ database, busy }: { database: Database; busy: boolean }) {
                     confirmLabel="Retry setup"
                     onConfirm={() =>
                         runAction(
-                            DatabaseOperationController.retrySetup(database.id),
+                            DatabaseOperationController.retrySetup({
+                                database: database.id,
+                            }),
                             { success: `Retrying ${database.name} setup` },
                         )
                     }
@@ -447,9 +449,9 @@ export default function OverviewTab({
                                 confirmLabel="Start rolling upgrade"
                                 onConfirm={() =>
                                     runAction(
-                                        DatabaseOperationController.upgrade(
-                                            database.id,
-                                        ),
+                                        DatabaseOperationController.upgrade({
+                                            database: database.id,
+                                        }),
                                         {
                                             success: 'Rolling upgrade started',
                                         },
@@ -463,7 +465,7 @@ export default function OverviewTab({
                                 onClick={() =>
                                     runAction(
                                         DatabaseOperationController.checkUpgrade(
-                                            database.id,
+                                            { database: database.id },
                                         ),
                                         { success: 'Checked for upgrades' },
                                     )

@@ -59,7 +59,7 @@ class PointInTimeRecovery extends Model
      */
     public function storageProvider(): BelongsTo
     {
-        return $this->belongsTo(StorageProvider::class);
+        return $this->belongsTo(StorageProvider::class)->withoutProject();
     }
 
     public function location(): ArchiveLocation

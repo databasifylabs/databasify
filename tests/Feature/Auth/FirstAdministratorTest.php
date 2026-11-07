@@ -11,7 +11,7 @@ use Inertia\Testing\AssertableInertia;
 
 it('sends every visitor to setup until the owner account exists', function (string $path) {
     $this->get($path)->assertRedirect(route('setup'));
-})->with(['/', '/dashboard', '/login', '/servers']);
+})->with(['/', '/dashboard', '/login', '/0199a1b2-0000-7000-8000-000000000000/servers']);
 
 it('shows the setup page with the password rules', function () {
     $this->get(route('setup'))->assertInertia(fn (AssertableInertia $page) => $page
@@ -21,7 +21,7 @@ it('shows the setup page with the password rules', function () {
 
 it('creates a verified owner account and signs it in', function () {
     $this->post(route('setup.store'), ['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'password', 'password_confirmation' => 'password'])
-        ->assertRedirect(route('dashboard'));
+        ->assertRedirect(route('home'));
 
     $owner = User::query()->sole();
     expect($owner->name)->toBe('Owner')

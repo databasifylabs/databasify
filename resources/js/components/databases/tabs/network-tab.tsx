@@ -49,7 +49,7 @@ function AddSourceForm({
 
     return (
         <Form
-            {...TrustedSourceController.store.form(database.id)}
+            {...TrustedSourceController.store.form({ database: database.id })}
             options={{ preserveScroll: true }}
             onSuccess={() => {
                 toast.success(`Allowing ${cidr}`);

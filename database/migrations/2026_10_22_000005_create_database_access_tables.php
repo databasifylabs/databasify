@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('database_users', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_id');
             $table->string('name');
             $table->text('password');
             $table->string('password_encryption')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
 
         Schema::create('schemas', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_id');
             $table->string('name');
             $table->timestamps();
             $table->unique(['database_id', 'name']);
@@ -30,7 +30,7 @@ return new class extends Migration
 
         Schema::create('trusted_sources', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_id');
             $table->string('cidr');
             $table->string('label')->nullable();
             $table->timestamps();

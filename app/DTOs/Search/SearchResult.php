@@ -18,12 +18,12 @@ final readonly class SearchResult
 
     public static function fromDatabase(Database $database): self
     {
-        return new self('database', $database->name, $database->versionLabel(), route('databases.show', $database));
+        return new self('database', $database->name, $database->versionLabel(), route('databases.show', ['project' => $database->project_id, 'database' => $database]));
     }
 
     public static function fromServer(Server $server): self
     {
-        return new self('server', $server->name, $server->public_ip ?? 'No address yet', route('servers.show', $server));
+        return new self('server', $server->name, $server->public_ip ?? 'No address yet', route('servers.show', ['project' => $server->project_id, 'server' => $server]));
     }
 
     /**

@@ -36,9 +36,9 @@ it('restores into a new database with the same engine line, secrets and accounts
     Queue::fake([BootstrapDatabaseJob::class]);
     withImage('postgres', '17.99');
 
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => $target->toIso8601String()])
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => $target->toIso8601String()])
         ->assertSessionHasNoErrors()
-        ->assertRedirect('/databases/'.Database::query()->where('name', 'orders-restored')->value('id'));
+        ->assertRedirect(projectUrl('/databases/').Database::query()->where('name', 'orders-restored')->value('id'));
 
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     expect($restored)
@@ -62,7 +62,7 @@ it('restores with the settings the source database runs with', function () {
     $server = Server::factory()->ready()->create();
     Queue::fake([BootstrapDatabaseJob::class]);
 
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => now()->subHour()->toIso8601String()])
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => now()->subHour()->toIso8601String()])
         ->assertSessionHasNoErrors();
 
     $restored = Database::query()->where('name', 'orders-restored')->sole();
@@ -76,7 +76,7 @@ it('refuses a moment outside the restorable window', function () {
     $window = $source->pointInTimeRecovery;
     $server = Server::factory()->ready()->create();
 
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => now()->addHour()->toIso8601String()])
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => now()->addHour()->toIso8601String()])
         ->assertSessionHasErrors(['target' => 'orders cannot be restored to '.now()->addHour()->utc()->format('Y-m-d H:i:s')." UTC. Pick a time between {$window?->earliest_restorable_at?->utc()->format('Y-m-d H:i:s')} and {$window?->latest_restorable_at?->utc()->format('Y-m-d H:i:s')} UTC."]);
 
     expect(Database::query()->count())->toBe(1);
@@ -85,7 +85,7 @@ it('refuses a moment outside the restorable window', function () {
 it('refuses a restore before the first base backup', function () {
     $source = withRecovery(idleDatabase('mariadb', 1, DatabaseMode::Single, 'orders'));
 
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => now()->toIso8601String()])
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => now()->toIso8601String()])
         ->assertSessionHasErrors(['target' => 'orders cannot be restored to '.now()->utc()->format('Y-m-d H:i:s').' UTC. The archive has no complete base backup yet.']);
 });
 
@@ -93,7 +93,7 @@ it('validates the restore request', function (array $input, string $field) {
     $source = restorableDatabase();
     $free = Server::factory()->ready()->create();
 
-    $this->post("/databases/{$source->id}/recovery/restore", [...['name' => 'orders-restored', 'server_id' => $free->id, 'target' => now()->subHour()->toIso8601String()], ...$input])
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), [...['name' => 'orders-restored', 'server_id' => $free->id, 'target' => now()->subHour()->toIso8601String()], ...$input])
         ->assertSessionHasErrors($field);
 })->with([
     'taken name' => [['name' => 'orders'], 'name'],
@@ -106,7 +106,7 @@ it('restores the archive onto the new seed before it starts and keeps its accoun
     $this->travelTo('2026-10-26 07:30:15');
     $source = restorableDatabase();
     Queue::fake([BootstrapDatabaseJob::class]);
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     $source->pointInTimeRecovery?->update(['earliest_restorable_at' => null]);
     $ssh = fakeSsh()->respond(certificateOutput('ca.crt', 'server.crt', 'server.key', 'ca.key'));
@@ -137,7 +137,7 @@ it('restores postgres with pgbackrest up to the target and clears the recovery s
     $this->travelTo('2026-10-26 07:30:15');
     $source = restorableDatabase('postgres');
     Queue::fake([BootstrapDatabaseJob::class]);
-    $this->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
+    $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     $ssh = fakeSsh()->respond(certificateOutput('ca.crt', 'server.crt', 'server.key', 'ca.key'));
 

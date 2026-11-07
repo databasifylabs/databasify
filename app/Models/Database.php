@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsDatabaseSettings;
+use App\Contracts\Projects\Movable;
 use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DatabaseProviders\Drivers\AbstractDatabaseDriver;
 use App\DatabaseProviders\Groups\EngineAccounts;
@@ -36,11 +37,15 @@ use App\Enums\Migrations\MigrationStatus;
 use App\Exceptions\Databases\MissingCapability;
 use App\Exceptions\Providers\UnknownProvider;
 use App\Models\Collections\DatabaseNodeCollection;
+use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MovesBetweenProjects;
+use App\Observers\DatabaseObserver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -56,6 +61,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string $engine
  * @property string $version_line
@@ -79,11 +85,12 @@ use Illuminate\Validation\ValidationException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at'])]
 #[Hidden(['settings'])]
-class Database extends Model
+#[ObservedBy(DatabaseObserver::class)]
+class Database extends Model implements Movable
 {
-    use HasUuids;
+    use BelongsToProject, HasUuids, MovesBetweenProjects;
 
     private const int STOP_TTL_SECONDS = 86400;
 
@@ -377,6 +384,14 @@ class Database extends Model
     public function nodes(): HasMany
     {
         return $this->hasMany(DatabaseNode::class)->chaperone()->with('server.network')->orderBy('position');
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function movesAlongWith(): iterable
+    {
+        return Server::query()->withoutProject()->whereIn('id', $this->nodes()->reorder()->select('server_id'))->get();
     }
 
     /**

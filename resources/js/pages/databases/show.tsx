@@ -228,7 +228,7 @@ ShowDatabase.layout = (props: Props) => ({
         { title: 'Databases', href: DatabaseController.index() },
         {
             title: props.database.data.name,
-            href: DatabaseController.show(props.database.data.id),
+            href: DatabaseController.show({ database: props.database.data.id }),
         },
     ],
 });

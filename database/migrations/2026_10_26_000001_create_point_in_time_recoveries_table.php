@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('point_in_time_recoveries', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->unique()->constrained()->cascadeOnDelete();
-            $table->foreignUuid('storage_provider_id')->constrained()->restrictOnDelete();
+            $table->foreignUuid('database_id')->unique();
+            $table->foreignUuid('storage_provider_id')->index();
             $table->string('path');
             $table->unsignedSmallInteger('retention_days');
             $table->unsignedTinyInteger('backup_hour');

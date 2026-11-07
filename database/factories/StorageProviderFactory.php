@@ -15,6 +15,7 @@ class StorageProviderFactory extends Factory
     public function definition(): array
     {
         return [
+            'project_id' => fn (): string => ProjectFactory::defaultProject()->id,
             'name' => fake()->unique()->slug(2),
             'endpoint' => 'https://s3.example.com',
             'region' => 'us-east-1',

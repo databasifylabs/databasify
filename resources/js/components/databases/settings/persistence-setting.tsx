@@ -7,17 +7,23 @@ import { runAction } from '@/lib/run-action';
 import type { Database } from '@/types';
 
 function turnOn(database: Database) {
-    runAction(DatabaseSettingsController.persistence(database.id), {
-        data: { persistence: 'snapshots' },
-        success: 'Turning on snapshots',
-    });
+    runAction(
+        DatabaseSettingsController.persistence({ database: database.id }),
+        {
+            data: { persistence: 'snapshots' },
+            success: 'Turning on snapshots',
+        },
+    );
 }
 
 function turnOff(database: Database) {
-    runAction(DatabaseSettingsController.persistence(database.id), {
-        data: { persistence: 'off' },
-        success: 'Turning off persistence',
-    });
+    runAction(
+        DatabaseSettingsController.persistence({ database: database.id }),
+        {
+            data: { persistence: 'off' },
+            success: 'Turning off persistence',
+        },
+    );
 }
 
 export default function PersistenceSetting({

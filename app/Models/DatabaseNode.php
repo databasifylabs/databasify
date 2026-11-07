@@ -14,10 +14,12 @@ use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\ResourceMetric;
 use App\Models\Collections\DatabaseNodeCollection;
+use App\Observers\DatabaseNodeObserver;
 use App\Services\Ssh\Ssh;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\CollectedBy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -43,6 +45,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
+#[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
 {
     use HasUuids;
@@ -77,6 +80,14 @@ class DatabaseNode extends Model
     public function openAlerts(): HasMany
     {
         return $this->alerts()->open();
+    }
+
+    /**
+     * @return HasMany<DatabaseMigration, $this>
+     */
+    public function migrations(): HasMany
+    {
+        return $this->hasMany(DatabaseMigration::class);
     }
 
     /**
@@ -157,6 +168,15 @@ class DatabaseNode extends Model
     protected function readOnly(Builder $query): void
     {
         $query->where('kind', NodeKind::ReadOnly);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function inCurrentProject(Builder $query): void
+    {
+        $query->whereHas('database');
     }
 
     /**

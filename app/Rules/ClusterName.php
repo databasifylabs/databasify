@@ -51,7 +51,7 @@ final readonly class ClusterName implements ValidationRule
 
     private function isTaken(string $name): bool
     {
-        return Database::query()->where('name', $name)->exists()
+        return Database::query()->withoutProject()->where('name', $name)->exists()
             || DatabaseNode::query()->where('name', $name)->whereKeyNot($this->exceptNode?->id)->exists();
     }
 }

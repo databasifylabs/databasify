@@ -15,9 +15,14 @@ export default function FailoverDialog({
             description="Writes pause for a few seconds while a standby is promoted."
             confirmLabel="Fail over"
             onConfirm={() =>
-                runAction(DatabaseOperationController.failover(database.id), {
-                    success: 'Failover started',
-                })
+                runAction(
+                    DatabaseOperationController.failover({
+                        database: database.id,
+                    }),
+                    {
+                        success: 'Failover started',
+                    },
+                )
             }
         />
     );

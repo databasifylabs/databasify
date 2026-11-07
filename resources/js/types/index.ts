@@ -6,6 +6,7 @@ export type * from './forms';
 export type * from './navigation';
 export type * from './pagination';
 export type * from './plugins';
+export type * from './projects';
 export type * from './server-logs';
 export type * from './servers';
 export type * from './storage';

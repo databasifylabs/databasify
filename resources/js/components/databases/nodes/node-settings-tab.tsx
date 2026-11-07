@@ -158,7 +158,9 @@ export default function NodeSettingsTab({
                             <dt className="text-muted-foreground">Primary</dt>
                             <dd>
                                 <Link
-                                    href={DatabaseController.show(database.id)}
+                                    href={DatabaseController.show({
+                                        database: database.id,
+                                    })}
                                     className="hover:underline"
                                 >
                                     {database.name}

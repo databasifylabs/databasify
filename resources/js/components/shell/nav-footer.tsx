@@ -1,4 +1,3 @@
-import { Star } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import {
     SidebarGroup,
@@ -39,12 +38,6 @@ export function NavFooter({
                                         <item.icon className="h-5 w-5" />
                                     )}
                                     <span>{item.title}</span>
-                                    {item.badge && (
-                                        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                                            <Star className="size-3 fill-amber-400 text-amber-400" />
-                                            {item.badge}
-                                        </span>
-                                    )}
                                 </a>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

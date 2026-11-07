@@ -67,7 +67,7 @@ it('checks for an upgrade over http', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     withImage('valkey', '9.1.2');
 
-    $this->post("/databases/{$database->id}/upgrade-check")->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/upgrade-check"))->assertRedirect()->assertSessionHasNoErrors();
 
     expect($database->fresh()->available_image_release)->toBe('9.1.2');
 });

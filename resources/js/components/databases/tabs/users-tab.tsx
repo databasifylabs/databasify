@@ -355,7 +355,9 @@ export default function UsersTab({
                     </p>
                 )}
                 <NameForm
-                    form={DatabaseUserController.store.form(database.id)}
+                    form={DatabaseUserController.store.form({
+                        database: database.id,
+                    })}
                     placeholder="New user name"
                     action="Add user"
                     success={(name) => `Created user ${name}`}
@@ -434,7 +436,9 @@ export default function UsersTab({
                     </TableBody>
                 </Table>
                 <NameForm
-                    form={SchemaController.store.form(database.id)}
+                    form={SchemaController.store.form({
+                        database: database.id,
+                    })}
                     placeholder="New database name"
                     action="Add database"
                     success={(name) => `Created database ${name}`}

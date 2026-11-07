@@ -50,12 +50,12 @@ it('validates migration sources per engine over http', function () {
     $valkey = migratingDatabase('valkey');
     $mysql = migratingDatabase('mysql');
 
-    $this->postJson("/databases/{$valkey->id}/migrations/check", ['host' => 'cache.example.com', 'port' => 6379, 'databases' => ['x']])
+    $this->postJson(projectUrl("/databases/{$valkey->id}/migrations/check"), ['host' => 'cache.example.com', 'port' => 6379, 'databases' => ['x']])
         ->assertUnprocessable()->assertJsonValidationErrors('databases');
-    $this->postJson("/databases/{$mysql->id}/migrations/check", ['host' => 'db.example.com; rm -rf /', 'port' => 3306])
+    $this->postJson(projectUrl("/databases/{$mysql->id}/migrations/check"), ['host' => 'db.example.com; rm -rf /', 'port' => 3306])
         ->assertUnprocessable()->assertJsonValidationErrors(['host', 'username', 'password']);
 
     fakeSsh()->respond(mysqlSourceReport());
-    $this->postJson("/databases/{$mysql->id}/migrations/check", ['host' => 'db.example.com', 'port' => 3306, 'username' => 'migrator', 'password' => 'secret', 'databases' => ['shop']])
+    $this->postJson(projectUrl("/databases/{$mysql->id}/migrations/check"), ['host' => 'db.example.com', 'port' => 3306, 'username' => 'migrator', 'password' => 'secret', 'databases' => ['shop']])
         ->assertOk()->assertJson(['reachable' => true, 'continuous' => true]);
 });

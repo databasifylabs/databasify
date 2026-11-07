@@ -127,6 +127,15 @@ class ServerLog extends Model
      * @param  Builder<self>  $query
      */
     #[Scope]
+    protected function inCurrentProject(Builder $query): void
+    {
+        $query->where(fn (Builder $logs) => $logs->whereHas('server')->orWhereHas('database'));
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
     protected function running(Builder $query): void
     {
         $query->where('status', ServerLogStatus::Running);

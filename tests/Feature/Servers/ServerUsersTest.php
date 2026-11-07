@@ -19,9 +19,9 @@ beforeEach(function () {
 it('creates an isolated user with a validated key', function () {
     $server = Server::factory()->ready()->create();
 
-    $this->post("/servers/{$server->id}/users", ['username' => 'app', 'public_key' => "ssh-ed25519 AAAA' ; rm -rf /"])
+    $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => 'app', 'public_key' => "ssh-ed25519 AAAA' ; rm -rf /"])
         ->assertSessionHasErrors('public_key');
-    $this->post("/servers/{$server->id}/users", ['username' => 'app'])->assertRedirect();
+    $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => 'app'])->assertRedirect();
 
     expect($server->users()->pluck('username')->all())->toBe(['app']);
     Queue::assertPushed(CreateServerUserJob::class, fn (CreateServerUserJob $job) => $job->server->is($server) && $job->username === 'app' && $job->publicKey === null);
@@ -30,7 +30,7 @@ it('creates an isolated user with a validated key', function () {
 it('rejects reserved and unsafe usernames', function (string $username) {
     $server = Server::factory()->ready()->create();
 
-    $this->post("/servers/{$server->id}/users", ['username' => $username])->assertSessionHasErrors('username');
+    $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => $username])->assertSessionHasErrors('username');
 
     expect($server->users()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -39,7 +39,7 @@ it('rejects reserved and unsafe usernames', function (string $username) {
 it('refuses to create a user on a server that is not ready', function () {
     $server = Server::factory()->create();
 
-    $this->post("/servers/{$server->id}/users", ['username' => 'app'])->assertSessionHasErrors('server');
+    $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => 'app'])->assertSessionHasErrors('server');
 
     Queue::assertNothingPushed();
 });
@@ -48,7 +48,7 @@ it('deletes a user of the server', function () {
     $server = Server::factory()->ready()->create();
     $user = $server->users()->create(['username' => 'app']);
 
-    $this->delete("/servers/{$server->id}/users/{$user->id}")->assertRedirect();
+    $this->delete(projectUrl("/servers/{$server->id}/users/{$user->id}"))->assertRedirect();
 
     expect($server->users()->count())->toBe(0);
     Queue::assertPushed(DeleteServerUserJob::class, fn (DeleteServerUserJob $job) => $job->server->is($server) && $job->username === 'app');
@@ -58,7 +58,7 @@ it('returns not found for a user of another server', function () {
     $server = Server::factory()->ready()->create();
     $user = Server::factory()->ready()->create()->users()->create(['username' => 'app']);
 
-    $this->delete("/servers/{$server->id}/users/{$user->id}")->assertNotFound();
+    $this->delete(projectUrl("/servers/{$server->id}/users/{$user->id}"))->assertNotFound();
 
     expect($user->fresh())->not->toBeNull();
     Queue::assertNothingPushed();

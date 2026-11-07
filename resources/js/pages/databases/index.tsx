@@ -156,7 +156,10 @@ export default function DatabasesIndex({
 
                                                             router.visit(
                                                                 DatabaseController.show(
-                                                                    database.id,
+                                                                    {
+                                                                        database:
+                                                                            database.id,
+                                                                    },
                                                                 ),
                                                             );
                                                         }}
@@ -164,7 +167,10 @@ export default function DatabasesIndex({
                                                         <TableCell className="py-4 pl-4">
                                                             <Link
                                                                 href={DatabaseController.show(
-                                                                    database.id,
+                                                                    {
+                                                                        database:
+                                                                            database.id,
+                                                                    },
                                                                 )}
                                                                 className="flex items-center gap-3"
                                                             >
@@ -283,7 +289,10 @@ export default function DatabasesIndex({
                                                             >
                                                                 <Link
                                                                     href={DatabaseController.show(
-                                                                        database.id,
+                                                                        {
+                                                                            database:
+                                                                                database.id,
+                                                                        },
                                                                         {
                                                                             query: {
                                                                                 tab: 'settings',
@@ -319,6 +328,6 @@ export default function DatabasesIndex({
     );
 }
 
-DatabasesIndex.layout = {
+DatabasesIndex.layout = () => ({
     breadcrumbs: [{ title: 'Databases', href: DatabaseController.index() }],
-};
+});

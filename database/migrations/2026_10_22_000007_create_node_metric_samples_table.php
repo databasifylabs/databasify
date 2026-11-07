@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('node_metric_samples', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_node_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_node_id');
             $table->timestamp('sampled_at');
             $table->decimal('cpu_percent', 5, 1)->nullable();
             $table->decimal('load_1m', 8, 2)->nullable();

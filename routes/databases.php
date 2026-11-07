@@ -15,7 +15,7 @@ use App\Http\Controllers\Databases\SchemaController;
 use App\Http\Controllers\Databases\TrustedSourceController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::project()->group(function () {
     Route::resource('databases', DatabaseController::class)->except(['edit', 'update']);
     Route::post('databases/{database}/failover', [DatabaseOperationController::class, 'failover'])->name('databases.failover');
     Route::post('databases/{database}/refresh', [DatabaseOperationController::class, 'refresh'])->name('databases.refresh');

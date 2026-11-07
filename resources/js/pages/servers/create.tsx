@@ -308,9 +308,9 @@ export default function CreateServer({
     );
 }
 
-CreateServer.layout = {
+CreateServer.layout = () => ({
     breadcrumbs: [
         { title: 'Servers', href: ServerController.index() },
         { title: 'Add server', href: ServerController.create() },
     ],
-};
+});

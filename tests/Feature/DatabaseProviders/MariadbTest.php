@@ -149,11 +149,11 @@ it('reads a read-only replica from show slave status, which mariadb 11.4 has wit
 it('keeps its version line and reserves the internal accounts', function () {
     $database = idleDatabase('mariadb', 1, DatabaseMode::Single, versionLine: '11.4');
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.version_line', '11.4')
         ->where('database.data.supports_users', true));
-    $this->post("/databases/{$database->id}/users", ['name' => 'sst'])->assertSessionHasErrors('name');
-    $this->post("/databases/{$database->id}/schemas", ['name' => 'databasify'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'sst'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'databasify'])->assertSessionHasErrors('name');
 });
 
 it('needs row binlogs on the source to keep a mariadb migration in sync', function () {

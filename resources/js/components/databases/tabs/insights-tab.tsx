@@ -309,7 +309,10 @@ function historyUrl(
               { database: database.id, node: node.id },
               options,
           )
-        : DatabaseInsightsController.history.url(database.id, options);
+        : DatabaseInsightsController.history.url(
+              { database: database.id },
+              options,
+          );
 }
 
 export default function InsightsTab({

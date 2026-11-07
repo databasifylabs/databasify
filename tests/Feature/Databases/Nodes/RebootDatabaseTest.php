@@ -38,7 +38,7 @@ it('reboots standbys one by one, moves the primary away and reboots it last', fu
         ->respond("boot-0\n")->respond('rebooting in 2 seconds')->respond("boot-0b\n")->respond()->respond()
         ->respond("role:slave\nmaster_link_status:up\nmaster_sync_in_progress:0\n")->respond("role:master\n")->respond("role:slave\nmaster_link_status:up\nmaster_sync_in_progress:0\n");
 
-    $this->post("/databases/{$database->id}/reboot")->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertRedirect()->assertSessionHasNoErrors();
 
     expect(rebootsIn($ssh))->toBe([$first->server->name, $second->server->name, $primary->server->name])
         ->and($ssh->runs[18]['server'])->toBe($primary->server->name)
@@ -58,7 +58,7 @@ it('reboots a single node database in place', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $ssh = fakeSsh()->respond("role:master\n")->respond("boot-0\n")->respond()->respond("boot-0b\n")->respond()->respond()->respond("role:master\n");
 
-    $this->post("/databases/{$database->id}/reboot")->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasNoErrors();
 
     expect(rebootsIn($ssh))->toBe([$database->seed()->server->name])
         ->and(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'SENTINEL')))->toBeEmpty()
@@ -71,7 +71,7 @@ it('reboots nothing while a clustered database is degraded', function () {
 
     $this->withoutExceptionHandling();
 
-    expect(fn () => $this->post("/databases/{$database->id}/reboot"))->toThrow(RuntimeException::class, 'main is degraded, bring every node back')
+    expect(fn () => $this->post(projectUrl("/databases/{$database->id}/reboot")))->toThrow(RuntimeException::class, 'main is degraded, bring every node back')
         ->and(rebootsIn($ssh))->toBe([])
         ->and($database->fresh()->operation)->toBeNull();
 });
@@ -85,7 +85,7 @@ it('stops when a server does not come back after its reboot', function () {
 
     $this->withoutExceptionHandling();
 
-    expect(fn () => $this->post("/databases/{$database->id}/reboot"))->toThrow(RuntimeException::class, 'did not come back within 15 minutes')
+    expect(fn () => $this->post(projectUrl("/databases/{$database->id}/reboot")))->toThrow(RuntimeException::class, 'did not come back within 15 minutes')
         ->and($database->fresh()->operation)->toBeNull();
 });
 
@@ -93,7 +93,7 @@ it('waits for the engine container to start after the reboot before checking rea
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $ssh = fakeSsh()->respond("role:master\n")->respond("boot-0\n")->respond()->respond("boot-0b\n")->respond('', 69)->respond('', 69)->respond()->respond()->respond("role:master\n");
 
-    $this->post("/databases/{$database->id}/reboot")->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasNoErrors();
 
     expect($database->fresh()->operation)->toBeNull()
         ->and($ssh->scriptAt(7))->toContain('wait_for');
@@ -109,7 +109,7 @@ it('stops when the engine container does not start after the reboot', function (
 
     $this->withoutExceptionHandling();
 
-    expect(fn () => $this->post("/databases/{$database->id}/reboot"))->toThrow(RuntimeException::class, 'within 60 seconds of the reboot')
+    expect(fn () => $this->post(projectUrl("/databases/{$database->id}/reboot")))->toThrow(RuntimeException::class, 'within 60 seconds of the reboot')
         ->and($database->fresh()->operation)->toBeNull();
 });
 
@@ -118,12 +118,12 @@ it('refuses to reboot while another operation runs or a server is not ready', fu
     Queue::fake([RebootDatabaseJob::class]);
     $database->startOperation('Upgrade');
 
-    $this->post("/databases/{$database->id}/reboot")->assertSessionHasErrors('database');
+    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasErrors('database');
 
     $database->finishOperation();
     $database->nodes()->with('server')->get()[1]->server->update(['status' => ServerStatus::Provisioning]);
 
-    $this->post("/databases/{$database->id}/reboot")->assertSessionHasErrors('database');
+    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasErrors('database');
 
     Queue::assertNothingPushed();
 });

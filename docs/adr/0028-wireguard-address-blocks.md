@@ -10,7 +10,7 @@ ADR 0010 gave every Databasify WireGuard network a fixed `/24` from `100.64.0.0/
 ## Decision
 
 - The user picks the block size when a Databasify network is created: `/24` (default), `/23`, `/22`, `/20` or `/16` (`Network::BLOCK_PREFIXES`). The block is stored in the network's `cidr`.
-- `AllocateNetworkBlock` walks the aligned blocks of that size in `100.64.0.0/10` (`Network::WIREGUARD_POOL`) and takes the first one that overlaps no existing network and no subnet seen on a member server's interfaces. With no free block it fails validation on `network`.
+- `AllocateNetworkBlock` walks the aligned blocks of that size in `100.64.0.0/10` (`Network::WIREGUARD_POOL`) and takes the first one that overlaps no existing network in any project (the pool is queried with `withoutProject()`, [0031](0031-projects-as-a-global-scope.md)) and no subnet seen on a member server's interfaces. With no free block it fails validation on `network`.
 - The facts script records every IPv4 interface subnet except loopback in `servers.interface_subnets`, canonicalised to the network address.
 - `WireguardAddressAllocator` hands out the lowest free host from the first usable to the last usable address of any block, never the network or broadcast address. The `servers(network_id, private_ip)` unique index and the one retry in `AssignServerAddress` stay.
 - The pool stays CGNAT only. RFC1918 ranges (`10.0.0.0/8`, `192.168.0.0/16`) are not offered.

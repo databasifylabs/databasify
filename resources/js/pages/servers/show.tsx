@@ -196,7 +196,9 @@ function NetworkCard({
             <CardContent>
                 {editing ? (
                     <Form
-                        {...ServerNetworkController.update.form(server.id)}
+                        {...ServerNetworkController.update.form({
+                            server: server.id,
+                        })}
                         options={{ preserveScroll: true }}
                         onSuccess={() => {
                             toast.success('Private network saved');
@@ -417,7 +419,7 @@ function AddUserDialog({ server }: { server: Server }) {
             </DialogTrigger>
             <DialogContent>
                 <Form
-                    {...ServerUserController.store.form(server.id)}
+                    {...ServerUserController.store.form({ server: server.id })}
                     options={{ preserveScroll: true }}
                     onSuccess={() => {
                         toast.success('Creating user');
@@ -658,7 +660,7 @@ ShowServer.layout = (props: Props) => ({
         { title: 'Servers', href: ServerController.index() },
         {
             title: props.server.data.name,
-            href: ServerController.show(props.server.data.id),
+            href: ServerController.show({ server: props.server.data.id }),
         },
     ],
 });

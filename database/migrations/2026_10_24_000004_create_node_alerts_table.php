@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('node_alerts', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_node_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('database_node_id');
             $table->string('metric', 32);
             $table->timestamp('opened_at');
             $table->timestamp('resolved_at')->nullable();

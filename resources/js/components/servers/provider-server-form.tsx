@@ -149,7 +149,9 @@ export default function ProviderServerForm({
         offeredSystems[0];
 
     const regions = useCatalog<Region>(
-        provider ? ProviderCatalogController.regions.url(provider.id) : null,
+        provider
+            ? ProviderCatalogController.regions.url({ provider: provider.id })
+            : null,
     );
     const plans = useCatalog<Plan>(
         provider && region

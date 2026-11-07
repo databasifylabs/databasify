@@ -144,9 +144,9 @@ export default function CreateProvider({ types }: { types: ProviderType[] }) {
     );
 }
 
-CreateProvider.layout = {
+CreateProvider.layout = () => ({
     breadcrumbs: [
         { title: 'Providers', href: ServerProviderController.index() },
         { title: 'Add provider', href: ServerProviderController.create() },
     ],
-};
+});

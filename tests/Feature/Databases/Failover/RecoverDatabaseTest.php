@@ -154,7 +154,7 @@ it('recovers from the database page', function () {
         ->respond('', 1)->respond("SECONDARY ONLINE\n")->respond()
         ->respond('', 1)->respond("PRIMARY ONLINE\n");
 
-    $this->post("/databases/{$database->id}/recover", ['others_down' => true])->assertRedirect();
+    $this->post(projectUrl("/databases/{$database->id}/recover"), ['others_down' => true])->assertRedirect();
 
     expect($ssh->scriptAt(5))->toContain('force_quorum_using_partition_of')
         ->and($survivor->fresh()->role)->toBe(NodeRole::Primary)

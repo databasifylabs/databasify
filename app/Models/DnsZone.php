@@ -11,7 +11,9 @@ use Carbon\CarbonImmutable;
 use Database\Factories\DnsZoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -47,7 +49,7 @@ class DnsZone extends Model
      */
     public function provider(): BelongsTo
     {
-        return $this->belongsTo(DnsProvider::class, 'dns_provider_id');
+        return $this->belongsTo(DnsProvider::class, 'dns_provider_id')->withoutProject();
     }
 
     /**
@@ -55,7 +57,7 @@ class DnsZone extends Model
      */
     public function databases(): HasMany
     {
-        return $this->hasMany(Database::class);
+        return $this->hasMany(Database::class)->withoutProject();
     }
 
     public function databaseDomain(): string
@@ -100,6 +102,15 @@ class DnsZone extends Model
     public function storeCertificate(AcmeCertificate $certificate): void
     {
         $this->update(['certificate' => $certificate->chain, 'certificate_key' => $certificate->key]);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function inCurrentProject(Builder $query): void
+    {
+        $query->whereIn('dns_provider_id', DnsProvider::query()->select('id'));
     }
 
     protected function casts(): array

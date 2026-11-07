@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Concerns;
 
+use App\Support\Projects\ProjectContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -15,7 +16,7 @@ trait ProviderRequestRules
      */
     protected function nameRules(string $table, ?Model $except = null): array
     {
-        return ['required', 'string', 'max:60', Rule::unique($table, 'name')->ignore($except?->getKey())];
+        return ['required', 'string', 'max:60', Rule::unique($table, 'name')->where('project_id', ProjectContext::current()->id())->ignore($except?->getKey())];
     }
 
     /**

@@ -7,7 +7,7 @@ use Inertia\Testing\AssertableInertia;
 
 it('links signed-in users to the Horizon dashboard', function () {
     $this->actingAs(User::factory()->create())
-        ->get('/dashboard')
+        ->get(projectUrl('/dashboard'))
         ->assertInertia(fn (AssertableInertia $page) => $page->where('horizonUrl', route('horizon.index')));
 });
 

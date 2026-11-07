@@ -12,6 +12,6 @@ it('sends each log with its group to the database page', function () {
     $id = (string) Str::uuid7();
     $database->nodes()->first()->server->serverLogs()->create(['name' => 'a', 'database_id' => $database->id, 'group_id' => $id, 'group_name' => 'updating membership on 1 node']);
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('logs.data.0.group', ['id' => $id, 'name' => 'updating membership on 1 node']));
 });

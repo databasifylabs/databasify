@@ -707,9 +707,9 @@ export default function CreateDatabase({
     );
 }
 
-CreateDatabase.layout = {
+CreateDatabase.layout = () => ({
     breadcrumbs: [
         { title: 'Databases', href: DatabaseController.index() },
         { title: 'Create', href: DatabaseController.create() },
     ],
-};
+});

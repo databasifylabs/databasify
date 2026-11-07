@@ -15,6 +15,7 @@ class ServerProviderFactory extends Factory
     public function definition(): array
     {
         return [
+            'project_id' => fn (): string => ProjectFactory::defaultProject()->id,
             'name' => fake()->unique()->slug(2),
             'type' => 'digitalocean',
             'credentials' => ['token' => 'test-token'],

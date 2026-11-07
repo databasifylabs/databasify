@@ -61,7 +61,7 @@ it('removes a node from its page and returns to the database', function () {
     $reader = withReadOnlyNode($database, ['name' => 'main-ro-1']);
     Queue::fake([RemoveDatabaseNodeJob::class]);
 
-    $this->delete("/databases/{$database->id}/nodes/{$reader->id}", ['force' => true])->assertRedirect("/databases/{$database->id}");
+    $this->delete(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['force' => true])->assertRedirect(projectUrl("/databases/{$database->id}"));
 
     expect($database->fresh()->operation)->toBe('Remove main-ro-1');
     Queue::assertPushed(RemoveDatabaseNodeJob::class, fn (RemoveDatabaseNodeJob $job): bool => $job->node->is($reader) && $job->force);
@@ -74,7 +74,7 @@ it('shows why the primary cannot be removed', function () {
     $primary = $database->seed();
     Queue::fake([RemoveDatabaseNodeJob::class]);
 
-    $this->delete("/databases/{$database->id}/nodes/{$primary->id}")->assertSessionHasErrors(['node' => "{$primary->server->name} is the primary, fail over first."]);
+    $this->delete(projectUrl("/databases/{$database->id}/nodes/{$primary->id}"))->assertSessionHasErrors(['node' => "{$primary->server->name} is the primary, fail over first."]);
 
     Queue::assertNothingPushed();
 });
@@ -86,7 +86,7 @@ it('only removes nodes of the database in the address', function () {
     $foreign = withReadOnlyNode($other);
     Queue::fake([RemoveDatabaseNodeJob::class]);
 
-    $this->delete("/databases/{$database->id}/nodes/{$foreign->id}")->assertNotFound();
+    $this->delete(projectUrl("/databases/{$database->id}/nodes/{$foreign->id}"))->assertNotFound();
 
     Queue::assertNothingPushed();
 });

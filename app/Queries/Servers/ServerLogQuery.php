@@ -57,6 +57,6 @@ final class ServerLogQuery extends Query
      */
     private function owned(): Builder
     {
-        return $this->owner === null ? ServerLog::query() : $this->owner->serverLogs()->getQuery();
+        return $this->owner === null ? ServerLog::query()->inCurrentProject() : $this->owner->serverLogs()->getQuery();
     }
 }

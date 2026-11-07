@@ -16,6 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     Queue::fake([ProvisionServerJob::class, JoinWireguardNetworkJob::class, LaunchProviderServerJob::class]);
+    inProject();
     $this->actingAs(User::factory()->create());
 });
 
@@ -24,7 +25,7 @@ $server = ['name' => 'db-1', 'public_ip' => '203.0.113.10', 'ssh_port' => 22, 's
 it('carves a databasify network of the chosen block size', function (?int $block, string $cidr) use ($server) {
     Network::factory()->wireguard()->create();
 
-    $this->post('/servers', [...$server, 'network' => 'wireguard', 'network_block' => $block])->assertSessionHasNoErrors();
+    $this->post(projectUrl('/servers'), [...$server, 'network' => 'wireguard', 'network_block' => $block])->assertSessionHasNoErrors();
 
     expect(Server::query()->sole())
         ->network->cidr->toBe($cidr)
@@ -38,7 +39,7 @@ it('carves a databasify network of the chosen block size', function (?int $block
 ]);
 
 it('refuses a block size outside the offered ones', function (int $block) use ($server) {
-    $this->post('/servers', [...$server, 'network' => 'wireguard', 'network_block' => $block])->assertSessionHasErrors('network_block');
+    $this->post(projectUrl('/servers'), [...$server, 'network' => 'wireguard', 'network_block' => $block])->assertSessionHasErrors('network_block');
 
     expect(Network::query()->count())->toBe(0);
 })->with([8, 21, 25, 30]);
@@ -46,7 +47,7 @@ it('refuses a block size outside the offered ones', function (int $block) use ($
 it('orders a provider server on a databasify network of the chosen block size', function () {
     $provider = ServerProvider::factory()->create();
 
-    $this->post('/providers/servers', ['server_provider_id' => $provider->id, 'name' => 'db-05', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'databasify:new', 'network_block' => 20])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-05', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'databasify:new', 'network_block' => 20])
         ->assertSessionHasNoErrors();
 
     expect(Server::query()->sole())->private_ip->toBe('100.64.0.1')->network->cidr->toBe('100.64.0.0/20');
@@ -62,7 +63,7 @@ it('skips blocks that overlap any existing network', function () {
 it('skips blocks that overlap a subnet on a member server interface', function () {
     $member = Server::factory()->ready()->onNetwork(null)->create(['private_ip' => null, 'interface_subnets' => ['10.0.0.0/24', '100.64.0.0/16']]);
 
-    $this->put("/servers/{$member->id}/network", ['network' => 'wireguard', 'network_block' => 24])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/servers/{$member->id}/network"), ['network' => 'wireguard', 'network_block' => 24])->assertSessionHasNoErrors();
 
     expect($member->fresh())->private_ip->toBe('100.65.0.1')->network->cidr->toBe('100.65.0.0/24');
 });

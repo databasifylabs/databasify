@@ -19,10 +19,15 @@ export default function RecoverDatabaseDialog({
             description="The most up-to-date reachable node becomes primary and the others rejoin it. Use this only when the database has lost quorum."
             confirmLabel="Recover"
             onConfirm={() =>
-                runAction(DatabaseOperationController.recover(database.id), {
-                    data: { others_down: othersDown },
-                    success: 'Recovery started',
-                })
+                runAction(
+                    DatabaseOperationController.recover({
+                        database: database.id,
+                    }),
+                    {
+                        data: { others_down: othersDown },
+                        success: 'Recovery started',
+                    },
+                )
             }
         >
             <div className="rounded-lg border p-3 text-sm">

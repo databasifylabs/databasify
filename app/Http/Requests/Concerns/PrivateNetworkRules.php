@@ -94,7 +94,7 @@ trait PrivateNetworkRules
             return;
         }
 
-        $owner = Server::query()->usingPrivateAddress($networkId, $value)->whereKeyNot($except?->id)->first();
+        $owner = Server::query()->withoutProject()->usingPrivateAddress($networkId, $value)->whereKeyNot($except?->id)->first();
 
         if ($owner !== null) {
             $fail("{$owner->name} already uses {$value} on this network.");

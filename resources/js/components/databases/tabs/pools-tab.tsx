@@ -70,7 +70,7 @@ function AddPoolForm({
 
     const submit = () => {
         setSaving(true);
-        runAction(ConnectionPoolController.store(database.id), {
+        runAction(ConnectionPoolController.store({ database: database.id }), {
             data: {
                 name,
                 schema,

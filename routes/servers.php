@@ -9,7 +9,7 @@ use App\Http\Controllers\Servers\ServerTerminalController;
 use App\Http\Controllers\Servers\ServerUserController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::project()->group(function () {
     Route::resource('servers', ServerController::class)->except(['edit', 'update']);
     Route::post('servers/{server}/operations/{operation}', [ServerOperationController::class, 'store'])->name('servers.operations.store');
     Route::post('servers/{server}/provision', [ServerOperationController::class, 'provision'])->name('servers.provision');

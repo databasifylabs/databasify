@@ -22,6 +22,7 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
+            'last_project_id' => null,
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),

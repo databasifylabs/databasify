@@ -16,9 +16,9 @@ it('creates and deletes databases over http', function () {
     idleDatabase('postgres', 1, DatabaseMode::Single, 'other')->schemas()->create(['name' => 'analytics']);
     $ssh = fakeSsh();
 
-    $this->post("/databases/{$database->id}/schemas", ['name' => 'analytics'])->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'analytics'])->assertRedirect()->assertSessionHasNoErrors();
     $schema = $database->schemas()->where('name', 'analytics')->sole();
-    $this->delete("/databases/{$database->id}/schemas/{$schema->id}")->assertRedirect()->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/schemas/{$schema->id}"))->assertRedirect()->assertSessionHasNoErrors();
 
     expect($ssh->scriptAt(0))->toContain('pg_from')
         ->and($ssh->scriptAt(1))->toContain("echo '".base64_encode("DROP DATABASE IF EXISTS \"analytics\" WITH (FORCE);\n")."' | pg_from")
@@ -29,7 +29,7 @@ it('rejects database names that are invalid, reserved or taken', function (strin
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
     $ssh = fakeSsh();
 
-    $this->post("/databases/{$database->id}/schemas", ['name' => $name])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => $name])->assertSessionHasErrors('name');
 
     expect($ssh->runs)->toBe([])
         ->and($database->schemas()->pluck('name')->all())->toBe(['defaultdb']);
@@ -47,7 +47,7 @@ it('rejects database names that are invalid, reserved or taken', function (strin
 it('refuses databases on sentinel databases over http', function (string $engine) {
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
 
-    $this->post("/databases/{$database->id}/schemas", ['name' => 'analytics'])->assertSessionHasErrors('database');
+    $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'analytics'])->assertSessionHasErrors('database');
 
     expect($database->schemas()->count())->toBe(0);
 })->with(['valkey', 'redis']);
@@ -57,7 +57,7 @@ it('only deletes databases of the database in the url', function () {
     $foreign = idleDatabase('mysql', 1, DatabaseMode::Single, 'other')->schemas()->sole();
     $ssh = fakeSsh();
 
-    $this->delete("/databases/{$database->id}/schemas/{$foreign->id}")->assertNotFound();
+    $this->delete(projectUrl("/databases/{$database->id}/schemas/{$foreign->id}"))->assertNotFound();
 
     expect($ssh->runs)->toBe([])
         ->and($foreign->fresh())->not->toBeNull();
@@ -68,7 +68,7 @@ it('refuses to delete the default database over http', function () {
     $schema = $database->schemas()->sole();
     $ssh = fakeSsh();
 
-    $this->delete("/databases/{$database->id}/schemas/{$schema->id}")->assertSessionHasErrors(['schema' => "defaultdb is the default database and can't be deleted."]);
+    $this->delete(projectUrl("/databases/{$database->id}/schemas/{$schema->id}"))->assertSessionHasErrors(['schema' => "defaultdb is the default database and can't be deleted."]);
 
     expect($ssh->runs)->toBe([])
         ->and($database->schemas()->pluck('name')->all())->toBe(['defaultdb']);

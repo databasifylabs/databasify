@@ -11,6 +11,7 @@ use App\Actions\Databases\Recovery\DeleteArchive;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 final readonly class TearDownDatabase
@@ -37,7 +38,7 @@ final readonly class TearDownDatabase
             $this->deleteBackupsOf($database);
         }
 
-        $database->delete();
+        DB::transaction(fn () => $database->delete());
     }
 
     private function tearDown(Database $database, DatabaseNode $node, bool $eraseData, bool $force): void

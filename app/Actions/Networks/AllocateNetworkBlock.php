@@ -41,7 +41,7 @@ final readonly class AllocateNetworkBlock
      */
     private function networkRanges(): Collection
     {
-        return Network::query()->get(['cidr'])->toBase()->map(fn (Network $network): string => $network->cidr);
+        return Network::query()->withoutProject()->get(['cidr'])->toBase()->map(fn (Network $network): string => $network->cidr);
     }
 
     /**

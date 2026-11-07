@@ -6,21 +6,20 @@ namespace App\Actions\Networks;
 
 use App\Exceptions\Providers\ProviderRequestFailed;
 use App\Models\Network;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final readonly class DeleteNetwork
 {
     public function handle(Network $network, bool $destroyAtProvider = false): void
     {
-        if ($network->servers()->exists()) {
-            throw ValidationException::withMessages(['network' => "{$network->name} still has servers on it."]);
-        }
+        $network->ensureDeletable();
 
         if ($destroyAtProvider) {
             $this->destroyAtProvider($network);
         }
 
-        $network->delete();
+        DB::transaction(fn () => $network->delete());
     }
 
     private function destroyAtProvider(Network $network): void

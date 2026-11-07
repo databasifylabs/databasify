@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Projects\Movable;
 use App\DnsProviders\Contracts\DnsDriver;
 use App\DnsProviders\Drivers\AbstractDnsDriver;
 use App\Exceptions\Providers\UnknownProvider;
+use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\DescribesProviderType;
+use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
+use App\Observers\DnsProviderObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\DnsProviderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -24,6 +29,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string $type
  * @property array<string, string> $credentials
@@ -31,15 +37,16 @@ use Illuminate\Validation\ValidationException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'type', 'credentials'])]
+#[Fillable(['project_id', 'name', 'type', 'credentials'])]
 #[Hidden(['credentials'])]
 #[UseFactory(DnsProviderFactory::class)]
-class DnsProvider extends Model
+#[ObservedBy(DnsProviderObserver::class)]
+class DnsProvider extends Model implements Movable
 {
-    use DescribesProviderType, OrdersByName;
-
     /** @use HasFactory<DnsProviderFactory> */
-    use HasFactory, HasUuids;
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects;
+
+    use DescribesProviderType, OrdersByName;
 
     /**
      * @return HasMany<DnsZone, $this>
@@ -54,7 +61,7 @@ class DnsProvider extends Model
      */
     public function databases(): HasManyThrough
     {
-        return $this->hasManyThrough(Database::class, DnsZone::class);
+        return $this->hasManyThrough(Database::class, DnsZone::class)->withoutProject();
     }
 
     /**

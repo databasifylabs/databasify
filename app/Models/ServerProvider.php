@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Projects\Movable;
 use App\Exceptions\Providers\UnknownProvider;
+use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\DescribesProviderType;
+use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
 use App\ServerProviders\Contracts\ServerDriver;
 use App\ServerProviders\Drivers\AbstractServerDriver;
@@ -22,6 +25,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string $type
  * @property array<string, string> $credentials
@@ -30,22 +34,22 @@ use Illuminate\Validation\ValidationException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'type', 'credentials'])]
+#[Fillable(['project_id', 'name', 'type', 'credentials'])]
 #[Hidden(['credentials'])]
 #[UseFactory(ServerProviderFactory::class)]
-class ServerProvider extends Model
+class ServerProvider extends Model implements Movable
 {
-    use DescribesProviderType, OrdersByName;
-
     /** @use HasFactory<ServerProviderFactory> */
-    use HasFactory, HasUuids;
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects;
+
+    use DescribesProviderType, OrdersByName;
 
     /**
      * @return HasMany<Server, $this>
      */
     public function servers(): HasMany
     {
-        return $this->hasMany(Server::class);
+        return $this->hasMany(Server::class)->withoutProject();
     }
 
     /**
@@ -53,7 +57,7 @@ class ServerProvider extends Model
      */
     public function networks(): HasMany
     {
-        return $this->hasMany(Network::class);
+        return $this->hasMany(Network::class)->withoutProject();
     }
 
     /**
@@ -90,11 +94,16 @@ class ServerProvider extends Model
 
     public function ensureDeletable(): void
     {
-        $servers = $this->servers()->count();
+        $dependents = collect([
+            'server' => $this->servers()->count(),
+            'network' => $this->networks()->count(),
+        ])->filter()->map(fn (int $count, string $noun): string => "{$count} ".str($noun)->plural($count));
 
-        if ($servers > 0) {
-            throw ValidationException::withMessages(['provider' => "{$this->name} still has {$servers} ".str('server')->plural($servers).' in Databasify. Delete them first.']);
+        if ($dependents->isEmpty()) {
+            return;
         }
+
+        throw ValidationException::withMessages(['provider' => "{$this->name} still has {$dependents->join(' and ')} in Databasify. Delete them first."]);
     }
 
     protected function casts(): array

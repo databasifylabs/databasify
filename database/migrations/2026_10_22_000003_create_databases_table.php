@@ -12,6 +12,8 @@ return new class extends Migration
     {
         Schema::create('databases', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->foreignUuid('project_id')->index();
+            $table->foreignUuid('dns_zone_id')->nullable()->index();
             $table->string('name')->unique();
             $table->string('engine');
             $table->string('version_line', 20);
@@ -27,7 +29,6 @@ return new class extends Migration
             $table->unsignedTinyInteger('maintenance_day')->default(0);
             $table->unsignedTinyInteger('maintenance_hour')->default(3);
             $table->text('settings');
-            $table->foreignUuid('dns_zone_id')->nullable()->constrained()->restrictOnDelete();
             $table->string('operation')->nullable();
             $table->timestamp('operation_started_at')->nullable();
             $table->timestamps();
@@ -35,8 +36,8 @@ return new class extends Migration
 
         Schema::create('database_nodes', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('database_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('server_id')->constrained()->restrictOnDelete();
+            $table->foreignUuid('database_id');
+            $table->foreignUuid('server_id')->index();
             $table->string('name', 43)->nullable()->unique();
             $table->unsignedSmallInteger('position');
             $table->string('kind')->default('member');

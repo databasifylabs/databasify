@@ -33,6 +33,7 @@ function osRelease(string $system): string
 it('stores the server and queues provisioning', function () {
     Queue::fake();
 
+    inProject();
     $server = resolve(AddServer::class)->handle(new NewServer('db-1', '203.0.113.10', 22, 'root', 'secret', true));
 
     expect($server->status)->toBe(ServerStatus::Pending)
@@ -238,6 +239,7 @@ it('marks the server failed and installs nothing when reading facts fails', func
 it('provisions the server when the queued job runs', function () {
     $ssh = fakeSsh()->respond('{"os":"Debian 12","id":"debian","version_id":"12","cpus":4,"memory_mb":8000,"disk_gb":80}'."\n");
 
+    inProject();
     $server = resolve(AddServer::class)->handle(new NewServer('db-1', '203.0.113.10', 22, 'root', null, false));
 
     expect($server->fresh())

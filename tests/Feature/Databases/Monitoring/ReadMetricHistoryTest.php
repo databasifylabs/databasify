@@ -23,12 +23,12 @@ it('serves bucketed history per node', function () {
     }
     NodeMetricSample::query()->create(['database_node_id' => $node->id, 'sampled_at' => now()->subDays(2), 'cpu_percent' => 99]);
 
-    $response = $this->getJson("/databases/{$database->id}/metrics/history?period=6h")->assertOk();
+    $response = $this->getJson(projectUrl("/databases/{$database->id}/metrics/history?period=6h"))->assertOk();
 
     expect($response->json('bucket_seconds'))->toBe(300)
         ->and($response->json('nodes.0.name'))->toBe($node->server->name)
         ->and(collect($response->json('points'))->pluck("values.{$node->id}.cpu_percent")->all())->toBe([10, 70]);
-    $this->getJson("/databases/{$database->id}/metrics/history?period=2y")->assertUnprocessable();
+    $this->getJson(projectUrl("/databases/{$database->id}/metrics/history?period=2y"))->assertUnprocessable();
 });
 
 it('averages each minute of the last hour per node and leaves read-only nodes out', function () {
@@ -43,7 +43,7 @@ it('averages each minute of the last hour per node and leaves read-only nodes ou
     NodeMetricSample::query()->create(['database_node_id' => $reader->id, 'sampled_at' => $minute, 'cpu_percent' => 99]);
     NodeMetricSample::query()->create(['database_node_id' => $first->id, 'sampled_at' => now()->subHours(2), 'cpu_percent' => 99]);
 
-    $response = $this->getJson("/databases/{$database->id}/metrics/history")->assertOk();
+    $response = $this->getJson(projectUrl("/databases/{$database->id}/metrics/history"))->assertOk();
 
     expect($response->json('period'))->toBe('1h')
         ->and($response->json('bucket_seconds'))->toBe(60)
@@ -62,12 +62,12 @@ it('serves the history of a single node including read-only nodes', function () 
     NodeMetricSample::query()->create(['database_node_id' => $database->seed()->id, 'sampled_at' => now()->subMinutes(3), 'cpu_percent' => 20]);
     NodeMetricSample::query()->create(['database_node_id' => $reader->id, 'sampled_at' => now()->subHours(20), 'disk_percent' => 70]);
 
-    $response = $this->getJson("/databases/{$database->id}/nodes/{$reader->id}/metrics/history?period=24h")->assertOk();
+    $response = $this->getJson(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/metrics/history?period=24h"))->assertOk();
 
     expect($response->json('bucket_seconds'))->toBe(900)
         ->and($response->json('nodes'))->toBe([['id' => $reader->id, 'name' => 'reports']])
         ->and(collect($response->json('points'))->pluck("values.{$reader->id}.disk_percent")->all())->toBe([70]);
-    $this->getJson("/databases/{$database->id}/nodes/{$reader->id}/metrics/history?period=1y")->assertUnprocessable()->assertJsonValidationErrors('period');
+    $this->getJson(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/metrics/history?period=1y"))->assertUnprocessable()->assertJsonValidationErrors('period');
 });
 
 it('hides the history of a node from another database', function () {
@@ -75,7 +75,7 @@ it('hides the history of a node from another database', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $other = idleDatabase('valkey', 1, DatabaseMode::Single, 'other');
 
-    $this->getJson("/databases/{$database->id}/nodes/{$other->seed()->id}/metrics/history")->assertNotFound();
+    $this->getJson(projectUrl("/databases/{$database->id}/nodes/{$other->seed()->id}/metrics/history"))->assertNotFound();
 });
 
 function weekOfMinuteSamples(Database $database): void
@@ -114,7 +114,7 @@ it('returns the same buckets as before', function () {
     $database = idleDatabase('mysql', 7);
     weekOfMinuteSamples($database);
 
-    $response = $this->getJson("/databases/{$database->id}/metrics/history?period=7d")->assertOk();
+    $response = $this->getJson(projectUrl("/databases/{$database->id}/metrics/history?period=7d"))->assertOk();
 
     $actual = metricHistoryFixture($response->content(), $database);
     $expected = json_decode((string) file_get_contents(base_path('tests/Fixtures/metric-history-week.json')), true, flags: JSON_THROW_ON_ERROR);
@@ -139,7 +139,7 @@ it('reads the history in one query', function () {
     $database->nodes()->get()->each(fn (DatabaseNode $node) => NodeMetricSample::query()->create(['database_node_id' => $node->id, 'sampled_at' => now()->subMinutes(5), 'cpu_percent' => 10]));
 
     DB::enableQueryLog();
-    $this->getJson("/databases/{$database->id}/metrics/history")->assertOk();
+    $this->getJson(projectUrl("/databases/{$database->id}/metrics/history"))->assertOk();
 
     $sampleQueries = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'node_metric_samples'));
     expect($sampleQueries)->toHaveCount(1)

@@ -13,12 +13,12 @@ it('validates trusted sources over http', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([ApplyTrustedSourcesJob::class]);
 
-    $this->post("/databases/{$database->id}/trusted-sources", ['cidr' => '10.0.0.0/33'])->assertSessionHasErrors('cidr');
-    $this->post("/databases/{$database->id}/trusted-sources", ['cidr' => '198.51.100.0/24'])->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/trusted-sources"), ['cidr' => '10.0.0.0/33'])->assertSessionHasErrors('cidr');
+    $this->post(projectUrl("/databases/{$database->id}/trusted-sources"), ['cidr' => '198.51.100.0/24'])->assertSessionHasNoErrors();
 
     $source = $database->trustedSources()->sole();
     $database->fresh()->finishOperation();
-    $this->delete("/databases/{$database->id}/trusted-sources/{$source->id}")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/trusted-sources/{$source->id}"))->assertSessionHasNoErrors();
 
     expect($database->trustedSources()->count())->toBe(0);
     Queue::assertPushed(ApplyTrustedSourcesJob::class, 2);
@@ -29,7 +29,7 @@ it('stores a bare address as a single host and applies it on the nodes straight 
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $ssh = fakeSsh();
 
-    $this->post("/databases/{$database->id}/trusted-sources", ['cidr' => ' 203.0.113.7 ', 'label' => 'office'])->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/trusted-sources"), ['cidr' => ' 203.0.113.7 ', 'label' => 'office'])->assertRedirect()->assertSessionHasNoErrors();
 
     expect($database->trustedSources()->sole())
         ->cidr->toBe('203.0.113.7/32')
@@ -46,7 +46,7 @@ it('rejects trusted sources that are not ipv4 ranges', function (array $input, s
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([ApplyTrustedSourcesJob::class]);
 
-    $this->post("/databases/{$database->id}/trusted-sources", ['cidr' => '203.0.113.0/24', ...$input])->assertSessionHasErrors($field);
+    $this->post(projectUrl("/databases/{$database->id}/trusted-sources"), ['cidr' => '203.0.113.0/24', ...$input])->assertSessionHasErrors($field);
 
     expect($database->trustedSources()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -66,7 +66,7 @@ it('only removes trusted sources of the database in the url', function () {
     $foreign = idleDatabase('mysql', 1, DatabaseMode::Single, 'other')->trustedSources()->create(['cidr' => '203.0.113.0/24']);
     Queue::fake([ApplyTrustedSourcesJob::class]);
 
-    $this->delete("/databases/{$database->id}/trusted-sources/{$foreign->id}")->assertNotFound();
+    $this->delete(projectUrl("/databases/{$database->id}/trusted-sources/{$foreign->id}"))->assertNotFound();
 
     expect($foreign->fresh())->not->toBeNull();
     Queue::assertNothingPushed();

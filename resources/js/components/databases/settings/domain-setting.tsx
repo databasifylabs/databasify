@@ -57,7 +57,9 @@ function ZoneForm({
 
     return (
         <Form
-            {...DatabaseSettingsController.domain.form(database.id)}
+            {...DatabaseSettingsController.domain.form({
+                database: database.id,
+            })}
             options={{ preserveScroll: true }}
             onSuccess={() => {
                 toast.success('Updating the domain');

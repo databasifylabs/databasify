@@ -12,11 +12,12 @@ return new class extends Migration
     {
         Schema::create('networks', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->foreignUuid('project_id')->index();
+            $table->foreignUuid('server_provider_id')->nullable();
             $table->string('name');
             $table->string('cidr', 43);
             $table->string('kind', 16)->default('custom');
             $table->unsignedSmallInteger('listen_port')->nullable();
-            $table->foreignUuid('server_provider_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('external_id')->nullable();
             $table->string('region')->nullable();
             $table->timestamps();

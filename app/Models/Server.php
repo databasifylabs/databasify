@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Projects\Movable;
 use App\DTOs\Databases\NodeResources;
 use App\DTOs\Networks\WireguardPeer;
 use App\DTOs\Providers\ProviderServer;
@@ -11,12 +12,16 @@ use App\Enums\Servers\NetworkMemberStatus;
 use App\Enums\Servers\OperatingSystem;
 use App\Enums\Servers\ServerLogStatus;
 use App\Enums\Servers\ServerStatus;
+use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
+use App\Observers\ServerObserver;
 use App\Services\Ssh\Ssh;
 use Carbon\CarbonImmutable;
 use Database\Factories\ServerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,6 +37,7 @@ use LogicException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string|null $public_ip
  * @property string|null $private_ip
@@ -60,13 +66,14 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'public_ip', 'private_ip', 'network_id', 'server_provider_id', 'provider_server_id', 'region', 'plan', 'image', 'wireguard_public_key', 'network_status', 'network_issue', 'network_checked_at', 'ssh_port', 'ssh_user', 'ssh_password', 'host_key_fingerprint', 'status', 'os', 'cpus', 'memory_mb', 'disk_gb', 'interface_subnets'])]
+#[Fillable(['project_id', 'name', 'public_ip', 'private_ip', 'network_id', 'server_provider_id', 'provider_server_id', 'region', 'plan', 'image', 'wireguard_public_key', 'network_status', 'network_issue', 'network_checked_at', 'ssh_port', 'ssh_user', 'ssh_password', 'host_key_fingerprint', 'status', 'os', 'cpus', 'memory_mb', 'disk_gb', 'interface_subnets'])]
 #[Hidden(['ssh_password'])]
 #[UseFactory(ServerFactory::class)]
-class Server extends Model
+#[ObservedBy(ServerObserver::class)]
+class Server extends Model implements Movable
 {
     /** @use HasFactory<ServerFactory> */
-    use HasFactory, HasUuids, OrdersByName;
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects, OrdersByName;
 
     /**
      * @return HasMany<DatabaseNode, $this>
@@ -81,7 +88,7 @@ class Server extends Model
      */
     public function network(): BelongsTo
     {
-        return $this->belongsTo(Network::class);
+        return $this->belongsTo(Network::class)->withoutProject();
     }
 
     /**
@@ -89,7 +96,7 @@ class Server extends Model
      */
     public function serverProvider(): BelongsTo
     {
-        return $this->belongsTo(ServerProvider::class);
+        return $this->belongsTo(ServerProvider::class)->withoutProject();
     }
 
     public function address(): string
@@ -207,6 +214,24 @@ class Server extends Model
     public function inDatabaseError(string $key): ValidationException
     {
         return ValidationException::withMessages([$key => "{$this->name} is part of a database, remove it from the database first."]);
+    }
+
+    public function ensureMovable(): void
+    {
+        $node = $this->databaseNodes()->with('database')->first();
+
+        if ($node === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['id' => "Move database {$node->database->name} instead; its servers move with it."]);
+    }
+
+    public function ensureDeletable(): void
+    {
+        if ($this->isInDatabase()) {
+            throw $this->inDatabaseError('server');
+        }
     }
 
     public function joinWireguard(string $publicKey): void

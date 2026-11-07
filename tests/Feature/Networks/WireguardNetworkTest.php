@@ -30,6 +30,8 @@ use Illuminate\Validation\ValidationException;
 
 const WIREGUARD_HOST_FACTS = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":1,"memory_mb":1024,"disk_gb":25}'."\n";
 
+beforeEach(fn () => inProject());
+
 function grabAddressesAfterLookupOn(Network $network, int $times): void
 {
     DB::listen(function (QueryExecuted $query) use ($network, &$times): void {
@@ -104,9 +106,9 @@ it('adds a server on a new databasify network without asking for an address', fu
     Queue::fake([ProvisionServerJob::class]);
     $this->actingAs(User::factory()->create());
 
-    $this->post('/servers', ['name' => 'db-1', 'public_ip' => '203.0.113.10', 'ssh_port' => 22, 'ssh_user' => 'root', 'network' => 'wireguard', 'private_ip' => '10.9.9.9'])
+    $this->post(projectUrl('/servers'), ['name' => 'db-1', 'public_ip' => '203.0.113.10', 'ssh_port' => 22, 'ssh_user' => 'root', 'network' => 'wireguard', 'private_ip' => '10.9.9.9'])
         ->assertSessionHasNoErrors();
-    $this->post('/servers', ['name' => 'db-2', 'public_ip' => '203.0.113.11', 'ssh_port' => 22, 'ssh_user' => 'root', 'network' => (string) Network::query()->sole()->id])
+    $this->post(projectUrl('/servers'), ['name' => 'db-2', 'public_ip' => '203.0.113.11', 'ssh_port' => 22, 'ssh_user' => 'root', 'network' => (string) Network::query()->sole()->id])
         ->assertSessionHasNoErrors();
 
     expect(Server::query()->where('name', 'db-1')->sole())->private_ip->toBe('100.64.0.1')->network->kind->toBe(NetworkKind::Wireguard)
@@ -172,7 +174,7 @@ it('leaves the old databasify network and joins the new one when moved', functio
     $old = Network::factory()->wireguard()->create();
     $server = Server::factory()->ready()->onNetwork($old)->create(['private_ip' => '100.64.0.1', 'wireguard_public_key' => 'KEY-A']);
 
-    $this->put("/servers/{$server->id}/network", ['network' => 'wireguard'])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/servers/{$server->id}/network"), ['network' => 'wireguard'])->assertSessionHasNoErrors();
 
     expect($server->fresh())->network->cidr->toBe('100.64.1.0/24')->private_ip->toBe('100.64.1.1');
     Queue::assertPushed(LeaveWireguardNetworkJob::class, fn (LeaveWireguardNetworkJob $job): bool => $job->network->is($old));
