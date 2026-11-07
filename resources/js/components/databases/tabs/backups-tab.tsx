@@ -146,7 +146,7 @@ function EnableForm({
 
     const enable = () => {
         setSaving(true);
-        runAction(DatabaseRecoveryController.store(database.id), {
+        runAction(DatabaseRecoveryController.store({ database: database.id }), {
             data: {
                 storage_provider_id: storage,
                 retention_days: Number(retention),
@@ -223,15 +223,18 @@ function ScheduleDialog({
 
     const save = () => {
         setSaving(true);
-        runAction(DatabaseRecoveryController.update(database.id), {
-            data: {
-                retention_days: Number(retention),
-                backup_hour: Number(hour),
+        runAction(
+            DatabaseRecoveryController.update({ database: database.id }),
+            {
+                data: {
+                    retention_days: Number(retention),
+                    backup_hour: Number(hour),
+                },
+                success: 'Saving the schedule',
+                onSuccess: () => setOpen(false),
+                onFinish: () => setSaving(false),
             },
-            success: 'Saving the schedule',
-            onSuccess: () => setOpen(false),
-            onFinish: () => setSaving(false),
-        });
+        );
     };
 
     return (
@@ -320,10 +323,15 @@ function TurnOffDialog({
             confirmLabel="Turn off"
             destructive
             onConfirm={() =>
-                runAction(DatabaseRecoveryController.destroy(database.id), {
-                    data: { delete_backups: deleteBackups },
-                    success: 'Turning off point-in-time recovery',
-                })
+                runAction(
+                    DatabaseRecoveryController.destroy({
+                        database: database.id,
+                    }),
+                    {
+                        data: { delete_backups: deleteBackups },
+                        success: 'Turning off point-in-time recovery',
+                    },
+                )
             }
         >
             <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
@@ -380,7 +388,9 @@ function ArchiveStatus({
                         size="sm"
                         onClick={() =>
                             runAction(
-                                DatabaseRecoveryController.check(database.id),
+                                DatabaseRecoveryController.check({
+                                    database: database.id,
+                                }),
                                 { success: 'Checking the archive' },
                             )
                         }
@@ -393,7 +403,9 @@ function ArchiveStatus({
                         disabled={busy}
                         onClick={() =>
                             runAction(
-                                DatabaseRecoveryController.backup(database.id),
+                                DatabaseRecoveryController.backup({
+                                    database: database.id,
+                                }),
                                 { success: 'Starting a base backup' },
                             )
                         }
@@ -476,15 +488,18 @@ function RestoreForm({
 
     const restore = () => {
         setBusy(true);
-        runAction(DatabaseRecoveryController.restore(database.id), {
-            data: {
-                name,
-                server_id: server,
-                target: new Date(target).toISOString(),
+        runAction(
+            DatabaseRecoveryController.restore({ database: database.id }),
+            {
+                data: {
+                    name,
+                    server_id: server,
+                    target: new Date(target).toISOString(),
+                },
+                success: `Restoring into ${name}`,
+                onFinish: () => setBusy(false),
             },
-            success: `Restoring into ${name}`,
-            onFinish: () => setBusy(false),
-        });
+        );
     };
 
     return (

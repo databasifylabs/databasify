@@ -32,8 +32,8 @@ function fakeCloudflareAccount(array $zones, string $status = 'active'): void
 it('adds a cloudflare account after checking its token and imports its domains', function () {
     fakeCloudflareAccount(['example.com', 'example.org']);
 
-    $this->post('/dns', ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => ' cf-token ']])
-        ->assertRedirect('/dns')
+    $this->post(projectUrl('/dns'), ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => ' cf-token ']])
+        ->assertRedirect(projectUrl('/dns'))
         ->assertSessionHasNoErrors();
 
     $provider = DnsProvider::query()->sole();
@@ -45,7 +45,7 @@ it('adds a cloudflare account after checking its token and imports its domains',
 it('refuses a token cloudflare does not accept and stores nothing', function () {
     Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false, 'errors' => [['message' => 'Invalid API Token']]], 401)]);
 
-    $this->post('/dns', ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'bad']])
+    $this->post(projectUrl('/dns'), ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'bad']])
         ->assertSessionHasErrors(['credentials' => 'Cloudflare answered 401. Invalid API Token']);
 
     expect(DnsProvider::query()->count())->toBe(0);
@@ -54,7 +54,7 @@ it('refuses a token cloudflare does not accept and stores nothing', function () 
 it('refuses an inactive token', function () {
     fakeCloudflareAccount(['example.com'], 'disabled');
 
-    $this->post('/dns', ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'cf-token']])
+    $this->post(projectUrl('/dns'), ['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'cf-token']])
         ->assertSessionHasErrors('credentials');
 
     expect(DnsProvider::query()->count())->toBe(0);
@@ -64,7 +64,7 @@ it('validates the account fields', function (array $input, string $field) {
     Http::fake();
     DnsProvider::factory()->create(['name' => 'taken']);
 
-    $this->post('/dns', [...['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'cf-token']], ...$input])
+    $this->post(projectUrl('/dns'), [...['name' => 'Cloudflare main', 'type' => 'cloudflare', 'credentials' => ['token' => 'cf-token']], ...$input])
         ->assertSessionHasErrors($field);
 
     Http::assertNothingSent();
@@ -82,7 +82,7 @@ it('refreshes the domains, forgetting removed ones unless a database uses them',
     idleDatabase('valkey', 1, DatabaseMode::Single)->update(['dns_zone_id' => $kept->id]);
     fakeCloudflareAccount(['example.com']);
 
-    $this->post("/dns/{$provider->id}/refresh")->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/dns/{$provider->id}/refresh"))->assertRedirect()->assertSessionHasNoErrors();
 
     expect($provider->zones()->orderBy('name')->pluck('name')->all())->toBe(['example.com', 'used.com']);
 });
@@ -92,9 +92,9 @@ it('refuses to remove an account while a database uses one of its domains', func
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
     $database->update(['dns_zone_id' => $zone->id]);
 
-    $this->delete("/dns/{$zone->provider->id}")->assertSessionHasErrors(['provider' => "cache uses a domain from {$zone->provider->name}, pick another domain for it first."]);
+    $this->delete(projectUrl("/dns/{$zone->provider->id}"))->assertSessionHasErrors(['provider' => "cache uses a domain from {$zone->provider->name}, pick another domain for it first."]);
     $database->update(['dns_zone_id' => null]);
-    $this->delete("/dns/{$zone->provider->id}")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/dns/{$zone->provider->id}"))->assertSessionHasNoErrors();
 
     expect(DnsProvider::query()->count())->toBe(0)
         ->and(DnsZone::query()->count())->toBe(0);
@@ -103,19 +103,19 @@ it('refuses to remove an account while a database uses one of its domains', func
 it('lists the accounts with their domains and never sends the token', function () {
     $zone = DnsZone::factory()->create(['name' => 'example.com']);
 
-    $this->get('/dns')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/dns'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->component('dns/index')
         ->where('providers.0.name', $zone->provider->name)
         ->where('providers.0.zones.0.name', 'example.com')
         ->where('providers.0.zones.0.databases_count', 0)
         ->missing('providers.0.credentials'));
-    expect($this->get('/dns')->getContent())->not->toContain('cf-token');
+    expect($this->get(projectUrl('/dns'))->getContent())->not->toContain('cf-token');
 });
 
 it('still lists an account whose provider plugin was removed', function () {
     DnsZone::factory()->for(DnsProvider::factory()->create(['type' => 'example-dns']), 'provider')->create(['name' => 'example.com']);
 
-    $this->get('/dns')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/dns'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('providers.0.type.label', 'example-dns (not installed)')
         ->where('providers.0.type.icon', null)
         ->where('providers.0.zones.0.name', 'example.com'));
@@ -125,7 +125,7 @@ it('renames a dns account without asking cloudflare and keeps its token', functi
     $provider = DnsProvider::factory()->create(['name' => 'Cloudflare']);
     Http::fake();
 
-    $this->put("/dns/{$provider->id}", ['name' => 'Cloudflare main', 'credentials' => ['token' => '']])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/dns/{$provider->id}"), ['name' => 'Cloudflare main', 'credentials' => ['token' => '']])->assertSessionHasNoErrors();
 
     expect($provider->fresh())->name->toBe('Cloudflare main')->credentials->toBe(['token' => 'cf-token']);
     Http::assertNothingSent();
@@ -141,11 +141,11 @@ it('refuses a new token that cannot see a domain a database uses, then imports t
         'api.cloudflare.com/client/v4/zones?*' => Http::sequence()->push($zones('example.org'))->push($zones('example.com', 'example.net'))->push($zones('example.com', 'example.net')),
     ]);
 
-    $this->put("/dns/{$provider->id}", ['name' => 'Cloudflare', 'credentials' => ['token' => 'narrow']])
+    $this->put(projectUrl("/dns/{$provider->id}"), ['name' => 'Cloudflare', 'credentials' => ['token' => 'narrow']])
         ->assertSessionHasErrors(['credentials' => 'The new credentials cannot see example.com, which databases use. Give them access to those domains first.']);
     expect($provider->fresh()?->credentials)->toBe(['token' => 'cf-token']);
 
-    $this->put("/dns/{$provider->id}", ['name' => 'Cloudflare', 'credentials' => ['token' => 'wide']])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/dns/{$provider->id}"), ['name' => 'Cloudflare', 'credentials' => ['token' => 'wide']])->assertSessionHasNoErrors();
     expect($provider->fresh()?->credentials)->toBe(['token' => 'wide'])
         ->and($provider->zones()->orderBy('name')->pluck('name')->all())->toBe(['example.com', 'example.net']);
 });

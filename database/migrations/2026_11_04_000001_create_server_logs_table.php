@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('server_logs', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('server_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('database_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUuid('server_id');
+            $table->foreignUuid('database_id')->nullable();
             $table->string('name');
             $table->string('status')->default('running');
             $table->longText('output')->nullable();

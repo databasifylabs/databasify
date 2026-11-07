@@ -25,9 +25,9 @@ final readonly class DashboardSummaryQuery
             databases: Database::query()->count(),
             onlineDatabases: Database::query()->ready()->count(),
             servers: ServerSummaryQuery::current()->get(),
-            nodes: DatabaseNode::query()->count(),
-            readOnlyNodes: DatabaseNode::query()->readOnly()->count(),
-            runningLogs: ServerLog::query()->running()->count(),
+            nodes: DatabaseNode::query()->inCurrentProject()->count(),
+            readOnlyNodes: DatabaseNode::query()->inCurrentProject()->readOnly()->count(),
+            runningLogs: ServerLog::query()->inCurrentProject()->running()->count(),
         );
     }
 }

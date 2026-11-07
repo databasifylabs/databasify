@@ -26,7 +26,7 @@ beforeEach(function () {
 it('lists servers', function () {
     Server::factory()->ready()->create(['name' => 'db-1']);
 
-    $this->get('/servers')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/servers'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('servers/index')
         ->where('servers.data.0.name', 'db-1'));
 });
@@ -34,7 +34,7 @@ it('lists servers', function () {
 it('shows the distribution each server runs', function (array $attributes, ?string $distribution) {
     Server::factory()->ready()->create($attributes);
 
-    $this->get('/servers')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/servers'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('servers.data.0.distribution', $distribution));
 })->with([
     'ordered image' => [['image' => OperatingSystem::Rocky9, 'os' => null], 'rocky'],
@@ -47,31 +47,31 @@ it('shows the distribution each server runs', function (array $attributes, ?stri
 it('shows which database each server belongs to', function () {
     $node = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache')->seed();
 
-    $this->get('/servers')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/servers'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('servers.data.0.database', ['id' => $node->database_id, 'name' => 'cache', 'engine' => 'valkey', 'engine_icon' => asset('assets/icons/database-providers/valkey.svg'), 'kind' => 'member', 'node_id' => $node->id]));
 });
 
 it('shows the app public key when adding a server', function () {
-    $this->get('/servers/create')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/servers/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('servers/create')
         ->where('publicKey', fn (string $key) => str_starts_with($key, 'ssh-ed25519 ')));
 });
 
 it('adds a server and queues provisioning', function () {
-    $this->post('/servers', [
+    $this->post(projectUrl('/servers'), [
         'name' => 'db-1',
         'public_ip' => '203.0.113.10',
         'ssh_port' => 22,
         'ssh_user' => 'root',
         'ssh_password' => 'secret',
         'disable_password_login' => true,
-    ])->assertRedirect('/servers/'.Server::query()->sole()->id);
+    ])->assertRedirect(projectUrl('/servers/').Server::query()->sole()->id);
 
     Queue::assertPushed(ProvisionServerJob::class);
 });
 
 it('rejects names and users that are unsafe in shell scripts', function () {
-    $this->post('/servers', [
+    $this->post(projectUrl('/servers'), [
         'name' => 'db;rm',
         'public_ip' => 'not-an-ip',
         'ssh_port' => 22,
@@ -82,7 +82,7 @@ it('rejects names and users that are unsafe in shell scripts', function () {
 it('rejects a server name or address that is already taken', function () {
     Server::factory()->create(['name' => 'db-1', 'public_ip' => '203.0.113.10']);
 
-    $this->post('/servers', ['name' => 'db-1', 'public_ip' => '203.0.113.10', 'ssh_port' => 70000, 'ssh_user' => 'root'])
+    $this->post(projectUrl('/servers'), ['name' => 'db-1', 'public_ip' => '203.0.113.10', 'ssh_port' => 70000, 'ssh_user' => 'root'])
         ->assertSessionHasErrors(['name', 'public_ip', 'ssh_port']);
 
     expect(Server::query()->count())->toBe(1);
@@ -95,7 +95,7 @@ it('shows a server with its users and recent logs', function () {
     $server->users()->create(['username' => 'app']);
     ServerLog::factory()->for($server)->create(['name' => 'Reboot', 'output' => 'rebooting', 'exit_code' => 0]);
 
-    $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('servers/show')
         ->where('server.data.name', 'db-1')
         ->where('server.data.database', null)
@@ -117,18 +117,18 @@ it('shows the output of the chosen log of the server only', function () {
     ServerLog::factory()->for($server)->create(['name' => 'Newer', 'output' => 'newer output']);
     $elsewhere = ServerLog::factory()->create(['output' => 'other server']);
 
-    $this->get("/servers/{$server->id}?log={$older->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}?log={$older->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('log.name', 'Older')
         ->where('log.output', 'older output'));
 
-    $this->get("/servers/{$server->id}?log={$elsewhere->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}?log={$elsewhere->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('log', null));
 });
 
 it('shows no log output before anything ran', function () {
     $server = Server::factory()->ready()->create();
 
-    $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('logs.data', 0)
         ->where('log', null)
         ->where('latestLogId', null));
@@ -140,7 +140,7 @@ it('points to the newest log of the server on every page of its logs', function 
     $newest = ServerLog::factory()->for($server)->create();
     ServerLog::factory()->create(['created_at' => now()->addMinute()]);
 
-    $firstPage = $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $firstPage = $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('latestLogId', $newest->id));
 
     $this->get($firstPage->inertiaProps('logs.links.next'))->assertInertia(fn (AssertableInertia $page) => $page
@@ -149,13 +149,13 @@ it('points to the newest log of the server on every page of its logs', function 
 });
 
 it('returns not found for a server that does not exist', function () {
-    $this->get('/servers/999')->assertNotFound();
+    $this->get(projectUrl('/servers/999'))->assertNotFound();
 });
 
 it('deletes a server', function () {
     $server = Server::factory()->ready()->create();
 
-    $this->delete("/servers/{$server->id}")->assertRedirect('/servers');
+    $this->delete(projectUrl("/servers/{$server->id}"))->assertRedirect(projectUrl('/servers'));
 
     expect(Server::query()->count())->toBe(0);
 });
@@ -163,7 +163,7 @@ it('deletes a server', function () {
 it('refuses to delete a server that belongs to a database', function () {
     $server = idleDatabase('valkey', 1, DatabaseMode::Single)->seed()->server;
 
-    $this->delete("/servers/{$server->id}")->assertSessionHasErrors('server');
+    $this->delete(projectUrl("/servers/{$server->id}"))->assertSessionHasErrors('server');
 
     expect($server->fresh())->not->toBeNull();
 });
@@ -176,7 +176,7 @@ it('lists logs newest first', function () {
     ServerLog::factory()->for($server)->create(['name' => 'Updating packages', 'created_at' => $at('10:02')]);
     ServerLog::factory()->create(['name' => 'Another server', 'created_at' => $at('10:06')]);
 
-    $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('logs.data', fn ($logs) => collect($logs)->pluck('name')->all() === ['Reboot', 'Updating packages', 'Read server facts']));
 });
 
@@ -184,7 +184,7 @@ it('pages the server list and summarises every server', function () {
     Server::factory()->ready()->count(26)->create();
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $first = $this->get('/servers');
+    $first = $this->get(projectUrl('/servers'));
 
     $first->assertInertia(fn (AssertableInertia $page) => $page
         ->has('servers.data', 25)
@@ -201,7 +201,7 @@ it('searches servers by name or address and filters them by status', function (s
     Server::factory()->ready()->create(['name' => 'web-01', 'public_ip' => '198.51.100.7']);
     Server::factory()->create(['name' => 'db-fra-01', 'public_ip' => '203.0.113.40', 'status' => ServerStatus::Failed]);
 
-    $this->get("/servers?{$query}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers?{$query}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('servers.data', fn ($servers) => collect($servers)->pluck('name')->sort()->values()->all() === $names)
         ->where('summary.total', 3));
 })->with([
@@ -215,7 +215,7 @@ it('searches servers by name or address and filters them by status', function (s
 it('echoes the active filters and keeps them on the next page link', function () {
     Server::factory()->ready()->count(26)->create();
 
-    $response = $this->get('/servers?status=ready&search=');
+    $response = $this->get(projectUrl('/servers?status=ready&search='));
 
     $response->assertInertia(fn (AssertableInertia $page) => $page
         ->where('filters', ['search' => '', 'status' => 'ready'])

@@ -22,6 +22,6 @@ class UpdateDatabaseDomainRequest extends FormRequest
 
     public function zone(): ?DnsZone
     {
-        return $this->filled('dns_zone_id') ? DnsZone::query()->findOrFail($this->string('dns_zone_id')->value()) : null;
+        return $this->filled('dns_zone_id') ? DnsZone::query()->inCurrentProject()->findOrFail($this->string('dns_zone_id')->value()) : null;
     }
 }

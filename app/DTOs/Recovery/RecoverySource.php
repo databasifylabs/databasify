@@ -48,7 +48,7 @@ final readonly class RecoverySource
 
     public function location(): ArchiveLocation
     {
-        return new ArchiveLocation(StorageProvider::query()->findOrFail($this->storageProviderId)->bucket(), $this->path);
+        return new ArchiveLocation(StorageProvider::query()->withoutProject()->findOrFail($this->storageProviderId)->bucket(), $this->path);
     }
 
     public function targetForTools(): string

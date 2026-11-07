@@ -12,7 +12,7 @@ it('loads only server and database names for the log list', function () {
     ServerLog::factory()->for($database->seed()->server)->for($database)->create();
 
     DB::enableQueryLog();
-    $this->get('/dashboard')->assertOk();
+    $this->get(projectUrl('/dashboard'))->assertOk();
     $queries = collect(DB::getQueryLog())->pluck('query');
 
     expect($queries->contains(fn (string $sql): bool => str_starts_with($sql, 'select "id", "name" from "servers"')))->toBeTrue()

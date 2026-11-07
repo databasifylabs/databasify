@@ -421,7 +421,7 @@ function SourceForm({ database, busy }: { database: Database; busy: boolean }) {
         setChecking(true);
         setErrors({});
         postJson<SourceReport>(
-            DatabaseMigrationController.check.url(database.id),
+            DatabaseMigrationController.check.url({ database: database.id }),
             payloadOf(source, form),
         )
             .then((result) => {
@@ -440,11 +440,14 @@ function SourceForm({ database, busy }: { database: Database; busy: boolean }) {
 
     const start = () => {
         setStarting(true);
-        runAction(DatabaseMigrationController.store(database.id), {
-            data: { ...payloadOf(source, form), mode },
-            success: 'Migration started',
-            onFinish: () => setStarting(false),
-        });
+        runAction(
+            DatabaseMigrationController.store({ database: database.id }),
+            {
+                data: { ...payloadOf(source, form), mode },
+                success: 'Migration started',
+                onFinish: () => setStarting(false),
+            },
+        );
     };
 
     const ready = report?.reachable === true && report.problems.length === 0;

@@ -172,11 +172,11 @@ it('installs the offered update over http', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class]);
 
-    $this->post("/databases/{$database->id}/upgrade")->assertSessionHasErrors('version');
+    $this->post(projectUrl("/databases/{$database->id}/upgrade"))->assertSessionHasErrors('version');
     Queue::assertNothingPushed();
 
     offer($database, '9.1.2');
-    $this->post("/databases/{$database->id}/upgrade")->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/upgrade"))->assertRedirect()->assertSessionHasNoErrors();
 
     Queue::assertPushed(UpgradeDatabaseJob::class, fn (UpgradeDatabaseJob $job): bool => $job->database->is($database) && $job->installUpdate);
 });

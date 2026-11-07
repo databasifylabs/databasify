@@ -12,11 +12,12 @@ return new class extends Migration
     {
         Schema::create('servers', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->foreignUuid('project_id')->index();
+            $table->foreignUuid('network_id')->nullable();
+            $table->foreignUuid('server_provider_id')->nullable()->index();
             $table->string('name')->unique();
             $table->string('public_ip')->nullable()->unique();
             $table->string('private_ip')->nullable();
-            $table->foreignUuid('network_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignUuid('server_provider_id')->nullable()->constrained()->restrictOnDelete();
             $table->string('provider_server_id')->nullable();
             $table->string('region')->nullable();
             $table->string('plan')->nullable();
@@ -41,7 +42,7 @@ return new class extends Migration
 
         Schema::create('server_users', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('server_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('server_id');
             $table->string('username');
             $table->timestamps();
             $table->unique(['server_id', 'username']);

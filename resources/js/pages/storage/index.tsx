@@ -5,6 +5,7 @@ import StorageProviderController from '@/actions/App/Http/Controllers/Storage/St
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
+import MoveToProjectButton from '@/components/projects/move-to-project-button';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ function Provider({ provider }: { provider: StorageProvider }) {
 
     const test = () => {
         setTesting(true);
-        runAction(StorageProviderController.test(provider.id), {
+        runAction(StorageProviderController.test({ provider: provider.id }), {
             success: `${provider.name} can write, read and delete in ${provider.bucket}`,
             onFinish: () => setTesting(false),
         });
@@ -57,11 +58,21 @@ function Provider({ provider }: { provider: StorageProvider }) {
                     </Button>
                     <Button variant="ghost" size="sm" asChild>
                         <Link
-                            href={StorageProviderController.edit(provider.id)}
+                            href={StorageProviderController.edit({
+                                provider: provider.id,
+                            })}
                         >
                             <Pencil /> Edit
                         </Link>
                     </Button>
+                    <MoveToProjectButton
+                        resource={{
+                            type: 'storage-provider',
+                            id: provider.id,
+                            name: provider.name,
+                        }}
+                        description="Databases that archive here keep archiving here."
+                    />
                     <ConfirmDialog
                         trigger={
                             <DeleteButton
@@ -78,7 +89,9 @@ function Provider({ provider }: { provider: StorageProvider }) {
                         destructive
                         onConfirm={() =>
                             runAction(
-                                StorageProviderController.destroy(provider.id),
+                                StorageProviderController.destroy({
+                                    provider: provider.id,
+                                }),
                                 { success: `Removed ${provider.name}` },
                             )
                         }
@@ -157,8 +170,8 @@ export default function StorageIndex({
     );
 }
 
-StorageIndex.layout = {
+StorageIndex.layout = () => ({
     breadcrumbs: [
         { title: 'Storage', href: StorageProviderController.index() },
     ],
-};
+});

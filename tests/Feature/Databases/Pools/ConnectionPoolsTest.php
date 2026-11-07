@@ -17,8 +17,8 @@ it('adds connection pools for known databases and applies them on every node', f
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
-    $this->post("/databases/{$database->id}/pools", ['name' => 'app_pool', 'schema' => 'missing', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('schema');
-    $this->post("/databases/{$database->id}/pools", ['name' => 'app_pool', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'missing', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('schema');
+    $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasNoErrors();
     $pool = $database->connectionPools()->sole();
     $ssh = fakeSsh();
 
@@ -28,7 +28,7 @@ it('adds connection pools for known databases and applies them on every node', f
         ->and($ssh->scriptAt(0))->toContain(base64_encode(renderedFile($database, 'pgbouncer.ini')))->toContain('databasify ctl reload databasify-pgbouncer');
     Queue::assertPushed(ApplyConnectionPoolsJob::class);
 
-    $this->delete("/databases/{$database->id}/pools/{$pool->id}")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/pools/{$pool->id}"))->assertSessionHasNoErrors();
     expect($database->connectionPools()->count())->toBe(0);
 });
 
@@ -36,7 +36,7 @@ it('applies a new pool on the nodes straight away when the queue runs it', funct
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $ssh = fakeSsh();
 
-    $this->post("/databases/{$database->id}/pools", ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'session', 'size' => 5])->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'session', 'size' => 5])->assertRedirect()->assertSessionHasNoErrors();
 
     expect(fileWrittenIn($ssh->scriptAt(0), '/srv/postgres/conf/pgbouncer.ini'))->toContain("reports = host=127.0.0.1 port=25060 dbname=defaultdb pool_size=5 pool_mode=session\n")
         ->and($database->fresh()->operation)->toBeNull()
@@ -51,7 +51,7 @@ it('rejects pools with invalid input', function (array $input, string $field) {
     idleDatabase('postgres', 1, DatabaseMode::Single, 'other')->schemas()->create(['name' => 'foreign']);
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
-    $this->post("/databases/{$database->id}/pools", [...['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20], ...$input])->assertSessionHasErrors($field);
+    $this->post(projectUrl("/databases/{$database->id}/pools"), [...['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20], ...$input])->assertSessionHasErrors($field);
 
     expect($database->connectionPools()->pluck('name')->all())->toBe(['taken']);
     Queue::assertNothingPushed();
@@ -74,7 +74,7 @@ it('refuses pools on engines without pgbouncer over http', function (string $eng
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
-    $this->post("/databases/{$database->id}/pools", ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('name');
 
     expect($database->connectionPools()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -85,7 +85,7 @@ it('only deletes pools of the database in the url', function () {
     $foreign = idleDatabase('postgres', 1, DatabaseMode::Single, 'other')->connectionPools()->create(['name' => 'reports', 'schema' => 'defaultdb', 'mode' => PoolMode::Transaction, 'size' => 10]);
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
-    $this->delete("/databases/{$database->id}/pools/{$foreign->id}")->assertNotFound();
+    $this->delete(projectUrl("/databases/{$database->id}/pools/{$foreign->id}"))->assertNotFound();
 
     expect($foreign->fresh())->not->toBeNull();
     Queue::assertNothingPushed();

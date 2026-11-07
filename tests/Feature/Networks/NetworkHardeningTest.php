@@ -19,6 +19,8 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
+beforeEach(fn () => inProject());
+
 function meshOf(int $members): Network
 {
     $network = Network::factory()->wireguard()->create();
@@ -151,10 +153,10 @@ it('shows member health on the server and providers pages', function () {
     $server->recordNetworkHealth(NetworkMemberStatus::Degraded, 'no handshake with node-2 for 6 min');
     Server::query()->orderByDesc('id')->first()->recordNetworkHealth(NetworkMemberStatus::Connected);
 
-    $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('server.data.network_status', 'degraded')
         ->where('server.data.network_issue', 'no handshake with node-2 for 6 min'));
-    $this->get('/providers')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/providers'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('networks.0.id', $network->id)
         ->where('networks.0.servers_count', 2)
         ->where('networks.0.connected_servers_count', 1));

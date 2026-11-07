@@ -6,6 +6,7 @@ import EditAccountDialog from '@/components/providers/edit-account-dialog';
 import DeleteButton from '@/components/delete-button';
 import BrandIcon from '@/components/brand-icon';
 import EmptyState from '@/components/empty-state';
+import MoveToProjectButton from '@/components/projects/move-to-project-button';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,9 @@ function Account({ account }: { account: DnsAccount }) {
                         size="sm"
                         onClick={() =>
                             runAction(
-                                DnsProviderController.refresh(account.id),
+                                DnsProviderController.refresh({
+                                    provider: account.id,
+                                }),
                                 {
                                     success: `Refreshed ${account.name}`,
                                 },
@@ -47,9 +50,19 @@ function Account({ account }: { account: DnsAccount }) {
                     >
                         <RefreshCw /> Refresh domains
                     </Button>
+                    <MoveToProjectButton
+                        resource={{
+                            type: 'dns-provider',
+                            id: account.id,
+                            name: account.name,
+                        }}
+                        description="Its domains move with it. Databases that use them keep their hostnames."
+                    />
                     <EditAccountDialog
                         name={account.name}
-                        form={DnsProviderController.update.form(account.id)}
+                        form={DnsProviderController.update.form({
+                            provider: account.id,
+                        })}
                         secrets={account.type.form
                             .filter((field) => field.type !== 'select')
                             .map((field) => ({
@@ -75,7 +88,9 @@ function Account({ account }: { account: DnsAccount }) {
                         destructive
                         onConfirm={() =>
                             runAction(
-                                DnsProviderController.destroy(account.id),
+                                DnsProviderController.destroy({
+                                    provider: account.id,
+                                }),
                                 {
                                     success: `Removed ${account.name}`,
                                 },
@@ -156,6 +171,6 @@ export default function DnsIndex({ providers }: { providers: DnsAccount[] }) {
     );
 }
 
-DnsIndex.layout = {
+DnsIndex.layout = () => ({
     breadcrumbs: [{ title: 'DNS', href: DnsProviderController.index() }],
-};
+});

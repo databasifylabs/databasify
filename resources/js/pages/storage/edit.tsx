@@ -11,7 +11,9 @@ export default function EditStorageProvider({ provider }: Props) {
     return (
         <StorageProviderForm
             title={`Edit ${provider.name}`}
-            form={StorageProviderController.update.form(provider.id)}
+            form={StorageProviderController.update.form({
+                provider: provider.id,
+            })}
             provider={provider}
             action="Test and save"
             icon={Save}
@@ -24,7 +26,9 @@ EditStorageProvider.layout = (props: Props) => ({
         { title: 'Storage', href: StorageProviderController.index() },
         {
             title: props.provider.name,
-            href: StorageProviderController.edit(props.provider.id),
+            href: StorageProviderController.edit({
+                provider: props.provider.id,
+            }),
         },
     ],
 });

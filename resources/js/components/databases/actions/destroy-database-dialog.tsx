@@ -30,14 +30,17 @@ export default function DestroyDatabaseDialog({
             destructive
             typeToConfirm={database.name}
             onConfirm={() =>
-                runAction(DatabaseController.destroy(database.id), {
-                    data: {
-                        erase_data: erase,
-                        force,
-                        delete_backups: erase && deleteBackups,
+                runAction(
+                    DatabaseController.destroy({ database: database.id }),
+                    {
+                        data: {
+                            erase_data: erase,
+                            force,
+                            delete_backups: erase && deleteBackups,
+                        },
+                        success: `Destroying ${database.name}`,
                     },
-                    success: `Destroying ${database.name}`,
-                })
+                )
             }
         >
             <div className="space-y-3 rounded-lg border p-3 text-sm">

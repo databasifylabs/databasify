@@ -39,7 +39,7 @@ it('shows the forgot password page', function () {
 it('sends an unverified administrator to the verify email page', function () {
     $this->actingAs(User::factory()->unverified()->create());
 
-    $this->get('/dashboard')->assertRedirect(route('verification.notice'));
+    $this->get(projectUrl('/dashboard'))->assertRedirect(route('verification.notice'));
     $this->get(route('verification.notice'))->assertInertia(fn (AssertableInertia $page) => $page->component('auth/verify-email'));
 });
 

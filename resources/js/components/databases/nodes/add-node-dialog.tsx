@@ -73,7 +73,7 @@ export default function AddNodeDialog({
         }
 
         setBusy(true);
-        runAction(DatabaseNodeController.store(database.id), {
+        runAction(DatabaseNodeController.store({ database: database.id }), {
             data: {
                 server_id: serverId,
                 kind,

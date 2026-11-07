@@ -37,7 +37,7 @@ function archiveStatusUpTo(CarbonInterface $latest): string
 
 function restoreTo(Database $source, CarbonInterface $target): TestResponse
 {
-    return test()->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => $target->toIso8601String()]);
+    return test()->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => $target->toIso8601String()]);
 }
 
 it('re-reads a stale archive window before refusing a target past it', function () {

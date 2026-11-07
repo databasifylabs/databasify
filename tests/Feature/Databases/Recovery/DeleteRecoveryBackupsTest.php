@@ -70,12 +70,12 @@ it('deletes the backups from the bucket after turning point-in-time recovery off
     $path = $database->pointInTimeRecovery?->path;
     Bus::fake();
 
-    $this->delete("/databases/{$database->id}/recovery")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
     Bus::assertChained([UpgradeDatabaseJob::class]);
 
     $database->fresh()->finishOperation();
     $database = withRecovery($database);
-    $this->delete("/databases/{$database->id}/recovery", ['delete_backups' => true])->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/recovery"), ['delete_backups' => true])->assertSessionHasNoErrors();
     Bus::assertChained([
         UpgradeDatabaseJob::class,
         fn (DeleteRecoveryBackupsJob $job): bool => $job->database->is($database) && $job->archive->path === $path && $job->archive->prefix() === "{$path}/",
@@ -108,7 +108,7 @@ it('deletes the backups while deleting the database only when asked', function (
     fakeArchiveBucket([['mysql/orders/a'], []]);
     fakeSsh();
 
-    $this->delete("/databases/{$database->id}", ['erase_data' => true, 'delete_backups' => $deleteBackups])->assertRedirect('/databases');
+    $this->delete(projectUrl("/databases/{$database->id}"), ['erase_data' => true, 'delete_backups' => $deleteBackups])->assertRedirect(projectUrl('/databases'));
 
     expect(Database::query()->exists())->toBeFalse();
     Http::assertSentCount($bucketRequests);
@@ -122,7 +122,7 @@ it('deletes the database even when the bucket refuses to delete its backups', fu
     Http::fake(fn () => Http::response('<Error><Code>AccessDenied</Code><Message>nope</Message></Error>', 403));
     fakeSsh();
 
-    $this->delete("/databases/{$database->id}", ['erase_data' => true, 'delete_backups' => true])->assertRedirect('/databases');
+    $this->delete(projectUrl("/databases/{$database->id}"), ['erase_data' => true, 'delete_backups' => true])->assertRedirect(projectUrl('/databases'));
 
     expect(Database::query()->exists())->toBeFalse();
 });

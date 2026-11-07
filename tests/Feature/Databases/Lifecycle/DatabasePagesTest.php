@@ -24,17 +24,17 @@ beforeEach(function () {
 
 it('shows the laravel settings and adds a server', function () {
     $ids = Server::factory()->ready()->count(1)->create()->pluck('id')->all();
-    $this->post('/databases', ['name' => 'cache', 'engine' => 'valkey', 'primary_server_id' => $ids[0]]);
+    $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'primary_server_id' => $ids[0]]);
     $database = Database::query()->sole();
     $database->finishOperation();
     $extra = Server::factory()->ready()->create();
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/show')
         ->where('appEnv.REDIS_PORT', '25061')
         ->where('availableServers.data.0.id', $extra->id));
 
-    $this->post("/databases/{$database->id}/nodes", ['server_id' => $extra->id])->assertRedirect();
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $extra->id])->assertRedirect();
     Queue::assertPushed(AddDatabaseNodeJob::class);
 });
 
@@ -42,7 +42,7 @@ it('lists every database with its nodes', function () {
     idleDatabase('mysql', 3);
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->get('/databases')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/index')
         ->where('databases.data.0.name', 'cache')
         ->has('databases.data.0.nodes', 1)
@@ -57,7 +57,7 @@ it('shows a database with its connection settings and newest server logs first',
     $newer = ServerLog::factory()->for($server)->create(['database_id' => $database->id, 'name' => 'Newer']);
     ServerLog::factory()->for($server)->create(['name' => 'Server only', 'created_at' => now()->addMinute()]);
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/show')
         ->where('database.data.name', 'main')
         ->where('appEnv.DB_PORT', '25060')
@@ -68,14 +68,14 @@ it('shows a database with its connection settings and newest server logs first',
         ->where('log.name', 'Newer')
         ->where('latestLogId', $newer->id));
 
-    $this->get('/databases/999')->assertNotFound();
+    $this->get(projectUrl('/databases/999'))->assertNotFound();
 });
 
 it('shows the operation a database is busy with in the list', function () {
     newDatabase('valkey', 2);
     $idle = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->get('/databases')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/index')
         ->where('databases.data.0.id', $idle->id)
         ->where('databases.data.0.operation', null)
@@ -85,7 +85,7 @@ it('shows the operation a database is busy with in the list', function () {
 it('marks the node that becomes primary while the database is created', function () {
     $database = newDatabase('valkey', 2);
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.status', 'creating')
         ->where('database.data.nodes.0.is_seed', true)
         ->where('database.data.nodes.1.is_seed', false));
@@ -104,7 +104,7 @@ it('searches databases by name or engine and filters them by engine and status',
     idleDatabase('mysql', 1, DatabaseMode::Single, 'orders')->update(['status' => DatabaseStatus::Ready]);
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache')->update(['status' => DatabaseStatus::Failed]);
 
-    $this->get("/databases?{$query}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases?{$query}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('databases.data', fn ($databases) => collect($databases)->pluck('name')->sort()->values()->all() === $names));
 })->with([
     'by name' => ['search=ord', ['orders']],
@@ -115,7 +115,7 @@ it('searches databases by name or engine and filters them by engine and status',
 ]);
 
 it('offers every engine and status as a database filter', function () {
-    $this->get('/databases?engine=redis')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases?engine=redis'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('filters', ['search' => '', 'status' => null, 'engine' => 'redis'])
         ->has('filterOptions.engines', count(Database::engines()))
         ->where('filterOptions.engines.0', ['value' => 'valkey', 'label' => 'Valkey'])
@@ -126,11 +126,12 @@ it('lists databases without per-node relations', function () {
     $queriesFor = function (): int {
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $this->get('/databases')->assertOk();
+        $this->get(projectUrl('/databases'))->assertOk();
 
         return count(DB::getQueryLog());
     };
 
+    $queriesFor();
     idleDatabase('valkey', 2, DatabaseMode::Single, 'first');
     $withOne = $queriesFor();
     foreach (range(1, 4) as $number) {
@@ -146,9 +147,9 @@ it('keeps the migration history off the list and on the database page', function
         $main->migrations()->create(['mode' => MigrationMode::OneTime, 'status' => MigrationStatus::Completed, 'source' => new MigrationSource("db{$number}.example.com", 3306, 'migrator', 'secret')]);
     }
 
-    $this->get('/databases')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases'))->assertInertia(fn (AssertableInertia $page) => $page
         ->missing('databases.data.0.migrations'));
-    $this->get("/databases/{$main->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$main->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('database.data.migrations', 5)
         ->where('database.data.migrations.0.source', 'db6.example.com:3306')
         ->where('database.data.migrations.4.source', 'db2.example.com:3306'));

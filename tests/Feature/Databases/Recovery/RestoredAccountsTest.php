@@ -30,7 +30,7 @@ function restoredOrders(): Database
     $source->schemas()->create(['name' => 'analytics']);
     $source->schemas()->create(['name' => 'late_db']);
     Queue::fake([BootstrapDatabaseJob::class]);
-    test()->post("/databases/{$source->id}/recovery/restore", ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => now()->subHour()->toIso8601String()]);
+    test()->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => now()->subHour()->toIso8601String()]);
 
     return Database::query()->where('name', 'orders-restored')->sole();
 }

@@ -21,8 +21,11 @@ use App\Models\DatabaseNode;
 use App\Models\DnsZone;
 use App\Models\NodeMetricSample;
 use App\Models\PointInTimeRecovery;
+use App\Models\Project;
 use App\Models\Server;
 use App\Models\StorageProvider;
+use App\Support\Projects\ProjectContext;
+use Database\Factories\ProjectFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +48,40 @@ pest()->extend(TestCase::class)
         config()->set('inertia.ssr.enabled', false);
     })
     ->in('Feature');
+
+function projectUrl(string $path): string
+{
+    return '/'.ProjectFactory::defaultProject()->id.$path;
+}
+
+function inProject(): Project
+{
+    $project = ProjectFactory::defaultProject();
+    resolve(ProjectContext::class)->initialize($project);
+
+    return $project;
+}
+
+/**
+ * @template TResult
+ *
+ * @param  Closure(): TResult  $callback
+ * @return TResult
+ */
+function inProjectDuring(Closure $callback): mixed
+{
+    $context = resolve(ProjectContext::class);
+    $wasInitialized = $context->isInitialized();
+    inProject();
+
+    try {
+        return $callback();
+    } finally {
+        if (! $wasInitialized) {
+            $context->terminate();
+        }
+    }
+}
 
 function fakeSsh(): FakeServerConnection
 {
@@ -132,7 +169,7 @@ function newDatabase(string $engine, int $servers, DatabaseMode $mode = Database
     Queue::fake([BootstrapDatabaseJob::class]);
     $ids = Server::factory()->ready()->count($servers)->create()->pluck('id')->all();
 
-    $database = resolve(CreateDatabase::class)->handle(new NewDatabase($name, $engine, $ids[0], array_slice($ids, 1), versionLine: $versionLine));
+    $database = inProjectDuring(fn (): Database => resolve(CreateDatabase::class)->handle(new NewDatabase($name, $engine, $ids[0], array_slice($ids, 1), versionLine: $versionLine)));
     $database->update(['mode' => $mode]);
 
     return $database;

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Projects\Movable;
 use App\DTOs\Storage\S3Bucket;
+use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
 use App\Services\Storage\S3;
 use Carbon\CarbonImmutable;
@@ -23,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string $endpoint
  * @property string $region
@@ -35,13 +39,13 @@ use Illuminate\Validation\ValidationException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'endpoint', 'region', 'bucket', 'path_prefix', 'path_style', 'credentials', 'verified_at'])]
+#[Fillable(['project_id', 'name', 'endpoint', 'region', 'bucket', 'path_prefix', 'path_style', 'credentials', 'verified_at'])]
 #[Hidden(['credentials'])]
 #[UseFactory(StorageProviderFactory::class)]
-class StorageProvider extends Model
+class StorageProvider extends Model implements Movable
 {
     /** @use HasFactory<StorageProviderFactory> */
-    use HasFactory, HasUuids;
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects;
 
     use OrdersByName;
 
@@ -58,7 +62,7 @@ class StorageProvider extends Model
      */
     public function databases(): HasManyThrough
     {
-        return $this->hasManyThrough(Database::class, PointInTimeRecovery::class, 'storage_provider_id', 'id', 'id', 'database_id');
+        return $this->hasManyThrough(Database::class, PointInTimeRecovery::class, 'storage_provider_id', 'id', 'id', 'database_id')->withoutProject();
     }
 
     public function bucket(): S3Bucket
@@ -88,9 +92,11 @@ class StorageProvider extends Model
     {
         $database = $this->databases()->first();
 
-        if ($database !== null) {
-            throw ValidationException::withMessages(['provider' => "{$database->name} archives to {$this->name}, turn off its point-in-time recovery first."]);
+        if ($database === null) {
+            return;
         }
+
+        throw ValidationException::withMessages(['provider' => "{$database->name} archives to {$this->name}, turn off its point-in-time recovery first."]);
     }
 
     public function ensureLocationKeptFor(S3Bucket $bucket): void

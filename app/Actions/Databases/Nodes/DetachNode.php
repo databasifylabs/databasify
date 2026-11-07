@@ -15,6 +15,7 @@ use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
 use App\Support\Messages\Sentence;
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 final readonly class DetachNode
@@ -135,7 +136,7 @@ final readonly class DetachNode
     private function forget(Database $database, DatabaseNode $node): void
     {
         $this->clearDnsOf($database, $node);
-        $node->delete();
+        DB::transaction(fn () => $node->delete());
         $database->forgetNodeCertificates($node);
     }
 

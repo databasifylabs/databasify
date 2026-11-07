@@ -12,7 +12,8 @@ return new class extends Migration
     {
         Schema::create('storage_providers', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('name')->unique();
+            $table->foreignUuid('project_id');
+            $table->string('name');
             $table->string('endpoint');
             $table->string('region', 40);
             $table->string('bucket', 63);
@@ -21,6 +22,8 @@ return new class extends Migration
             $table->text('credentials');
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
+
+            $table->unique(['project_id', 'name']);
         });
     }
 };

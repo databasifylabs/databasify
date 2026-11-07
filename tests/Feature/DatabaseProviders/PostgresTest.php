@@ -78,12 +78,12 @@ it('writes postgres account statements that grant schema access per database', f
 it('keeps its version line and reserves the internal roles', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single, versionLine: '17');
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.version_line', '17')
         ->where('database.data.pool_port', 25061)
         ->where('database.data.connection.uri_scheme', 'postgresql'));
-    $this->post("/databases/{$database->id}/users", ['name' => 'replicator'])->assertSessionHasErrors('name');
-    $this->post("/databases/{$database->id}/schemas", ['name' => 'template1'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'replicator'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'template1'])->assertSessionHasErrors('name');
 });
 
 it('needs logical replication on the source to keep a postgres migration in sync', function () {

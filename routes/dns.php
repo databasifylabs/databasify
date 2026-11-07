@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Dns\DnsProviderController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::project()->group(function () {
     Route::get('dns', [DnsProviderController::class, 'index'])->name('dns.index');
     Route::get('dns/create', [DnsProviderController::class, 'create'])->name('dns.create');
     Route::post('dns', [DnsProviderController::class, 'store'])->name('dns.store');

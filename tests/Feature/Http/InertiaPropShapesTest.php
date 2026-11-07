@@ -36,7 +36,7 @@ it('sends every nested database list as plain arrays with fixed keys', function 
     $database = databaseWithEveryRelation();
     StorageProvider::factory()->create();
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('database.data', fn (AssertableInertia $data) => $data
             ->has('users.0', fn ($user) => $user->hasAll(['id', 'name', 'password', 'password_encryption', 'is_default']))
             ->has('schemas.0', fn ($schema) => $schema->hasAll(['id', 'name', 'is_default']))
@@ -56,15 +56,15 @@ it('shares the list fields with the database page', function () {
     $database = databaseWithEveryRelation();
     $fields = ['id', 'name', 'engine_label', 'engine_icon', 'engine_version', 'available_version', 'available_update_refreshes_image', 'mode', 'status', 'operation', 'created_at', 'point_in_time_recovery', 'nodes'];
 
-    $list = $this->get('/databases')->inertiaProps('databases.data.0');
-    $show = $this->get("/databases/{$database->id}")->inertiaProps('database.data');
+    $list = $this->get(projectUrl('/databases'))->inertiaProps('databases.data.0');
+    $show = $this->get(projectUrl("/databases/{$database->id}"))->inertiaProps('database.data');
 
     expect(array_keys($list))->toEqualCanonicalizing($fields)
         ->and(array_intersect_key($show, array_flip($fields)))->toEqual($list);
 });
 
 it('lists the engines the create page offers', function () {
-    $this->get('/databases/create')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('engines', count(Database::engines()))
         ->has('engines.0', fn ($engine) => $engine->hasAll(['value', 'label', 'icon', 'category', 'max_standbys', 'lines']))
         ->has('servers.data'));
@@ -74,7 +74,7 @@ it('lists server users as plain arrays', function () {
     $server = Server::factory()->ready()->create();
     $server->users()->create(['username' => 'app']);
 
-    $this->get("/servers/{$server->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/servers/{$server->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('users', 1)
         ->has('users.0', fn ($user) => $user->hasAll(['id', 'username'])));
 });
@@ -90,20 +90,20 @@ it('lists passkeys with when they were created and last used', function () {
 });
 
 it('describes what the dashboard requires', function () {
-    $this->get('/dashboard')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/dashboard'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('requirements', fn ($requirements) => $requirements->hasAll(['systems', 'engines'])));
 });
 
 it('offers every installed provider type on the add pages', function () {
-    $this->get('/dns/create')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/dns/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('types.0', fn ($type) => $type->hasAll(['value', 'label', 'icon', 'form', 'instructions'])));
-    $this->get('/providers/create')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/providers/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('types.0', fn ($type) => $type->hasAll(['value', 'label', 'icon', 'form', 'server_label', 'ssh_user', 'instructions'])));
 });
 
 it('describes a provider whose type is no longer installed', function () {
     DnsProvider::factory()->create(['type' => 'gone']);
 
-    $this->get('/dns')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/dns'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('providers.0.type', ['value' => 'gone', 'label' => 'gone (not installed)', 'icon' => null, 'form' => []]));
 });

@@ -23,9 +23,14 @@ export default function RebootDatabaseDialog({
             confirmLabel="Reboot"
             destructive={!clustered}
             onConfirm={() =>
-                runAction(DatabaseOperationController.reboot(database.id), {
-                    success: 'Rolling reboot started',
-                })
+                runAction(
+                    DatabaseOperationController.reboot({
+                        database: database.id,
+                    }),
+                    {
+                        success: 'Rolling reboot started',
+                    },
+                )
             }
         />
     );

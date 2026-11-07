@@ -15,6 +15,7 @@ class DnsProviderFactory extends Factory
     public function definition(): array
     {
         return [
+            'project_id' => fn (): string => ProjectFactory::defaultProject()->id,
             'name' => fake()->unique()->slug(2),
             'type' => 'cloudflare',
             'credentials' => ['token' => 'cf-token'],

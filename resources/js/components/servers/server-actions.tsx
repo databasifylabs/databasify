@@ -1,6 +1,7 @@
 import {
     ChevronDown,
     EllipsisVertical,
+    FolderInput,
     Package,
     Power,
     RefreshCw,
@@ -11,6 +12,7 @@ import { useState } from 'react';
 import ServerController from '@/actions/App/Http/Controllers/Servers/ServerController';
 import ServerOperationController from '@/actions/App/Http/Controllers/Servers/ServerOperationController';
 import ConfirmDialog from '@/components/confirm-dialog';
+import MoveToProjectDialog from '@/components/projects/move-to-project-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -20,6 +22,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useMoveTargets } from '@/hooks/use-move-targets';
 import { runAction } from '@/lib/run-action';
 import type { Server } from '@/types';
 
@@ -36,11 +39,13 @@ export default function ServerActions({
 }) {
     const [rebooting, setRebooting] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [moving, setMoving] = useState(false);
+    const canMove = useMoveTargets().length > 0;
     const [destroyAtProvider, setDestroyAtProvider] = useState(true);
     const ready = server.status === 'ready';
     const failed = server.status === 'failed';
     const retrySetup = () =>
-        runAction(ServerOperationController.provision(server.id), {
+        runAction(ServerOperationController.provision({ server: server.id }), {
             success: 'Retrying setup',
         });
     const operation = (name: 'update-packages' | 'reboot', label: string) =>
@@ -88,7 +93,9 @@ export default function ServerActions({
                         disabled={!ready || busy}
                         onSelect={() =>
                             runAction(
-                                ServerOperationController.refresh(server.id),
+                                ServerOperationController.refresh({
+                                    server: server.id,
+                                }),
                                 { success: 'Refreshing details' },
                             )
                         }
@@ -112,6 +119,17 @@ export default function ServerActions({
                         <Power />
                         Reboot
                     </DropdownMenuItem>
+                    {canMove && (
+                        <DropdownMenuItem
+                            disabled={busy || Boolean(server.database)}
+                            onSelect={() => setMoving(true)}
+                        >
+                            <FolderInput />
+                            {server.database
+                                ? `Moves with ${server.database.name}`
+                                : 'Move to project'}
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                         variant="destructive"
@@ -135,6 +153,11 @@ export default function ServerActions({
                 confirmLabel="Reboot"
                 onConfirm={() => operation('reboot', 'Rebooting')}
             />
+            <MoveToProjectDialog
+                resource={{ type: 'server', id: server.id, name: server.name }}
+                open={moving}
+                onOpenChange={setMoving}
+            />
             <ConfirmDialog
                 open={deleting}
                 onOpenChange={setDeleting}
@@ -148,7 +171,7 @@ export default function ServerActions({
                 destructive
                 typeToConfirm={server.name}
                 onConfirm={() =>
-                    runAction(ServerController.destroy(server.id), {
+                    runAction(ServerController.destroy({ server: server.id }), {
                         data: {
                             destroy_at_provider:
                                 Boolean(server.provider) && destroyAtProvider,

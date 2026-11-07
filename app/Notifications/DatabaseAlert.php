@@ -22,7 +22,7 @@ final class DatabaseAlert extends Notification implements ShouldQueue
 
     public static function from(DatabaseAlertRaised $alert): self
     {
-        return new self($alert->subject, $alert->message, route('databases.show', $alert->database));
+        return new self($alert->subject, $alert->message, route('databases.show', ['project' => $alert->database->project_id, 'database' => $alert->database]));
     }
 
     /**

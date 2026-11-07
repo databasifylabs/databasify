@@ -54,7 +54,7 @@ it('deletes a database from its page and frees its servers', function () {
     $server = $database->seed()->server;
     $ssh = fakeSsh();
 
-    $this->delete("/databases/{$database->id}", ['erase_data' => true])->assertRedirect('/databases');
+    $this->delete(projectUrl("/databases/{$database->id}"), ['erase_data' => true])->assertRedirect(projectUrl('/databases'));
 
     expect(Database::query()->exists())->toBeFalse()
         ->and($ssh->scriptAt(0))->toContain('rm -rf "$dir"')
@@ -66,7 +66,7 @@ it('passes the erase and force choices on to the delete job', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([DeleteDatabaseJob::class]);
 
-    $this->delete("/databases/{$database->id}", ['force' => true])->assertRedirect('/databases');
+    $this->delete(projectUrl("/databases/{$database->id}"), ['force' => true])->assertRedirect(projectUrl('/databases'));
 
     expect($database->fresh()->operation)->toBe('Delete database');
     Queue::assertPushed(DeleteDatabaseJob::class, fn (DeleteDatabaseJob $job): bool => $job->database->is($database) && ! $job->eraseData && $job->force);
@@ -78,12 +78,12 @@ it('refuses to delete a busy or migrating database', function () {
     Queue::fake([DeleteDatabaseJob::class]);
     $database->startOperation('Upgrade');
 
-    $this->delete("/databases/{$database->id}")->assertSessionHasErrors(['database' => "{$database->name} is busy with Upgrade, try again when it finishes."]);
+    $this->delete(projectUrl("/databases/{$database->id}"))->assertSessionHasErrors(['database' => "{$database->name} is busy with Upgrade, try again when it finishes."]);
 
     $database->finishOperation();
     migrationOf($database, MigrationMode::Continuous);
 
-    $this->delete("/databases/{$database->id}")->assertSessionHasErrors(['database' => "{$database->name} is migrating data in, finish or stop the migration first."]);
+    $this->delete(projectUrl("/databases/{$database->id}"))->assertSessionHasErrors(['database' => "{$database->name} is migrating data in, finish or stop the migration first."]);
 
     Queue::assertNothingPushed();
     expect(Database::query()->whereKey($database->id)->exists())->toBeTrue();

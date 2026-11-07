@@ -1,5 +1,6 @@
 import { AppearanceMenu } from '@/components/shell/appearance-menu';
 import { Breadcrumbs } from '@/components/shell/breadcrumbs';
+import { HeaderLinks } from '@/components/shell/header-links';
 import { SearchCommand } from '@/components/shell/search-command';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
@@ -17,6 +18,7 @@ export function AppSidebarHeader({
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <SearchCommand />
+                <HeaderLinks />
                 <AppearanceMenu />
             </div>
         </header>

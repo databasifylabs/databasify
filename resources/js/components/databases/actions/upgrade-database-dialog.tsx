@@ -16,9 +16,14 @@ export default function UpgradeDatabaseDialog({
             description="Each node restarts on the new image in turn, standbys first. Clients may reconnect once when the primary moves."
             confirmLabel="Upgrade"
             onConfirm={() =>
-                runAction(DatabaseOperationController.upgrade(database.id), {
-                    success: 'Upgrade started',
-                })
+                runAction(
+                    DatabaseOperationController.upgrade({
+                        database: database.id,
+                    }),
+                    {
+                        success: 'Upgrade started',
+                    },
+                )
             }
         />
     );

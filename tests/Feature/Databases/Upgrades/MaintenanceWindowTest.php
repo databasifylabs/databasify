@@ -36,8 +36,8 @@ it('picks the databases whose maintenance window is open', function () {
 it('saves the maintenance window and rejects hours outside a day', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
 
-    $this->put("/databases/{$database->id}/maintenance", ['day' => 3, 'hour' => 24])->assertSessionHasErrors('hour');
-    $this->put("/databases/{$database->id}/maintenance", ['day' => 3, 'hour' => 22])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/maintenance"), ['day' => 3, 'hour' => 24])->assertSessionHasErrors('hour');
+    $this->put(projectUrl("/databases/{$database->id}/maintenance"), ['day' => 3, 'hour' => 22])->assertSessionHasNoErrors();
 
     expect($database->fresh()->maintenanceWindow())->day->toBe(3)->hour->toBe(22);
 });
@@ -77,8 +77,8 @@ it('skips the maintenance window while the registry cannot be reached', function
 it('rejects a maintenance day outside the week', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
 
-    $this->put("/databases/{$database->id}/maintenance", ['day' => 7, 'hour' => 2])->assertSessionHasErrors('day');
-    $this->put("/databases/{$database->id}/maintenance", [])->assertSessionHasErrors(['day', 'hour']);
+    $this->put(projectUrl("/databases/{$database->id}/maintenance"), ['day' => 7, 'hour' => 2])->assertSessionHasErrors('day');
+    $this->put(projectUrl("/databases/{$database->id}/maintenance"), [])->assertSessionHasErrors(['day', 'hour']);
 
     expect($database->fresh()->maintenanceWindow())->day->toBe(0)->hour->toBe(3);
 });

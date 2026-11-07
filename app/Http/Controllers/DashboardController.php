@@ -9,6 +9,7 @@ use App\Http\Resources\DatabaseListResource;
 use App\Http\Resources\ServerLogListResource;
 use App\Http\Resources\ServerResource;
 use App\Queries\Dashboard\DashboardSummaryQuery;
+use App\Queries\Dashboard\StarPromptQuery;
 use App\Queries\Databases\DatabaseQuery;
 use App\Queries\Servers\ServerLogQuery;
 use App\Queries\Servers\ServerQuery;
@@ -27,6 +28,7 @@ class DashboardController extends Controller
             'servers' => ServerResource::collection(ServerQuery::all()->take(self::PREVIEW)),
             'logs' => ServerLogListResource::collection(ServerLogQuery::latest()->take(self::PREVIEW)),
             'requirements' => SystemRequirements::current()->toArray(),
+            'showStarPrompt' => StarPromptQuery::current()->shows(),
         ]);
     }
 }

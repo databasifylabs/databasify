@@ -39,12 +39,15 @@ export default function MaintenanceSetting({
 
     const save = () => {
         setSaving(true);
-        runAction(DatabaseSettingsController.maintenance(database.id), {
-            data: { day: Number(day), hour: Number(hour) },
-            success: 'Maintenance window saved',
-            onSuccess: () => setEditing(false),
-            onFinish: () => setSaving(false),
-        });
+        runAction(
+            DatabaseSettingsController.maintenance({ database: database.id }),
+            {
+                data: { day: Number(day), hour: Number(hour) },
+                success: 'Maintenance window saved',
+                onSuccess: () => setEditing(false),
+                onFinish: () => setSaving(false),
+            },
+        );
     };
 
     return (

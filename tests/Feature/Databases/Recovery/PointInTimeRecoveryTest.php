@@ -27,7 +27,7 @@ it('turns on point-in-time recovery and redeploys every node to start archiving'
     $provider = StorageProvider::factory()->create(['path_prefix' => 'team']);
     Queue::fake([UpgradeDatabaseJob::class]);
 
-    $this->post("/databases/{$database->id}/recovery", ['storage_provider_id' => $provider->id, 'retention_days' => 14, 'backup_hour' => 2])->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/recovery"), ['storage_provider_id' => $provider->id, 'retention_days' => 14, 'backup_hour' => 2])->assertSessionHasNoErrors();
 
     $recovery = PointInTimeRecovery::query()->sole();
     expect($recovery)
@@ -47,8 +47,8 @@ it('refuses point-in-time recovery where it cannot work', function () {
     $provider = StorageProvider::factory()->create();
     $input = ['storage_provider_id' => $provider->id, 'retention_days' => 7, 'backup_hour' => 3];
 
-    $this->post("/databases/{$valkey->id}/recovery", $input)->assertSessionHasErrors(['recovery' => 'Valkey has no point-in-time recovery.']);
-    $this->post("/databases/{$postgres->id}/recovery", $input)->assertSessionHasErrors(['recovery' => 'orders already has point-in-time recovery.']);
+    $this->post(projectUrl("/databases/{$valkey->id}/recovery"), $input)->assertSessionHasErrors(['recovery' => 'Valkey has no point-in-time recovery.']);
+    $this->post(projectUrl("/databases/{$postgres->id}/recovery"), $input)->assertSessionHasErrors(['recovery' => 'orders already has point-in-time recovery.']);
 
     expect(PointInTimeRecovery::query()->count())->toBe(1);
 });
@@ -57,7 +57,7 @@ it('validates the recovery settings', function (array $input, string $field) {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $provider = StorageProvider::factory()->create();
 
-    $this->post("/databases/{$database->id}/recovery", [...['storage_provider_id' => $provider->id, 'retention_days' => 7, 'backup_hour' => 3], ...$input])->assertSessionHasErrors($field);
+    $this->post(projectUrl("/databases/{$database->id}/recovery"), [...['storage_provider_id' => $provider->id, 'retention_days' => 7, 'backup_hour' => 3], ...$input])->assertSessionHasErrors($field);
 
     expect(PointInTimeRecovery::query()->count())->toBe(0);
 })->with([
@@ -71,7 +71,7 @@ it('refuses to turn it on while another operation runs', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single, 'orders');
     $database->startOperation('Upgrade');
 
-    $this->post("/databases/{$database->id}/recovery", ['storage_provider_id' => StorageProvider::factory()->create()->id, 'retention_days' => 7, 'backup_hour' => 3])
+    $this->post(projectUrl("/databases/{$database->id}/recovery"), ['storage_provider_id' => StorageProvider::factory()->create()->id, 'retention_days' => 7, 'backup_hour' => 3])
         ->assertSessionHasErrors(['database' => 'orders is busy with Upgrade, try again when it finishes.']);
 });
 
@@ -79,7 +79,7 @@ it('turns it off, keeping the archive in the bucket', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
     Queue::fake([UpgradeDatabaseJob::class]);
 
-    $this->delete("/databases/{$database->id}/recovery")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
 
     expect(PointInTimeRecovery::query()->count())->toBe(0)
         ->and(StorageProvider::query()->count())->toBe(1)
@@ -91,7 +91,7 @@ it('changes the schedule without a restart', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
     Queue::fake([SyncRecoveryFilesJob::class]);
 
-    $this->put("/databases/{$database->id}/recovery", ['retention_days' => 30, 'backup_hour' => 5])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/recovery"), ['retention_days' => 30, 'backup_hour' => 5])->assertSessionHasNoErrors();
 
     expect($database->pointInTimeRecovery?->fresh())->retention_days->toBe(30)->backup_hour->toBe(5)
         ->and($database->fresh()->operation)->toBe('Update point-in-time recovery');
@@ -101,23 +101,23 @@ it('changes the schedule without a restart', function () {
 it('asks for point-in-time recovery before backing up or checking', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single, 'orders');
 
-    $this->post("/databases/{$database->id}/recovery/backup")->assertSessionHasErrors(['recovery' => 'orders has no point-in-time recovery, turn it on first.']);
-    $this->post("/databases/{$database->id}/recovery/check")->assertSessionHasErrors('recovery');
-    $this->put("/databases/{$database->id}/recovery", ['retention_days' => 7, 'backup_hour' => 3])->assertSessionHasErrors('recovery');
-    $this->delete("/databases/{$database->id}/recovery")->assertSessionHasErrors('recovery');
+    $this->post(projectUrl("/databases/{$database->id}/recovery/backup"))->assertSessionHasErrors(['recovery' => 'orders has no point-in-time recovery, turn it on first.']);
+    $this->post(projectUrl("/databases/{$database->id}/recovery/check"))->assertSessionHasErrors('recovery');
+    $this->put(projectUrl("/databases/{$database->id}/recovery"), ['retention_days' => 7, 'backup_hour' => 3])->assertSessionHasErrors('recovery');
+    $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasErrors('recovery');
 });
 
 it('tells engines without archiving that they have no backups to take', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->post("/databases/{$database->id}/recovery/backup")->assertSessionHasErrors(['recovery' => 'Valkey has no point-in-time recovery.']);
+    $this->post(projectUrl("/databases/{$database->id}/recovery/backup"))->assertSessionHasErrors(['recovery' => 'Valkey has no point-in-time recovery.']);
 });
 
 it('starts a base backup on request', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
     Queue::fake([RefreshRecoveryStatusJob::class]);
 
-    $this->post("/databases/{$database->id}/recovery/backup")->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/recovery/backup"))->assertSessionHasNoErrors();
 
     Queue::assertPushed(RefreshRecoveryStatusJob::class, fn (RefreshRecoveryStatusJob $job): bool => $job->backUpNow);
 });
@@ -126,7 +126,7 @@ it('checks the archive on request', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
     Queue::fake([RefreshRecoveryStatusJob::class]);
 
-    $this->post("/databases/{$database->id}/recovery/check")->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/recovery/check"))->assertSessionHasNoErrors();
 
     Queue::assertPushed(RefreshRecoveryStatusJob::class, fn (RefreshRecoveryStatusJob $job): bool => ! $job->backUpNow);
 });
@@ -147,7 +147,7 @@ it('checks the archive of every running database every five minutes', function (
 it('shows the archive status and the restorable window on the database page without keys', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'), restorable: true);
 
-    $this->get("/databases/{$database->id}")->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.supports_point_in_time_recovery', true)
         ->where('database.data.point_in_time_recovery.health', 'healthy')
         ->where('database.data.point_in_time_recovery.backups_count', 2)
@@ -156,13 +156,13 @@ it('shows the archive status and the restorable window on the database page with
         ->where('database.data.point_in_time_recovery.latest_restorable_at', $database->pointInTimeRecovery?->latest_restorable_at?->toIso8601String())
         ->where('storageProviders.0.bucket', 'archives'));
 
-    expect($this->get("/databases/{$database->id}")->getContent())->not->toContain('EXAMPLEKEY');
+    expect($this->get(projectUrl("/databases/{$database->id}"))->getContent())->not->toContain('EXAMPLEKEY');
 });
 
 it('offers no point-in-time recovery for engines without archiving', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
 
-    $this->get("/databases/{$database->id}")->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.supports_point_in_time_recovery', false)
         ->where('database.data.point_in_time_recovery_unavailable', null)
         ->where('database.data.point_in_time_recovery', null));
@@ -171,7 +171,7 @@ it('offers no point-in-time recovery for engines without archiving', function ()
 it('keeps the backups page for a version whose archive tool is not ready yet and says why', function () {
     $database = idleDatabase('mongodb', 1, DatabaseMode::Single, 'nine', '9.0');
 
-    $this->get("/databases/{$database->id}")->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.supports_point_in_time_recovery', false)
         ->where('database.data.point_in_time_recovery_unavailable', 'Point-in-time recovery is not available for MongoDB 9.0 at this moment.'));
 });

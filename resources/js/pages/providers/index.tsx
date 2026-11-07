@@ -7,6 +7,7 @@ import ConfirmDialog from '@/components/confirm-dialog';
 import EditAccountDialog from '@/components/providers/edit-account-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
+import MoveToProjectButton from '@/components/projects/move-to-project-button';
 import Heading from '@/components/heading';
 import BrandIcon from '@/components/brand-icon';
 import { Button } from '@/components/ui/button';
@@ -76,11 +77,19 @@ function Accounts({ providers }: { providers: ProviderAccount[] }) {
                                 {provider.networks_count}
                             </TableCell>
                             <TableCell className="pr-4 text-right">
+                                <MoveToProjectButton
+                                    resource={{
+                                        type: 'server-provider',
+                                        id: provider.id,
+                                        name: provider.name,
+                                    }}
+                                    description="Its servers stay in this project and keep using it."
+                                />
                                 <EditAccountDialog
                                     name={provider.name}
-                                    form={ServerProviderController.update.form(
-                                        provider.id,
-                                    )}
+                                    form={ServerProviderController.update.form({
+                                        provider: provider.id,
+                                    })}
                                     secrets={provider.type.form
                                         .filter(
                                             (field) => field.type !== 'select',
@@ -104,9 +113,9 @@ function Accounts({ providers }: { providers: ProviderAccount[] }) {
                                     destructive
                                     onConfirm={() =>
                                         runAction(
-                                            ServerProviderController.destroy(
-                                                provider.id,
-                                            ),
+                                            ServerProviderController.destroy({
+                                                provider: provider.id,
+                                            }),
                                             {
                                                 success: `Removed ${provider.name}`,
                                             },
@@ -137,7 +146,7 @@ function RemoveNetwork({ network }: { network: NetworkRow }) {
             confirmLabel="Remove network"
             destructive
             onConfirm={() =>
-                runAction(NetworkController.destroy(network.id), {
+                runAction(NetworkController.destroy({ network: network.id }), {
                     data: {
                         destroy_at_provider:
                             network.provider_label !== null &&
@@ -205,6 +214,14 @@ function Networks({ networks }: { networks: NetworkRow[] }) {
                                     )}
                             </TableCell>
                             <TableCell className="pr-4 text-right">
+                                <MoveToProjectButton
+                                    resource={{
+                                        type: 'network',
+                                        id: network.id,
+                                        name: network.name,
+                                    }}
+                                    description="Its servers stay in this project."
+                                />
                                 {network.servers_count === 0 && (
                                     <RemoveNetwork network={network} />
                                 )}
@@ -270,8 +287,8 @@ export default function Providers({
     );
 }
 
-Providers.layout = {
+Providers.layout = () => ({
     breadcrumbs: [
         { title: 'Providers', href: ServerProviderController.index() },
     ],
-};
+});

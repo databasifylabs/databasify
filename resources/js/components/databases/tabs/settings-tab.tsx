@@ -82,7 +82,7 @@ export default function SettingsTab({
                                     onClick={() =>
                                         runAction(
                                             DatabaseOperationController.checkUpgrade(
-                                                database.id,
+                                                { database: database.id },
                                             ),
                                             { success: 'Checked for updates' },
                                         )

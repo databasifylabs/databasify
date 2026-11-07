@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Requests\Storage;
 
 use App\DTOs\Storage\NewStorageProvider;
+use App\Http\Requests\Concerns\ProviderRequestRules;
 use App\Http\Requests\Concerns\StorageProviderRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreStorageProviderRequest extends FormRequest
 {
-    use StorageProviderRules;
+    use ProviderRequestRules, StorageProviderRules;
 
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -19,7 +20,7 @@ class StoreStorageProviderRequest extends FormRequest
     public function rules(): array
     {
         return array_merge(
-            ['name' => ['required', 'string', 'max:60', 'unique:storage_providers,name']],
+            ['name' => $this->nameRules('storage_providers')],
             $this->locationRules(),
             ['secret_access_key' => $this->secretRules(required: true)],
         );

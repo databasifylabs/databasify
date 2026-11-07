@@ -19,7 +19,7 @@ it('turns valkey persistence off live without a restart', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/persistence", ['persistence' => 'off'])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/persistence"), ['persistence' => 'off'])->assertSessionHasNoErrors();
     $database = $database->fresh();
 
     expect($database->settings->persistence)->toBe(Persistence::Off)
@@ -33,7 +33,7 @@ it('turns valkey persistence off live without a restart', function () {
 it('refuses persistence choices on mysql', function () {
     $mysql = idleDatabase('mysql', 1, DatabaseMode::Single, 'db');
 
-    expect(fn () => $this->withoutExceptionHandling()->put("/databases/{$mysql->id}/persistence", ['persistence' => 'off']))->toThrow(ValidationException::class, 'always keeps its data on disk');
+    expect(fn () => $this->withoutExceptionHandling()->put(projectUrl("/databases/{$mysql->id}/persistence"), ['persistence' => 'off']))->toThrow(ValidationException::class, 'always keeps its data on disk');
 });
 
 it('turns redis snapshots back on', function () {
@@ -56,7 +56,7 @@ it('refuses persistence choices on engines that always write to disk', function 
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
     Queue::fake([ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/persistence", ['persistence' => 'off'])->assertSessionHasErrors(['persistence' => Database::providerFor($engine)->label().' always keeps its data on disk.']);
+    $this->put(projectUrl("/databases/{$database->id}/persistence"), ['persistence' => 'off'])->assertSessionHasErrors(['persistence' => Database::providerFor($engine)->label().' always keeps its data on disk.']);
 
     expect($database->fresh()->settings->persistence)->toBe(Persistence::Snapshots);
     Queue::assertNothingPushed();
@@ -66,7 +66,7 @@ it('rejects unknown persistence modes', function (mixed $persistence) {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/persistence", ['persistence' => $persistence])->assertSessionHasErrors('persistence');
+    $this->put(projectUrl("/databases/{$database->id}/persistence"), ['persistence' => $persistence])->assertSessionHasErrors('persistence');
 
     Queue::assertNothingPushed();
 })->with(['', 'aof', 'OFF']);

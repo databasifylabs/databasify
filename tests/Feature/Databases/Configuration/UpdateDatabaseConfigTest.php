@@ -19,9 +19,9 @@ it('accepts only known engine settings and writes them into the engine config', 
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class, ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/config", ['config' => ['requirepass' => 'x']])->assertSessionHasErrors('config');
-    $this->put("/databases/{$database->id}/config", ['config' => ['maxmemory-policy' => 'evict-all']])->assertSessionHasErrors('config.maxmemory-policy');
-    $this->put("/databases/{$database->id}/config", ['config' => ['maxmemory-policy' => 'allkeys-lru', 'timeout' => '']])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['requirepass' => 'x']])->assertSessionHasErrors('config');
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['maxmemory-policy' => 'evict-all']])->assertSessionHasErrors('config.maxmemory-policy');
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['maxmemory-policy' => 'allkeys-lru', 'timeout' => '']])->assertSessionHasNoErrors();
 
     $database->refresh();
     expect($database->settings->config)->toBe(['maxmemory-policy' => 'allkeys-lru'])
@@ -35,10 +35,10 @@ it('rejects engine settings that would crash mysql', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class, ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/config", ['config' => ['default_time_zone' => '+25:00']])->assertSessionHasErrors('config.default_time_zone');
-    $this->put("/databases/{$database->id}/config", ['config' => ['collation_server' => 'klingon_ci']])->assertSessionHasErrors('config.collation_server');
-    $this->put("/databases/{$database->id}/config", ['config' => ['sql_mode' => 'STRICT_TRANS_TABLES,MADE_UP']])->assertSessionHasErrors('config.sql_mode');
-    $this->put("/databases/{$database->id}/config", ['config' => ['sql_mode' => 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION', 'default_time_zone' => '+06:00']])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['default_time_zone' => '+25:00']])->assertSessionHasErrors('config.default_time_zone');
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['collation_server' => 'klingon_ci']])->assertSessionHasErrors('config.collation_server');
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['sql_mode' => 'STRICT_TRANS_TABLES,MADE_UP']])->assertSessionHasErrors('config.sql_mode');
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['sql_mode' => 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION', 'default_time_zone' => '+06:00']])->assertSessionHasNoErrors();
 });
 
 it('describes each engine setting with its default and choices', function () {
@@ -46,7 +46,7 @@ it('describes each engine setting with its default and choices', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->get("/databases/{$database->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.config_fields.0.key', 'maxmemory-policy')
         ->where('database.data.config_fields.0.label', 'Eviction policy')
         ->where('database.data.config_fields.0.default', 'noeviction')
@@ -71,7 +71,7 @@ it('writes settings into each engine its own config file', function (string $eng
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class, ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/config", ['config' => $config])->assertRedirect()->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => $config])->assertRedirect()->assertSessionHasNoErrors();
 
     $database->refresh();
     expect($database->settings->config)->toBe($config)
@@ -87,7 +87,7 @@ it('rejects config that is missing or out of pattern', function (string $engine,
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class, ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/config", $input)->assertSessionHasErrors($field);
+    $this->put(projectUrl("/databases/{$database->id}/config"), $input)->assertSessionHasErrors($field);
 
     expect($database->fresh()->settings->config)->toBe([]);
     Queue::assertNothingPushed();
@@ -114,7 +114,7 @@ it('rejects a number outside the engine range with the allowed range', function 
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([UpgradeDatabaseJob::class, ApplyDatabaseConfigJob::class]);
 
-    $this->put("/databases/{$database->id}/config", ['config' => ['connect_timeout' => '1']])
+    $this->put(projectUrl("/databases/{$database->id}/config"), ['config' => ['connect_timeout' => '1']])
         ->assertSessionHasErrors(['config.connect_timeout' => 'Connect timeout must be between 2 and 3600.']);
 
     expect($database->fresh()->settings->config)->toBe([]);

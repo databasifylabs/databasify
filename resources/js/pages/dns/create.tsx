@@ -142,9 +142,9 @@ export default function CreateDnsProvider({
     );
 }
 
-CreateDnsProvider.layout = {
+CreateDnsProvider.layout = () => ({
     breadcrumbs: [
         { title: 'DNS', href: DnsProviderController.index() },
         { title: 'Add DNS account', href: DnsProviderController.create() },
     ],
-};
+});

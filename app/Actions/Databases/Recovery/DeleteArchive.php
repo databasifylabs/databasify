@@ -11,7 +11,7 @@ final readonly class DeleteArchive
 {
     public function handle(StoredArchive $archive): void
     {
-        $provider = StorageProvider::query()->findOrFail($archive->storageProviderId);
+        $provider = StorageProvider::query()->withoutProject()->findOrFail($archive->storageProviderId);
 
         $s3 = $provider->s3();
         $s3->deleteAllUnder($archive->prefix());

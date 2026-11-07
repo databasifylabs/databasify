@@ -20,9 +20,9 @@ it('starts a continuous migration with tls on by default', function () {
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $this->ssh->respond(mysqlSourceReport());
 
-    $this->from("/databases/{$database->id}")
-        ->post("/databases/{$database->id}/migrations", ['host' => 'db.example.com', 'port' => 3306, 'username' => 'migrator', 'password' => 'secret', 'databases' => ['shop']])
-        ->assertRedirect("/databases/{$database->id}")
+    $this->from(projectUrl("/databases/{$database->id}"))
+        ->post(projectUrl("/databases/{$database->id}/migrations"), ['host' => 'db.example.com', 'port' => 3306, 'username' => 'migrator', 'password' => 'secret', 'databases' => ['shop']])
+        ->assertRedirect(projectUrl("/databases/{$database->id}"))
         ->assertSessionHasNoErrors();
 
     $migration = $database->migrations()->sole();
@@ -37,7 +37,7 @@ it('starts a one-time plain migration from a source without credentials', functi
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $this->ssh->respond("redis_version=7.2.4\nkeys=3\n");
 
-    $this->post("/databases/{$database->id}/migrations", ['host' => 'cache.example.com', 'port' => 6379, 'tls' => false, 'mode' => 'one_time'])
+    $this->post(projectUrl("/databases/{$database->id}/migrations"), ['host' => 'cache.example.com', 'port' => 6379, 'tls' => false, 'mode' => 'one_time'])
         ->assertSessionHasNoErrors();
 
     expect($database->migrations()->sole())->mode->toBe(MigrationMode::OneTime)
@@ -50,7 +50,7 @@ it('rejects malformed sources before contacting them', function (string $engine,
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $ssh = $this->ssh;
 
-    $this->post("/databases/{$database->id}/migrations", $payload)->assertSessionHasErrors($errors);
+    $this->post(projectUrl("/databases/{$database->id}/migrations"), $payload)->assertSessionHasErrors($errors);
 
     expect($ssh->runs)->toBe([])
         ->and($database->migrations()->count())->toBe(0);
@@ -75,8 +75,8 @@ it('reports unreachable and unsupported sources as form errors', function () {
         ->respond("reachable=yes\nversion=16.4\nwal_level=replica\ncan_replicate=t\n");
     $payload = ['host' => 'pg.example.com', 'port' => 5432, 'username' => 'm', 'password' => 's'];
 
-    $this->post("/databases/{$database->id}/migrations", $payload)->assertSessionHasErrors(['source' => 'Could not connect to the source: connection refused']);
-    $this->post("/databases/{$database->id}/migrations", $payload)->assertSessionHasErrors('mode');
+    $this->post(projectUrl("/databases/{$database->id}/migrations"), $payload)->assertSessionHasErrors(['source' => 'Could not connect to the source: connection refused']);
+    $this->post(projectUrl("/databases/{$database->id}/migrations"), $payload)->assertSessionHasErrors('mode');
 
     expect($database->migrations()->count())->toBe(0);
 });
@@ -86,7 +86,7 @@ it('checks a source of every engine and answers with its report', function (stri
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $this->ssh->respond($output);
 
-    $this->postJson("/databases/{$database->id}/migrations/check", ['host' => 'source.example.com', 'port' => $port, 'username' => 'migrator', 'password' => 'secret'])
+    $this->postJson(projectUrl("/databases/{$database->id}/migrations/check"), ['host' => 'source.example.com', 'port' => $port, 'username' => 'migrator', 'password' => 'secret'])
         ->assertOk()
         ->assertJson($expected);
 })->with([
@@ -102,12 +102,12 @@ it('finishes a migration only once it is syncing', function () {
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $copying = migrationOf($database, MigrationMode::Continuous);
 
-    $this->post("/databases/{$database->id}/migrations/{$copying->id}/finish")->assertSessionHasErrors(['migration' => 'The initial copy is still running, wait until the migration is syncing.']);
+    $this->post(projectUrl("/databases/{$database->id}/migrations/{$copying->id}/finish"))->assertSessionHasErrors(['migration' => 'The initial copy is still running, wait until the migration is syncing.']);
     Queue::assertNothingPushed();
 
     $copying->update(['status' => MigrationStatus::Syncing]);
 
-    $this->from("/databases/{$database->id}")->post("/databases/{$database->id}/migrations/{$copying->id}/finish")->assertRedirect("/databases/{$database->id}")->assertSessionHasNoErrors();
+    $this->from(projectUrl("/databases/{$database->id}"))->post(projectUrl("/databases/{$database->id}/migrations/{$copying->id}/finish"))->assertRedirect(projectUrl("/databases/{$database->id}"))->assertSessionHasNoErrors();
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => $job->cutover && ! $job->force);
     expect($database->fresh()->operation)->toBe('Finish migration');
 });
@@ -117,10 +117,10 @@ it('stops or force stops an active migration', function () {
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $migration = migrationOf($database, MigrationMode::OneTime);
 
-    $this->delete("/databases/{$database->id}/migrations/{$migration->id}")->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"))->assertSessionHasNoErrors();
     expect($database->fresh()->operation)->toBe('Stop migration');
     $database->finishOperation();
-    $this->delete("/databases/{$database->id}/migrations/{$migration->id}", ['force' => true])->assertSessionHasNoErrors();
+    $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"), ['force' => true])->assertSessionHasNoErrors();
 
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => ! $job->cutover && ! $job->force);
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => ! $job->cutover && $job->force);
@@ -131,8 +131,8 @@ it('refuses to stop or finish a migration that already ended', function () {
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $migration = migrationOf($database, MigrationMode::Continuous, MigrationStatus::Completed);
 
-    $this->delete("/databases/{$database->id}/migrations/{$migration->id}")->assertSessionHasErrors(['migration' => 'This migration has already ended.']);
-    $this->post("/databases/{$database->id}/migrations/{$migration->id}/finish")->assertSessionHasErrors('migration');
+    $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"))->assertSessionHasErrors(['migration' => 'This migration has already ended.']);
+    $this->post(projectUrl("/databases/{$database->id}/migrations/{$migration->id}/finish"))->assertSessionHasErrors('migration');
     Queue::assertNothingPushed();
 });
 
@@ -142,8 +142,8 @@ it('force stops a migration that already ended to clean it up again', function (
     $migration = migrationOf($database, MigrationMode::Continuous, MigrationStatus::Stopped);
     $migration->update(['cleanup_failed_at' => now()]);
 
-    $this->from("/databases/{$database->id}")->delete("/databases/{$database->id}/migrations/{$migration->id}", ['force' => true])
-        ->assertRedirect("/databases/{$database->id}")
+    $this->from(projectUrl("/databases/{$database->id}"))->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"), ['force' => true])
+        ->assertRedirect(projectUrl("/databases/{$database->id}"))
         ->assertSessionHasNoErrors();
 
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => $job->migration->is($migration) && ! $job->cutover && $job->force);
@@ -156,7 +156,7 @@ it('does not find a migration through another database', function () {
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
     $migration = migrationOf($other, MigrationMode::Continuous, MigrationStatus::Syncing);
 
-    $this->post("/databases/{$database->id}/migrations/{$migration->id}/finish")->assertNotFound();
-    $this->delete("/databases/{$database->id}/migrations/{$migration->id}")->assertNotFound();
+    $this->post(projectUrl("/databases/{$database->id}/migrations/{$migration->id}/finish"))->assertNotFound();
+    $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"))->assertNotFound();
     Queue::assertNothingPushed();
 });

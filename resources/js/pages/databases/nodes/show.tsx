@@ -181,7 +181,9 @@ export default function ShowNode({
                         <p className="text-sm text-muted-foreground">
                             Read-only node of{' '}
                             <Link
-                                href={DatabaseController.show(database.id)}
+                                href={DatabaseController.show({
+                                    database: database.id,
+                                })}
                                 className="font-medium text-foreground hover:underline"
                             >
                                 {database.name}
@@ -250,7 +252,7 @@ ShowNode.layout = (props: Props) => ({
         { title: 'Databases', href: DatabaseController.index() },
         {
             title: props.database.data.name,
-            href: DatabaseController.show(props.database.data.id),
+            href: DatabaseController.show({ database: props.database.data.id }),
         },
         {
             title: props.node.data.name,

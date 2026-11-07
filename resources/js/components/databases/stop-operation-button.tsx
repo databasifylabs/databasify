@@ -36,9 +36,12 @@ export default function StopOperationButton({
             confirmLabel="Stop"
             destructive
             onConfirm={() =>
-                runAction(DatabaseOperationController.stop(database.id), {
-                    success: `Stopping ${label}`,
-                })
+                runAction(
+                    DatabaseOperationController.stop({ database: database.id }),
+                    {
+                        success: `Stopping ${label}`,
+                    },
+                )
             }
         />
     );

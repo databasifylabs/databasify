@@ -108,7 +108,7 @@ export default function ServerTerminal({ server }: { server: Server }) {
         });
 
         postJson<{ id: string }>(
-            ServerTerminalController.store.url(server.id),
+            ServerTerminalController.store.url({ server: server.id }),
             {
                 columns: terminal.cols,
                 rows: terminal.rows,

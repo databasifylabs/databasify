@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Projects\Movable;
 use App\DTOs\Networks\WireguardPeer;
 use App\DTOs\Providers\ProviderNetwork;
 use App\Enums\Servers\NetworkKind;
 use App\Enums\Servers\NetworkMemberStatus;
+use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
 use Carbon\CarbonImmutable;
 use Database\Factories\NetworkFactory;
@@ -22,9 +25,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\LazyCollection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * @property string $id
+ * @property string $project_id
  * @property string $name
  * @property string $cidr
  * @property NetworkKind $kind
@@ -38,12 +43,12 @@ use Illuminate\Support\LazyCollection;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'cidr', 'kind', 'listen_port', 'server_provider_id', 'external_id', 'region'])]
+#[Fillable(['project_id', 'name', 'cidr', 'kind', 'listen_port', 'server_provider_id', 'external_id', 'region'])]
 #[UseFactory(NetworkFactory::class)]
-class Network extends Model
+class Network extends Model implements Movable
 {
     /** @use HasFactory<NetworkFactory> */
-    use HasFactory, HasUuids;
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects;
 
     use OrdersByName;
 
@@ -60,7 +65,7 @@ class Network extends Model
      */
     public function servers(): HasMany
     {
-        return $this->hasMany(Server::class);
+        return $this->hasMany(Server::class)->withoutProject();
     }
 
     /**
@@ -84,7 +89,16 @@ class Network extends Model
      */
     public function serverProvider(): BelongsTo
     {
-        return $this->belongsTo(ServerProvider::class);
+        return $this->belongsTo(ServerProvider::class)->withoutProject();
+    }
+
+    public function ensureDeletable(): void
+    {
+        if ($this->servers()->doesntExist()) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['network' => "{$this->name} still has servers on it."]);
     }
 
     public function isWireguard(): bool
@@ -107,7 +121,7 @@ class Network extends Model
 
     public static function recordFromProvider(ServerProvider $provider, ProviderNetwork $network): self
     {
-        return self::query()->updateOrCreate(
+        return self::query()->withoutProject()->updateOrCreate(
             ['server_provider_id' => $provider->id, 'external_id' => $network->externalId],
             ['name' => $network->name, 'cidr' => $network->cidr, 'region' => $network->region, 'kind' => NetworkKind::Provider],
         );
@@ -120,7 +134,7 @@ class Network extends Model
 
     public static function freeName(): string
     {
-        $names = self::query()->pluck('name');
+        $names = self::query()->withoutProject()->pluck('name');
         $number = LazyCollection::range(0, $names->count())->first(fn (int $number): bool => $names->doesntContain("databasify-{$number}"));
 
         return "databasify-{$number}";

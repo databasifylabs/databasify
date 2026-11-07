@@ -2,6 +2,7 @@ import { createInertiaApp } from '@inertiajs/react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
+import { trackProjectUrlDefaults } from '@/lib/project-url-defaults';
 import AppLayout from '@/layouts/app/app-sidebar-layout';
 import AuthLayout from '@/layouts/auth/auth-simple-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -42,7 +43,9 @@ void createInertiaApp({
         }
     },
     strictMode: true,
-    withApp(app) {
+    withApp(app, { page, ssr }) {
+        trackProjectUrlDefaults(page, ssr);
+
         return (
             <TooltipProvider delayDuration={0}>
                 {app}

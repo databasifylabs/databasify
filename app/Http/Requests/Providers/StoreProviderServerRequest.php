@@ -9,6 +9,8 @@ use App\DTOs\Servers\PrivateNetworkChoice;
 use App\Enums\Servers\OperatingSystem;
 use App\Http\Requests\Concerns\ReadsTypedInput;
 use App\Models\Network;
+use App\Models\ServerProvider;
+use App\Rules\ExistsInProject;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,7 +31,7 @@ class StoreProviderServerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'server_provider_id' => ['required', 'uuid', 'exists:server_providers,id'],
+            'server_provider_id' => ['required', 'uuid', new ExistsInProject(ServerProvider::class)],
             'name' => ['required', 'string', 'max:60', 'regex:/^[a-z0-9][a-z0-9-]*$/', 'unique:servers,name'],
             'region' => ['required', 'string', 'max:64'],
             'plan' => ['required', 'string', 'max:64'],

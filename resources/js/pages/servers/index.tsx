@@ -202,7 +202,9 @@ export default function ServersIndex({
 
                                                         router.visit(
                                                             ServerController.show(
-                                                                server.id,
+                                                                {
+                                                                    server: server.id,
+                                                                },
                                                             ),
                                                         );
                                                     }}
@@ -210,7 +212,9 @@ export default function ServersIndex({
                                                     <TableCell className="py-4 pl-4">
                                                         <Link
                                                             href={ServerController.show(
-                                                                server.id,
+                                                                {
+                                                                    server: server.id,
+                                                                },
                                                             )}
                                                             className="flex items-center gap-3"
                                                         >
@@ -310,6 +314,6 @@ export default function ServersIndex({
     );
 }
 
-ServersIndex.layout = {
+ServersIndex.layout = () => ({
     breadcrumbs: [{ title: 'Servers', href: ServerController.index() }],
-};
+});

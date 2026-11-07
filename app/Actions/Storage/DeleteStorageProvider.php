@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Storage;
 
 use App\Models\StorageProvider;
+use Illuminate\Support\Facades\DB;
 
 final readonly class DeleteStorageProvider
 {
@@ -12,6 +13,6 @@ final readonly class DeleteStorageProvider
     {
         $provider->ensureDeletable();
 
-        $provider->delete();
+        DB::transaction(fn () => $provider->delete());
     }
 }

@@ -138,12 +138,15 @@ export default function ConfigSettingRow({
 
     const save = (next: string | null) => {
         setSaving(true);
-        runAction(DatabaseSettingsController.config(database.id), {
-            data: { config: configWith(database, field.key, next) },
-            success: `Applying ${field.label.toLowerCase()}`,
-            onSuccess: () => setEditing(false),
-            onFinish: () => setSaving(false),
-        });
+        runAction(
+            DatabaseSettingsController.config({ database: database.id }),
+            {
+                data: { config: configWith(database, field.key, next) },
+                success: `Applying ${field.label.toLowerCase()}`,
+                onSuccess: () => setEditing(false),
+                onFinish: () => setSaving(false),
+            },
+        );
     };
 
     const startEditing = () => {

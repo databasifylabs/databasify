@@ -23,7 +23,7 @@ it('serves the database under a picked domain after checking its names are free'
     Queue::fake([UpgradeDatabaseJob::class]);
     $zone = DnsZone::factory()->create(['name' => 'example.com']);
 
-    $this->put("/databases/{$database->id}/domain", ['dns_zone_id' => $zone->id])->assertRedirect()->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $zone->id])->assertRedirect()->assertSessionHasNoErrors();
 
     $checked = collect(Http::recorded())->map(fn (array $pair): string => $pair[0]['name'])->sort()->values()->all();
     expect($database->fresh()->dns_zone_id)->toBe($zone->id)
@@ -38,7 +38,7 @@ it('refuses a name that has records databasify did not create', function () {
     Queue::fake([UpgradeDatabaseJob::class]);
     $zone = DnsZone::factory()->create(['name' => 'example.com']);
 
-    $this->put("/databases/{$database->id}/domain", ['dns_zone_id' => $zone->id])
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $zone->id])
         ->assertSessionHasErrors(['dns_zone_id' => "app-db.db.example.com already has DNS records Databasify didn't create. Remove them or pick another name."]);
 
     expect($database->fresh()->dns_zone_id)->toBeNull();
@@ -51,7 +51,7 @@ it('reuses names that only hold records databasify created', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
     Queue::fake([UpgradeDatabaseJob::class]);
 
-    $this->put("/databases/{$database->id}/domain", ['dns_zone_id' => DnsZone::factory()->create(['name' => 'example.com'])->id])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => DnsZone::factory()->create(['name' => 'example.com'])->id])->assertSessionHasNoErrors();
 
     Queue::assertPushed(UpgradeDatabaseJob::class);
 });
@@ -77,9 +77,9 @@ it('refuses to pick the domain it already uses, or none when it has none', funct
     $plain = idleDatabase('valkey', 1, DatabaseMode::Single, 'plain');
     Queue::fake([UpgradeDatabaseJob::class]);
 
-    $this->put("/databases/{$database->id}/domain", ['dns_zone_id' => $database->dns_zone_id])->assertSessionHasErrors(['dns_zone_id' => 'cache already uses example.com.']);
-    $this->put("/databases/{$plain->id}/domain", ['dns_zone_id' => null])->assertSessionHasErrors(['dns_zone_id' => "plain doesn't use a domain."]);
-    $this->put("/databases/{$plain->id}/domain", ['dns_zone_id' => 999])->assertSessionHasErrors('dns_zone_id');
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $database->dns_zone_id])->assertSessionHasErrors(['dns_zone_id' => 'cache already uses example.com.']);
+    $this->put(projectUrl("/databases/{$plain->id}/domain"), ['dns_zone_id' => null])->assertSessionHasErrors(['dns_zone_id' => "plain doesn't use a domain."]);
+    $this->put(projectUrl("/databases/{$plain->id}/domain"), ['dns_zone_id' => 999])->assertSessionHasErrors('dns_zone_id');
 
     Queue::assertNothingPushed();
 });

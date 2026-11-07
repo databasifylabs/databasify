@@ -8,7 +8,7 @@ use App\Http\Controllers\Providers\ProviderServerController;
 use App\Http\Controllers\Providers\ServerProviderController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::project()->group(function () {
     Route::get('providers', [ServerProviderController::class, 'index'])->name('providers.index');
     Route::get('providers/create', [ServerProviderController::class, 'create'])->name('providers.create');
     Route::post('providers', [ServerProviderController::class, 'store'])->name('providers.store');

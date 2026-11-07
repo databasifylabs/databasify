@@ -16,6 +16,7 @@ class NetworkFactory extends Factory
     public function definition(): array
     {
         return [
+            'project_id' => fn (): string => ProjectFactory::defaultProject()->id,
             'name' => fake()->unique()->slug(2),
             'cidr' => '10.0.0.0/8',
         ];

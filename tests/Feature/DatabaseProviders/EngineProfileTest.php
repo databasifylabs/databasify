@@ -15,14 +15,14 @@ it('describes how to connect and migrate from the engine itself', function () {
     $mysql = idleDatabase('mysql', 1, DatabaseMode::Single, 'db');
     $valkey = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->get("/databases/{$mysql->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$mysql->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.connection.uri_scheme', 'mysql')
         ->where('database.data.connection.fixed_username', null)
         ->where('database.data.connection.env_keys.database', 'DB_DATABASE')
         ->where('database.data.migration_source', ['default_port' => 3306, 'credentials_required' => true, 'selects_databases' => true])
         ->where('database.data.supports_users', true));
 
-    $this->get("/databases/{$valkey->id}")->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl("/databases/{$valkey->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.connection.uri_scheme', 'rediss')
         ->where('database.data.connection.fixed_username', 'default')
         ->where('database.data.migration_source.default_port', 6379)
@@ -31,7 +31,7 @@ it('describes how to connect and migrate from the engine itself', function () {
 });
 
 it('offers application engines before caching engines with their version lines', function () {
-    $this->get('/databases/create')->assertInertia(fn (AssertableInertia $page) => $page
+    $this->get(projectUrl('/databases/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('engines', fn ($engines): bool => collect($engines)->map(fn (array $engine): string => "{$engine['category']}:{$engine['value']}")->all() === [
             'Application:mysql', 'Application:postgres', 'Application:mariadb', 'Application:mongodb', 'Caching:valkey', 'Caching:redis',
         ])

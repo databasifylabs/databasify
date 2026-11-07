@@ -18,9 +18,9 @@ it('renames a read-only node and refuses a name another node uses', function () 
     $reader = withReadOnlyNode($database, ['name' => 'main-ro-1']);
     withReadOnlyNode($database, ['name' => 'main-ro-2']);
 
-    $this->put("/databases/{$database->id}/nodes/{$reader->id}", ['name' => 'main-ro-2'])->assertSessionHasErrors('name');
-    $this->put("/databases/{$database->id}/nodes/{$reader->id}", ['name' => 'Reports'])->assertSessionHasErrors('name');
-    $this->put("/databases/{$database->id}/nodes/{$reader->id}", ['name' => 'reports'])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'main-ro-2'])->assertSessionHasErrors('name');
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'Reports'])->assertSessionHasErrors('name');
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'reports'])->assertSessionHasNoErrors();
 
     expect($reader->fresh()->name)->toBe('reports');
 });
@@ -32,7 +32,7 @@ it('moves a renamed read-only node to its new names and gives it a new certifica
     Queue::fake([RedeployDatabaseNodeJob::class]);
     $database->update(['settings' => $database->settings->withNodeCertificates($reader->id, ['server.pem' => 'pem'])]);
 
-    $this->put("/databases/{$database->id}/nodes/{$reader->id}", ['name' => 'analytics'])->assertSessionHasNoErrors();
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'analytics'])->assertSessionHasNoErrors();
 
     $looked = collect(Http::recorded(fn (Request $request): bool => $request->method() === 'GET'))->map(fn (array $pair): string => $pair[0]['name'])->unique()->sort()->values()->all();
     expect($reader->fresh()->name)->toBe('analytics')
@@ -48,7 +48,7 @@ it('refuses a new name whose hostnames hold records databasify did not create', 
     $reader = withReadOnlyNode($database, ['name' => 'reports']);
     Queue::fake([RedeployDatabaseNodeJob::class]);
 
-    $this->put("/databases/{$database->id}/nodes/{$reader->id}", ['name' => 'analytics'])->assertSessionHasErrors('name');
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'analytics'])->assertSessionHasErrors('name');
 
     expect($reader->fresh()->name)->toBe('reports');
     Queue::assertNothingPushed();

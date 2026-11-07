@@ -22,7 +22,7 @@ it('records the database server version each node reports', function () {
 
     expect($database->nodes()->orderBy('position')->pluck('engine_version')->all())->toBe(['8.1.4', '8.1.3']);
     $this->actingAs(User::factory()->create())
-        ->get("/databases/{$database->id}")
+        ->get(projectUrl("/databases/{$database->id}"))
         ->assertInertia(fn (AssertableInertia $page) => $page->where('database.data.nodes.0.engine_version', '8.1.4')->where('database.data.engine_version', $database->image_release));
 });
 
@@ -96,7 +96,7 @@ it('queues a status refresh from the database page', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Queue::fake([RefreshDatabaseStatusJob::class]);
 
-    $this->post("/databases/{$database->id}/refresh")->assertRedirect();
+    $this->post(projectUrl("/databases/{$database->id}/refresh"))->assertRedirect();
 
     Queue::assertPushed(RefreshDatabaseStatusJob::class, fn (RefreshDatabaseStatusJob $job): bool => $job->database->is($database));
 });

@@ -22,6 +22,6 @@ final class DnsZoneQuery extends Query
 
     public function builder(): Builder
     {
-        return DnsZone::query()->with('provider')->byName();
+        return DnsZone::query()->inCurrentProject()->with('provider')->byName();
     }
 }

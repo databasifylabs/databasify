@@ -13,9 +13,9 @@ export default function CreateStorageProvider() {
     );
 }
 
-CreateStorageProvider.layout = {
+CreateStorageProvider.layout = () => ({
     breadcrumbs: [
         { title: 'Storage', href: StorageProviderController.index() },
         { title: 'Add storage', href: StorageProviderController.create() },
     ],
-};
+});

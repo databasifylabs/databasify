@@ -14,7 +14,7 @@ it('retunes a database for its server size over http', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([RetuneDatabaseJob::class]);
 
-    $this->post("/databases/{$database->id}/retune")->assertRedirect()->assertSessionHasNoErrors();
+    $this->post(projectUrl("/databases/{$database->id}/retune"))->assertRedirect()->assertSessionHasNoErrors();
 
     expect($database->fresh()->operation)->toBe('Retune for server size');
     Queue::assertPushed(RetuneDatabaseJob::class, fn (RetuneDatabaseJob $job): bool => $job->database->is($database));

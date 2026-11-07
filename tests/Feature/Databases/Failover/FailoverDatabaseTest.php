@@ -18,7 +18,7 @@ it('moves the primary to a standby from the database page', function () {
     [$primary, $standby] = $database->nodes()->get()->all();
     $ssh = fakeSsh()->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond()->respond("SECONDARY ONLINE\n")->respond("PRIMARY ONLINE\n");
 
-    $this->post("/databases/{$database->id}/failover")->assertRedirect();
+    $this->post(projectUrl("/databases/{$database->id}/failover"))->assertRedirect();
 
     expect($ssh->runs[2]['server'])->toBe($primary->server->name)
         ->and($ssh->scriptAt(2))->toContain("set_primary_instance('{$standby->privateIp()}:25060')")
@@ -32,7 +32,7 @@ it('refuses to fail over without a standby member', function () {
     withReadOnlyNode($database);
     Queue::fake([FailoverDatabaseJob::class]);
 
-    $this->post("/databases/{$database->id}/failover")->assertSessionHasErrors(['database' => 'Failover needs at least one standby node.']);
+    $this->post(projectUrl("/databases/{$database->id}/failover"))->assertSessionHasErrors(['database' => 'Failover needs at least one standby node.']);
 
     Queue::assertNothingPushed();
 });
@@ -42,7 +42,7 @@ it('refuses to fail over while another operation runs', function () {
     Queue::fake([FailoverDatabaseJob::class]);
     $database->startOperation('Upgrade');
 
-    $this->post("/databases/{$database->id}/failover")->assertSessionHasErrors('database');
+    $this->post(projectUrl("/databases/{$database->id}/failover"))->assertSessionHasErrors('database');
 
     Queue::assertNothingPushed();
 });
