@@ -83,6 +83,7 @@ write_env() {
 banner install
 require_root
 require_linux
+require_memory
 install_docker
 download_release_files
 write_env

@@ -5,8 +5,6 @@ cd /app
 
 SECRETS=/app/storage/databasify.env
 
-. /usr/local/lib/databasify/horizon-workers.sh
-
 log() {
     printf '%s [databasify] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
@@ -62,8 +60,6 @@ case "$role" in
         ;;
     horizon)
         ensure_secrets
-        tune_horizon_workers
-        log "horizon workers for ${cpus} cpus and ${memory_mb} MB: default ${HORIZON_DEFAULT_MAX_PROCESSES}, monitoring ${HORIZON_MONITORING_MAX_PROCESSES}, provisioning ${HORIZON_PROVISIONING_MAX_PROCESSES}, databases ${HORIZON_DATABASES_MAX_PROCESSES}, migrations ${HORIZON_MIGRATIONS_MAX_PROCESSES}, terminals ${HORIZON_TERMINALS_MAX_PROCESSES}"
         cache_config
         exec php artisan horizon
         ;;

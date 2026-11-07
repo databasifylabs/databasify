@@ -15,6 +15,12 @@ require_linux() {
     [ "$(uname -s)" = Linux ] || fail "Databasify installs on Linux servers"
 }
 
+require_memory() {
+    local memory_mb
+    memory_mb=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
+    [ "$memory_mb" -ge 1800 ] || fail "Databasify needs a server with at least 2 GB of memory, this one has ${memory_mb} MB"
+}
+
 require_installed() {
     [ -f "$DIR/compose.yaml" ] || fail "Databasify is not installed in $DIR"
 }
