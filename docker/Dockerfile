@@ -39,6 +39,7 @@ COPY --from=vendor /app /app
 COPY --from=assets /app/public/build /app/public/build
 COPY docker/Caddyfile /etc/frankenphp/Caddyfile
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/databasify
+COPY --chmod=644 docker/horizon-workers.sh /usr/local/lib/databasify/horizon-workers.sh
 
 RUN rm -rf node_modules tests docker .github \
     && chown -R www-data:www-data /app/storage /app/bootstrap/cache

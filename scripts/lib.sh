@@ -18,7 +18,8 @@ require_linux() {
 require_memory() {
     local memory_mb
     memory_mb=$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)
-    [ "$memory_mb" -ge 1800 ] || fail "Databasify needs a server with at least 2 GB of memory, this one has ${memory_mb} MB"
+    [ "$memory_mb" -ge 900 ] || fail "Databasify needs a server with at least 1 GB of memory, this one has ${memory_mb} MB"
+    [ "$memory_mb" -ge 1800 ] || warn "this server has ${memory_mb} MB of memory; Databasify runs on 1 GB, 2 GB is recommended"
 }
 
 require_installed() {

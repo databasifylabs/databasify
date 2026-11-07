@@ -34,7 +34,7 @@ An open-source, self-hostable DBaaS alternative to DigitalOcean Managed Database
 
 ## Installation
 
-On a Linux server with at least 2 GB of memory:
+On a Linux server with at least 1 GB of memory (2 GB recommended):
 
 ```bash
 curl -fsSL https://get.databasify.io/install.sh | sudo bash
