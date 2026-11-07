@@ -1,6 +1,5 @@
-export VALKEYCLI_AUTH REDISCLI_AUTH
+export VALKEYCLI_AUTH
 VALKEYCLI_AUTH=$(echo '{{ base64_encode($password) }}' | base64 -d)
-REDISCLI_AUTH=$VALKEYCLI_AUTH
 info=$(timeout 15 {{ $cli }} -h {{ $host }} -p {{ $port }} {!! $username !== '' ? '--user '.escapeshellarg($username) : '' !!} {{ $tls ? '--tls --insecure' : '' }} --no-auth-warning INFO </dev/null 2>&1 | tr -d '\r' || true)
 if ! grep -qE '^(redis|valkey)_version:' <<< "$info"; then
     printf 'error=%s\n' "$(head -n 3 <<< "$info" | tr '\n' ' ')"

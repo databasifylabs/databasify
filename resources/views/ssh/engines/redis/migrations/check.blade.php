@@ -1,6 +1,5 @@
-export VALKEYCLI_AUTH REDISCLI_AUTH
-VALKEYCLI_AUTH=$(echo '{{ base64_encode($password) }}' | base64 -d)
-REDISCLI_AUTH=$VALKEYCLI_AUTH
+export REDISCLI_AUTH
+REDISCLI_AUTH=$(echo '{{ base64_encode($password) }}' | base64 -d)
 source_info() { timeout 15 {{ $cli }} -h {{ $host }} -p {{ $port }} {!! $username !== '' ? '--user '.escapeshellarg($username) : '' !!} {{ $tls ? '--tls --insecure' : '' }} --no-auth-warning INFO "$@" </dev/null 2>&1 | tr -d '\r' || true; }
 info=$(source_info)
 if ! grep -qE '^(redis|valkey)_version:' <<< "$info"; then
