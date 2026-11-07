@@ -44,10 +44,10 @@ it('orders a droplet in the chosen vpc and records that network', function () {
     $provider = ServerProvider::factory()->create();
     Http::fake([DIGITALOCEAN.'/vpcs*' => Http::response(['vpcs' => [['id' => 'vpc-1', 'name' => 'default-blr1', 'region' => 'blr1', 'ip_range' => '10.104.0.0/20', 'default' => true]]])]);
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-1'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-1'])
         ->assertRedirect();
 
-    $server = Server::query()->where('name', 'db-04')->sole();
+    $server = Server::query()->where('name', 'server-01')->sole();
     expect($server)
         ->status->toBe(ServerStatus::Creating)
         ->public_ip->toBeNull()
@@ -64,10 +64,10 @@ it('creates a new vpc for the server when asked', function () {
     $provider = ServerProvider::factory()->create();
     Http::fake([DIGITALOCEAN.'/vpcs' => Http::response(['vpc' => ['id' => 'vpc-new', 'name' => 'databasify-blr1-x', 'region' => 'blr1', 'ip_range' => '10.122.16.0/20', 'default' => false]], 201)]);
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'new'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'new'])
         ->assertSessionHasNoErrors();
 
-    expect(Server::query()->where('name', 'db-04')->sole()->network)
+    expect(Server::query()->where('name', 'server-01')->sole()->network)
         ->external_id->toBe('vpc-new')->cidr->toBe('10.122.16.0/20')->server_provider_id->toBe($provider->id);
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_starts_with((string) $request['name'], 'databasify-blr1-'));
 });
@@ -76,18 +76,18 @@ it('keeps no server when the provider refuses to create the network', function (
     $provider = ServerProvider::factory()->create();
     Http::fake([DIGITALOCEAN.'/vpcs' => Http::response(['message' => 'quota reached'], 422)]);
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'new'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'new'])
         ->assertSessionHasErrors(['network' => 'DigitalOcean could not create a private network: DigitalOcean answered 422. quota reached']);
-    expect(Server::query()->where('name', 'db-04')->exists())->toBeFalse();
+    expect(Server::query()->where('name', 'server-01')->exists())->toBeFalse();
 });
 
 it('refuses a vpc the region does not have', function () {
     $provider = ServerProvider::factory()->create();
     Http::fake([DIGITALOCEAN.'/vpcs*' => Http::response(['vpcs' => []])]);
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-9'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-9'])
         ->assertSessionHasErrors(['network' => 'That private network is not in blr1 anymore.']);
-    expect(Server::query()->where('name', 'db-04')->exists())->toBeFalse();
+    expect(Server::query()->where('name', 'server-01')->exists())->toBeFalse();
 });
 
 function orderedServer(?Network $network = null): Server
@@ -95,7 +95,7 @@ function orderedServer(?Network $network = null): Server
     $provider = ServerProvider::factory()->create();
 
     return Server::factory()->create([
-        'name' => 'db-04', 'public_ip' => null, 'private_ip' => null, 'network_id' => $network?->id,
+        'name' => 'server-01', 'public_ip' => null, 'private_ip' => null, 'network_id' => $network?->id,
         'server_provider_id' => $provider->id, 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'image' => OperatingSystem::Ubuntu2604, 'status' => ServerStatus::Creating,
     ]);
 }
@@ -124,7 +124,7 @@ it('launches the droplet, waits for its addresses and ssh, then queues setup', f
     Queue::assertPushed(ProvisionServerJob::class, fn (ProvisionServerJob $job): bool => $job->server->is($server) && $job->disablePasswordLogin);
     expect($server->serverLogs()->pluck('status')->all())->each->toBe(ServerLogStatus::Succeeded)
         ->and($server->serverLogs()->pluck('output', 'name')->all())->toEqual([
-            'Order server from DigitalOcean' => "Ordering db-04: plan s-1vcpu-2gb in blr1, image ubuntu-26-04-x64\nDigitalOcean created instance 9001\n",
+            'Order server from DigitalOcean' => "Ordering server-01: plan s-1vcpu-2gb in blr1, image ubuntu-26-04-x64\nDigitalOcean created instance 9001\n",
             'Wait for DigitalOcean to start the server' => "Check 1/60: starting, no IP address yet\nCheck 2/60: running, public IP 203.0.113.20, private IP 10.104.0.12\n",
             'Wait for SSH' => "Check 1/60: SSH on 203.0.113.20:22 is not answering yet\nCheck 2/60: SSH on 203.0.113.20:22 is not answering yet\nSSH answers on 203.0.113.20:22\n",
         ]);
@@ -243,14 +243,14 @@ it('keeps the server when the provider refuses to destroy it', function () {
     Http::fake([DIGITALOCEAN.'/droplets/9001' => Http::response(['message' => 'locked'], 422)]);
 
     $this->delete(projectUrl("/servers/{$server->id}"), ['destroy_at_provider' => true])
-        ->assertSessionHasErrors(['server' => 'Could not destroy db-04 at DigitalOcean: DigitalOcean answered 422. locked']);
+        ->assertSessionHasErrors(['server' => 'Could not destroy server-01 at DigitalOcean: DigitalOcean answered 422. locked']);
     expect($server->fresh())->not->toBeNull();
 });
 
 it('offers only the supported releases, each on the providers that have its image', function () {
     $provider = ServerProvider::factory()->create();
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-22.04'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-22.04'])
         ->assertSessionHasErrors('os');
     $this->get(projectUrl('/servers/create'))->assertInertia(fn ($page) => $page
         ->where('operatingSystems.0', [
@@ -269,7 +269,7 @@ it('refuses an operating system the provider has no image of', function () {
     Queue::fake([LaunchProviderServerJob::class]);
     $provider = ServerProvider::factory()->create();
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'debian-12'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'debian-12'])
         ->assertSessionHasErrors(['os' => 'DigitalOcean does not offer Debian 12.']);
     expect(Server::query()->count())->toBe(0);
     Queue::assertNothingPushed();
@@ -302,12 +302,12 @@ it('orders a droplet on a databasify network outside any vpc', function () {
     $existing = Network::factory()->wireguard()->create();
     Server::factory()->onNetwork($existing)->create(['private_ip' => '100.64.0.1']);
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => "databasify:{$existing->id}"])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => "databasify:{$existing->id}"])
         ->assertSessionHasNoErrors();
     $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-05', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'databasify:new'])
         ->assertSessionHasNoErrors();
 
-    expect(Server::query()->where('name', 'db-04')->sole())->network_id->toBe($existing->id)->private_ip->toBe('100.64.0.2')
+    expect(Server::query()->where('name', 'server-01')->sole())->network_id->toBe($existing->id)->private_ip->toBe('100.64.0.2')
         ->and(Server::query()->where('name', 'db-05')->sole())->private_ip->toBe('100.64.1.1')->network->cidr->toBe('100.64.1.0/24');
     Http::assertNothingSent();
 });
@@ -315,7 +315,7 @@ it('orders a droplet on a databasify network outside any vpc', function () {
 it('refuses a databasify network that does not exist', function () {
     $provider = ServerProvider::factory()->create();
 
-    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'databasify:999'])
+    $this->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'databasify:999'])
         ->assertSessionHasErrors('network');
 });
 
@@ -342,7 +342,7 @@ it('sends an inertia form post back with the provider error when a provider call
 
     $this->withHeader('X-Inertia', 'true')
         ->from(projectUrl('/servers/create'))
-        ->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'db-04', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-1'])
+        ->post(projectUrl('/providers/servers'), ['server_provider_id' => $provider->id, 'name' => 'server-01', 'region' => 'blr1', 'plan' => 's-1vcpu-2gb', 'os' => 'ubuntu-26.04', 'network' => 'vpc-1'])
         ->assertRedirect(projectUrl('/servers/create'))
         ->assertSessionHasErrors(['provider' => 'DigitalOcean answered 503. down']);
 });

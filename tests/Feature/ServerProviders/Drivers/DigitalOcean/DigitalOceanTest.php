@@ -83,7 +83,7 @@ it('creates a droplet in the chosen vpc and reads its addresses', function () {
     ]);
     $driver = new DigitalOcean(new ServerProvider(['credentials' => ['token' => 't']]));
 
-    $id = $driver->createServer(new NewProviderServer('db-04', 'blr1', 's-1vcpu-2gb', 'ubuntu-26-04-x64', 'vpc-1', '42', 'ssh-ed25519 AAAA'));
+    $id = $driver->createServer(new NewProviderServer('server-01', 'blr1', 's-1vcpu-2gb', 'ubuntu-26-04-x64', 'vpc-1', '42', 'ssh-ed25519 AAAA'));
     $starting = $driver->findServer($id);
     $running = $driver->findServer($id);
 
@@ -91,7 +91,7 @@ it('creates a droplet in the chosen vpc and reads its addresses', function () {
         ->and($starting->isReachable())->toBeFalse()
         ->and($running)->running->toBeTrue()->publicIp->toBe('203.0.113.20')->privateIp->toBe('10.104.0.12');
     Http::assertSent(fn (Request $request): bool => $request->url() === DO_API.'/droplets' && $request->data() === [
-        'name' => 'db-04', 'region' => 'blr1', 'size' => 's-1vcpu-2gb', 'image' => 'ubuntu-26-04-x64',
+        'name' => 'server-01', 'region' => 'blr1', 'size' => 's-1vcpu-2gb', 'image' => 'ubuntu-26-04-x64',
         'ssh_keys' => ['42'], 'vpc_uuid' => 'vpc-1', 'ipv6' => false, 'monitoring' => true, 'tags' => ['databasify'],
     ]);
 });

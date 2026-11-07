@@ -222,7 +222,7 @@ function ExistingServerForm({
                         name={name}
                         onName={setName}
                         nameLabel="Server name"
-                        placeholder="db-01"
+                        placeholder="server-01"
                         error={errors.name}
                         processing={processing}
                         missing={missing}
