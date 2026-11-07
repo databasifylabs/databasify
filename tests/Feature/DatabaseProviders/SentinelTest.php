@@ -6,7 +6,10 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\Persistence;
 use App\Models\Database;
+use App\Plugins\PluginContext;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Symfony\Component\Finder\SplFileInfo;
 
 dataset('sentinel engines', [
     'valkey' => ['valkey', 'VALKEY'],
@@ -165,7 +168,7 @@ it('recovers through the generic path: quorum without script data, offsets from 
     $driver = Database::providerFor($engine);
     $render = fn (string $name): string => view(Database::providerFor($engine)->scriptView($name), [...$database->provider()->scriptData()->for($node), 'instance' => $driver->clientAddress($node)])->render();
 
-    expect(view(Database::providerFor($engine)->scriptView('cluster.quorum'), engineScript($engine))->render())->toContain('for candidate in valkey redis; do')->toContain('echo "online=$total"')
+    expect(view(Database::providerFor($engine)->scriptView('cluster.quorum'), engineScript($engine))->render())->toContain("password=/srv/{$engine}/conf/password")->toContain("timeout 5 /usr/local/bin/{$engine}-cli -h")->toContain('echo "online=$(( reachable + 1 ))"')
         ->and($render('cluster.recovery-position'))->toContain("/{$engine}-check-rdb /srv/{$engine}/data/dump.rdb")
         ->and($render('cluster.force-quorum'))->toContain('sentinel already serves from $primary, nothing to force')
         ->toContain("sentinel monitor main {$node->privateIp()} ")
@@ -173,6 +176,20 @@ it('recovers through the generic path: quorum without script data, offsets from 
         ->and($render('cluster.rejoin'))->toContain('held back from promotion until its first full sync finishes')->toContain('rejoined as a replica of $primary')
         ->and($render('lifecycle.wake'))->toContain("databasify ctl stop databasify-{$engine}-sentinel ")->toContain("databasify ctl kill -s KILL databasify-{$engine} ")->toContain("databasify ctl stop databasify-{$engine} ")->toContain('stopped without saving');
 })->with('sentinel engines');
+
+it('counts the quorum from the directory of a plugin engine built on a sentinel driver', function (string $engine, string $line) {
+    (new PluginContext('assets'))->database('example-cache')->label('Example Cache')->handler(Database::providerFor($engine)::class)->scripts("ssh.engines.{$engine}")->directory('/srv/example-cache')->versions($line, [['value' => $line, 'label' => 'Example Cache']])->register();
+
+    expect(view(Database::providerFor('example-cache')->scriptView('cluster.quorum'), engineScript('example-cache'))->render())
+        ->toContain('password=/srv/example-cache/conf/password')
+        ->not->toContain("/srv/{$engine}");
+})->with([['valkey', '9'], ['redis', '8']]);
+
+it('passes the password only through the cli variable of its own engine', function (string $engine, string $own, string $other) {
+    $scripts = collect(File::allFiles(resource_path("views/ssh/engines/{$engine}")))->map(fn (SplFileInfo $file): string => $file->getContents())->implode("\n");
+
+    expect($scripts)->toContain("{$own}=")->not->toContain($other);
+})->with([['valkey', 'VALKEYCLI_AUTH', 'REDISCLI_AUTH'], ['redis', 'REDISCLI_AUTH', 'VALKEYCLI_AUTH']]);
 
 it('puts the kernel back to its defaults when erasing a node, so the server is clean for the next database', function (string $engine) {
     $script = view("ssh.engines.{$engine}.lifecycle.cleanup", idleDatabase($engine, 1, DatabaseMode::Single, 'solo')->provider()->scriptData()->for())->render();

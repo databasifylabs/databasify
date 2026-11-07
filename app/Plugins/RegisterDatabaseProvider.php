@@ -30,7 +30,7 @@ final class RegisterDatabaseProvider extends AbstractProviderRegistrar
     }
 
     /**
-     * @param  array<string, array<string, string>>  $overrides
+     * @param  array<array-key, array<string, string>>  $overrides
      */
     public function scripts(string $path, array $overrides = []): static
     {

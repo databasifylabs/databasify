@@ -1,6 +1,6 @@
 @include('ssh.engines.valkey.helpers')
 sentinel_conf={{ $directory }}/sentinel/sentinel.conf
-ask() { { REDISCLI_AUTH=$(cat {{ $directory }}/conf/password) VALKEYCLI_AUTH=$(cat {{ $directory }}/conf/password) timeout 5 {{ $cli }} -h "$1" -p "$2" "${@:3}" </dev/null 2>/dev/null || true; } | tr -d '\r'; }
+ask() { { VALKEYCLI_AUTH=$(cat {{ $directory }}/conf/password) timeout 5 {{ $cli }} -h "$1" -p "$2" "${@:3}" </dev/null 2>/dev/null || true; } | tr -d '\r'; }
 sentinel_hosts() { { echo 127.0.0.1; sed -n 's/^sentinel known-sentinel {{ $master }} \([^ ]*\) .*/\1/p' "$sentinel_conf" 2> /dev/null || true; } | sort -u; }
 sentinel_view() { ask "$1" {{ $sentinelPort }} SENTINEL master {{ $master }} | paste - - | awk -F '\t' -v key="$2" '$1 == key { print $2 }'; }
 serves_as_primary() { [ "$(ask "$1" {{ $dataPort }} ROLE | head -n 1)" = master ]; }
