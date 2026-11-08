@@ -49,3 +49,23 @@ jobs:
             org.opencontainers.image.title=databasify
             org.opencontainers.image.version=${{ github.ref_name }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+  bump:
+    needs: publish
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 0.x
+
+      - name: Commit version to 0.x
+        run: |
+          sed -i "s/'version' => '[^']*'/'version' => '${GITHUB_REF_NAME}'/" config/app.php
+          git diff --quiet && exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore: set version to ${GITHUB_REF_NAME}"
+          git push origin HEAD:0.x
