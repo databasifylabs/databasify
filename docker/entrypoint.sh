@@ -33,19 +33,36 @@ ensure_secrets() {
     done < "$SECRETS"
 }
 
-prepare_database() {
-    if [ "${DB_CONNECTION:-sqlite}" = sqlite ]; then
-        touch "${DB_DATABASE:-/app/storage/database.sqlite}"
-    fi
-    php artisan migrate --force --no-interaction
-}
-
-cache_config() {
-    php artisan optimize --no-interaction > /dev/null
+as_app() {
+    exec setpriv --reuid=www-data --regid=www-data --init-groups -- "$@"
 }
 
 own_storage() {
     chown -R www-data:www-data /app/storage /app/bootstrap/cache
+}
+
+prepare_database() {
+    if [ "${DB_CONNECTION:-sqlite}" = sqlite ]; then
+        (as_app touch "${DB_DATABASE:-/app/storage/database.sqlite}")
+    fi
+    (as_app php artisan migrate --force --no-interaction)
+}
+
+cache_config() {
+    (as_app php artisan optimize --no-interaction) > /dev/null
+}
+
+serve() {
+    php-fpm8.5 --nodaemonize &
+    fpm=$!
+    nginx -g 'daemon off;' &
+    web=$!
+    trap 'kill -TERM "$fpm" "$web" 2>/dev/null || true' TERM INT
+    while kill -0 "$fpm" 2>/dev/null && kill -0 "$web" 2>/dev/null; do
+        sleep 1
+    done
+    kill -TERM "$fpm" "$web" 2>/dev/null || true
+    wait
 }
 
 role=${1:-web}
@@ -54,36 +71,40 @@ role=${1:-web}
 case "$role" in
     web)
         ensure_secrets
+        own_storage
         prepare_database
         cache_config
-        own_storage
-        log "serving on ${SERVER_NAME}"
-        exec frankenphp run --config /etc/frankenphp/Caddyfile
+        log "serving on port 80"
+        serve
         ;;
     horizon)
         ensure_secrets
         tune_horizon_workers
         log "horizon workers for ${cpus} cpus and ${memory_mb} MB: default ${HORIZON_DEFAULT_MAX_PROCESSES}, monitoring ${HORIZON_MONITORING_MAX_PROCESSES}, provisioning ${HORIZON_PROVISIONING_MAX_PROCESSES}, databases ${HORIZON_DATABASES_MAX_PROCESSES}, migrations ${HORIZON_MIGRATIONS_MAX_PROCESSES}, terminals ${HORIZON_TERMINALS_MAX_PROCESSES}, estimated ceiling ${ceiling_mb} MB"
         [ "$ceiling_mb" -le "$memory_mb" ] || log "warning: busy workers may need ${ceiling_mb} MB of ${memory_mb} MB, so expect swap under load; 2 GB is recommended"
+        own_storage
         cache_config
-        exec php artisan horizon
+        as_app php artisan horizon
         ;;
     scheduler)
         ensure_secrets
+        own_storage
         cache_config
-        exec php artisan schedule:work
+        as_app php artisan schedule:work
         ;;
     reverb)
         ensure_secrets
+        own_storage
         cache_config
-        exec php artisan reverb:start --host=0.0.0.0 --port=8080
+        as_app php artisan reverb:start --host=0.0.0.0 --port=8080
         ;;
     healthcheck)
-        exec curl --fail --silent --output /dev/null http://127.0.0.1:8081/up
+        exec curl --fail --silent --output /dev/null http://127.0.0.1/up
         ;;
     artisan)
         ensure_secrets
-        exec php artisan "$@"
+        own_storage
+        as_app php artisan "$@"
         ;;
     *)
         exec "$role" "$@"

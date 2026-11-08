@@ -23,12 +23,6 @@ public_address() {
     curl -fsS --max-time 5 https://api.ipify.org 2> /dev/null || hostname -I 2> /dev/null | awk '{ print $1 }'
 }
 
-check_domain() {
-    local resolved
-    resolved=$(getent hosts "$1" 2> /dev/null | awk '{ print $1 }' | head -n 1)
-    [ "$resolved" = "$2" ] || warn "$1 resolves to ${resolved:-nothing}, not this server ($2); HTTPS starts working once it points here"
-}
-
 set_setting() {
     sed -i "s|^$1=.*|$1=$2|" "$DIR/.env"
 }
@@ -40,11 +34,10 @@ setting() {
 require_free_ports() {
     command -v ss > /dev/null 2>&1 || return 0
     compose ps -q web | grep -q . && return 0
-    for name in HTTP_PORT HTTPS_PORT; do
-        local port
-        port=$(setting "$name")
-        [ -z "$(ss -ltnH "sport = :$port")" ] || fail "port $port is already in use; free it or change $name in $DIR/.env, then run the install script again"
-    done
+    local port
+    port=$(setting HTTP_PORT || true)
+    port=${port:-80}
+    [ -z "$(ss -ltnH "sport = :$port")" ] || fail "port $port is already in use; free it or set HTTP_PORT in $DIR/.env, then run the install script again"
 }
 
 write_env() {
@@ -52,7 +45,7 @@ write_env() {
         log "keeping the settings in $DIR/.env"
         return
     fi
-    local address domain port cloudflare
+    local address domain
     address=$(public_address)
     address=${address:-localhost}
     domain=${DATABASIFY_DOMAIN:-$(ask "Domain for Databasify, leave empty to use the IP" "")}
@@ -60,23 +53,11 @@ write_env() {
     cp "$DIR/.env.example" "$DIR/.env"
     chmod 600 "$DIR/.env"
     if [ -n "$domain" ]; then
-        cloudflare=${DATABASIFY_CLOUDFLARE_PROXY:-$(ask "Is $domain proxied by Cloudflare (orange cloud)? y/N" "n")}
-        port=${DATABASIFY_HTTP_PORT:-80}
         set_setting APP_URL "https://$domain"
-        set_setting SERVER_NAME "$domain"
-        if [ "$cloudflare" = y ] || [ "$cloudflare" = Y ]; then
-            set_setting CADDY_TLS "tls internal"
-            log "Cloudflare serves the public certificate; set its SSL/TLS mode to Full"
-        else
-            check_domain "$domain" "$address"
-            log "Caddy requests a Let's Encrypt certificate for $domain once it points to this server"
-        fi
+        log "proxy $domain through Cloudflare (orange cloud) to $address with SSL/TLS mode Flexible; Cloudflare serves HTTPS"
     else
-        port=${DATABASIFY_HTTP_PORT:-$(ask "HTTP port" "80")}
-        set_setting APP_URL "http://$address$([ "$port" = 80 ] || printf ':%s' "$port")"
+        set_setting APP_URL "http://$address"
     fi
-    set_setting HTTP_PORT "$port"
-    set_setting HTTPS_PORT "${DATABASIFY_HTTPS_PORT:-443}"
     log "wrote $DIR/.env (APP_URL=$(app_url))"
 }
 

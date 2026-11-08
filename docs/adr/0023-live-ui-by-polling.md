@@ -10,7 +10,7 @@ Pages show state that changes on remote servers: node status, running operations
 ## Decision
 
 - Pages refresh their data with Inertia `usePoll` partial reloads every few seconds (for example 5 seconds on the databases list and 10 on the dashboard).
-- Reverb carries only byte streams: server log output and terminal output. There are no model-change broadcasts. Caddy proxies Reverb on the same origin.
+- Reverb carries only byte streams: server log output and terminal output. There are no model-change broadcasts. nginx proxies Reverb on the same origin.
 - All endpoints are Inertia routes reached through Wayfinder; there is no public API.
 
 ## Consequences
@@ -30,4 +30,4 @@ Pages show state that changes on remote servers: node status, running operations
 - `resources/js/pages/databases/index.tsx`
 - `app/Events/ServerLogOutputReceived.php`
 - `app/Events/TerminalOutputReceived.php`
-- `docker/Caddyfile`
+- `docker/nginx.conf`
