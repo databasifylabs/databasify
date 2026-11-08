@@ -12,7 +12,6 @@ use App\Http\Requests\Concerns\ReadsTypedInput;
 use App\Models\Database;
 use App\Models\Server;
 use App\Rules\AvailableServer;
-use App\Rules\HasClusterMemory;
 use App\Rules\SharesPrivateNetwork;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -34,9 +33,9 @@ class StoreDatabaseRequest extends FormRequest
             'name' => $this->databaseNameRules(),
             'engine' => ['required', Rule::in(Database::engines())],
             'version_line' => ['nullable', 'string', Rule::in($engine?->versions()->map(fn (VersionLine $line): string => $line->value)->all() ?? [])],
-            'primary_server_id' => ['required', 'uuid', new AvailableServer, $this->eachServerOnce(...), Rule::when($this->stringList('standby_server_ids') !== [], [new HasClusterMemory])],
+            'primary_server_id' => ['required', 'uuid', new AvailableServer, $this->eachServerOnce(...)],
             'standby_server_ids' => ['array', 'max:'.($engine?->maxStandbys() ?? 0)],
-            'standby_server_ids.*' => array_merge($this->serverIdRules(), [new SharesPrivateNetwork(Server::query()->find($this->string('primary_server_id')->value())), new HasClusterMemory]),
+            'standby_server_ids.*' => array_merge($this->serverIdRules(), [new SharesPrivateNetwork(Server::query()->find($this->string('primary_server_id')->value()))]),
         ];
     }
 

@@ -35,7 +35,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { useClusterMemory } from '@/lib/cluster';
 import { formatMemory, pluralize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { NetworkSummary, Server } from '@/types';
@@ -330,7 +329,6 @@ export default function CreateDatabase({
 
     const primaryServer =
         servers.find((server) => server.id === primary) ?? null;
-    const fitsCluster = useClusterMemory();
     const choosePrimary = (id: string) => {
         const chosen = servers.find((server) => server.id === id);
         setPrimary((current) => (current === id ? null : id));
@@ -342,7 +340,6 @@ export default function CreateDatabase({
                     value !== id &&
                     chosen !== undefined &&
                     standby !== undefined &&
-                    fitsCluster(chosen.memory_mb) &&
                     sharesPrivateNetwork(chosen, standby)
                 );
             }),
@@ -475,11 +472,7 @@ export default function CreateDatabase({
                                                                         server.id,
                                                                     )
                                                                         ? 'Standby'
-                                                                        : fitsCluster(
-                                                                                server.memory_mb,
-                                                                            )
-                                                                          ? undefined
-                                                                          : 'Single-node only'
+                                                                        : undefined
                                                                 }
                                                                 onToggle={() =>
                                                                     choosePrimary(
@@ -501,7 +494,7 @@ export default function CreateDatabase({
                                         <RoleHeading
                                             icon={Copy}
                                             title="Standbys"
-                                            hint="Optional"
+                                            hint="Optional, at least 1 GB of RAM suggested"
                                             aside={
                                                 <span className="text-xs text-muted-foreground tabular-nums">
                                                     {standbys.length} of{' '}
@@ -513,18 +506,6 @@ export default function CreateDatabase({
                                             <StandbyNote>
                                                 Pick a primary first. Standbys
                                                 must share its private network.
-                                            </StandbyNote>
-                                        ) : !fitsCluster(
-                                              primaryServer.memory_mb,
-                                          ) ? (
-                                            <StandbyNote>
-                                                {primaryServer.name} has{' '}
-                                                {formatMemory(
-                                                    primaryServer.memory_mb,
-                                                )}{' '}
-                                                of memory. Standbys need 1 GB on
-                                                every node, so it runs as a
-                                                single-node database.
                                             </StandbyNote>
                                         ) : !primaryServer.network ? (
                                             <StandbyNote>
@@ -546,37 +527,25 @@ export default function CreateDatabase({
                                                         primaryServer.network
                                                     }
                                                 />
-                                                {candidates.map((server) => {
-                                                    const fits = fitsCluster(
-                                                        server.memory_mb,
-                                                    );
-
-                                                    return (
-                                                        <ServerRow
-                                                            key={server.id}
-                                                            server={server}
-                                                            multiple
-                                                            selected={standbys.includes(
+                                                {candidates.map((server) => (
+                                                    <ServerRow
+                                                        key={server.id}
+                                                        server={server}
+                                                        multiple
+                                                        selected={standbys.includes(
+                                                            server.id,
+                                                        )}
+                                                        disabled={
+                                                            standbys.length >=
+                                                            maxStandbys
+                                                        }
+                                                        onToggle={() =>
+                                                            toggleStandby(
                                                                 server.id,
-                                                            )}
-                                                            disabled={
-                                                                standbys.length >=
-                                                                    maxStandbys ||
-                                                                !fits
-                                                            }
-                                                            note={
-                                                                fits
-                                                                    ? undefined
-                                                                    : 'Needs 1 GB'
-                                                            }
-                                                            onToggle={() =>
-                                                                toggleStandby(
-                                                                    server.id,
-                                                                )
-                                                            }
-                                                        />
-                                                    );
-                                                })}
+                                                            )
+                                                        }
+                                                    />
+                                                ))}
                                             </div>
                                         )}
                                         {primaryServer?.network &&

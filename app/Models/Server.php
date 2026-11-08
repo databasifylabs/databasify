@@ -337,11 +337,6 @@ class Server extends Model implements Movable
         return $this->network?->isWireguard() ? $this->network : null;
     }
 
-    public function canJoinCluster(): bool
-    {
-        return $this->memory_mb === null || $this->memory_mb >= Database::CLUSTER_MEMORY_MB;
-    }
-
     public function sharesPrivateNetworkWith(Server $other): bool
     {
         return $this->network_id !== null && $this->network_id === $other->network_id;

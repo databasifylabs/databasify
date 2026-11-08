@@ -9,12 +9,9 @@ use App\Enums\Databases\NodeKind;
 use App\Http\Requests\Concerns\DatabaseValidationRules;
 use App\Http\Requests\Concerns\ReadsTypedInput;
 use App\Http\Requests\Concerns\ResolvesRouteModel;
-use App\Models\DatabaseNode;
 use App\Models\Server;
 use App\Rules\AvailableServer;
-use App\Rules\HasClusterMemory;
 use App\Rules\SharesPrivateNetwork;
-use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,7 +26,7 @@ class AddDatabaseNodeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'server_id' => ['required', 'uuid', new AvailableServer, new SharesPrivateNetwork($this->routeDatabase()->seed()->server), Rule::when($this->addsStandby(), [new HasClusterMemory, $this->membersCanCluster(...)])],
+            'server_id' => ['required', 'uuid', new AvailableServer, new SharesPrivateNetwork($this->routeDatabase()->seed()->server)],
             'kind' => ['sometimes', Rule::enum(NodeKind::class)],
             'name' => array_merge(['required_if:kind,'.NodeKind::ReadOnly->value, 'nullable', 'prohibited_unless:kind,'.NodeKind::ReadOnly->value], $this->nodeNameRules()),
         ];
@@ -47,20 +44,5 @@ class AddDatabaseNodeRequest extends FormRequest
     private function chosenKind(): NodeKind
     {
         return $this->enum('kind', NodeKind::class) ?? NodeKind::Member;
-    }
-
-    private function addsStandby(): bool
-    {
-        return $this->chosenKind() === NodeKind::Member;
-    }
-
-    private function membersCanCluster(string $attribute, mixed $value, Closure $fail): void
-    {
-        $small = $this->routeDatabase()->nodes()->members()->get()
-            ->first(fn (DatabaseNode $node): bool => ! $node->server->canJoinCluster());
-
-        if ($small !== null) {
-            $fail(HasClusterMemory::shortfallOf($small->server, 'move it to a bigger server first'));
-        }
     }
 }

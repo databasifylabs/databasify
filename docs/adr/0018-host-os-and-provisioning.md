@@ -13,7 +13,7 @@ Databasify runs on servers the user brings or orders. Every host script has to w
 - Host scripts branch on the family into `ssh/servers/os/{debian,rhel}`.
 - Provisioning runs a fixed sequence: package update, base tools, pinned Docker ([0002](0002-container-per-node.md)), then swap. A 2 GB swap file is added only when the server has less than 4 GB of RAM and at least 6 GB of free disk.
 - SELinux stays enforcing on RHEL hosts; scripts relabel files instead of disabling it.
-- A server needs about 1 GB of RAM to join a cluster (`Database::CLUSTER_MEMORY_MB` is 900, so 1 GB plans that report about 960 MB qualify).
+- At least 1 GB of RAM per node is suggested in the UI but not enforced: servers of any size can be primaries, standbys or read-only nodes.
 - Only IPv4 is supported: public and private addresses and network ranges are validated as IPv4.
 
 ## Consequences

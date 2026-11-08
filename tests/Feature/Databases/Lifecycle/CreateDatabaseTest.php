@@ -192,29 +192,16 @@ it('validates the database name, engine and version line', function () {
     expect(Database::query()->count())->toBe(1);
 });
 
-it('runs a single-node database on a 512 MB server but lets standbys run on 1 GB servers', function () {
+it('creates a database with standbys on servers with less than 1 GB of memory', function () {
     Queue::fake([BootstrapDatabaseJob::class]);
     $this->actingAs(User::factory()->create());
-    $small = Server::factory()->ready()->create(['name' => 'small', 'memory_mb' => 480]);
-    $large = Server::factory()->ready()->create(['name' => 'large', 'memory_mb' => 1967]);
-    $other = Server::factory()->ready()->create(['name' => 'other', 'memory_mb' => 3925]);
-    $tooSmall = 'Every node of a database with standbys needs at least 1 GB, so it can only run a single-node database.';
+    $primary = Server::factory()->ready()->create(['memory_mb' => 480]);
+    $standby = Server::factory()->ready()->create(['memory_mb' => 480]);
 
-    $this->post(projectUrl('/databases'), ['name' => 'cluster', 'engine' => 'mysql', 'primary_server_id' => $small->id, 'standby_server_ids' => [$large->id]])
-        ->assertSessionHasErrors(['primary_server_id' => "small has 480 MB of memory. {$tooSmall}"]);
-    $this->post(projectUrl('/databases'), ['name' => 'cluster', 'engine' => 'mysql', 'primary_server_id' => $large->id, 'standby_server_ids' => [$small->id]])
-        ->assertSessionHasErrors(['standby_server_ids.0' => "small has 480 MB of memory. {$tooSmall}"]);
-    $this->post(projectUrl('/databases'), ['name' => 'cluster', 'engine' => 'mysql', 'primary_server_id' => $large->id, 'standby_server_ids' => [$other->id]])
-        ->assertSessionHasNoErrors();
-    $this->post(projectUrl('/databases'), ['name' => 'single', 'engine' => 'mysql', 'primary_server_id' => $small->id])
+    $this->post(projectUrl('/databases'), ['name' => 'cluster', 'engine' => 'mysql', 'primary_server_id' => $primary->id, 'standby_server_ids' => [$standby->id]])
         ->assertSessionHasNoErrors();
 
-    $oneGb = Server::factory()->ready()->create(['name' => 'one-gb', 'memory_mb' => 961]);
-    $oneGbStandby = Server::factory()->ready()->create(['name' => 'one-gb-standby', 'memory_mb' => 961]);
-    $this->post(projectUrl('/databases'), ['name' => 'small-cluster', 'engine' => 'mysql', 'primary_server_id' => $oneGb->id, 'standby_server_ids' => [$oneGbStandby->id]])
-        ->assertSessionHasNoErrors();
-
-    expect(Database::query()->pluck('name')->sort()->values()->all())->toBe(['cluster', 'single', 'small-cluster']);
+    expect(Database::query()->sole()->name)->toBe('cluster');
 });
 
 it('gives every new sql database the databasify user and the defaultdb database', function (string $engine) {

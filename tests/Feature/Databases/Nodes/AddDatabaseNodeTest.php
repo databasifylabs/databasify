@@ -157,21 +157,14 @@ it('refuses to add a node while the database is busy', function () {
     Queue::assertNothingPushed();
 });
 
-it('adds standbys only when every member has 1 GB but allows small read-only nodes', function () {
+it('adds a standby on a server with less than 1 GB of memory', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     Queue::fake([AddDatabaseNodeJob::class]);
-    $seed = $database->seed()->server;
-    $small = Server::factory()->ready()->create(['name' => 'small', 'memory_mb' => 480]);
-    $large = Server::factory()->ready()->create(['name' => 'large', 'memory_mb' => 3925]);
+    $database->seed()->server->update(['memory_mb' => 480]);
+    $small = Server::factory()->ready()->create(['memory_mb' => 480]);
 
-    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $small->id])
-        ->assertSessionHasErrors(['server_id' => 'small has 480 MB of memory. Every node of a database with standbys needs at least 1 GB, so it can only run a single-node database.']);
+    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $small->id])->assertSessionHasNoErrors();
 
-    $seed->update(['memory_mb' => 480]);
-    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $large->id])
-        ->assertSessionHasErrors(['server_id' => "{$seed->name} has 480 MB of memory. Every node of a database with standbys needs at least 1 GB, move it to a bigger server first."]);
-
-    $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $small->id, 'kind' => 'read_only', 'name' => 'reports'])->assertSessionHasNoErrors();
-    expect($database->nodes()->readOnly()->sole()->server_id)->toBe($small->id);
+    expect($database->nodes()->members()->pluck('server_id'))->toContain($small->id);
 });

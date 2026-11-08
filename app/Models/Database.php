@@ -96,8 +96,6 @@ class Database extends Model implements Movable
 
     public const string CERTIFICATE_AUTHORITY = 'ca.crt';
 
-    public const int CLUSTER_MEMORY_MB = 900;
-
     private const array AUTHORITY_FILES = ['ca.crt', 'ca.key'];
 
     /**
