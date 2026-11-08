@@ -1,6 +1,6 @@
 FROM dunglas/frankenphp:1.13.3-php8.5.12-alpine@sha256:6c330d81614c3e451beb6c9d3aec7e3893e4e46007e2e3cd5b2056c7bd3c0ffa AS base
 
-RUN install-php-extensions bcmath gmp intl opcache pcntl pdo_mysql pdo_pgsql redis zip \
+RUN install-php-extensions bcmath gmp intl opcache pcntl pdo_mysql pdo_pgsql redis sockets zip \
     && apk add --no-cache curl
 
 WORKDIR /app
