@@ -76,3 +76,4 @@ Options that were tried or rejected, and why.
 | [0030](0030-provider-http-client-with-dns-write-retries.md) | One provider HTTP client; DNS record writes retry too              | Accepted           |
 | [0031](0031-projects-as-a-global-scope.md)                  | Projects as a global scope                                         | Accepted           |
 | [0032](0032-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers              | Accepted           |
+| [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`                        | Accepted           |

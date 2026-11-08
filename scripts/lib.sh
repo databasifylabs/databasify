@@ -2,6 +2,7 @@
 
 DIR=${DATABASIFY_DIR:-/opt/databasify}
 PULL=${DATABASIFY_PULL:-true}
+SECRET_NAMES='APP_KEY REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET'
 
 SUPPORTED_SYSTEMS="Databasify runs on Ubuntu 24.04 or 26.04, Debian 12 or 13,
   Rocky Linux 9 or AlmaLinux 9."
@@ -92,7 +93,7 @@ fetch() {
     if [ -d "$SOURCE" ]; then
         cp "$SOURCE/$1" "$2"
     else
-        curl -fsSL "$SOURCE/$1" -o "$2"
+        curl -fsSL "$SOURCE/$1" -o "$2" < /dev/null
     fi
 }
 
@@ -122,7 +123,7 @@ running_version() {
     local container
     container=$(compose ps -q web 2> /dev/null) || return 0
     [ -n "$container" ] || return 0
-    docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$container" 2> /dev/null || true
+    docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$container" < /dev/null 2> /dev/null || true
 }
 
 version_chip() {
@@ -136,7 +137,7 @@ version_chip() {
 }
 
 compose() {
-    (cd "$DIR" && docker compose "$@")
+    (cd "$DIR" && docker compose "$@" < /dev/null)
 }
 
 download_release_files() {
@@ -178,6 +179,161 @@ wait_for_health() {
 
 app_url() {
     env_value APP_URL
+}
+
+set_setting() {
+    local file
+    file=$(mktemp "$DIR/.env.XXXXXX")
+    SETTING_NAME=$1 SETTING_VALUE=$2 awk '
+        index($0, ENVIRON["SETTING_NAME"] "=") == 1 { print ENVIRON["SETTING_NAME"] "=" ENVIRON["SETTING_VALUE"]; found = 1; next }
+        { print }
+        END { if (!found) print ENVIRON["SETTING_NAME"] "=" ENVIRON["SETTING_VALUE"] }
+    ' "$DIR/.env" > "$file"
+    mv "$file" "$DIR/.env"
+}
+
+write_settings() {
+    local line
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        set_setting "${line%%=*}" "${line#*=}"
+    done <<< "$1"
+}
+
+value_in() {
+    grep "^$2=" <<< "$1" | head -n 1 | cut -d= -f2- || true
+}
+
+random_hex() {
+    head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'
+}
+
+new_secrets() {
+    printf 'APP_KEY=base64:%s\n' "$(head -c 32 /dev/urandom | base64)"
+    printf 'REVERB_APP_ID=%s\n' "$(random_hex 4)"
+    printf 'REVERB_APP_KEY=%s\n' "$(random_hex 16)"
+    printf 'REVERB_APP_SECRET=%s\n' "$(random_hex 32)"
+}
+
+missing_secrets() {
+    local name
+    for name in $SECRET_NAMES; do
+        [ -n "$(env_value "$name")" ] || printf '%s\n' "$name"
+    done
+}
+
+storage_volume_missing() {
+    docker info > /dev/null 2>&1 < /dev/null || return 1
+    ! docker volume inspect databasify_storage > /dev/null 2>&1 < /dev/null
+}
+
+resolve_secrets() {
+    SECRETS=$(new_secrets)
+    [ -z "$(env_value APP_KEY)" ] || return 0
+    storage_volume_missing && return 0
+    step_failed "APP_KEY is missing from $DIR/.env" "Put APP_KEY and the REVERB_APP_* values from your backup into $DIR/.env, then run the command again. No new key is generated while the databasify_storage volume exists or Docker does not answer, because it would make that data unreadable."
+}
+
+fill_secrets() {
+    local name
+    for name in $(missing_secrets); do
+        set_setting "$name" "$(value_in "$SECRETS" "$name")"
+    done
+    step_result "App key and Reverb credentials generated in $DIR/.env"
+}
+
+secrets_step() {
+    [ -n "$(missing_secrets)" ] || return 0
+    resolve_secrets
+    run_step 'Saving the app key and Reverb credentials' '' fill_secrets
+}
+
+load_horizon_workers() {
+    local file
+    file=$(mktemp)
+    if ! fetch horizon-workers.sh "$file" 2>> "${LOG:-/dev/null}"; then
+        rm -f "$file"
+        step_failed 'Downloading the Horizon sizing failed'
+    fi
+    # shellcheck source=scripts/horizon-workers.sh
+    . "$file"
+    rm -f "$file"
+}
+
+sizing_overrides_in_env() {
+    grep -oE '^(DATABASIFY_(CPUS|MEMORY_MB|RESERVE_MB|STACK_MB|PHP_PROCESS_MB|WORKER_RSS_MB)|HORIZON_[A-Z]+_MIN_PROCESSES)=' "$DIR/.env" 2> /dev/null | tr -d = || true
+}
+
+use_sizing_overrides() {
+    local name
+    for name in $(sizing_overrides_in_env); do
+        [ -n "${!name:-}" ] || export "$name=$(env_value "$name")"
+    done
+}
+
+measure_horizon_workers() {
+    load_horizon_workers
+    use_sizing_overrides
+    SERVER_CPUS=$(cpu_count)
+    SERVER_MEMORY_MB=$(memory_size_mb)
+    HORIZON_WORKERS=$(horizon_workers "$SERVER_CPUS" "$SERVER_MEMORY_MB")
+}
+
+server_size() {
+    printf '%s CPU%s and %s MB' "$SERVER_CPUS" "$([ "$SERVER_CPUS" -eq 1 ] || printf s)" "$SERVER_MEMORY_MB"
+}
+
+empty_horizon_workers() {
+    local line
+    while IFS= read -r line; do
+        [ -n "$(env_value "${line%%=*}")" ] || printf '%s\n' "$line"
+    done <<< "$HORIZON_WORKERS"
+}
+
+changed_horizon_workers() {
+    local line current
+    while IFS= read -r line; do
+        current=$(env_value "${line%%=*}")
+        [ -z "$current" ] || [ "$current" = "${line#*=}" ] || printf '%s\n' "$line"
+    done <<< "$HORIZON_WORKERS"
+}
+
+horizon_group_of() {
+    local group=${1#HORIZON_}
+    printf '%s' "${group%_MAX_PROCESSES}" | tr '[:upper:]' '[:lower:]'
+}
+
+horizon_changes_in() {
+    local line name summary=
+    while IFS= read -r line; do
+        name=${line%%=*}
+        summary="${summary:+$summary, }$(horizon_group_of "$name") $(env_value "$name") → ${line#*=}"
+    done <<< "$1"
+    printf '%s' "$summary"
+}
+
+horizon_changes_accepted() {
+    [ "${DATABASIFY_YES:-false}" = true ] && return 0
+    has_terminal || return 1
+    local answer=
+    printf '\n  %sHorizon workers for %s: %s. Apply? [y/N]: %s' "$RED" "$(server_size)" "$(horizon_changes_in "$1")" "$RESET" > /dev/tty
+    read -r answer < /dev/tty || true
+    [ "$answer" = y ] || [ "$answer" = Y ]
+}
+
+horizon_step() {
+    local empty changed
+    measure_horizon_workers
+    empty=$(empty_horizon_workers)
+    changed=$(changed_horizon_workers)
+    [ -n "$empty$changed" ] || return 0
+    write_settings "$empty"
+    if [ -n "$changed" ] && ! horizon_changes_accepted "$changed"; then
+        skipped_line "Horizon workers kept (run again to apply: $(horizon_changes_in "$changed"))" ""
+        return 0
+    fi
+    write_settings "$changed"
+    done_line "Horizon workers updated for $(server_size)"
 }
 
 use_color() {

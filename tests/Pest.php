@@ -158,6 +158,36 @@ function temporaryFile(string $contents = ''): string
     return $path;
 }
 
+function fakeHost(int $cpus, int $memoryMb): string
+{
+    $root = temporaryDirectory();
+    mkdir("$root/proc");
+    file_put_contents("$root/proc/cpuinfo", collect(range(0, $cpus - 1))->map(fn (int $cpu): string => "processor\t: $cpu\n")->implode("\n"));
+    file_put_contents("$root/proc/meminfo", 'MemTotal:       '.($memoryMb * 1024)." kB\n");
+
+    return $root;
+}
+
+function filledSecrets(): string
+{
+    return "APP_KEY=base64:c3RvcmVkLWtleS1zdG9yZWQta2V5LXN0b3JlZC1rZXk=\nREVERB_APP_ID=a1b2c3d4\nREVERB_APP_KEY=0123456789abcdef0123456789abcdef\nREVERB_APP_SECRET=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\n";
+}
+
+function dockerWithStorageVolume(): string
+{
+    return 'docker() { [ "$*" = "volume inspect databasify_storage" ] || [ "$1" = info ]; }';
+}
+
+function dockerWithoutStorageVolume(): string
+{
+    return 'docker() { [ "$1" = info ]; }';
+}
+
+function workersFor2CpusAnd4Gb(): string
+{
+    return "HORIZON_DEFAULT_MAX_PROCESSES=2\nHORIZON_MONITORING_MAX_PROCESSES=4\nHORIZON_PROVISIONING_MAX_PROCESSES=4\nHORIZON_DATABASES_MAX_PROCESSES=6\nHORIZON_MIGRATIONS_MAX_PROCESSES=4\nHORIZON_TERMINALS_MAX_PROCESSES=3\n";
+}
+
 function javascriptErrorsIn(string $script): string
 {
     $result = Process::input($script)->run(['node', '--check']);

@@ -22,7 +22,7 @@ missing_settings() {
 add_new_settings() {
     local line names='' count=0
     while IFS= read -r line; do
-        printf '%s\n' "$line" >> "$DIR/.env"
+        set_setting "${line%%=*}" "${line#*=}"
         names="${names:+$names, }${line%%=*}"
         count=$((count + 1))
     done < <(missing_settings)
@@ -67,6 +67,8 @@ banner 'Welcome to the Databasify updater' "This pulls the latest release and re
 heading Databasify
 run_step 'Refreshing release files' '' release_files_step
 settings_step
+secrets_step
+horizon_step
 pull_step
 
 heading Start

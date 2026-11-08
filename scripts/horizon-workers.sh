@@ -20,6 +20,7 @@ ceil_div() {
 }
 
 cgroup_cpus() {
+    # shellcheck disable=SC2046
     set -- $(file_in /sys/fs/cgroup/cpu.max)
     if [ "$#" -eq 2 ] && [ "$1" != max ]; then
         ceil_div "$1" "$2"
@@ -59,11 +60,18 @@ workers_for() {
     clamp "$by_memory" "$minimum" "$cap"
 }
 
-tune_horizon_workers() {
+cpu_count() {
     cpus=${DATABASIFY_CPUS:-$(smaller_of "$(cgroup_cpus)" "$(host_cpus)")}
+    echo "${cpus:-1}"
+}
+
+memory_size_mb() {
     memory_mb=${DATABASIFY_MEMORY_MB:-$(smaller_of "$(cgroup_memory_mb)" "$(host_memory_mb)")}
-    cpus=${cpus:-1}
-    memory_mb=${memory_mb:-1024}
+    echo "${memory_mb:-1024}"
+}
+
+horizon_workers() {
+    cpus=$1 memory_mb=$2
 
     reserve_mb=${DATABASIFY_RESERVE_MB:-256}
     stack_mb=${DATABASIFY_STACK_MB:-200}
@@ -77,16 +85,11 @@ tune_horizon_workers() {
     [ "$available_mb" -lt 0 ] && available_mb=0
     worker_slots=$(( available_mb / worker_mb ))
 
-    total_workers=0
     for spec in $groups; do
         IFS=: read -r group share per_cpu maximum <<SPEC
 $spec
 SPEC
         eval "minimum=\${HORIZON_${group}_MIN_PROCESSES:-1}"
-        eval "current=\${HORIZON_${group}_MAX_PROCESSES:-}"
-        [ -n "$current" ] || export "HORIZON_${group}_MAX_PROCESSES=$(workers_for "$share" "$per_cpu" "$maximum" "$minimum")"
-        eval "total_workers=\$(( total_workers + HORIZON_${group}_MAX_PROCESSES ))"
+        echo "HORIZON_${group}_MAX_PROCESSES=$(workers_for "$share" "$per_cpu" "$maximum" "$minimum")"
     done
-
-    ceiling_mb=$(( reserve_mb + stack_mb + horizon_mb + total_workers * worker_mb ))
 }

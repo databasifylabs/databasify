@@ -11,14 +11,14 @@ else
 fi
 
 docker_ready() {
-    command -v docker > /dev/null 2>&1 && docker compose version > /dev/null 2>&1
+    command -v docker > /dev/null 2>&1 && docker compose version > /dev/null 2>&1 < /dev/null
 }
 
 docker_version() {
     local version
-    version=$(docker version --format '{{.Server.Version}}' 2> /dev/null | sed -n '/./{p;q;}')
+    version=$(docker version --format '{{.Server.Version}}' 2> /dev/null < /dev/null | sed -n '/./{p;q;}')
     [ -z "$version" ] || { printf '%s\n' "$version"; return 0; }
-    docker --version | sed -n 's/^Docker version \([^,]*\),.*/\1/p'
+    docker --version < /dev/null | sed -n 's/^Docker version \([^,]*\),.*/\1/p'
 }
 
 install_docker() {
@@ -28,11 +28,7 @@ install_docker() {
 }
 
 public_address() {
-    curl -fsS --max-time 5 https://api.ipify.org 2> /dev/null || hostname -I 2> /dev/null | awk '{ print $1 }'
-}
-
-set_setting() {
-    sed -i.bak "s|^$1=.*|$1=$2|" "$DIR/.env" && rm -f "$DIR/.env.bak"
+    curl -fsS --max-time 5 https://api.ipify.org 2> /dev/null < /dev/null || hostname -I 2> /dev/null | awk '{ print $1 }'
 }
 
 domain_from() {
@@ -62,14 +58,20 @@ write_env() {
     cp "$DIR/.env.example" "$DIR/.env"
     chmod 600 "$DIR/.env"
     set_setting APP_URL "$url"
+    fill_secrets
+    measure_horizon_workers
+    write_settings "$HORIZON_WORKERS"
     step_result "Settings written ($url)"
 }
 
 settings_step() {
     if [ -f "$DIR/.env" ]; then
         skipped_line "Settings kept from $DIR/.env" ""
+        secrets_step
+        horizon_step
         return 0
     fi
+    resolve_secrets
     run_step 'Writing settings' '' write_env "$1" "$2"
 }
 

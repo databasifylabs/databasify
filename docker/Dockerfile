@@ -40,7 +40,6 @@ COPY docker/nginx.conf /etc/nginx/sites-available/default
 COPY docker/php-fpm.conf /etc/php/8.5/fpm/pool.d/www.conf
 COPY docker/php.ini /etc/php/8.5/fpm/conf.d/99-databasify.ini
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/databasify
-COPY --chmod=644 docker/horizon-workers.sh /usr/local/lib/databasify/horizon-workers.sh
 
 RUN rm -rf node_modules tests docker .github \
     && mkdir -p /run/php \
