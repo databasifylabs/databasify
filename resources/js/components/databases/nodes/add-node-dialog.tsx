@@ -4,10 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import DatabaseNodeController from '@/actions/App/Http/Controllers/Databases/DatabaseNodeController';
 import ServerController from '@/actions/App/Http/Controllers/Servers/ServerController';
-import { membersOf } from '@/components/databases/describe';
 import { ServerSpecItems } from '@/components/servers/server-specs';
-import { Badge } from '@/components/ui/badge';
-import { useClusterMemory } from '@/lib/cluster';
 import { runAction } from '@/lib/run-action';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +18,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { formatMemory } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Database, Server } from '@/types';
 
@@ -29,7 +25,7 @@ const copy = {
     member: {
         title: 'Add a standby node',
         description:
-            'A standby keeps a full copy of the data and takes over automatically if the primary fails.',
+            'A standby keeps a full copy of the data and takes over automatically if the primary fails. We suggest at least 1 GB of RAM on every node.',
         action: 'Add standby node',
     },
     read_only: {
@@ -56,11 +52,6 @@ export default function AddNodeDialog({
     const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const readOnly = kind === 'read_only';
-    const fitsCluster = useClusterMemory();
-    const smallMember = readOnly
-        ? undefined
-        : membersOf(database).find((node) => !fitsCluster(node.memory_mb));
-    const fits = (server: Server) => readOnly || fitsCluster(server.memory_mb);
     const servers = freeServers.filter(
         (server) =>
             database.network !== null &&
@@ -102,14 +93,7 @@ export default function AddNodeDialog({
                         {copy[kind].description}
                     </DialogDescription>
                 </DialogHeader>
-                {smallMember ? (
-                    <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                        {smallMember.server_name} has{' '}
-                        {formatMemory(smallMember.memory_mb)} of memory.
-                        Standbys need 1 GB on every node, so move it to a bigger
-                        server first.
-                    </div>
-                ) : database.network === null ? (
+                {database.network === null ? (
                     <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                         {database.name} has no private network, so it can't have
                         more nodes.
@@ -131,10 +115,9 @@ export default function AddNodeDialog({
                             <button
                                 key={server.id}
                                 type="button"
-                                disabled={!fits(server)}
                                 onClick={() => setServerId(server.id)}
                                 className={cn(
-                                    'flex items-center gap-3 rounded-lg border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50',
+                                    'flex items-center gap-3 rounded-lg border p-3 text-left transition',
                                     serverId === server.id
                                         ? 'border-primary ring-2 ring-primary/20'
                                         : 'hover:bg-muted/50',
@@ -144,16 +127,8 @@ export default function AddNodeDialog({
                                     <ServerIcon className="size-4" />
                                 </span>
                                 <span className="flex-1">
-                                    <span className="flex items-center gap-2 font-medium">
+                                    <span className="block font-medium">
                                         {server.name}
-                                        {!fits(server) && (
-                                            <Badge
-                                                variant="secondary"
-                                                className="px-1.5 py-0"
-                                            >
-                                                Needs 1 GB
-                                            </Badge>
-                                        )}
                                     </span>
                                     <span className="flex gap-3 text-xs text-muted-foreground">
                                         <ServerSpecItems server={server} />

@@ -11,6 +11,14 @@ it('links signed-in users to the Horizon dashboard', function () {
         ->assertInertia(fn (AssertableInertia $page) => $page->where('horizonUrl', route('horizon.index')));
 });
 
+it('shares the running Databasify version', function () {
+    config(['app.version' => '1.2.3']);
+    User::factory()->create();
+
+    $this->get('/login')
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('version', '1.2.3'));
+});
+
 it('offers no Horizon link before signing in', function () {
     User::factory()->create();
     $this->get('/login')

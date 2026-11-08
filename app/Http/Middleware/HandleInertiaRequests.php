@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\DTOs\Projects\ProjectLink;
-use App\Models\Database;
 use App\Models\Project;
 use App\Models\User;
 use App\Queries\Projects\CurrentProjectQuery;
@@ -27,10 +26,10 @@ class HandleInertiaRequests extends Middleware
     {
         return array_merge(parent::share($request), [
             'name' => config()->string('app.name'),
+            'version' => config()->string('app.version'),
             'auth' => [
                 'user' => $request->user(),
             ],
-            'clusterMemoryMb' => Database::CLUSTER_MEMORY_MB,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'horizonUrl' => $request->user() !== null && Gate::allows('viewHorizon') ? route('horizon.index') : null,
             'currentProject' => fn (): ?array => $this->currentProjectFor($request->user()),

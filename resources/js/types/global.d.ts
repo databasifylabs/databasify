@@ -11,9 +11,9 @@ declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
             name: string;
+            version: string;
             auth: Auth;
             sidebarOpen: boolean;
-            clusterMemoryMb: number;
             horizonUrl: string | null;
             currentProject: Project | null;
             projects: Project[];
