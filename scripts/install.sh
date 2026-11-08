@@ -152,7 +152,7 @@ pull_step
 
 heading Start
 STEP_FIX="Free the port, or set HTTP_PORT in $DIR/.env" run_step 'Starting containers' '' start_containers
-STEP_LOG_LINES=50 STEP_FIX='See the web container log above' run_step 'Waiting until healthy' '' wait_for_health
+STEP_LOG_LINES=50 STEP_FIX='See the app container log above' run_step 'Waiting until healthy' '' wait_for_health
 
 summary_box "Databasify is installed  in $(elapsed_since "$started")" "Open|$(app_url)" 'Next|Create your admin account on that page'
 [ -z "$domain" ] || dns_hint "$domain" "$address"

@@ -3,7 +3,7 @@ FROM ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab0
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl nginx unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl nginx redis-server supervisor unzip \
         php8.5-cli php8.5-fpm php8.5-bcmath php8.5-curl php8.5-gmp php8.5-intl php8.5-mbstring \
         php8.5-mysql php8.5-pgsql php8.5-redis php8.5-sqlite3 php8.5-xml php8.5-zip \
     && rm -rf /var/lib/apt/lists/*
@@ -39,6 +39,8 @@ COPY --from=assets /app/public/build /app/public/build
 COPY docker/nginx.conf /etc/nginx/sites-available/default
 COPY docker/php-fpm.conf /etc/php/8.5/fpm/pool.d/www.conf
 COPY docker/php.ini /etc/php/8.5/fpm/conf.d/99-databasify.ini
+COPY docker/supervisord.conf /etc/supervisor/databasify.conf
+COPY docker/redis.conf /etc/redis/databasify.conf
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/databasify
 
 RUN rm -rf node_modules tests docker .github \
@@ -47,10 +49,10 @@ RUN rm -rf node_modules tests docker .github \
     && ln -sf /dev/stderr /var/log/nginx/error.log \
     && chown -R www-data:www-data /app/storage /app/bootstrap/cache
 
-VOLUME /app/storage
+VOLUME /app/storage /var/lib/redis
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD ["databasify", "healthcheck"]
 
 ENTRYPOINT ["databasify"]
-CMD ["web"]
+CMD ["start"]

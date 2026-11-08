@@ -166,3 +166,21 @@ it('stops with a clear line when the Horizon sizing cannot be downloaded', funct
         ->and($result->output())->toContain('✗ Downloading the Horizon sizing failed')
         ->and(file_get_contents("$dir/.env"))->toBe(workersFor2CpusAnd4Gb());
 });
+
+it('points Redis and Reverb from the old service hosts to the app container', function () {
+    $dir = updateDirectory("REDIS_HOST=valkey\nREVERB_HOST=reverb\n", '');
+
+    $output = installerScript('. "$SOURCE/update.sh" --functions-only; LOG=/dev/null; bundled_services_step', ['DATABASIFY_DIR' => $dir])->output();
+
+    expect($output)->toContain('✓ Redis and Reverb now run inside the app container')
+        ->and(file_get_contents("$dir/.env"))->toBe("REDIS_HOST=127.0.0.1\nREVERB_HOST=127.0.0.1\n");
+});
+
+it('keeps an external Redis host on update', function () {
+    $dir = updateDirectory("REDIS_HOST=redis.example.com\nREVERB_HOST=127.0.0.1\n", '');
+
+    $output = installerScript('. "$SOURCE/update.sh" --functions-only; LOG=/dev/null; bundled_services_step', ['DATABASIFY_DIR' => $dir])->output();
+
+    expect($output)->toBe('')
+        ->and(file_get_contents("$dir/.env"))->toBe("REDIS_HOST=redis.example.com\nREVERB_HOST=127.0.0.1\n");
+});

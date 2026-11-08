@@ -17,7 +17,7 @@ The owner must be able to see and edit every app setting in one place, and back 
 
 ## Consequences
 
-- Every setting is visible and editable in one file, and a backup is the storage volume plus `.env` ([0021](0021-app-state-sqlite-and-valkey.md)).
+- Every setting is visible and editable in one file, and a backup is the storage volume plus `.env` ([0021](0021-app-state-sqlite-and-redis.md)).
 - `scripts/horizon-workers.sh` holds the sizing formula once; `scripts/lib.sh` fetches it from `get.databasify.io` like the other release files, and the image no longer contains it.
 - Worker counts follow the server only when the installer or updater runs, so a resized server keeps its old counts until the next update.
 - Losing `.env` now loses the app key, so `.env` must be backed up with the storage volume.

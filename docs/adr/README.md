@@ -64,7 +64,7 @@ Options that were tried or rejected, and why.
 | [0018](0018-host-os-and-provisioning.md)                    | Supported host operating systems and provisioning                  | Accepted           |
 | [0019](0019-providers-order-vm-only.md)                     | Cloud providers only order the server                              | Accepted           |
 | [0020](0020-monitoring-by-ssh-polling.md)                   | Monitoring is the app polling over SSH                             | Accepted           |
-| [0021](0021-app-state-sqlite-and-valkey.md)                 | App state in SQLite, queues in Valkey                              | Accepted           |
+| [0021](0021-app-state-sqlite-and-redis.md)                  | App state in SQLite, queues in Redis                               | Accepted           |
 | [0022](0022-safe-values-in-scripts.md)                      | Values reach rendered scripts only in safe forms                   | Accepted           |
 | [0023](0023-live-ui-by-polling.md)                          | Live UI by polling, Reverb only for streams                        | Accepted           |
 | [0024](0024-testing-with-boundary-fakes.md)                 | Tests fake the boundaries; real servers tested by hand             | Accepted           |
@@ -77,4 +77,4 @@ Options that were tried or rejected, and why.
 | [0031](0031-projects-as-a-global-scope.md)                  | Projects as a global scope                                         | Accepted           |
 | [0032](0032-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers              | Accepted           |
 | [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`                        | Accepted           |
-| [0034](0034-cache-and-sessions-in-valkey.md)                | Cache, sessions and locks in Valkey                                | Accepted           |
+| [0034](0034-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                                 | Accepted           |

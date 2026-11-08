@@ -30,6 +30,30 @@ add_new_settings() {
     step_result "$count new setting$([ "$count" -eq 1 ] || printf s) added ($names)"
 }
 
+RETIRED_HOSTS='REDIS_HOST=valkey REVERB_HOST=reverb'
+
+settings_on_retired_hosts() {
+    local pair
+    for pair in $RETIRED_HOSTS; do
+        if [ "$(env_value "${pair%%=*}")" = "${pair#*=}" ]; then
+            printf '%s\n' "${pair%%=*}"
+        fi
+    done
+}
+
+use_bundled_services() {
+    local name
+    for name in $(settings_on_retired_hosts); do
+        set_setting "$name" 127.0.0.1
+    done
+    step_result 'Redis and Reverb now run inside the app container'
+}
+
+bundled_services_step() {
+    [ -n "$(settings_on_retired_hosts)" ] || return 0
+    run_step 'Moving Redis and Reverb into the app container' '' use_bundled_services
+}
+
 release_files_step() {
     download_release_files
     step_result 'Release files refreshed'
@@ -50,6 +74,16 @@ remove_old_images() {
     step_result 'Old images removed'
 }
 
+remove_valkey_volume() {
+    docker volume rm databasify_valkey
+    step_result 'Valkey volume removed'
+}
+
+valkey_volume_step() {
+    docker volume inspect databasify_valkey > /dev/null 2>&1 < /dev/null || return 0
+    run_step 'Removing the old Valkey volume' '' remove_valkey_volume
+}
+
 if [ "${1:-}" = --functions-only ]; then
     return 0
 fi
@@ -67,13 +101,15 @@ banner 'Welcome to the Databasify updater' "This pulls the latest release and re
 heading Databasify
 run_step 'Refreshing release files' '' release_files_step
 settings_step
+bundled_services_step
 secrets_step
 horizon_step
 pull_step
 
 heading Start
 run_step 'Restarting containers' '' restart_containers
-STEP_LOG_LINES=50 STEP_FIX='See the web container log above' run_step 'Waiting until healthy' '' wait_for_health
+STEP_LOG_LINES=50 STEP_FIX='See the app container log above' run_step 'Waiting until healthy' '' wait_for_health
 run_step 'Removing old images' '' remove_old_images
+valkey_volume_step
 
 summary_box "Databasify is up to date  in $(elapsed_since "$started")" "Open|$(app_url)"

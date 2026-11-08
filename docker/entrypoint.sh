@@ -1,8 +1,6 @@
 #!/bin/sh
 set -eu
 
-cd /app
-
 log() {
     printf '%s [databasify] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
@@ -33,48 +31,43 @@ cache_config() {
     (as_app php artisan optimize --no-interaction) > /dev/null
 }
 
-serve() {
-    php-fpm8.5 --nodaemonize &
-    fpm=$!
-    nginx -g 'daemon off;' &
-    web=$!
-    trap 'kill -TERM "$fpm" "$web" 2>/dev/null || true' TERM INT
-    while kill -0 "$fpm" 2>/dev/null && kill -0 "$web" 2>/dev/null; do
-        sleep 1
-    done
-    kill -TERM "$fpm" "$web" 2>/dev/null || true
-    wait
+uses_local_redis() {
+    [ -z "${REDIS_URL:-}" ] || return 1
+    case "${REDIS_HOST:-127.0.0.1}" in
+        127.0.0.1 | localhost | ::1) return 0 ;;
+    esac
+    return 1
 }
 
-role=${1:-web}
+own_redis_data() {
+    mkdir -p /var/lib/redis
+    chown -R redis:redis /var/lib/redis
+}
+
+run_processes() {
+    export LOCAL_REDIS=false
+    if uses_local_redis; then
+        LOCAL_REDIS=true
+        own_redis_data
+    fi
+    log "serving on port 80"
+    exec supervisord --configuration /etc/supervisor/databasify.conf
+}
+
+[ "${1:-}" != --functions-only ] || return 0
+
+cd /app
+
+role=${1:-start}
 [ "$#" -gt 0 ] && shift
 
 case "$role" in
-    web)
+    start)
         require_app_key
         own_storage
         prepare_database
         cache_config
-        log "serving on port 80"
-        serve
-        ;;
-    horizon)
-        require_app_key
-        own_storage
-        cache_config
-        as_app php artisan horizon
-        ;;
-    scheduler)
-        require_app_key
-        own_storage
-        cache_config
-        as_app php artisan schedule:work
-        ;;
-    reverb)
-        require_app_key
-        own_storage
-        cache_config
-        as_app php artisan reverb:start --host=0.0.0.0 --port=8080
+        run_processes
         ;;
     healthcheck)
         exec curl --fail --silent --output /dev/null http://127.0.0.1/up

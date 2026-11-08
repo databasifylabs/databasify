@@ -59,14 +59,14 @@ env_value() {
     grep "^$1=" "$DIR/.env" 2> /dev/null | cut -d= -f2- | tr -d '\r"'"'"'' || true
 }
 
-web_container_running() {
-    [ -f "$DIR/compose.yaml" ] && [ -n "$(compose ps -q web 2> /dev/null)" ]
+app_container_running() {
+    [ -f "$DIR/compose.yaml" ] && [ -n "$(compose ps -q app 2> /dev/null)" ]
 }
 
 require_free_port() {
     PORT_SUMMARY=
     command -v ss > /dev/null 2>&1 || return 0
-    web_container_running && return 0
+    app_container_running && return 0
     local port
     port=$(env_value HTTP_PORT)
     port=${port:-80}
@@ -120,7 +120,7 @@ release_version() {
 
 running_version() {
     local container
-    container=$(compose ps -q web 2> /dev/null) || return 0
+    container=$(compose ps -q app 2> /dev/null) || return 0
     [ -n "$container" ] || return 0
     docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$container" < /dev/null 2> /dev/null || true
 }
@@ -148,13 +148,13 @@ download_release_files() {
 wait_until_healthy() {
     local container
     for _ in $(seq 1 60); do
-        container=$(compose ps -q web)
+        container=$(compose ps -q app)
         if [ -n "$container" ] && [ "$(docker inspect -f '{{.State.Health.Status}}' "$container")" = healthy ]; then
             return 0
         fi
         sleep 5
     done
-    compose logs --tail 50 web >> "${LOG:-/dev/null}" 2>&1
+    compose logs --tail 50 app >> "${LOG:-/dev/null}" 2>&1
     return 1
 }
 
