@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
@@ -7,7 +7,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useRepositoryStars } from '@/hooks/use-repository-stars';
-import { documentationUrl, repositoryUrl } from '@/lib/repository';
+import { repositoryUrl } from '@/lib/repository';
 
 function HeaderLink({
     href,
@@ -43,18 +43,11 @@ export function HeaderLinks() {
     const stars = useRepositoryStars();
 
     return (
-        <>
-            <HeaderLink
-                href={documentationUrl}
-                label="Documentation"
-                icon={BookOpen}
-            />
-            <HeaderLink
-                href={repositoryUrl}
-                label={stars ? `Star on GitHub (${stars})` : 'Star on GitHub'}
-                icon={Star}
-                iconClassName="fill-amber-400 text-amber-400"
-            />
-        </>
+        <HeaderLink
+            href={repositoryUrl}
+            label={stars ? `Star on GitHub (${stars})` : 'Star on GitHub'}
+            icon={Star}
+            iconClassName="fill-amber-400 text-amber-400"
+        />
     );
 }

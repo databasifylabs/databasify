@@ -1,5 +1,4 @@
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight } from 'lucide-react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -33,7 +32,6 @@ export function NavMain({ label, items }: { label: string; items: NavItem[] }) {
                                 >
                                     {item.icon && <item.icon />}
                                     <span>{item.title}</span>
-                                    <ArrowUpRight className="ml-auto size-3.5 opacity-60 group-data-[collapsible=icon]:hidden" />
                                 </a>
                             ) : (
                                 <Link href={item.href} prefetch>

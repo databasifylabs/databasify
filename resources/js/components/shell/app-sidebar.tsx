@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
+    BookOpen,
     Cloud,
     DatabaseIcon,
     FolderKanban,
@@ -24,6 +25,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { documentationUrl } from '@/lib/repository';
 import { dashboard } from '@/routes';
 import { index as databasesIndex } from '@/routes/databases';
 import { index as dnsIndex } from '@/routes/dns';
@@ -45,10 +47,20 @@ function projectNavItems(): NavItem[] {
     ];
 }
 
-function globalNavItems(): NavItem[] {
+function globalNavItems(horizonUrl: string | null): NavItem[] {
     return [
         { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
         { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
+        ...(horizonUrl
+            ? [
+                  {
+                      title: 'Horizon',
+                      href: horizonUrl,
+                      icon: ListEnd,
+                      external: true,
+                  },
+              ]
+            : []),
     ];
 }
 
@@ -74,23 +86,20 @@ export function AppSidebar() {
                 {currentProject && (
                     <NavMain label="Project" items={projectNavItems()} />
                 )}
-                <NavMain label="Global" items={globalNavItems()} />
+                <NavMain label="Global" items={globalNavItems(horizonUrl)} />
             </SidebarContent>
 
             <SidebarFooter>
-                {horizonUrl && (
-                    <NavFooter
-                        items={[
-                            {
-                                title: 'Horizon',
-                                href: horizonUrl,
-                                icon: ListEnd,
-                                external: true,
-                            },
-                        ]}
-                        className="mt-auto"
-                    />
-                )}
+                <NavFooter
+                    items={[
+                        {
+                            title: 'Documentation',
+                            href: documentationUrl,
+                            icon: BookOpen,
+                        },
+                    ]}
+                    className="mt-auto"
+                />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
