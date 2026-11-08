@@ -76,7 +76,6 @@ require_free_port() {
 
 check_server() {
     SERVER_CHECKS=1
-    require_root
     require_linux
     require_supported_os
     require_memory

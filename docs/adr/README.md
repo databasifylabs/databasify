@@ -77,3 +77,4 @@ Options that were tried or rejected, and why.
 | [0031](0031-projects-as-a-global-scope.md)                  | Projects as a global scope                                         | Accepted           |
 | [0032](0032-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers              | Accepted           |
 | [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`                        | Accepted           |
+| [0034](0034-cache-and-sessions-in-valkey.md)                | Cache, sessions and locks in Valkey                                | Accepted           |

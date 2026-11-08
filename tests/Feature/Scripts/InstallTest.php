@@ -14,15 +14,43 @@ it('uses the address when the environment sets an empty domain', function () {
     expect(installerScript('. "$SOURCE/install.sh" --functions-only; ask_domain 203.0.113.10', ['DATABASIFY_DOMAIN' => ''])->output())->toBe('');
 });
 
-it('keeps an existing .env and reports it', function () {
+it('detects an install only when both .env and compose.yaml exist', function (array $files, int $status) {
     $dir = temporaryDirectory();
-    $env = "APP_URL=https://kept.example.com\n".filledSecrets().workersFor2CpusAnd4Gb();
-    file_put_contents("$dir/.env", $env);
+    collect($files)->each(fn (string $file): int|false => file_put_contents("$dir/$file", ''));
 
-    $output = installerScript('. "$SOURCE/install.sh" --functions-only; compose() { exit 9; }; docker() { exit 9; }; settings_step db.example.com 203.0.113.10', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(2, 4096)])->output();
+    $result = installerScript('. "$SOURCE/install.sh" --functions-only; already_installed', ['DATABASIFY_DIR' => $dir]);
 
-    expect($output)->toBe("    – Settings kept from $dir/.env\n")
-        ->and(file_get_contents("$dir/.env"))->toBe($env);
+    expect($result->exitCode())->toBe($status);
+})->with([
+    'both files' => [['.env', 'compose.yaml'], 0],
+    'only .env' => [['.env'], 1],
+    'only compose.yaml' => [['compose.yaml'], 1],
+]);
+
+it('stops with the update command and changes nothing when already installed', function () {
+    $dir = temporaryDirectory();
+    file_put_contents("$dir/.env", "APP_URL=https://kept.example.com\n");
+    file_put_contents("$dir/compose.yaml", "services: {}\n");
+
+    $result = installerScript('. "$SOURCE/install.sh" --functions-only; stop_when_installed; echo AFTER', ['DATABASIFY_DIR' => $dir]);
+
+    expect($result->exitCode())->toBe(0)
+        ->and($result->output())->toContain("✓ Databasify is already installed in $dir")
+        ->toContain('To update it, run:')
+        ->toContain('curl -fsSL https://get.databasify.io/update.sh | sudo bash')
+        ->not->toContain('AFTER')
+        ->and(file_get_contents("$dir/.env"))->toBe("APP_URL=https://kept.example.com\n")
+        ->and(file_get_contents("$dir/compose.yaml"))->toBe("services: {}\n")
+        ->and(file_exists("$dir/install.log"))->toBeFalse();
+});
+
+it('continues the install when only .env exists', function () {
+    $dir = temporaryDirectory();
+    file_put_contents("$dir/.env", '');
+
+    $output = installerScript('. "$SOURCE/install.sh" --functions-only; stop_when_installed; echo AFTER', ['DATABASIFY_DIR' => $dir])->output();
+
+    expect($output)->toBe("AFTER\n");
 });
 
 it('writes the settings from the template with the chosen address', function (string $domain, string $url) {
@@ -51,18 +79,6 @@ it('writes a new app key, Reverb credentials and Horizon workers sized for the s
         ->toMatch('/^REVERB_APP_KEY=[0-9a-f]{32}$/m')
         ->toMatch('/^REVERB_APP_SECRET=[0-9a-f]{64}$/m')
         ->toContain(workersFor2CpusAnd4Gb());
-});
-
-it('refuses to generate a key when it keeps a .env without one over an existing storage volume', function () {
-    $dir = temporaryDirectory();
-    $env = "APP_KEY=\nREVERB_APP_ID=\nREVERB_APP_KEY=\nREVERB_APP_SECRET=\n".workersFor2CpusAnd4Gb();
-    file_put_contents("$dir/.env", $env);
-
-    $result = installerScript('. "$SOURCE/install.sh" --functions-only; '.dockerWithStorageVolume().'; LOG=/dev/null; settings_step db.example.com 203.0.113.10', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(2, 4096)]);
-
-    expect($result->exitCode())->toBe(1)
-        ->and($result->output())->toContain("✗ APP_KEY is missing from $dir/.env")->toContain('from your backup')
-        ->and(file_get_contents("$dir/.env"))->toBe($env);
 });
 
 it('refuses a fresh install over an existing storage volume', function () {

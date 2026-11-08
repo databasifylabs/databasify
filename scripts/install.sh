@@ -65,12 +65,6 @@ write_env() {
 }
 
 settings_step() {
-    if [ -f "$DIR/.env" ]; then
-        skipped_line "Settings kept from $DIR/.env" ""
-        secrets_step
-        horizon_step
-        return 0
-    fi
     resolve_secrets
     run_step 'Writing settings' '' write_env "$1" "$2"
 }
@@ -99,6 +93,19 @@ dns_hint() {
     printf '    %sProxy: on (orange cloud) · SSL/TLS mode: Flexible%s\n' "$DIM" "$RESET"
 }
 
+already_installed() {
+    [ -f "$DIR/.env" ] && [ -f "$DIR/compose.yaml" ]
+}
+
+stop_when_installed() {
+    already_installed || return 0
+    printf '\n'
+    done_line "Databasify is already installed in $DIR"
+    printf '\n  To update it, run:\n'
+    printf '    %scurl -fsSL https://get.databasify.io/update.sh | sudo bash%s\n\n' "$DIM" "$RESET"
+    exit 0
+}
+
 footer_row() {
     printf '  %s%-16s%s%s\n' "$DIM" "$1" "$2" "$RESET"
 }
@@ -122,15 +129,14 @@ started=$(date +%s)
 
 banner 'Welcome to the Databasify installer' "This sets up Docker and Databasify on this server. It takes 2 to 5 minutes.\n${DIM}Full log: $LOG${RESET}" "$(version_chip '' "$(release_version)")"
 
+require_root
+stop_when_installed
 check_server
 
 address=$(public_address || true)
 address=${address:-localhost}
-domain=
-if [ ! -f "$DIR/.env" ]; then
-    domain=$(ask_domain "$address")
-    [ -n "$domain" ] || printf '\n  %sUsing http://%s. Add a domain later in %s/.env%s\n' "$DIM" "$address" "$DIR" "$RESET"
-fi
+domain=$(ask_domain "$address")
+[ -n "$domain" ] || printf '\n  %sUsing http://%s. Add a domain later in %s/.env%s\n' "$DIM" "$address" "$DIR" "$RESET"
 
 mkdir -p "$DIR"
 touch "$LOG"
