@@ -31,6 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
+        $middleware->redirectUsersTo(fn (): string => route('home'));
+
         $middleware->alias(['project' => SetCurrentProject::class]);
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);

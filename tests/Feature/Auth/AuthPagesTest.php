@@ -72,3 +72,9 @@ it('locks out sign in after five failed attempts', function () {
     $this->post(route('login.store'), ['email' => 'owner@example.com', 'password' => 'password'])->assertTooManyRequests();
     $this->assertGuest();
 });
+
+it('sends a signed-in administrator from guest pages to home', function (string $route) {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route($route))->assertRedirect(route('home'));
+})->with(['login', 'password.request', 'setup']);
