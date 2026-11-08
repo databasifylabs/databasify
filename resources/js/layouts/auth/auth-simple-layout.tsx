@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import AppLogoIcon from '@/components/shell/app-logo-icon';
+import AppVersion from '@/components/shell/app-version';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 
@@ -32,6 +33,9 @@ export default function AuthSimpleLayout({
                     </div>
                     {children}
                 </div>
+                <footer className="mt-6 text-center">
+                    <AppVersion withName />
+                </footer>
             </div>
         </div>
     );
