@@ -23,6 +23,6 @@ resources/js/actions
 resources/js/routes
 resources/js/wayfinder
 tests
-docker/compose.yaml
 docker/.env
 scripts
+docs

@@ -26,6 +26,7 @@ use App\Models\Server;
 use App\Models\StorageProvider;
 use App\Support\Projects\ProjectContext;
 use Database\Factories\ProjectFactory;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -116,6 +117,45 @@ function bashErrorsIn(string $script): string
     $result = Process::input($script)->run(['bash', '-n']);
 
     return $result->successful() ? '' : $result->errorOutput();
+}
+
+/**
+ * @param  array<string, string>  $env
+ */
+function installerScript(string $snippet, array $env = []): ProcessResult
+{
+    $script = "set -euo pipefail\nSOURCE=\$DATABASIFY_SOURCE\n. \"\$SOURCE/lib.sh\"\n{$snippet}";
+
+    return Process::input($script)
+        ->env($env + ['NO_COLOR' => '1', 'DATABASIFY_SOURCE' => base_path('scripts')])
+        ->run(['bash']);
+}
+
+function temporaryPath(): string
+{
+    $path = sys_get_temp_dir().'/databasify-'.bin2hex(random_bytes(4));
+
+    register_shutdown_function(function () use ($path): void {
+        is_dir($path) ? (new Filesystem)->deleteDirectory($path) : @unlink($path);
+    });
+
+    return $path;
+}
+
+function temporaryDirectory(): string
+{
+    $path = temporaryPath();
+    mkdir($path);
+
+    return $path;
+}
+
+function temporaryFile(string $contents = ''): string
+{
+    $path = temporaryPath();
+    file_put_contents($path, $contents);
+
+    return $path;
 }
 
 function javascriptErrorsIn(string $script): string

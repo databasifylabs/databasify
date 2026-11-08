@@ -9,7 +9,7 @@ Databasify runs on servers the user brings or orders. Every host script has to w
 
 ## Decision
 
-- Supported systems are Ubuntu 24.04 and 26.04, Debian 12 and 13, Rocky Linux 9 and AlmaLinux 9 (`OperatingSystem`), in two families (`OsFamily`): Debian and RHEL. The system is read from `/etc/os-release`; anything else is refused with `UnsupportedOperatingSystem`.
+- Supported systems are Ubuntu 24.04 and 26.04, Debian 12 and 13, Rocky Linux 9 and AlmaLinux 9 (`OperatingSystem`), in two families (`OsFamily`): Debian and RHEL. The system is read from `/etc/os-release`; anything else is refused with `UnsupportedOperatingSystem`. The app installer enforces the same list before changing anything.
 - Host scripts branch on the family into `ssh/servers/os/{debian,rhel}`.
 - Provisioning runs a fixed sequence: package update, base tools, pinned Docker ([0002](0002-container-per-node.md)), then swap. A 2 GB swap file is added only when the server has less than 4 GB of RAM and at least 6 GB of free disk.
 - SELinux stays enforcing on RHEL hosts; scripts relabel files instead of disabling it.
@@ -33,3 +33,4 @@ Databasify runs on servers the user brings or orders. Every host script has to w
 - `resources/views/ssh/servers/provision/provision.blade.php`
 - `resources/views/ssh/servers/os/swap.blade.php`
 - `app/Models/Database.php`
+- `scripts/lib.sh`

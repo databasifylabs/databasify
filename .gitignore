@@ -29,6 +29,7 @@ yarn-error.log
 /.zed
 /.agents
 /.amp
+/.superpowers
 /.claude/*
 !/.claude/agents/
 !/.claude/skills/
@@ -47,3 +48,4 @@ yarn-error.log
 /opencode.jsonc
 /docker/.env
 /scratchpad
+/docs/superpowers

@@ -3,14 +3,6 @@ name: databasify
 x-app: &app
     image: ghcr.io/databasifylabs/databasify:${DATABASIFY_VERSION:-latest}
     env_file: .env
-    environment:
-        LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
-        QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
-        BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-reverb}
-        REDIS_HOST: ${REDIS_HOST:-valkey}
-        REVERB_HOST: ${REVERB_HOST:-reverb}
-        REVERB_PORT: ${REVERB_PORT:-8080}
-        REVERB_SCHEME: ${REVERB_SCHEME:-http}
     volumes:
         - storage:/app/storage
     restart: unless-stopped

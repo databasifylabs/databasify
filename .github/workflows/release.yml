@@ -124,7 +124,9 @@ jobs:
       - name: Commit version to 0.x
         run: |
           sed -i "s/'version' => '[^']*'/'version' => '${GITHUB_REF_NAME}'/" config/app.php
-          git diff --quiet && exit 0
+          printf '%s\n' "${GITHUB_REF_NAME}" > scripts/version
+          git add scripts/version
+          git diff --quiet HEAD && exit 0
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -am "chore: set version to ${GITHUB_REF_NAME}"

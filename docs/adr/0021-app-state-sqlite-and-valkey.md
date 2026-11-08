@@ -29,7 +29,7 @@ The app installs on one small server and must be easy to back up. It still needs
 ## Evidence
 
 - `docker/Dockerfile`
-- `docker/compose.yaml`
+- `scripts/compose.yaml`
 - `docker/entrypoint.sh`
 - `config/database.php`
 - `storage/.gitignore`
