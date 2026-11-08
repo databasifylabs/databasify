@@ -1,14 +1,14 @@
-name: app
+name: release
 
 on:
   push:
-    tags: ['*']
+    tags: ['[0-9]+.[0-9]+.[0-9]+*']
 
 permissions:
   contents: read
 
 concurrency:
-  group: app-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -21,6 +21,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set version from tag
+        run: sed -i "s/'version' => '[^']*'/'version' => '${GITHUB_REF_NAME}'/" config/app.php
 
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
@@ -40,7 +43,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/databasify:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/databasify:latest
+            ${{ !contains(github.ref_name, '-') && format('ghcr.io/{0}/databasify:latest', github.repository_owner) || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.title=databasify
