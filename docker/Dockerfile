@@ -14,7 +14,9 @@ FROM base AS vendor
 
 COPY --from=composer:2.9@sha256:b09bccd91a78fe8a9ab4b33d707b862e8fe54fec17782e32683ad2a69c46867d /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --no-progress
+RUN --mount=type=secret,id=composer_auth \
+    COMPOSER_AUTH="$(cat /run/secrets/composer_auth 2>/dev/null)" \
+    composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --no-progress
 COPY . .
 RUN composer dump-autoload --optimize --no-dev \
     && php artisan package:discover --ansi
