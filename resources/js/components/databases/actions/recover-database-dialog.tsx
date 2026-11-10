@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
-import ConfirmDialog from '@/components/confirm-dialog';
-import type { DialogControl } from '@/components/databases/actions/dialog-control';
-import { Switch } from '@/components/ui/switch';
-import { runAction } from '@/lib/run-action';
-import type { DatabaseSummary } from '@/types';
+import { useState } from "react";
+import DatabaseOperationController from "@/actions/App/Http/Controllers/Databases/DatabaseOperationController";
+import ConfirmDialog from "@/components/confirm-dialog";
+import type { DialogControl } from "@/components/databases/actions/dialog-control";
+import { Switch } from "@/components/ui/switch";
+import { runAction } from "@/lib/run-action";
+import type { DatabaseSummary } from "@/types";
 
 export default function RecoverDatabaseDialog({
     database,
@@ -16,7 +16,7 @@ export default function RecoverDatabaseDialog({
         <ConfirmDialog
             {...control}
             title="Recover the database?"
-            description="The most up-to-date reachable node becomes primary and the others rejoin it. Use this only when the database has lost quorum."
+            description="When the database has lost quorum, the most up-to-date reachable node becomes primary and the others rejoin it. When it still has a primary and a majority, only the members outside it rejoin."
             confirmLabel="Recover"
             onConfirm={() =>
                 runAction(
@@ -25,7 +25,7 @@ export default function RecoverDatabaseDialog({
                     }),
                     {
                         data: { others_down: othersDown },
-                        success: 'Recovery started',
+                        success: "Recovery started",
                     },
                 )
             }

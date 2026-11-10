@@ -164,3 +164,18 @@ it('tells the owner to fail over while a member still sees a majority', function
 
     expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'use failover instead');
 });
+
+it('rejoins only the members outside a group that still has its majority', function () {
+    $database = idleDatabase('mysql', 3);
+    [$primary, $replica, $restarted] = $database->nodes()->orderBy('position')->get()->map->server->all();
+    $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica'), $restarted, 'offline'))
+        ->respondToEngine('cluster quorum', ['total' => 3, 'online' => 2]);
+
+    resolve(RecoverDatabase::class)->handle($database);
+    advanceFlows();
+
+    expect(collect(payloadsOf($ssh, 'cluster rejoin'))->pluck('server')->all())->toBe([$restarted->name])
+        ->and(payloadsOf($ssh, 'cluster force-quorum'))->toBe([])
+        ->and(payloadsOf($ssh, 'node wake'))->toBe([])
+        ->and($database->fresh()->operation)->toBeNull();
+});
