@@ -24,11 +24,11 @@ class EngineServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->sentinel('valkey', 'Valkey', 'valkey-cli')
-            ->versions('9', [['value' => '8', 'label' => 'Valkey 8'], ['value' => '9', 'label' => 'Valkey 9']])
+            ->versions('9', [['value' => '7', 'label' => 'Valkey 7'], ['value' => '8', 'label' => 'Valkey 8'], ['value' => '9', 'label' => 'Valkey 9']])
             ->register();
 
         $this->sentinel('redis', 'Redis', 'redis-cli')
-            ->versions('8', [['value' => '8', 'label' => 'Redis 8']])
+            ->versions('8', [['value' => '7.2', 'label' => 'Redis 7.2'], ['value' => '8', 'label' => 'Redis 8']])
             ->register();
 
         $this->engine('mysql', 'MySQL', self::APPLICATION)
@@ -44,7 +44,7 @@ class EngineServiceProvider extends ServiceProvider
             ->connection(new ConnectionProfile('postgresql', '?sslmode=require', 'sslmode', 'require', 'PGSSLMODE=require PGPASSWORD={password} psql -U {username} -h {host} -p {port} -d {database}', null, true, self::SQL_ENV_KEYS, 'To verify the server, download the CA certificate and use sslmode=verify-full with sslrootcert=/path/to/{ca}.', 'To verify the server, download the CA certificate and use PGSSLMODE=verify-full PGSSLROOTCERT={ca}.'))
             ->environment('pgsql', ['DB_SSLMODE' => 'require'])
             ->failoverHint('Patroni needs three members for etcd to keep a majority and fail over on its own. Add one more standby.')
-            ->versions('18', [['value' => '17', 'label' => 'PostgreSQL 17'], ['value' => '18', 'label' => 'PostgreSQL 18']])
+            ->versions('18', [['value' => '15', 'label' => 'PostgreSQL 15'], ['value' => '16', 'label' => 'PostgreSQL 16'], ['value' => '17', 'label' => 'PostgreSQL 17'], ['value' => '18', 'label' => 'PostgreSQL 18']])
             ->register();
 
         $this->engine('mariadb', 'MariaDB', self::APPLICATION)
@@ -52,7 +52,7 @@ class EngineServiceProvider extends ServiceProvider
             ->connection(new ConnectionProfile('mysql', '?ssl-mode=REQUIRED', 'sslmode', 'REQUIRED', 'mariadb -u {username} -p{password} -h {host} -P {port} -D {database} --ssl', null, true, self::SQL_ENV_KEYS, self::MYSQL_ENV_NOTE, 'If the client cannot verify the server through your password, add --ssl-verify-server-cert=0. To verify the server with the CA certificate, download it and add --ssl-ca={ca}.'))
             ->environment('mariadb')
             ->failoverHint('Galera needs three members to keep a majority when one fails. Add one more standby.')
-            ->versions('11.8', [['value' => '11.4', 'label' => 'MariaDB 11.4 LTS'], ['value' => '11.8', 'label' => 'MariaDB 11.8 LTS']])
+            ->versions('11.8', [['value' => '10.11', 'label' => 'MariaDB 10.11 LTS'], ['value' => '11.4', 'label' => 'MariaDB 11.4 LTS'], ['value' => '11.8', 'label' => 'MariaDB 11.8 LTS'], ['value' => '12.3', 'label' => 'MariaDB 12.3 LTS']])
             ->register();
 
         $this->engine('mongodb', 'MongoDB', self::APPLICATION)

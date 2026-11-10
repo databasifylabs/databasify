@@ -24,7 +24,7 @@ An open-source, self-hostable DBaaS alternative to DigitalOcean Managed Database
 
 ## Features
 
-- MySQL 8.4 and 9.7, MariaDB 11.4 and 11.8, PostgreSQL 17 and 18, MongoDB 7.0, 8.0 and 9.0, Valkey 8 and 9, Redis 8
+- MySQL 8.4 and 9.7, MariaDB 10.11, 11.4, 11.8 and 12.3, PostgreSQL 15 to 18, MongoDB 7.0, 8.0 and 9.0, Valkey 7, 8 and 9, Redis 7.2 and 8
 - A single primary, or a cluster with standbys, automatic failover and read-only nodes
 - Hostnames on your own domain and TLS everywhere
 - Connection pools, users, metrics, logs and email alerts

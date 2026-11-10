@@ -23,6 +23,21 @@ it('offers a newer release of the line without asking the servers', function () 
         ->and($ssh->runs)->toBeEmpty();
 });
 
+it('only ever offers a release of the database\'s own line', function (string $engine, string $line, string $running, string $offered) {
+    withImage($engine, $running);
+    $database = idleDatabase($engine, 1, DatabaseMode::Single, versionLine: $line);
+    foreach (['7.2.18', '7.4.0', '7.4.6', '8.10.3', '8.12.0', '9.0.0', '9.1.4', '10.11.20', '11.4.14', '12.3.4'] as $release) {
+        withImage($engine, $release);
+    }
+
+    expect(resolve(CheckDatabaseUpgrade::class)->handle($database)?->release)->toBe($offered);
+})->with([
+    'redis 7.2 never moves to 7.4' => ['redis', '7.2', '7.2.17', '7.2.18'],
+    'redis 8 takes a newer minor' => ['redis', '8', '8.10.3', '8.12.0'],
+    'valkey 9 stays on 9' => ['valkey', '9', '9.1.3', '9.1.4'],
+    'mariadb 10.11 compares as numbers' => ['mariadb', '10.11', '10.11.19', '10.11.20'],
+]);
+
 it('offers a refresh when the release was rebuilt under the same tag', function () {
     withImage('postgres', '18.6', 'sha256:'.str_repeat('a', 64));
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);

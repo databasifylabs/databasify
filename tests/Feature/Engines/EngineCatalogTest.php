@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\DTOs\Databases\VersionLine;
+use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Exceptions\Databases\UnknownEngine;
 use App\Plugins\RegisterEngine;
@@ -24,6 +25,20 @@ it('lists the six engines with their lines and labels', function () {
         ->and($mongodb->serviceRecord)->prefix->toBe('_mongodb._tcp')->options->toBe('replicaSet=databasify&authSource=admin')
         ->and(EngineCatalog::find('valkey'))->category->toBe('Caching')->publicCertificate->toBeTrue()->persistenceChoice->toBeTrue()
         ->and(EngineCatalog::find('postgres'))->publicCertificate->toBeFalse()->serviceRecord->toBeNull();
+});
+
+it('offers every supported line with its label and default', function () {
+    $offered = EngineCatalog::all()->map(fn (Engine $engine): array => array_map(fn (VersionLine $line): array => $line->toArray() + ['archives' => $line->archives], $engine->lines));
+    $line = fn (string $value, string $label, bool $default = false, bool $archives = true): array => ['value' => $value, 'label' => $label, 'default' => $default, 'archives' => $archives];
+
+    expect($offered->all())->toBe([
+        'valkey' => [$line('7', 'Valkey 7'), $line('8', 'Valkey 8'), $line('9', 'Valkey 9', true)],
+        'redis' => [$line('7.2', 'Redis 7.2'), $line('8', 'Redis 8', true)],
+        'mysql' => [$line('8.4', 'MySQL 8.4 LTS', true), $line('9.7', 'MySQL 9.7 LTS')],
+        'postgres' => [$line('15', 'PostgreSQL 15'), $line('16', 'PostgreSQL 16'), $line('17', 'PostgreSQL 17'), $line('18', 'PostgreSQL 18', true)],
+        'mariadb' => [$line('10.11', 'MariaDB 10.11 LTS'), $line('11.4', 'MariaDB 11.4 LTS'), $line('11.8', 'MariaDB 11.8 LTS', true), $line('12.3', 'MariaDB 12.3 LTS')],
+        'mongodb' => [$line('7.0', 'MongoDB 7.0'), $line('8.0', 'MongoDB 8.0', true), $line('9.0', 'MongoDB 9.0', false, false)],
+    ]);
 });
 
 it('lets a plugin register an engine', function () {
