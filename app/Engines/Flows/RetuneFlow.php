@@ -36,12 +36,9 @@ final readonly class RetuneFlow implements Flow
         $database = $flow->database;
 
         return [
-            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [Step::prepare("read the size of {$node->server->name}", $this->steps->quick(fn () => $this->facts->handle($node->server)))], failover: false),
-            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [Step::prepare("configure {$node->server->name}", $this->steps->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node")))], failover: false),
-            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [
-                Step::prepare("tune {$node->server->name}", $this->steps->quick(fn (DatabaseFlow $flow) => $this->tune($flow, $node))),
-                Step::prepare("apply the tuning on {$node->server->name}", $this->steps->send($node, new ConfigApply, 'applying the tuned settings')),
-            ], failover: false),
+            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->readSizeStepOn($node)], failover: false),
+            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->configureStepOn($database, $node)], failover: false),
+            ...$this->rolling->over($flow, $this->tuneStepsOn(...), failover: false),
             ...($flow->context->restart ? $this->rolling->restart($flow) : []),
             Step::finish('refresh the status', $this->steps->quick(function () use ($database): void {
                 $database->markRetuned();
@@ -55,12 +52,37 @@ final readonly class RetuneFlow implements Flow
         rescue(fn () => $this->refresh->handle($flow->database));
     }
 
+    private function readSizeStepOn(DatabaseNode $node): Step
+    {
+        return Step::prepare("read the size of {$node->server->name}", $this->steps->quick(fn () => $this->facts->handle($node->server)));
+    }
+
+    private function configureStepOn(Database $database, DatabaseNode $node): Step
+    {
+        return Step::prepare("configure {$node->server->name}", $this->steps->quick(
+            fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node"),
+        ));
+    }
+
+    /**
+     * @return list<Step>
+     */
+    private function tuneStepsOn(DatabaseNode $node): array
+    {
+        return [
+            Step::prepare("tune {$node->server->name}", $this->steps->quick(fn (DatabaseFlow $flow) => $this->tune($flow, $node))),
+            Step::prepare("apply the tuning on {$node->server->name}", $this->steps->send($node, new ConfigApply, 'applying the tuned settings')),
+        ];
+    }
+
     private function tune(DatabaseFlow $flow, DatabaseNode $node): void
     {
-        $restart = $this->engine->send($node, new ConfigTune, "{$node->server->name}: tuning the engine")->restart !== [];
+        $restartKeys = $this->engine->send($node, new ConfigTune, "{$node->server->name}: tuning the engine")->restart;
 
-        if ($restart && ! $flow->context->restart) {
-            $flow->update(['context' => $flow->context->needingRestart(true)]);
+        if ($restartKeys === [] || $flow->context->restart) {
+            return;
         }
+
+        $flow->update(['context' => $flow->context->needingRestart(true)]);
     }
 }

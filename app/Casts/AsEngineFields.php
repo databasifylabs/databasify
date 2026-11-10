@@ -37,6 +37,16 @@ final class AsEngineFields implements CastsAttributes
     {
         throw_unless(is_array($value), InvalidArgumentException::class, 'Config fields must be a list of EngineField instances.');
 
-        return json_encode(array_map(fn (mixed $field): array => $field instanceof EngineField ? $field->toArray() : throw new InvalidArgumentException('Config fields must be EngineField instances.'), $value), JSON_THROW_ON_ERROR);
+        return json_encode(array_map($this->rowOf(...), $value), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array{key: string, label: string, description: string, kind: string, default: string, options: list<string>, unit: ?string, min: ?float, max: ?float, pattern: ?string, restart: bool, tuned: bool}
+     */
+    private function rowOf(mixed $field): array
+    {
+        throw_unless($field instanceof EngineField, InvalidArgumentException::class, 'Config fields must be EngineField instances.');
+
+        return $field->toArray();
     }
 }

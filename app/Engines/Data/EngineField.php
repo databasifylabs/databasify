@@ -50,9 +50,18 @@ final readonly class EngineField
     public function toArray(): array
     {
         return [
-            'key' => $this->key, 'label' => $this->label, 'description' => $this->description, 'kind' => $this->kind,
-            'default' => $this->default, 'options' => $this->options, 'unit' => $this->unit, 'min' => $this->min,
-            'max' => $this->max, 'pattern' => $this->pattern, 'restart' => $this->restart, 'tuned' => $this->tuned,
+            'key' => $this->key,
+            'label' => $this->label,
+            'description' => $this->description,
+            'kind' => $this->kind,
+            'default' => $this->default,
+            'options' => $this->options,
+            'unit' => $this->unit,
+            'min' => $this->min,
+            'max' => $this->max,
+            'pattern' => $this->pattern,
+            'restart' => $this->restart,
+            'tuned' => $this->tuned,
         ];
     }
 }

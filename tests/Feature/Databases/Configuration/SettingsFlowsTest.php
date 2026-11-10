@@ -11,9 +11,16 @@ use App\Models\Server;
 use App\Models\User;
 use Tests\Support\FakeServerConnection;
 
+/**
+ * @return list<string>
+ */
 function commandsSentTo(Server $server, FakeServerConnection $ssh): array
 {
-    return array_values(array_map(fn (string $command): string => str($command)->after(': ')->value(), array_filter(engineCommandsIn($ssh), fn (string $command): bool => str_starts_with($command, "{$server->name}: "))));
+    return collect(engineCommandsIn($ssh))
+        ->filter(fn (string $command): bool => str_starts_with($command, "{$server->name}: "))
+        ->map(fn (string $command): string => str($command)->after(': ')->value())
+        ->values()
+        ->all();
 }
 
 it('rotates certificates with tls install on every node', function () {

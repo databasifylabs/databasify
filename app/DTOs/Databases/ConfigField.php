@@ -39,14 +39,7 @@ final readonly class ConfigField
             key: $field->key,
             label: $field->label,
             description: $field->description,
-            pattern: match ($field->kind) {
-                'integer' => self::INTEGER_PATTERN,
-                'decimal' => self::DECIMAL_PATTERN,
-                'choice' => self::alternationOf($field->options),
-                'flags' => '('.self::alternationOf($field->options).'(,'.self::alternationOf($field->options).')*)?',
-                'text' => $field->pattern ?? '.*',
-                default => '.+',
-            },
+            pattern: self::patternOf($field),
             default: $field->default,
             options: $field->options,
             multiple: $field->kind === 'flags',
@@ -142,6 +135,20 @@ final readonly class ConfigField
         }
 
         return (float) $value >= $this->min && (float) $value <= $this->max;
+    }
+
+    private static function patternOf(EngineField $field): string
+    {
+        $option = self::alternationOf($field->options);
+
+        return match ($field->kind) {
+            'integer' => self::INTEGER_PATTERN,
+            'decimal' => self::DECIMAL_PATTERN,
+            'choice' => $option,
+            'flags' => "({$option}(,{$option})*)?",
+            'text' => $field->pattern ?? '.*',
+            default => '.+',
+        };
     }
 
     /**
