@@ -9,9 +9,3 @@ awk -v busy="$busy" -v idle="$idle" 'BEGIN { total = busy + idle; printf "cpu_pe
 awk '{ print "load_1m=" $1; print "load_5m=" $2 }' /proc/loadavg
 awk '/^MemTotal:/ { print "memory_total_mb=" int($2 / 1024) } /^MemAvailable:/ { print "memory_available_mb=" int($2 / 1024) }' /proc/meminfo
 df -Pm "$dir" | awk 'NR == 2 { print "disk_total_mb=" $2; print "disk_used_mb=" $3 }'
-docker exec -i {{ $container }} databasify step metrics <<'ENGINE_METRICS' || true
-set -uo pipefail
-dir={{ $directory }}
-@include($engineHelpers)
-@include($engineMetrics)
-ENGINE_METRICS

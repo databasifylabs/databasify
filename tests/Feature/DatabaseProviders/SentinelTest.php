@@ -342,18 +342,6 @@ it('controls processes through the wrapper in every script that runs inside the 
         ->and($scripts['cluster.rejoin'])->toContain("databasify ctl start databasify-{$engine}\n");
 })->with('sentinel engines');
 
-it('reloads certificates and reads metrics inside the container with only the engine directory', function (string $engine) {
-    $database = idleDatabase($engine, 2);
-    $refresh = view('ssh.databases.certificates.refresh', [...$database->provider()->scriptData()->for(), 'files' => [], 'reload' => Database::providerFor($engine)->scriptView('config.reload-tls')])->render();
-    $metrics = view('ssh.databases.monitoring.metrics', [...$database->provider()->scriptData()->for(), 'engineHelpers' => Database::providerFor($engine)->scriptView('helpers'), 'engineMetrics' => Database::providerFor($engine)->scriptView('monitoring.metrics')])->render();
-
-    expect($refresh)->toContain("docker exec -i databasify-{$engine} databasify step reload-tls <<'RELOAD'")
-        ->toContain("if databasify ctl is-active --quiet databasify-{$engine}; then")
-        ->and($metrics)->toContain("conf=/srv/{$engine}/conf/{$engine}.conf")->toContain('vcli INFO keyspace')
-        ->and(bashErrorsIn($refresh))->toBe('')
-        ->and(bashErrorsIn($metrics))->toBe('');
-})->with('sentinel engines');
-
 it('turns transparent huge pages off on the host after tuned and before docker starts the container', function (string $engine) {
     $script = view("ssh.engines.{$engine}.config.host-tuning", idleDatabase($engine, 1, DatabaseMode::Single, 'solo')->provider()->scriptData()->for())->render();
 

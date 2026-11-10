@@ -6,6 +6,7 @@ use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Nodes\AddDatabaseNode;
 use App\Actions\Databases\Nodes\RebootDatabase;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
+use App\Actions\Databases\Upgrades\UpgradeDatabase;
 use App\DTOs\Databases\NewDatabaseNode;
 use App\Engines\Flows\CreateDatabaseFlow;
 use App\Engines\Flows\FlowContext;
@@ -168,4 +169,23 @@ it('reboots standbys first, fails over, then reboots the former primary', functi
         ->and(requestOf($ssh, $primary->server, 'cluster failover'))->toBe(['target' => $standby->privateIp()])
         ->and(sentTo($primary->server, $ssh))->toContain('cluster rejoin')
         ->and($database->fresh()->operation)->toBeNull();
+});
+
+it('upgrades in the documented order and reads the engine again afterwards', function () {
+    $database = idleDatabase('mysql', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
+    $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'));
+    $database->update(['available_image_repository' => $database->image_repository, 'available_image_digest' => 'sha256:'.str_repeat('b', 64), 'available_image_release' => '8.4.9', 'config_fields' => []]);
+
+    resolve(UpgradeDatabase::class)->handle($database->fresh());
+    advanceFlows(40);
+    $commands = engineCommandsIn($ssh);
+    $at = fn (Server $server, string $command): int|false => array_search("{$server->name}: {$command}", $commands, true);
+
+    expect($at($standby->server, 'host deploy'))->toBeLessThan($at($primary->server, 'cluster failover'))
+        ->and($at($primary->server, 'cluster failover'))->toBeLessThan($at($primary->server, 'host deploy'))
+        ->and(requestOf($ssh, $primary->server, 'host deploy')['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
+        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()
+        ->and($database->fresh()->config_fields)->toHaveCount(1);
 });

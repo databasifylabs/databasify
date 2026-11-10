@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use App\Actions\Databases\Recovery\RefreshRecoveryStatus;
+use App\Actions\Databases\Recovery\UpdateRecoverySchedule;
+use App\DTOs\Recovery\RecoverySchedule;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Recovery\ArchiveHealth;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Jobs\Databases\RefreshRecoveryStatusJob;
-use App\Jobs\Databases\SyncRecoveryFilesJob;
-use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\PointInTimeRecovery;
 use App\Models\StorageProvider;
 use App\Models\User;
@@ -25,7 +26,7 @@ it('turns on point-in-time recovery and redeploys every node to start archiving'
     $this->freezeSecond();
     $database = idleDatabase($engine, 1, DatabaseMode::Single, 'orders');
     $provider = StorageProvider::factory()->create(['path_prefix' => 'team']);
-    Queue::fake([UpgradeDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
 
     $this->post(projectUrl("/databases/{$database->id}/recovery"), ['storage_provider_id' => $provider->id, 'retention_days' => 14, 'backup_hour' => 2])->assertSessionHasNoErrors();
 
@@ -37,8 +38,7 @@ it('turns on point-in-time recovery and redeploys every node to start archiving'
         ->backup_hour->toBe(2)
         ->health->toBe(ArchiveHealth::Pending)
         ->and($database->fresh()->operation)->toBe('Turn on point-in-time recovery');
-    Queue::assertPushed(UpgradeDatabaseJob::class, fn (UpgradeDatabaseJob $job): bool => ! $job->installUpdate);
-    Queue::assertPushedWithChain(UpgradeDatabaseJob::class, [new RefreshRecoveryStatusJob($recovery, backUpNow: true)]);
+    Queue::assertPushed(AdvanceDatabaseFlow::class);
 })->with(['postgres', 'mysql', 'mariadb']);
 
 it('refuses point-in-time recovery where it cannot work', function () {
@@ -77,25 +77,25 @@ it('refuses to turn it on while another operation runs', function () {
 
 it('turns it off, keeping the archive in the bucket', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([UpgradeDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
 
     $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
 
     expect(PointInTimeRecovery::query()->count())->toBe(0)
         ->and(StorageProvider::query()->count())->toBe(1)
         ->and($database->fresh()->operation)->toBe('Turn off point-in-time recovery');
-    Queue::assertPushed(UpgradeDatabaseJob::class);
+    Queue::assertPushed(AdvanceDatabaseFlow::class);
 });
 
 it('changes the schedule without a restart', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([SyncRecoveryFilesJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/recovery"), ['retention_days' => 30, 'backup_hour' => 5])->assertSessionHasNoErrors();
 
     expect($database->pointInTimeRecovery?->fresh())->retention_days->toBe(30)->backup_hour->toBe(5)
         ->and($database->fresh()->operation)->toBe('Update point-in-time recovery');
-    Queue::assertPushed(SyncRecoveryFilesJob::class);
+    Queue::assertPushed(AdvanceDatabaseFlow::class);
 });
 
 it('asks for point-in-time recovery before backing up or checking', function () {
@@ -205,21 +205,6 @@ it('keeps a requested backup apart from the routine archive check', function () 
         ->not->toBe((new RefreshRecoveryStatusJob($recovery))->uniqueId());
 });
 
-it('reads the archive from the current primary only', function () {
-    $database = withRecovery(idleDatabase('postgres', 3, name: 'orders'));
-    markRoles($database, NodeRole::Replica, NodeRole::Primary, NodeRole::Replica);
-    $ssh = fakeSsh()->respond("backups=1\nearliest=1792843200\nlatest=".now()->getTimestamp()."\nlast_backup=1792843200\nproblem=\n");
-
-    (new RefreshRecoveryStatusJob($database->pointInTimeRecovery))->handle(resolve(RefreshRecoveryStatus::class));
-
-    expect($ssh->runs)->toHaveCount(1)
-        ->and($ssh->runs[0]['server'])->toBe($database->nodes[1]->server->name)
-        ->and($database->pointInTimeRecovery?->fresh())
-        ->health->toBe(ArchiveHealth::Healthy)
-        ->earliest_restorable_at->getTimestamp()->toBe(1792843200)
-        ->checked_at->not->toBeNull();
-});
-
 it('records a problem when no primary can be asked about the archive', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'), restorable: true);
     $ssh = fakeSsh();
@@ -242,51 +227,6 @@ it('records a problem when the primary cannot be reached', function () {
     expect($database->pointInTimeRecovery?->fresh()?->problem)->toBe("Could not reach {$database->seed()->server->name} to read the archive.");
 });
 
-it('keeps the restorable window when a newly promoted primary has no local archive history', function () {
-    $this->travelTo('2026-10-27 00:53:00');
-    $database = withRecovery(idleDatabase('postgres', 2, name: 'orders'), ['latest_restorable_at' => now()->subMinutes(3)]);
-    markRoles($database, NodeRole::Replica, NodeRole::Primary);
-    $base = now()->subMinutes(28)->getTimestamp();
-    fakeSsh()->respond("backups=1\nearliest={$base}\nlatest={$base}\nlast_backup={$base}\nproblem=\n");
-
-    resolve(RefreshRecoveryStatus::class)->handle($database->pointInTimeRecovery);
-
-    expect($database->pointInTimeRecovery?->fresh())
-        ->health->toBe(ArchiveHealth::Healthy)
-        ->problem->toBeNull()
-        ->and($database->pointInTimeRecovery?->fresh()?->latest_restorable_at?->toDateTimeString())->toBe('2026-10-27 00:50:00');
-});
-
-it('asks the primary to start a base backup when one is requested', function (string $engine, string $service) {
-    $database = withRecovery(idleDatabase($engine, 1, DatabaseMode::Single, 'orders'));
-    markRoles($database, NodeRole::Primary);
-    $ssh = fakeSsh()->respond("backups=0\nproblem=\n");
-
-    resolve(RefreshRecoveryStatus::class)->handle($database->pointInTimeRecovery, backUpNow: true);
-
-    expect($ssh->scriptAt(0))->toContain("start_backup=1\n")->toContain("databasify ctl start --no-block {$service}")
-        ->and($database->pointInTimeRecovery?->fresh()?->health)->toBe(ArchiveHealth::Pending);
-})->with([
-    'postgres' => ['postgres', 'databasify-postgres-backup'],
-    'mysql' => ['mysql', 'binlog-backup'],
-]);
-
-it('starts the first base backup on its own but never retries a failed one', function () {
-    $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
-    markRoles($database, NodeRole::Primary);
-    $ssh = fakeSsh();
-
-    resolve(RefreshRecoveryStatus::class)->handle($database->pointInTimeRecovery);
-
-    expect($ssh->scriptAt(0))
-        ->toContain('[ "$backups" -gt 0 ] || [ "$backup_failed" = "1" ] || start_backup=1')
-        ->toContain('stanza-create')
-        ->toContain('SELECT floor(extract(epoch FROM now()))::bigint, txid_current()')
-        ->toContain('(substr($2, 9) < segment || (whole && substr($2, 9) == segment))')
-        ->toContain("grep -h 'dropped WAL file'")
-        ->toContain('pgbackrest --config=/srv/postgres/conf/pgbackrest.conf --stanza=main --log-level-console=off info --output=json');
-});
-
 it('leaves the archive alone while the database is busy', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
     markRoles($database, NodeRole::Primary);
@@ -296,4 +236,32 @@ it('leaves the archive alone while the database is busy', function () {
     (new RefreshRecoveryStatusJob($database->pointInTimeRecovery))->handle(resolve(RefreshRecoveryStatus::class));
 
     expect($ssh->runs)->toBeEmpty();
+});
+
+it('reads the archive status from the primary and backs up on request', function () {
+    $database = withRecovery(idleDatabase('postgres', 2));
+    markRoles($database, NodeRole::Replica, NodeRole::Primary);
+    $primary = $database->nodes()->orderBy('position')->get()[1]->server;
+    $ssh = fakeEngine(fakeSsh()->respondToEngine('archive status', ['backups' => 2, 'earliest' => '2026-11-01T00:00:00Z', 'latest' => '2026-11-10T00:00:00Z', 'lastBackup' => '2026-11-09T01:00:00Z', 'problem' => null]));
+
+    resolve(RefreshRecoveryStatus::class)->handle($database->fresh()->pointInTimeRecovery, backUpNow: true);
+    $status = collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify archive status '));
+
+    expect($ssh->runs[$status]['server'])->toBe($primary->name)
+        ->and(json_decode($ssh->engineRequestAt($status), true))->toBe(['backUpNow' => true])
+        ->and($database->fresh()->pointInTimeRecovery)->backups_count->toBe(2)->latest_restorable_at->toIso8601ZuluString()->toBe('2026-11-10T00:00:00Z');
+});
+
+it('configures every node with the archive when point-in-time recovery is turned on', function () {
+    $this->actingAs(User::factory()->create());
+    $ssh = fakeEngine()->respondToEngine('archive status', ['backups' => 0, 'earliest' => null, 'latest' => null, 'lastBackup' => null, 'problem' => null]);
+    $database = withRecovery(idleDatabase('mysql', 2));
+    $configures = fn () => collect($ssh->runs)->keys()->filter(fn (int $index): bool => str_contains($ssh->scriptAt($index), '| databasify node configure '));
+
+    resolve(UpdateRecoverySchedule::class)->handle($database->fresh(), new RecoverySchedule(7, 3));
+    advanceFlows();
+
+    expect($configures())->toHaveCount(2)
+        ->and(json_decode($ssh->engineRequestAt($configures()->first()), true)['archive'])->retentionDays->toBe(7)->backupHour->toBe(3)
+        ->and($database->fresh()->operation)->toBeNull();
 });

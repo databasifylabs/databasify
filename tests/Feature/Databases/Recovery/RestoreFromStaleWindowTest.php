@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\FakeServerConnection;
 
 beforeEach(function () {
     $this->freezeSecond();
@@ -30,9 +31,9 @@ function staleWindowDatabase(): Database
     ], restorable: true);
 }
 
-function archiveStatusUpTo(CarbonInterface $latest): string
+function archiveStatusUpTo(CarbonInterface $latest): FakeServerConnection
 {
-    return 'backups=2'."\nearliest=".now()->subDay()->getTimestamp()."\nlatest={$latest->getTimestamp()}\nlast_backup=".now()->subHours(5)->getTimestamp()."\n";
+    return fakeEngine(fakeEngine()->respondToEngine('archive status', ['backups' => 2, 'earliest' => now()->subDay()->toIso8601ZuluString(), 'latest' => $latest->toIso8601ZuluString(), 'lastBackup' => now()->subHours(5)->toIso8601ZuluString(), 'problem' => null]));
 }
 
 function restoreTo(Database $source, CarbonInterface $target): TestResponse
@@ -42,7 +43,7 @@ function restoreTo(Database $source, CarbonInterface $target): TestResponse
 
 it('re-reads a stale archive window before refusing a target past it', function () {
     $source = staleWindowDatabase();
-    $ssh = fakeSsh()->respond(archiveStatusUpTo(now()->subMinute()));
+    $ssh = archiveStatusUpTo(now()->subMinute());
 
     restoreTo($source, now()->subMinutes(5))->assertSessionHasNoErrors();
 
@@ -53,7 +54,7 @@ it('re-reads a stale archive window before refusing a target past it', function 
 
 it('restores without reaching the server when the window already covers the target', function () {
     $source = staleWindowDatabase();
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     restoreTo($source, now()->subHour())->assertSessionHasNoErrors();
 
@@ -62,7 +63,7 @@ it('restores without reaching the server when the window already covers the targ
 
 it('refuses with the refreshed window when the archive still has not reached the target', function () {
     $source = staleWindowDatabase();
-    fakeSsh()->respond(archiveStatusUpTo(now()->subMinutes(10)));
+    archiveStatusUpTo(now()->subMinutes(10));
 
     restoreTo($source, now()->subMinutes(5))
         ->assertSessionHasErrors(['target' => 'orders cannot be restored to '.now()->subMinutes(5)->utc()->format('Y-m-d H:i:s').' UTC. Pick a time between '.now()->subDay()->utc()->format('Y-m-d H:i:s').' and '.now()->subMinutes(10)->utc()->format('Y-m-d H:i:s').' UTC.']);
@@ -72,7 +73,7 @@ it('refuses with the refreshed window when the archive still has not reached the
 
 it('does not reach the server for a target the archive can never cover', function (Closure $target) {
     $source = staleWindowDatabase();
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     restoreTo($source, $target())->assertSessionHasErrors('target');
 

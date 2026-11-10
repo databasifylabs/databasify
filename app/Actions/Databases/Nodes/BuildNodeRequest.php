@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Nodes;
 
+use App\Engines\Data\ArchiveSettings;
 use App\Engines\Data\Member;
 use App\Engines\Data\Secrets;
 use App\Engines\Requests\NodeConfigure;
@@ -27,6 +28,7 @@ final readonly class BuildNodeRequest
             members: $this->membersAmong($nodes),
             settings: array_filter($database->settings->config, fn (string $value): bool => $value !== ''),
             secrets: Secrets::of($database->settings),
+            archive: $database->pointInTimeRecovery === null ? null : ArchiveSettings::of($database->pointInTimeRecovery),
             primary: $primary->privateIp(),
         );
     }

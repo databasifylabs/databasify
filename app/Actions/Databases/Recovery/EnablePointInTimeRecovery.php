@@ -4,20 +4,25 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\Actions\Databases\Lifecycle\RedeployDatabase;
+use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Recovery\RecoverySettings;
-use App\Jobs\Databases\RefreshRecoveryStatusJob;
+use App\Engines\Flows\ArchiveFlow;
+use App\Engines\Flows\FlowContext;
 use App\Models\Database;
 
 final readonly class EnablePointInTimeRecovery
 {
-    public function __construct(private RedeployDatabase $redeploy) {}
+    public function __construct(
+        private StartFlow $startFlow,
+        private ArchiveFlow $flow,
+    ) {}
 
     public function handle(Database $database, RecoverySettings $settings): void
     {
         $database->ensureIdle();
-        $recovery = $database->enableRecovery($settings);
+        $database->enableRecovery($settings);
 
-        $this->redeploy->handle($database, 'Turn on point-in-time recovery', then: [new RefreshRecoveryStatusJob($recovery, backUpNow: true)]);
+        $this->startFlow->handle($database->refresh(), $this->flow, new FlowContext([]));
+        $database->retitleOperation('Turn on point-in-time recovery');
     }
 }

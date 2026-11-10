@@ -89,13 +89,14 @@ use LogicException;
  * @property DatabaseSettings $settings
  * @property EngineCapabilities|null $engine_capabilities
  * @property list<EngineField> $config_fields
+ * @property list<string>|null $log_units
  * @property string|null $dns_zone_id
  * @property-read DnsZone|null $dnsZone
  * @property-read PointInTimeRecovery|null $pointInTimeRecovery
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -1045,7 +1046,7 @@ class Database extends Model implements Movable
      */
     public function processNames(): array
     {
-        return $this->provider()->processes()->names();
+        return $this->log_units ?? [];
     }
 
     public static function providerFor(string $engine): DatabaseDriver
@@ -1162,6 +1163,7 @@ class Database extends Model implements Movable
         return [
             'engine_capabilities' => AsEngineCapabilities::class,
             'config_fields' => AsEngineFields::class,
+            'log_units' => 'array',
             'mode' => DatabaseMode::class,
             'status' => DatabaseStatus::class,
             'settings' => AsDatabaseSettings::class,

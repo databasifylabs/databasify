@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Lifecycle;
 
-use App\Jobs\Databases\UpgradeDatabaseJob;
+use App\Actions\Databases\Flows\StartFlow;
+use App\Engines\Flows\RollingSteps;
+use App\Engines\Flows\UpgradeFlow;
 use App\Models\Database;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Bus;
 
 final readonly class RedeployDatabase
 {
-    /**
-     * @param  list<ShouldQueue>  $then
-     */
-    public function handle(Database $database, string $title, array $then = []): void
+    public function __construct(
+        private StartFlow $startFlow,
+        private UpgradeFlow $flow,
+    ) {}
+
+    public function handle(Database $database, ?string $title = null): void
     {
-        $database->startOperation($title);
-        Bus::chain(collect($then)->prepend(new UpgradeDatabaseJob($database, installUpdate: false)))->dispatch();
+        $this->startFlow->handle($database, $this->flow, RollingSteps::contextFor($database));
+
+        if ($title !== null) {
+            $database->retitleOperation($title);
+        }
     }
 }

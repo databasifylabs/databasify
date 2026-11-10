@@ -13,13 +13,14 @@ return new class extends Migration
         Schema::table('databases', function (Blueprint $table) {
             $table->json('engine_capabilities')->nullable();
             $table->json('config_fields')->nullable();
+            $table->json('log_units')->nullable();
         });
     }
 
     public function down(): void
     {
         Schema::table('databases', function (Blueprint $table) {
-            $table->dropColumn(['engine_capabilities', 'config_fields']);
+            $table->dropColumn(['engine_capabilities', 'config_fields', 'log_units']);
         });
     }
 };

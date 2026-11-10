@@ -143,6 +143,7 @@ function withEngineDetails(Database $database): Database
     $database->update([
         'engine_capabilities' => EngineCapabilities::fromPayload(new Payload(engineCapabilitiesPayload($database->engine))),
         'config_fields' => [EngineField::fromPayload(new Payload(engineFieldPayload()))],
+        'log_units' => [$database->engine, "databasify-{$database->engine}"],
     ]);
 
     return $database;
@@ -182,6 +183,8 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
         ->respondToEngine('migration start', [])
         ->respondToEngine('migration progress', ['copy' => 'running', 'log' => 'copying shop', 'subscribedTables' => 0, 'readyTables' => 0, 'lagSeconds' => null, 'lagUnknown' => true])
         ->respondToEngine('migration stop', [])
+        ->respondToEngine('logs read', ['units' => ['engine-server'], 'lines' => ['ready']])
+        ->respondToEngine('node metrics', ['connections' => 3, 'queries' => 120, 'dataMb' => 40, 'keys' => null, 'hits' => null, 'misses' => null, 'evicted' => null])
         ->respondToEngine('operation status', $operation('succeeded'))
         ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0'])
         ->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))

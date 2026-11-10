@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Engines\Requests;
 
 use App\Contracts\Engines\EngineRequest;
+use App\Engines\Data\ArchiveSettings;
 use App\Engines\Data\Member;
 use App\Engines\Data\Secrets;
 use App\Engines\Responses\NodeConfigure as NodeConfigureReply;
@@ -26,6 +27,7 @@ final readonly class NodeConfigure implements EngineRequest
         public array $members,
         public array $settings,
         public Secrets $secrets,
+        public ?ArchiveSettings $archive,
         public ?string $primary,
     ) {}
 
@@ -44,7 +46,7 @@ final readonly class NodeConfigure implements EngineRequest
             'members' => array_map(fn (Member $member): array => $member->toPayload(), $this->members),
             'settings' => (object) $this->settings,
             'secrets' => $this->secrets->toPayload(),
-            'archive' => null,
+            'archive' => $this->archive?->toPayload(),
             'primary' => $this->primary,
         ];
     }

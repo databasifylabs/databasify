@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Monitoring;
 
 use App\DTOs\Metrics\NodeMetrics;
+use App\Engines\EngineClient;
+use App\Engines\Requests\NodeMetrics as EngineNodeMetrics;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
+use App\Support\Ssh\KeyValueOutput;
 use Illuminate\Support\Collection;
 use Throwable;
 
 final readonly class ReadDatabaseMetrics
 {
-    public function __construct(private NodeRunner $nodeRunner) {}
+    public function __construct(
+        private NodeRunner $nodeRunner,
+        private EngineClient $engine,
+    ) {}
 
     /**
      * @return Collection<int, NodeMetrics>
@@ -30,7 +36,9 @@ final readonly class ReadDatabaseMetrics
     private function metricsOf(Database $database, DatabaseNode $node): NodeMetrics
     {
         try {
-            return $database->provider()->nodes()->metrics($node);
+            $host = KeyValueOutput::parse($node->ssh()->exec('ssh.databases.monitoring.metrics', ['directory' => "/srv/{$database->engine}"]));
+
+            return new NodeMetrics($node->id, $node->server->name, true, [...$host, ...$this->engine->send($node, new EngineNodeMetrics)->toValues()]);
         } catch (Throwable) {
             return NodeMetrics::unreachable($node);
         }

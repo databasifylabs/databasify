@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Recovery;
 
 use App\DTOs\Recovery\ArchiveStatus;
-use App\Exceptions\Ssh\RemoteScriptFailed;
+use App\Engines\EngineClient;
+use App\Engines\Requests\ArchiveStatus as EngineArchiveStatus;
+use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Ssh\SshAccessDenied;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Models\DatabaseNode;
@@ -14,6 +16,8 @@ use Throwable;
 
 final readonly class RefreshRecoveryStatus
 {
+    public function __construct(private EngineClient $engine) {}
+
     public function handle(PointInTimeRecovery $recovery, bool $backUpNow = false): ArchiveStatus
     {
         $status = $this->statusOf($recovery, $backUpNow)->keepingLatestOf($recovery->latest_restorable_at);
@@ -31,11 +35,9 @@ final readonly class RefreshRecoveryStatus
             return ArchiveStatus::unreadable("{$database->name} has no healthy primary to read the archive from.");
         }
 
-        $archive = $database->engineArchive();
-
         try {
-            return $archive->status($primary, $backUpNow);
-        } catch (SshConnectionFailed|SshAccessDenied|RemoteScriptFailed) {
+            return ArchiveStatus::fromEngine($this->engine->send($primary, new EngineArchiveStatus($backUpNow), $backUpNow ? "{$primary->server->name}: backing up now" : null));
+        } catch (EngineError|SshConnectionFailed|SshAccessDenied) {
             return $this->unreachable($primary);
         } catch (Throwable $exception) {
             report($exception);

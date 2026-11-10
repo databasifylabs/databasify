@@ -6,8 +6,8 @@ use App\Actions\Databases\Recovery\DeleteArchive;
 use App\DTOs\Recovery\StoredArchive;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Servers\ServerLogStatus;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Jobs\Databases\DeleteRecoveryBackupsJob;
-use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\Database;
 use App\Models\ServerLog;
 use App\Models\StorageProvider;
@@ -71,15 +71,13 @@ it('deletes the backups from the bucket after turning point-in-time recovery off
     Bus::fake();
 
     $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
-    Bus::assertChained([UpgradeDatabaseJob::class]);
+    Bus::assertDispatched(AdvanceDatabaseFlow::class);
+    Bus::assertNotDispatched(DeleteRecoveryBackupsJob::class);
 
     $database->fresh()->finishOperation();
     $database = withRecovery($database);
     $this->delete(projectUrl("/databases/{$database->id}/recovery"), ['delete_backups' => true])->assertSessionHasNoErrors();
-    Bus::assertChained([
-        UpgradeDatabaseJob::class,
-        fn (DeleteRecoveryBackupsJob $job): bool => $job->database->is($database) && $job->archive->path === $path && $job->archive->prefix() === "{$path}/",
-    ]);
+    Bus::assertDispatched(DeleteRecoveryBackupsJob::class, fn (DeleteRecoveryBackupsJob $job): bool => $job->database->is($database) && $job->archive->path === $path && $job->archive->prefix() === "{$path}/" && $job->delay !== null);
 });
 
 it('keeps a folder that still holds other archives', function () {

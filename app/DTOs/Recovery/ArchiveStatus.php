@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Recovery;
 
+use App\Engines\Responses\ArchiveStatus as EngineArchiveStatus;
 use App\Enums\Recovery\ArchiveHealth;
 use App\Support\Ssh\KeyValueOutput;
 use Carbon\CarbonImmutable;
@@ -20,6 +21,17 @@ final readonly class ArchiveStatus
         public ?CarbonImmutable $lastBackup,
         public ?string $problem,
     ) {}
+
+    public static function fromEngine(EngineArchiveStatus $status): self
+    {
+        return new self(
+            backups: $status->backups,
+            earliest: $status->earliest === null ? null : CarbonImmutable::parse($status->earliest),
+            latest: $status->latest === null ? null : CarbonImmutable::parse($status->latest),
+            lastBackup: $status->lastBackup === null ? null : CarbonImmutable::parse($status->lastBackup),
+            problem: $status->problem,
+        );
+    }
 
     public static function fromOutput(string $output): self
     {

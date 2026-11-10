@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Actions\Databases\Lifecycle\CreateDatabase;
 use App\Actions\Databases\Lifecycle\DeleteDatabase;
 use App\Actions\Databases\Lifecycle\ReadNodeStatus;
+use App\Actions\Databases\Recovery\RestoreToPointInTime;
 use App\DTOs\Databases\NewDatabase;
+use App\DTOs\Recovery\PointInTimeRestore;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeRole;
@@ -48,7 +50,7 @@ it('creates a single node through the create flow', function () {
     $database = createThroughFlow('postgres', 1);
 
     expect(commandsOn($database->seed()->server, engineCommandsIn($ssh)))->toBe([
-        'host deploy', 'tls install', 'engine capabilities', 'config fields', 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'node status',
+        'host deploy', 'tls install', 'engine capabilities', 'config fields', 'logs read', 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'node status',
     ])
         ->and($database->flows()->sole()->state)->toBe(FlowState::Succeeded)
         ->and($database->operation)->toBeNull()
@@ -62,7 +64,7 @@ it('creates a three node cluster and enables every member', function () {
     $commands = engineCommandsIn($ssh);
 
     $database->nodes->each(fn (DatabaseNode $node) => expect(commandsOn($node->server, $commands))->toBe([
-        'host deploy', 'tls install', ...($node->isSeed() ? ['engine capabilities', 'config fields'] : []), 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'cluster enable', 'operation status', 'node status',
+        'host deploy', 'tls install', ...($node->isSeed() ? ['engine capabilities', 'config fields', 'logs read'] : []), 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'cluster enable', 'operation status', 'node status',
     ]));
     expect(array_search("{$database->nodes[2]->server->name}: node ready", $commands, true))->toBeLessThan(array_search("{$database->nodes[0]->server->name}: node bootstrap", $commands, true))
         ->and($database->flows()->sole()->state)->toBe(FlowState::Succeeded);
@@ -120,3 +122,20 @@ it('maps node status roles', function (array $reply, int $exit, NodeRole $role) 
     'container stopped' => [[], 69, NodeRole::Offline],
     'unreachable' => [['error' => ['code' => 'unavailable', 'message' => 'not yet', 'details' => []]], 1, NodeRole::Unknown],
 ]);
+
+it('restores to a point in time through the create flow before checking the accounts', function () {
+    $ssh = fakeEngine()->respondToEngine('restore start', ['key' => 'k', 'kind' => 'restore start', 'state' => 'running', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-10T00:00:00Z', 'finishedAt' => null, 'error' => null]);
+    $source = withRecovery(idleDatabase('postgres', 1, name: 'orders'), restorable: true);
+    $server = Server::factory()->ready()->create();
+    $target = $source->pointInTimeRecovery->latest_restorable_at->subMinute();
+
+    $restored = inProjectDuring(fn (): Database => resolve(RestoreToPointInTime::class)->handle($source, new PointInTimeRestore('orders-restored', $server->id, $target)));
+    advanceFlows();
+    $commands = commandsOn($server, engineCommandsIn($ssh));
+    $restore = collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify restore start '));
+
+    expect(array_search('restore start', $commands, true))->toBeGreaterThan(array_search('node bootstrap', $commands, true))
+        ->and($commands)->toContain('account list')
+        ->and(json_decode($ssh->engineRequestAt($restore), true))->target->toBe($target->utc()->toIso8601ZuluString())
+        ->and($restored->fresh()->flows()->sole()->state)->toBe(FlowState::Succeeded);
+});

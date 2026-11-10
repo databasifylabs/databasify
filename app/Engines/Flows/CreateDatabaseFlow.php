@@ -9,20 +9,24 @@ use App\Actions\Databases\Network\ApplyNodeFirewall;
 use App\Actions\Databases\Nodes\BuildNodeRequest;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\LearnEngine;
+use App\Actions\Databases\Recovery\ReconcileRestoredAccounts;
 use App\Contracts\Engines\Flow;
 use App\Engines\Data\DefaultAccount;
 use App\Engines\Data\Secrets;
+use App\Engines\Data\Storage;
 use App\Engines\EngineClient;
 use App\Engines\Requests\ClusterEnable;
 use App\Engines\Requests\HostRemove;
 use App\Engines\Requests\NodeBootstrap;
 use App\Engines\Requests\NodeReady;
 use App\Engines\Requests\NodeStart;
+use App\Engines\Requests\RestoreStart;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
+use App\Models\StorageProvider;
 use Throwable;
 
 final readonly class CreateDatabaseFlow implements Flow
@@ -35,6 +39,7 @@ final readonly class CreateDatabaseFlow implements Flow
         private ApplyNodeFirewall $firewall,
         private RefreshDatabaseStatus $refresh,
         private LearnEngine $learn,
+        private ReconcileRestoredAccounts $restoredAccounts,
     ) {}
 
     public function name(Database $database, FlowContext $context): string
@@ -50,8 +55,29 @@ final readonly class CreateDatabaseFlow implements Flow
         return [
             ...$nodes->flatMap($this->prepareStepsFor(...))->all(),
             ...$nodes->map($this->bootstrapStepFor(...))->all(),
+            ...$this->restoreStepsOf($flow),
             ...$joinSteps,
             Step::finish('refresh the status', $this->steps->quick(fn (DatabaseFlow $flow) => $this->refresh->handle($flow->database))),
+        ];
+    }
+
+    /**
+     * @return list<Step>
+     */
+    private function restoreStepsOf(DatabaseFlow $flow): array
+    {
+        $database = $flow->database;
+        $source = $database->settings->restore;
+
+        if ($source === null) {
+            return [];
+        }
+
+        $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
+
+        return [
+            Step::catchUp('restore the archive', $this->steps->long($database->seed(), fn (string $key): RestoreStart => new RestoreStart($key, $storage, $source->target))),
+            Step::finish('check the restored accounts', $this->steps->quick(fn () => $this->restoredAccounts->handle($database))),
         ];
     }
 

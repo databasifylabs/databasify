@@ -4,21 +4,30 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\Actions\Databases\Lifecycle\RedeployDatabase;
+use App\Actions\Databases\Flows\StartFlow;
+use App\Engines\Flows\ArchiveFlow;
+use App\Engines\Flows\FlowContext;
 use App\Jobs\Databases\DeleteRecoveryBackupsJob;
 use App\Models\Database;
 
 final readonly class DisablePointInTimeRecovery
 {
-    public function __construct(private RedeployDatabase $redeploy) {}
+    private const int BACKUP_DELETE_DELAY_MINUTES = 10;
+
+    public function __construct(
+        private StartFlow $startFlow,
+        private ArchiveFlow $flow,
+    ) {}
 
     public function handle(Database $database, bool $deleteBackups = false): void
     {
         $database->ensureIdle();
         $archive = $database->disableRecovery();
 
-        $then = $deleteBackups ? [new DeleteRecoveryBackupsJob($database, $archive)] : [];
+        $this->startFlow->handle($database->refresh(), $this->flow, new FlowContext([]));
 
-        $this->redeploy->handle($database, 'Turn off point-in-time recovery', then: $then);
+        if ($deleteBackups) {
+            dispatch(new DeleteRecoveryBackupsJob($database, $archive))->delay(now()->addMinutes(self::BACKUP_DELETE_DELAY_MINUTES));
+        }
     }
 }
