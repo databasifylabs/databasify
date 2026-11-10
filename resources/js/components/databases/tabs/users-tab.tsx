@@ -346,7 +346,9 @@ export default function UsersTab({
                         ))}
                     </TableBody>
                 </Table>
-                {options.length > 0 && (
+                {options.some(
+                    (option) => option.value === 'mysql_native_password',
+                ) && (
                     <p className="px-6 text-sm text-muted-foreground">
                         Having trouble connecting? Your MySQL client might not
                         support the MySQL 8 default password encryption. If the
