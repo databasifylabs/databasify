@@ -34,6 +34,7 @@ final readonly class RestoreToPointInTime
             persistence: $source->settings->persistence,
             image: $source->image(),
             accountsFrom: $source,
+            recovery: $recovery->settings(),
         ));
     }
 

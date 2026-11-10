@@ -82,3 +82,17 @@ it('does not reach the server for a target the archive can never cover', functio
     'in the future' => [fn () => now()->addHour()],
     'before the earliest backup' => [fn () => now()->subDays(3)],
 ]);
+
+it('gives the restored database its own point-in-time recovery on the same storage', function () {
+    $source = staleWindowDatabase();
+    fakeEngine();
+
+    restoreTo($source, now()->subHour())->assertSessionHasNoErrors();
+
+    $restored = Database::query()->where('name', 'orders-restored')->sole();
+    expect($restored->pointInTimeRecovery)
+        ->storage_provider_id->toBe($source->pointInTimeRecovery?->storage_provider_id)
+        ->retention_days->toBe($source->pointInTimeRecovery?->retention_days)
+        ->backup_hour->toBe($source->pointInTimeRecovery?->backup_hour)
+        ->path->not->toBe($source->pointInTimeRecovery?->path);
+});

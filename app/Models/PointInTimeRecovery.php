@@ -7,6 +7,7 @@ namespace App\Models;
 use App\DTOs\Recovery\ArchiveLocation;
 use App\DTOs\Recovery\ArchiveStatus;
 use App\DTOs\Recovery\RecoverySchedule;
+use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\RecoverySource;
 use App\DTOs\Recovery\StoredArchive;
 use App\Enums\Recovery\ArchiveHealth;
@@ -87,6 +88,11 @@ class PointInTimeRecovery extends Model
     public function recordStatus(ArchiveStatus $status): void
     {
         $this->update($status->toRow(now()));
+    }
+
+    public function settings(): RecoverySettings
+    {
+        return new RecoverySettings($this->storage_provider_id, new RecoverySchedule($this->retention_days, $this->backup_hour));
     }
 
     public function reschedule(RecoverySchedule $schedule): void

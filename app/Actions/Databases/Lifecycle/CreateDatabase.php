@@ -53,6 +53,10 @@ final readonly class CreateDatabase
             $this->sized->handle($database);
             $this->recordAccountsOf($database, $data);
 
+            if ($data->recovery !== null) {
+                $database->recordRecovery($data->recovery);
+            }
+
             return $database;
         });
 

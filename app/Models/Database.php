@@ -879,6 +879,11 @@ class Database extends Model implements Movable
             throw ValidationException::withMessages(['recovery' => "{$this->name} already has point-in-time recovery."]);
         }
 
+        return $this->recordRecovery($settings);
+    }
+
+    public function recordRecovery(RecoverySettings $settings): PointInTimeRecovery
+    {
         $provider = StorageProvider::query()->findOrFail($settings->storageProviderId);
         $recovery = $this->pointInTimeRecovery()->create(array_merge([
             'storage_provider_id' => $provider->id,

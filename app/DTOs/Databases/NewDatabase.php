@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Databases;
 
+use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\RecoverySource;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\Persistence;
@@ -28,6 +29,7 @@ final readonly class NewDatabase
         public Persistence $persistence = Persistence::Snapshots,
         public ?EngineImage $image = null,
         public ?Database $accountsFrom = null,
+        public ?RecoverySettings $recovery = null,
     ) {}
 
     /**
