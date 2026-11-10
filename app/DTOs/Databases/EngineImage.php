@@ -17,6 +17,11 @@ final readonly class EngineImage
         return "{$this->repository}@{$this->digest}";
     }
 
+    public function pinnedReference(): string
+    {
+        return "{$this->repository}:{$this->release}@{$this->digest}";
+    }
+
     public function replaces(self $current): bool
     {
         $comparison = version_compare($this->release, $current->release);

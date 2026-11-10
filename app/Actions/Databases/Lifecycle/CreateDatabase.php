@@ -8,6 +8,7 @@ use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
+use App\Engines\EngineSecrets;
 use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Jobs\Databases\BootstrapDatabaseJob;
@@ -63,7 +64,7 @@ final readonly class CreateDatabase
     private function settingsFor(NewDatabase $data, DatabaseDriver $engine): DatabaseSettings
     {
         return new DatabaseSettings(
-            secrets: $data->secrets ?? $engine->generateSecrets(),
+            secrets: $data->secrets ?? [...$engine->generateSecrets(), ...EngineSecrets::generate()],
             config: $data->config,
             persistence: $data->persistence,
             restore: $data->restore,

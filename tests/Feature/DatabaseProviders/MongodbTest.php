@@ -18,6 +18,7 @@ use Illuminate\Validation\ValidationException;
 
 it('runs mongod as a tls replica set with keyfile auth and tuned settings', function () {
     $database = idleDatabase('mongodb', 1, DatabaseMode::Single);
+    $database->nodes()->sole()->server->update(['cpus' => null, 'memory_mb' => null, 'disk_gb' => null]);
     $database->update(['settings' => $database->settings->withConfig(['slowOpThresholdMs' => '250', 'verbosity' => '1', 'compressors' => 'zstd'])]);
     $config = json_decode(renderedFile($database->fresh(), 'mongod.conf'), true);
 
