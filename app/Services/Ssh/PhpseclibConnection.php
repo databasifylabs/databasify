@@ -12,6 +12,9 @@ use App\Support\Ssh\Fingerprint;
 use Closure;
 use Illuminate\Support\Str;
 use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Exception\ConnectionClosedException;
+use phpseclib3\Exception\TimeoutException;
+use phpseclib3\Exception\UnableToConnectException;
 use phpseclib3\Net\SFTP;
 use Throwable;
 
@@ -117,6 +120,10 @@ final readonly class PhpseclibConnection implements ServerConnection
             $ssh = $this->sessions->sessionFor($server, fn (): SFTP => $this->connectTo($server));
 
             return [$ssh, $this->upload($ssh, $server, $script)];
+        } catch (ConnectionClosedException|TimeoutException|UnableToConnectException $exception) {
+            $this->sessions->forget($server);
+
+            throw SshConnectionFailed::onServer($server, "Could not connect to {$server->address()}:{$server->ssh_port}: {$exception->getMessage()}");
         } catch (Throwable $exception) {
             $this->sessions->forget($server);
 

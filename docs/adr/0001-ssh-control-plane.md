@@ -14,7 +14,7 @@ The Laravel app is the only control plane. It renders bash scripts from Blade vi
 ## Consequences
 
 - Every script starts with `set -euo pipefail`. Its `apt-get` wrapper waits up to 600 seconds for the dpkg/apt locks (`APT_LOCK_TIMEOUT_SECONDS`); `dnf` is not wrapped.
-- Timeouts: 3600 seconds per step, 21600 seconds for long steps (`LONG_STEP_TIMEOUT_SECONDS`), 90 seconds for probes. SSH connects time out after 10 seconds and are tried 3 times, 3 seconds apart, except when access is denied.
+- Timeouts: 3600 seconds per step, 21600 seconds for long steps (`LONG_STEP_TIMEOUT_SECONDS`), 90 seconds for probes. SSH connects time out after 10 seconds and are tried 3 times, 3 seconds apart, except when access is denied. A connect or upload that still fails (refused, closed or timed out) raises `SshConnectionFailed`; a script that has started is never run again by the connection.
 - A changed host key refuses the connection ([0013](0013-secrets-and-ssh-keys.md)).
 - Scripts must be idempotent, because a failed operation is retried by running the same steps again.
 - When the app is down, failover still works, but provisioning, status refresh and alerts stop.
