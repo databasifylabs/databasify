@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Lifecycle;
 
 use App\Actions\Databases\Flows\StartFlow;
+use App\Actions\Databases\Nodes\EnsureNodesSized;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
@@ -26,6 +27,7 @@ final readonly class CreateDatabase
         private ImageResolver $newestImage,
         private StartFlow $startFlow,
         private CreateDatabaseFlow $createFlow,
+        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(NewDatabase $data): Database
@@ -46,6 +48,7 @@ final readonly class CreateDatabase
             ], $image->toRow()));
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));
+            $this->sized->handle($database);
             $this->recordAccountsOf($database, $data);
 
             return $database;

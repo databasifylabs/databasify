@@ -100,7 +100,7 @@ it('rejoins each node after a forced quorum on the most advanced member', functi
     }
     fakeEngine($ssh)->respondToEngine('cluster quorum', ['total' => 3, 'online' => 0])->respondToEngine('node wake', [])->respondToEngine('cluster force-quorum', ['leader' => 'x']);
 
-    resolve(RecoverDatabase::class)->handle($database);
+    resolve(RecoverDatabase::class)->handle($database, othersAreDown: true);
     advanceFlows();
 
     expect(payloadsOf($ssh, 'cluster force-quorum'))->toBe([['server' => $servers[1]->name, 'request' => ['othersDown' => true]]])

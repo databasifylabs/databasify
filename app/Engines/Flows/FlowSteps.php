@@ -44,10 +44,11 @@ final readonly class FlowSteps
     public function long(DatabaseNode $node, Closure $request): Closure
     {
         return function (DatabaseFlow $flow) use ($node, $request): StartedOperation {
-            $key = $flow->newOperationKey();
-            $this->engine->send($node, $request($key));
+            $operation = new StartedOperation($node->id, $flow->newOperationKey());
+            $flow->waitFor($operation);
+            $this->engine->send($node, $request($operation->key));
 
-            return new StartedOperation($node->id, $key);
+            return $operation;
         };
     }
 }

@@ -14,7 +14,10 @@ All database logic now lives in the engine images: the `databasify` wrapper answ
   - `Prepare`: a failure fails the flow and runs its cleanup.
   - `CatchUp` (the engine copying data): a failed operation fails the flow and runs cleanup; an app outage only delays the next poll.
   - `Finish`: a failure is retried on the next tick and never cleans up.
-  - A lost operation (`not_found` or `interrupted`) starts the step again with a new key; the engine's commands are safe to repeat. `StepNotReady` waits for the next tick.
+  - An operation key is `{flow}.{step}.{attempt}` and is saved before the command is sent, so a worker that dies right after the engine accepted it finds the operation on the next tick. A lost operation (`not_found` or `interrupted`) starts the step again under the next attempt; the engine's commands are safe to repeat. An SSH, `not_running` or `unavailable` error while starting a catch-up or finish step waits for the next tick. `StepNotReady` waits too.
+  - A finish step or a lost operation gives up after 30 attempts, so a deterministic error cannot hold the lock forever.
+  - A failed flow's cleanup runs in its own `CleanUpDatabaseFlow` job (one hour), which releases the operation when it ends.
+  - Recovery sends `cluster force-quorum` with `othersDown` only when the owner confirmed the other nodes are down, refuses when no member's quorum can be read, and refuses to pick a survivor when a member's position is unknown.
 - **The flows follow the engine README.** Create (and restore), add, remove, redeploy, reboot, settings change, rolling restart, re-tune, upgrade, point-in-time recovery changes and recovery after an outage each follow the order the engine documents. Rolling changes (reboot, restart, upgrade) go read-only nodes, standbys, `cluster failover`, former primary.
 - **A small catalog.** `EngineCatalog` holds only what the app needs per engine: label, icon, category, image repository, version lines, failover hint, SRV record, connection profile, Laravel environment, migration source form, persistence choice and whether read-only nodes vote. Plugins register engines with `RegisterEngine` as data. What a database can do comes from the engine: `engine capabilities` (commands, password encryptions, reserved names, ports) and `config fields` are read from the seed after its first deploy and stored on the database.
 - **The app's CA.** Certificates are issued in PHP ([0012](0012-tls-private-ca.md)) and installed with `tls install`.
@@ -42,5 +45,6 @@ All database logic now lives in the engine images: the `databasify` wrapper answ
 - `app/Engines/Flows/CreateDatabaseFlow.php`
 - `app/Engines/Flows/RollingSteps.php`
 - `app/Jobs/Databases/AdvanceDatabaseFlow.php`
+- `app/Jobs/Databases/CleanUpDatabaseFlow.php`
 - `app/Actions/Databases/RunOnPrimary.php`
 - `database/migrations/2026_11_10_030902_create_database_flows_table.php`

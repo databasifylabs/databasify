@@ -29,7 +29,7 @@ final readonly class RecoverDatabase
 
         $this->startFlow->handle($database, $this->flow, new FlowContext(
             nodeIds: array_values(array_filter($reachable->modelKeys(), is_string(...))),
-            force: $othersAreDown || $reachable->count() === $database->memberCount(),
+            force: $othersAreDown,
         ));
     }
 

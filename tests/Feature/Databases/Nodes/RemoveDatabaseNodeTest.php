@@ -26,6 +26,8 @@ it('plans a failover to a standby before removing the primary', function () {
     Queue::fake([AdvanceDatabaseFlow::class]);
     markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
+    $ssh = fakeSsh();
+    $database->nodes()->orderBy('position')->get()->each(fn ($node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
     resolve(RemoveDatabaseNode::class)->handle($primary->fresh());
 

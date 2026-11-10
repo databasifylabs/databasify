@@ -102,12 +102,13 @@ it('removes a node in the documented order', function () {
     $database = idleDatabase('mysql', 3);
     markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
     [$primary, $staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
     resolve(RemoveDatabaseNode::class)->handle($leaving);
     advanceFlows();
 
-    expect(sentTo($leaving->server, $ssh))->toBe(['cluster disable', 'host remove'])
-        ->and(sentTo($primary->server, $ssh))->toBe(['node configure', 'member forget', 'cluster membership', 'node status'])
+    expect(sentTo($leaving->server, $ssh))->toBe(['node status', 'cluster disable', 'host remove'])
+        ->and(sentTo($primary->server, $ssh))->toBe(['node status', 'node configure', 'member forget', 'cluster membership', 'node status'])
         ->and(requestOf($ssh, $staying->server, 'member forget'))->toBe(['ip' => $leaving->privateIp()])
         ->and(count(requestOf($ssh, $staying->server, 'cluster membership')['members']))->toBe(2)
         ->and(DatabaseNode::query()->find($leaving->id))->toBeNull();
@@ -118,11 +119,12 @@ it('falls back to node reset when member forget is unsupported', function () {
     $database = idleDatabase('valkey', 3);
     markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
     [$primary, $staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
     resolve(RemoveDatabaseNode::class)->handle($leaving);
     advanceFlows();
 
-    expect(sentTo($staying->server, $ssh))->toBe(['node configure', 'member forget', 'node reset', 'cluster membership', 'node status'])
+    expect(sentTo($staying->server, $ssh))->toBe(['node status', 'node configure', 'member forget', 'node reset', 'cluster membership', 'node status'])
         ->and(requestOf($ssh, $staying->server, 'node reset'))->toBe(['peers' => 1, 'hosts' => [$primary->privateIp(), $staying->privateIp()]]);
 });
 
@@ -131,11 +133,12 @@ it('fails over before removing the primary', function () {
     $database = idleDatabase('postgres', 3);
     markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
     resolve(RemoveDatabaseNode::class)->handle($primary);
     advanceFlows();
 
-    expect(sentTo($primary->server, $ssh))->toBe(['cluster failover', 'cluster disable', 'host remove'])
+    expect(sentTo($primary->server, $ssh))->toBe(['node status', 'cluster failover', 'cluster disable', 'host remove'])
         ->and(requestOf($ssh, $primary->server, 'cluster failover'))->toBe(['target' => $standby->privateIp()])
         ->and(DatabaseNode::query()->find($primary->id))->toBeNull();
 });

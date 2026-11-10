@@ -194,7 +194,7 @@ function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $ro
 {
     $reply = $role === null ? ['error' => ['code' => 'unavailable', 'message' => 'unreachable', 'details' => (object) []]] : ['role' => $role, 'version' => $version];
 
-    return $ssh->respondWhen(
+    return $ssh->respondFirstWhen(
         fn (string $name, string $script): bool => $name === $server->name && str_contains($script, '| databasify node status '),
         json_encode($reply, JSON_THROW_ON_ERROR),
         $role === null ? 1 : 0,

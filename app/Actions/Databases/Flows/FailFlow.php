@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Flows;
 
 use App\Enums\Databases\FlowState;
+use App\Jobs\Databases\CleanUpDatabaseFlow;
 use App\Models\DatabaseFlow;
-use Throwable;
 
 final readonly class FailFlow
 {
@@ -14,12 +14,6 @@ final readonly class FailFlow
     {
         $flow->update(['state' => FlowState::Failed, 'error' => $error, 'operation_node_id' => null, 'operation_key' => null]);
 
-        try {
-            $flow->database->ignoringStop(fn () => $flow->definition()->cleanup($flow));
-        } catch (Throwable $exception) {
-            report($exception);
-        } finally {
-            $flow->database->finishOperation();
-        }
+        dispatch(new CleanUpDatabaseFlow($flow));
     }
 }

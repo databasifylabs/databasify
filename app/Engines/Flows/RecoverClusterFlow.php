@@ -15,6 +15,7 @@ use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
 use Illuminate\Support\Collection;
+use RuntimeException;
 
 final readonly class RecoverClusterFlow implements Flow
 {
@@ -90,7 +91,7 @@ final readonly class RecoverClusterFlow implements Flow
         $positions = $nodes->map(fn (DatabaseNode $node): ?int => $this->engine->send($node, new ClusterPosition, "{$node->server->name}: reading how far its data got")->position);
 
         if ($positions->contains(null)) {
-            return $nodes->firstOrFail();
+            throw new RuntimeException('A member could not say how far its data got, so Databasify will not pick a new primary. Check the members and recover again.');
         }
 
         return $nodes->sortByDesc(fn (DatabaseNode $node, int $index): ?int => $positions[$index])->firstOrFail();

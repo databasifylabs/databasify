@@ -19,6 +19,7 @@ final readonly class AddDatabaseNode
         private EnsureHostnamesFree $free,
         private StartFlow $startFlow,
         private AddNodeFlow $flow,
+        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(Database $database, NewDatabaseNode $data): void
@@ -30,6 +31,7 @@ final readonly class AddDatabaseNode
 
         $this->startFlow->handle($database, $this->flow, function () use ($database, $data, $name): FlowContext {
             $node = $database->addNode($data->server->id, $data->kind, $name);
+            $this->sized->handle($database);
 
             return new FlowContext(array_values(array_filter($database->nodes()->pluck('id')->all(), is_string(...))), $node->id);
         });

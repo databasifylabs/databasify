@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Nodes;
 
 use App\Actions\Databases\Flows\StartFlow;
+use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\RemoveNodeFlow;
 use App\Models\DatabaseNode;
@@ -15,12 +16,17 @@ final readonly class RemoveDatabaseNode
     public function __construct(
         private StartFlow $startFlow,
         private RemoveNodeFlow $flow,
+        private RefreshDatabaseStatus $refresh,
+        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(DatabaseNode $node, bool $force = false): void
     {
         $database = $node->database;
         $database->ensureIdle();
+        $this->sized->handle($database, without: $node);
+        $this->refresh->handle($database);
+        $node->refresh();
 
         if (! $node->isReadOnly() && $database->memberCount() === 1) {
             throw ValidationException::withMessages(['node' => "{$node->server->name} is the only member left."]);

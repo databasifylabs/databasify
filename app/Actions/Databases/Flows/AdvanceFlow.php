@@ -24,6 +24,8 @@ use Throwable;
 
 final readonly class AdvanceFlow
 {
+    private const int MAX_ATTEMPTS = 30;
+
     public function __construct(
         private EngineClient $engine,
         private FailFlow $fail,
@@ -58,6 +60,8 @@ final readonly class AdvanceFlow
             $operation = $this->operationStartedBy($step, $flow);
         } catch (StepNotReady) {
             return false;
+        } catch (EngineNotRunning|EngineUnavailable|SshConnectionFailed $exception) {
+            return $step->kind === StepKind::Prepare ? $this->stepFailed($flow, $step, $exception->getMessage()) : false;
         } catch (Throwable $exception) {
             return $this->stepFailed($flow, $step, $exception->getMessage());
         }
@@ -130,6 +134,12 @@ final readonly class AdvanceFlow
 
     private function forget(DatabaseFlow $flow): bool
     {
+        if ($flow->attempt + 1 >= self::MAX_ATTEMPTS) {
+            $this->fail->handle($flow, 'The engine lost the operation '.self::MAX_ATTEMPTS.' times.');
+
+            return false;
+        }
+
         $flow->forgetOperation();
 
         return true;
@@ -137,7 +147,7 @@ final readonly class AdvanceFlow
 
     private function stepFailed(DatabaseFlow $flow, ?Step $step, string $error): bool
     {
-        if ($step?->kind === StepKind::Finish) {
+        if ($step?->kind === StepKind::Finish && $flow->attempt + 1 < self::MAX_ATTEMPTS) {
             $flow->forgetOperation($error);
 
             return false;

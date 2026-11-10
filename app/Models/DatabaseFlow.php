@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 use LogicException;
 
 /**
@@ -26,6 +25,7 @@ use LogicException;
  * @property string $database_id
  * @property class-string<Flow> $flow
  * @property int $step
+ * @property int $attempt
  * @property FlowContext $context
  * @property string|null $operation_node_id
  * @property string|null $operation_key
@@ -37,7 +37,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['flow', 'step', 'context', 'operation_node_id', 'operation_key', 'state', 'error', 'phase', 'progress'])]
+#[Fillable(['flow', 'step', 'attempt', 'context', 'operation_node_id', 'operation_key', 'state', 'error', 'phase', 'progress'])]
 class DatabaseFlow extends Model
 {
     use HasUuids;
@@ -80,7 +80,7 @@ class DatabaseFlow extends Model
 
     public function newOperationKey(): string
     {
-        return "{$this->id}.{$this->step}.".Str::lower(Str::random(6));
+        return "{$this->id}.{$this->step}.{$this->attempt}";
     }
 
     public function waitFor(StartedOperation $operation): void
@@ -90,12 +90,12 @@ class DatabaseFlow extends Model
 
     public function forgetOperation(?string $error = null): void
     {
-        $this->update(['operation_node_id' => null, 'operation_key' => null, 'error' => $error]);
+        $this->update(['operation_node_id' => null, 'operation_key' => null, 'error' => $error, 'attempt' => $this->attempt + 1]);
     }
 
     public function moveOn(): void
     {
-        $this->update(['step' => $this->step + 1, 'operation_node_id' => null, 'operation_key' => null, 'error' => null]);
+        $this->update(['step' => $this->step + 1, 'attempt' => 0, 'operation_node_id' => null, 'operation_key' => null, 'error' => null]);
     }
 
     public function title(): string
@@ -113,6 +113,7 @@ class DatabaseFlow extends Model
     {
         return [
             'step' => 'integer',
+            'attempt' => 'integer',
             'context' => AsFlowContext::class,
             'state' => FlowState::class,
             'progress' => AsProgress::class,

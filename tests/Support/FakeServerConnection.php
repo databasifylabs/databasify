@@ -73,6 +73,16 @@ final class FakeServerConnection implements ServerConnection
         return $request === false ? '' : $request;
     }
 
+    /**
+     * @param  Closure(string, string): bool  $matches
+     */
+    public function respondFirstWhen(Closure $matches, string $output = '', int $exit = 0): self
+    {
+        array_unshift($this->rules, ['matches' => $matches, 'output' => $output, 'exit' => $exit]);
+
+        return $this;
+    }
+
     public function bootIdChangesAfterReboot(): self
     {
         $reboots = [];
