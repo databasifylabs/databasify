@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Certificates;
 
+use App\DTOs\Databases\IssuedCertificate;
 use App\Engines\EngineClient;
 use App\Engines\Requests\TlsInstall;
 use App\Models\Database;
@@ -15,7 +16,10 @@ final readonly class InstallNodeCertificate
 
     public function handle(Database $database, DatabaseNode $node): void
     {
-        $this->engine->send($node, $this->certificateOf($database, $node), "{$node->server->name}: installing certificates");
+        $certificate = $this->certificateOf($database, $node);
+
+        $this->engine->send($node, $certificate, "{$node->server->name}: installing certificates");
+        $node->update(['certificate_fingerprint' => IssuedCertificate::fingerprintOf($certificate->certificate)]);
     }
 
     private function certificateOf(Database $database, DatabaseNode $node): TlsInstall

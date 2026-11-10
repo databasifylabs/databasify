@@ -128,7 +128,14 @@ class Database extends Model implements Movable
 
     public function clientCaCertificate(): ?string
     {
-        return $this->publicCertificateZone() === null ? $this->settings->certificate(self::CERTIFICATE_AUTHORITY) : null;
+        return $this->servesPublicCertificate() ? null : $this->settings->certificate(self::CERTIFICATE_AUTHORITY);
+    }
+
+    public function servesPublicCertificate(): bool
+    {
+        $fingerprint = $this->publicCertificateZone()?->certificateFingerprint();
+
+        return $fingerprint !== null && $this->nodes()->pluck('certificate_fingerprint')->every(fn (?string $installed): bool => $installed === $fingerprint);
     }
 
     public function publicCertificateZone(): ?DnsZone
@@ -141,7 +148,7 @@ class Database extends Model implements Movable
         $zone = $this->publicCertificateZone();
 
         if ($zone !== null) {
-            return $zone->hasCurrentCertificate();
+            return $zone->hasCurrentCertificate() && $this->servesPublicCertificate();
         }
 
         return $this->nodesWithServers()->every(fn (DatabaseNode $node): bool => IssuedCertificate::fromPem($this->settings->nodeCertificate($node->id, 'server.crt') ?? '')?->isCurrentFor($node->ownCertificateNames()) === true);
@@ -1003,7 +1010,7 @@ class Database extends Model implements Movable
     public function connectionProfile(): ConnectionProfile
     {
         $engine = $this->engine();
-        $profile = ($this->publicCertificateZone() === null ? null : $engine->publicConnection) ?? $engine->connection;
+        $profile = ($this->servesPublicCertificate() ? $engine->publicConnection : null) ?? $engine->connection;
 
         if ($this->dnsZone === null || $engine->serviceConnection === null) {
             return $profile;

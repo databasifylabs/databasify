@@ -80,6 +80,11 @@ class DnsZone extends Model
         return IssuedCertificate::fromPem($this->certificate ?? '')?->isCurrentFor([$this->wildcardName()]) ?? false;
     }
 
+    public function certificateFingerprint(): ?string
+    {
+        return IssuedCertificate::fingerprintOf($this->certificate ?? '');
+    }
+
     public function certificateBundle(): ?string
     {
         if ($this->certificate === null || $this->certificate_key === null) {

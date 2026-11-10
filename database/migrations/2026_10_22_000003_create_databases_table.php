@@ -48,6 +48,7 @@ return new class extends Migration
             $table->string('kind')->default('member');
             $table->string('role')->default('unknown');
             $table->string('engine_version', 40)->nullable();
+            $table->string('certificate_fingerprint', 64)->nullable();
             $table->timestamps();
             $table->unique(['database_id', 'server_id']);
         });

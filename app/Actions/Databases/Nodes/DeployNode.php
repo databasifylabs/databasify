@@ -6,6 +6,7 @@ namespace App\Actions\Databases\Nodes;
 
 use App\Actions\Databases\Certificates\InstallNodeCertificate;
 use App\Actions\Databases\Certificates\IssueNodeCertificates;
+use App\Actions\Dns\EnsureZoneCertificate;
 use App\Engines\EngineClient;
 use App\Engines\Requests\HostDeploy;
 use App\Models\Database;
@@ -19,10 +20,12 @@ final readonly class DeployNode
         private EngineClient $engine,
         private InstallNodeCertificate $certificate,
         private InstallPinnedWrapper $wrapper,
+        private EnsureZoneCertificate $zoneCertificate,
     ) {}
 
     public function handle(Database $database, DatabaseNode $node): void
     {
+        $this->ensurePublicCertificateOf($database);
         $this->certificates->handle($database);
         $this->hostBinary->handle($node);
 
@@ -33,6 +36,17 @@ final readonly class DeployNode
         }
 
         $this->certificate->handle($database->refresh(), $node);
+    }
+
+    private function ensurePublicCertificateOf(Database $database): void
+    {
+        $zone = $database->publicCertificateZone();
+
+        if ($zone === null) {
+            return;
+        }
+
+        rescue(fn () => $this->zoneCertificate->handle($zone));
     }
 
     private function deploymentOf(Database $database, DatabaseNode $node): HostDeploy

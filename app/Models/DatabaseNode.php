@@ -37,13 +37,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property NodeKind $kind
  * @property NodeRole $role
  * @property string|null $engine_version
+ * @property string|null $certificate_fingerprint
  * @property-read Database $database
  * @property-read Server $server
  * @property-read Collection<int, NodeAlert> $openAlerts
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version'])]
+#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
