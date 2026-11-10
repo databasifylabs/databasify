@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\DTOs\Migrations;
 
+use App\Engines\Responses\MigrationCheck;
+
 final readonly class SourceReport
 {
     /**
@@ -24,6 +26,26 @@ final readonly class SourceReport
         public array $warnings = [],
         public array $databases = [],
     ) {}
+
+    public static function fromEngine(MigrationCheck $check): self
+    {
+        if (! $check->reachable) {
+            return self::unreachable($check->error ?? 'The source did not answer.');
+        }
+
+        return new self(
+            reachable: true,
+            blockers: $check->canReplicate ? [] : ['The source cannot replicate continuously, so only a one-time copy is possible.'],
+            facts: array_filter(['version' => $check->version ?? '', 'size_mb' => (string) ($check->sizeMb ?? 0), 'wal_level' => $check->walLevel ?? ''], fn (string $fact): bool => $fact !== ''),
+            occupied: $check->occupied,
+            problems: [
+                ...array_map(fn (string $database): string => "Databasify cannot read {$database} on the source.", $check->unreadable),
+                ...array_map(fn (string $database): string => "{$database} is not owned by the source user.", $check->unowned),
+            ],
+            warnings: $check->warnings,
+            databases: $check->databases,
+        );
+    }
 
     public static function unreachable(string $error): self
     {

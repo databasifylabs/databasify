@@ -39,6 +39,11 @@ final class RegisterEngine extends AbstractProviderRegistrar
         return $this->set('public_certificate', true);
     }
 
+    public function migrationSource(int $defaultPort, bool $credentialsRequired = true, bool $selectsDatabases = true): static
+    {
+        return $this->set('migration_source', ['default_port' => $defaultPort, 'credentials_required' => $credentialsRequired, 'selects_databases' => $selectsDatabases]);
+    }
+
     public function persistenceChoice(): static
     {
         return $this->set('persistence_choice', true);

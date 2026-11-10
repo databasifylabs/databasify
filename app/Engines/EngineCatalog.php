@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Engines;
 
 use App\DTOs\Databases\VersionLine;
+use App\DTOs\Migrations\SourceForm;
 use App\Engines\Data\ServiceRecord;
 use App\Exceptions\Databases\UnknownEngine;
 use Illuminate\Support\Collection;
@@ -48,6 +49,7 @@ final readonly class EngineCatalog
             serviceRecord: self::serviceRecordOf($entry['service_record'] ?? null),
             publicCertificate: $flag('public_certificate'),
             persistenceChoice: $flag('persistence_choice'),
+            migrationSource: self::migrationSourceOf($entry['migration_source'] ?? null),
         );
     }
 
@@ -67,6 +69,15 @@ final readonly class EngineCatalog
             ->filter(fn (mixed $line): bool => is_array($line) && is_string($line['value'] ?? null) && is_string($line['label'] ?? null))
             ->map(fn (array $line): VersionLine => new VersionLine($line['value'], $line['label'], $line['value'] === $defaultLine, ($line['recovery'] ?? true) !== false))
             ->all());
+    }
+
+    private static function migrationSourceOf(mixed $source): ?SourceForm
+    {
+        if (! is_array($source) || ! is_int($source['default_port'] ?? null)) {
+            return null;
+        }
+
+        return new SourceForm($source['default_port'], ($source['credentials_required'] ?? true) === true, ($source['selects_databases'] ?? true) === true);
     }
 
     private static function serviceRecordOf(mixed $record): ?ServiceRecord

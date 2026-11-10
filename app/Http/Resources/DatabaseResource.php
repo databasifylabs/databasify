@@ -39,7 +39,7 @@ class DatabaseResource extends DatabaseListResource
             'pool_port' => $engine->ports()->pool,
             'supports_users' => $engine->accounts() !== null,
             'password_encryptions' => $this->encryptionChoicesOf($this->passwordEncryptions()),
-            'migration_source' => $engine->migration()?->form()->toArray(),
+            'migration_source' => $this->engine()->migrationSource?->toArray(),
             'connection' => $engine->connection()->toArray(),
             'failover_hint' => $engine->failoverHint(),
             'automatic_failover' => $engine->canFailover($this->nodes),

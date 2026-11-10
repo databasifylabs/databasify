@@ -4,28 +4,31 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\DatabaseProviders\Groups\EngineAccounts;
+use App\Actions\Databases\RunOnPrimary;
 use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Recovery\RecoverySource;
+use App\Engines\Requests\AccountList;
+use App\Engines\Requests\UserSetPassword;
 use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
+use App\Models\DatabaseUser;
 use RuntimeException;
 use Throwable;
 
 final readonly class ReconcileRestoredAccounts
 {
+    public function __construct(private RunOnPrimary $primary) {}
+
     public function handle(Database $database): void
     {
         $source = $database->settings->restore;
-        $accounts = $database->provider()->accounts();
-
-        if ($source === null || $accounts === null) {
+        if ($source === null || ! $database->managesAccounts()) {
             return;
         }
 
         try {
-            $listed = $this->verifiedAccountsOf($database, $accounts);
-            $accounts->resetPasswordsOf($database->users()->whereIn('name', $listed->users)->get());
+            $listed = $this->verifiedAccountsOf($database);
+            $database->users()->whereIn('name', $listed->users)->get()->each(fn (DatabaseUser $user) => $this->primary->handle($database, new UserSetPassword($user->name, $user->password, $user->password_encryption), "Reset the restored password of {$user->name}"));
             $database->forgetAccountsMissingFrom($listed);
         } catch (OperationStopped $stopped) {
             throw $stopped;
@@ -34,9 +37,10 @@ final readonly class ReconcileRestoredAccounts
         }
     }
 
-    private function verifiedAccountsOf(Database $database, EngineAccounts $accounts): ServerAccounts
+    private function verifiedAccountsOf(Database $database): ServerAccounts
     {
-        $listed = $accounts->listAccounts();
+        $reply = $this->primary->handle($database, new AccountList, 'Listing the restored users and databases');
+        $listed = new ServerAccounts($reply->users, $reply->databases);
         $default = $database->settings->defaultUsername();
 
         if (! $listed->hasUser($default)) {

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Migrations;
 
 use App\DTOs\Migrations\MigrationProgress;
+use App\Engines\EngineClient;
+use App\Engines\Requests\MigrationProgress as MigrationProgressRequest;
 use App\Enums\Migrations\MigrationPhase;
 use App\Enums\Migrations\MigrationStatus;
 use App\Models\DatabaseMigration;
@@ -14,7 +16,12 @@ final readonly class RefreshMigration
 {
     private const int TOLERATED_STALLS = 5;
 
-    public function __construct(private FailMigration $fail, private RecordMigratedSchemas $recordSchemas, private CleanUpEndedMigration $cleanUpEnded) {}
+    public function __construct(
+        private FailMigration $fail,
+        private RecordMigratedSchemas $recordSchemas,
+        private CleanUpEndedMigration $cleanUpEnded,
+        private EngineClient $engine,
+    ) {}
 
     public function handle(DatabaseMigration $migration): void
     {
@@ -43,7 +50,7 @@ final readonly class RefreshMigration
                     : MigrationProgress::stalled("{$host->server->name} did not report as the primary, checking again.");
             }
 
-            return $migration->database->engineMigration()->progress($migration);
+            return MigrationProgress::fromEngine($this->engine->send($host, new MigrationProgressRequest));
         } catch (Throwable $exception) {
             return MigrationProgress::stalled("Could not check the migration: {$exception->getMessage()}");
         }
@@ -75,16 +82,6 @@ final readonly class RefreshMigration
         }
 
         if (! $migration->claimSyncing()) {
-            return;
-        }
-
-        try {
-            $migration->database->engineMigration()->follow($migration);
-        } catch (Throwable $exception) {
-            if (! $this->fail->handle($migration, $exception->getMessage())) {
-                $this->cleanUpEnded->handle($migration);
-            }
-
             return;
         }
 

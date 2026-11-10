@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
-use App\DatabaseProviders\Groups\EngineAccounts;
 use App\Models\Database;
 use App\Support\Databases\SchemaName;
 use App\Support\Migrations\NameList;
@@ -15,9 +14,9 @@ final readonly class RecordSchemas
      * @param  list<string>  $names
      * @return list<string>
      */
-    public function handle(Database $database, EngineAccounts $accounts, array $names): array
+    public function handle(Database $database, array $names): array
     {
-        $candidates = array_values(array_diff(array_unique($names), $accounts->reservedDatabases()));
+        $candidates = array_values(array_diff(array_unique($names), $database->engine_capabilities->reservedDatabases ?? []));
 
         $this->logSkipped($database, array_values(array_filter($candidates, fn (string $name): bool => ! SchemaName::isValid($name))));
 

@@ -4,29 +4,35 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
+use App\Actions\Databases\RunOnPrimary;
 use App\DTOs\Migrations\SourceReport;
+use App\Engines\Requests\UserGrant;
 use App\Models\DatabaseMigration;
 
 final readonly class RecordMigratedSchemas
 {
-    public function __construct(private CheckMigrationSource $check, private RecordSchemas $record) {}
+    public function __construct(
+        private CheckMigrationSource $check,
+        private RecordSchemas $record,
+        private RunOnPrimary $primary,
+    ) {}
 
     public function handle(DatabaseMigration $migration): void
     {
         $database = $migration->database;
-        $accounts = $database->provider()->accounts();
+        $default = $database->settings->defaultUsername();
 
-        if ($accounts === null) {
+        if (! $database->managesAccounts()) {
             return;
         }
 
-        $copied = $this->record->handle($database, $accounts, $this->sourceDatabasesOf($migration));
+        $copied = $this->record->handle($database, $this->sourceDatabasesOf($migration));
 
-        if ($copied === []) {
+        if ($copied === [] || $default === '') {
             return;
         }
 
-        $accounts->grantDefaultUserOn($copied);
+        $this->primary->handle($database, new UserGrant($default, $database->writeGrants()), "Grant {$default} the migrated databases");
     }
 
     /**

@@ -718,12 +718,21 @@ class Database extends Model implements Movable
     {
         $default = $this->engine_capabilities?->defaultPasswordEncryption;
 
-        return $default === null ? null : $chosen ?? $default;
+        if ($default === null) {
+            return null;
+        }
+
+        return $chosen ?? $default;
+    }
+
+    public function managesAccounts(): bool
+    {
+        return $this->engine_capabilities?->offers('user create') === true;
     }
 
     public function ensureManagesAccounts(): void
     {
-        if ($this->engine_capabilities?->offers('user create') === true) {
+        if ($this->managesAccounts()) {
             return;
         }
 
@@ -898,7 +907,7 @@ class Database extends Model implements Movable
     }
 
     /**
-     * @return array<int, string>
+     * @return list<string>
      */
     public function schemaNames(): array
     {

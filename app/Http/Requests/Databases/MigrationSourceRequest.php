@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Databases;
 
 use App\DTOs\Migrations\MigrationSource;
+use App\DTOs\Migrations\SourceForm;
 use App\Enums\Migrations\MigrationMode;
 use App\Http\Requests\Concerns\ReadsTypedInput;
 use App\Http\Requests\Concerns\ResolvesRouteModel;
@@ -26,7 +27,15 @@ class MigrationSourceRequest extends FormRequest
             'port' => ['required', 'integer', 'between:1,65535'],
             'tls' => ['boolean'],
             'mode' => ['sometimes', Rule::enum(MigrationMode::class)],
-        ], $this->routeDatabase()->provider()->migration()?->form()->rules() ?? []);
+        ], $this->sourceForm()?->rules() ?? []);
+    }
+
+    private function sourceForm(): ?SourceForm
+    {
+        $database = $this->routeDatabase();
+        $form = $database->engine()->migrationSource;
+
+        return $form === null ? null : new SourceForm($form->defaultPort, $form->credentialsRequired, $form->selectsDatabases, $database->engine_capabilities->reservedDatabases ?? []);
     }
 
     public function source(): MigrationSource

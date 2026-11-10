@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Engines;
 
 use App\DTOs\Databases\VersionLine;
+use App\DTOs\Migrations\SourceForm;
 use App\Engines\Data\ServiceRecord;
 
 final readonly class Engine
@@ -26,6 +27,7 @@ final readonly class Engine
         public ?ServiceRecord $serviceRecord,
         public bool $publicCertificate,
         public bool $persistenceChoice,
+        public ?SourceForm $migrationSource,
     ) {}
 
     /**

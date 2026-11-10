@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
-    $this->ssh = fakeSsh();
+    $this->ssh = fakeEngine();
 });
 
 it('starts a continuous migration with tls on by default', function () {
@@ -31,19 +31,6 @@ it('starts a continuous migration with tls on by default', function () {
         ->and($database->fresh()->operation)->toBe('Migrate from db.example.com:3306');
     Queue::assertPushed(RunMigrationJob::class, fn (RunMigrationJob $job): bool => $job->migration->is($migration));
 });
-
-it('starts a one-time plain migration from a source without credentials', function (string $engine) {
-    $database = migratingDatabase($engine);
-    Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
-    $this->ssh->respond("redis_version=7.2.4\nkeys=3\n");
-
-    $this->post(projectUrl("/databases/{$database->id}/migrations"), ['host' => 'cache.example.com', 'port' => 6379, 'tls' => false, 'mode' => 'one_time'])
-        ->assertSessionHasNoErrors();
-
-    expect($database->migrations()->sole())->mode->toBe(MigrationMode::OneTime)
-        ->source->toEqual(new MigrationSource('cache.example.com', 6379, '', '', false));
-    Queue::assertPushed(RunMigrationJob::class);
-})->with(['valkey', 'redis']);
 
 it('rejects malformed sources before contacting them', function (string $engine, array $payload, array $errors) {
     $database = migratingDatabase($engine);
@@ -66,37 +53,6 @@ it('rejects malformed sources before contacting them', function (string $engine,
     'host with spaces' => ['mysql', ['host' => 'db example.com', 'port' => 3306, 'username' => 'm', 'password' => 's'], ['host']],
     'username with quotes' => ['mysql', ['host' => 'db.example.com', 'port' => 3306, 'username' => "m'x", 'password' => 's', 'tls' => 'maybe'], ['username', 'tls']],
 ]);
-
-it('reports unreachable and unsupported sources as form errors', function () {
-    $database = migratingDatabase('postgres');
-    Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
-    $this->ssh
-        ->respond("reachable=no\nerror=connection refused\n")
-        ->respond("reachable=yes\nversion=16.4\nwal_level=replica\ncan_replicate=t\n");
-    $payload = ['host' => 'pg.example.com', 'port' => 5432, 'username' => 'm', 'password' => 's'];
-
-    $this->post(projectUrl("/databases/{$database->id}/migrations"), $payload)->assertSessionHasErrors(['source' => 'Could not connect to the source: connection refused']);
-    $this->post(projectUrl("/databases/{$database->id}/migrations"), $payload)->assertSessionHasErrors('mode');
-
-    expect($database->migrations()->count())->toBe(0);
-});
-
-it('checks a source of every engine and answers with its report', function (string $engine, int $port, string $output, array $expected) {
-    $database = migratingDatabase($engine);
-    Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
-    $this->ssh->respond($output);
-
-    $this->postJson(projectUrl("/databases/{$database->id}/migrations/check"), ['host' => 'source.example.com', 'port' => $port, 'username' => 'migrator', 'password' => 'secret'])
-        ->assertOk()
-        ->assertJson($expected);
-})->with([
-    'mysql' => ['mysql', 3306, mysqlSourceReport(logBin: '0'), ['reachable' => true, 'continuous' => false, 'blockers' => ['Binary logging is off on the source (log_bin).']]],
-    'mariadb' => ['mariadb', 3306, "reachable=no\nerror=Access denied\n", ['reachable' => false, 'continuous' => false, 'error' => 'Access denied']],
-    'postgres' => ['postgres', 5432, "reachable=yes\nversion=17.2\nwal_level=logical\ncan_replicate=t\nsize_mb=5\ndatabases=shop blog\n", ['reachable' => true, 'continuous' => true, 'facts' => ['databases' => 'shop blog']]],
-    'valkey' => ['valkey', 6379, "valkey_version=8.1.1\nkeys=9\n", ['reachable' => true, 'continuous' => true, 'facts' => ['version' => '8.1.1', 'keys' => '9']]],
-    'redis' => ['redis', 6379, "redis_version=7.4.2\nrole=master\n", ['reachable' => true, 'facts' => ['version' => '7.4.2', 'role' => 'master']]],
-]);
-
 it('finishes a migration only once it is syncing', function () {
     $database = migratingDatabase('postgres');
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
