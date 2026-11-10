@@ -48,8 +48,8 @@ final readonly class AddNodeFlow implements Flow
 
         return [
             Step::prepare('deploy the new node', $this->steps->quick(fn () => $this->deploy->handle($database, $joiner))),
-            Step::prepare('configure the new node', $this->steps->quick(fn () => $this->configure($database, $joiner))),
             ...$database->nodes()->with('server')->get()->toBase()->map(fn (DatabaseNode $node): Step => $this->firewallStepOn($database, $node))->all(),
+            Step::prepare('configure the new node', $this->steps->quick(fn () => $this->configure($database, $joiner))),
             Step::prepare('start the new node', $this->steps->send($joiner, new NodeStart, 'starting the engine')),
             Step::prepare('wait for the new node', $this->steps->long($joiner, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: false))),
             ...$existing->flatMap(fn (DatabaseNode $node): array => $this->membershipStepsOn($database, $node))->all(),

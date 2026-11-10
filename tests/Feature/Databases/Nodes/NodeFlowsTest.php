@@ -72,6 +72,21 @@ it('adds a node in the documented order', function () {
         ->and($database->nodes()->count())->toBe(3);
 });
 
+it('opens the firewall of every member before configuring the new node', function () {
+    $ssh = fakeEngine();
+    $database = idleDatabase('postgres', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    $existing = $database->nodes->map->server;
+    $server = Server::factory()->ready()->create();
+
+    addThroughFlow($database, $server);
+    $runs = collect($ssh->runs);
+    $firewallOn = fn (Server $peer): int|false => $runs->search(fn (array $run): bool => $run['server'] === $peer->name && str_contains($run['script'], '/etc/databasify/nftables/'));
+    $configure = $runs->search(fn (array $run): bool => $run['server'] === $server->name && str_contains($run['script'], '| databasify node configure '));
+
+    expect($existing->map($firewallOn)->all())->each->toBeLessThan($configure);
+});
+
 it('enables the cluster on the seed first when a single node gets its first peer', function () {
     $ssh = fakeEngine();
     $database = idleDatabase('postgres', 1);
