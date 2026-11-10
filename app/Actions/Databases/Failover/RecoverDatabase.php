@@ -12,7 +12,7 @@ use App\Engines\Flows\RejoinMembersFlow;
 use App\Enums\Databases\NodeRole;
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 final readonly class RecoverDatabase
