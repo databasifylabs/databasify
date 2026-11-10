@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\DTOs\Databases\ConfigField;
+use App\Engines\Engine;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Http\Request;
@@ -21,7 +22,8 @@ class DatabaseResource extends DatabaseListResource
      */
     public function toArray(Request $request): array
     {
-        $engine = $this->provider();
+        $engine = $this->engine();
+        $capabilities = $this->engine_capabilities;
 
         return [
             ...parent::toArray($request),
@@ -35,22 +37,22 @@ class DatabaseResource extends DatabaseListResource
             'dns_zone_id' => $this->dns_zone_id,
             'hostnames' => $this->hostnamesArray(),
             'network' => $this->networkOfNodes(),
-            'port' => $engine->ports()->client,
-            'pool_port' => $engine->ports()->pool,
-            'supports_users' => $engine->accounts() !== null,
+            'port' => $this->clientPort(),
+            'pool_port' => $capabilities?->ports->pool,
+            'supports_users' => $this->managesAccounts(),
             'password_encryptions' => $this->encryptionChoicesOf($this->passwordEncryptions()),
-            'migration_source' => $this->engine()->migrationSource?->toArray(),
-            'connection' => $engine->connection()->toArray(),
-            'failover_hint' => $engine->failoverHint(),
-            'automatic_failover' => $engine->canFailover($this->nodes),
+            'migration_source' => $engine->migrationSource?->toArray(),
+            'connection' => $this->connectionProfile()->toArray(),
+            'failover_hint' => $engine->failoverHint,
+            'automatic_failover' => $this->canFailover(),
             'supports_point_in_time_recovery' => $this->archivesForRecovery(),
             'point_in_time_recovery_unavailable' => $this->recoveryUnavailableMessage(),
             'restored_from' => $this->settings->restore === null ? null : ['database' => $this->settings->restore->database, 'target' => $this->settings->restore->target->toIso8601String()],
-            'offers_persistence' => $engine->supportsPersistence(),
+            'offers_persistence' => $engine->persistenceChoice,
             'persistence' => $this->settings->persistence->value,
             'services' => $this->processNames(),
             'config' => $this->settings->config,
-            'tuned_config' => $this->tunedConfig(),
+            'tuned_config' => (object) [],
             'config_fields' => array_map(fn (ConfigField $field): array => $field->toArray(), $this->configFields()),
             'endpoints' => $this->endpointsAmong($this->nodes)->toArray(),
             'users' => DatabaseUserResource::collection($this->users),
@@ -60,8 +62,8 @@ class DatabaseResource extends DatabaseListResource
             'alerts' => DatabaseAlertResource::collection($this->openAlerts),
             'pools' => DatabasePoolResource::collection($this->connectionPools),
             'trusted_sources' => TrustedSourceResource::collection($this->trustedSources),
-            'max_standbys' => $engine->maxStandbys(),
-            'max_read_only_nodes' => $engine->maxReadOnlyNodes(),
+            'max_standbys' => Engine::MAX_STANDBYS,
+            'max_read_only_nodes' => Engine::MAX_READ_ONLY_NODES,
         ];
     }
 

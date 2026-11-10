@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\DTOs\Databases\EngineImage;
+use App\Engines\EngineCatalog;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
@@ -12,7 +13,7 @@ it('picks the highest exact version of the line and ignores every other tag', fu
     collect($tags)->each(fn (string $tag) => withImage($engine, $tag));
 
     expect(resolve(ImageResolver::class)->newest(new Database(['engine' => $engine]), $line))
-        ->toEqual(new EngineImage(Database::providerFor($engine)->imageRepository(), FakeImageRegistry::digestFor($engine, $expected), $expected));
+        ->toEqual(new EngineImage(EngineCatalog::find($engine)->imageRepository, FakeImageRegistry::digestFor($engine, $expected), $expected));
 })->with([
     'postgres 18' => ['postgres', '18', ['17.11', '18.6', '18.10', '18', 'latest', '18.11-a1b2c3d', '180.1', '18.12-r3'], '18.10'],
     'mysql 8.4' => ['mysql', '8.4', ['8.0.40', '8.4.9', '8.4.13', '8.4', '8.4.14-0f00ba1', 'latest'], '8.4.13'],

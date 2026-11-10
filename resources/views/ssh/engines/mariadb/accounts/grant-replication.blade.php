@@ -1,1 +1,0 @@
-GRANT REPLICATION SLAVE, BINLOG MONITOR, RELOAD ON *.* TO '{!! $name !!}'@'%';

@@ -18,7 +18,6 @@ beforeEach(function () {
 it('starts a continuous migration with tls on by default', function () {
     $database = migratingDatabase('mysql');
     Queue::fake([RunMigrationJob::class, StopMigrationJob::class]);
-    $this->ssh->respond(mysqlSourceReport());
 
     $this->from(projectUrl("/databases/{$database->id}"))
         ->post(projectUrl("/databases/{$database->id}/migrations"), ['host' => 'db.example.com', 'port' => 3306, 'username' => 'migrator', 'password' => 'secret', 'databases' => ['shop']])

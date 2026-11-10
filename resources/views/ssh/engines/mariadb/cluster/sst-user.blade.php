@@ -1,4 +1,0 @@
-mariadb -N -B <<SQL
-CREATE USER IF NOT EXISTS 'sst'@'localhost' IDENTIFIED BY '{{ $secrets['SST_PASSWORD'] ?? '' }}';
-GRANT RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR, SLAVE MONITOR ON *.* TO 'sst'@'localhost';
-SQL

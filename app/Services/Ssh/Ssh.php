@@ -11,25 +11,15 @@ use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\ServerLog;
-use Illuminate\Support\Str;
-use LogicException;
 use Throwable;
 
 final readonly class Ssh
 {
     public const int TIMEOUT = 3600;
 
-    public const int LONG_TIMEOUT = 21600;
-
     public const int PROBE_TIMEOUT = 90;
 
     public const int APT_LOCK_TIMEOUT = 600;
-
-    public const int CONTAINER_NOT_RUNNING = 69;
-
-    public const string START_CONTAINER = 'startContainer';
-
-    private const string CONTAINER_VIEWS = 'ssh.engines.';
 
     public function __construct(
         private Server $server,
@@ -49,7 +39,7 @@ final readonly class Ssh
         $output = '';
 
         try {
-            $exitCode = $this->connection->run($this->server, $this->scriptFor($view, $data), function (string $chunk) use (&$output, $serverLog, $secret): void {
+            $exitCode = $this->connection->run($this->server, $this->render($view, $data), function (string $chunk) use (&$output, $serverLog, $secret): void {
                 $output .= $chunk;
 
                 if (! $secret) {
@@ -93,46 +83,9 @@ final readonly class Ssh
      * @param  view-string  $view
      * @param  array<string, mixed>  $data
      */
-    private function scriptFor(string $view, array $data): string
-    {
-        $container = $this->containerFor($view, $data);
-        $script = $this->render($view, $data);
-
-        if ($container === null) {
-            return $script;
-        }
-
-        return $this->render('ssh.databases.containers.step', [
-            'container' => $container,
-            'step' => Str::after(Str::after($view, '::'), self::CONTAINER_VIEWS),
-            'start' => ($data[self::START_CONTAINER] ?? false) === true,
-            'script' => base64_encode($script),
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function containerFor(string $view, array $data): ?string
-    {
-        if (! str_starts_with(Str::after($view, '::'), self::CONTAINER_VIEWS)) {
-            return null;
-        }
-
-        $container = $data['container'] ?? null;
-
-        throw_unless(is_string($container), LogicException::class, "{$view} runs inside the engine container, but no container was named for it.");
-
-        return $container;
-    }
-
-    /**
-     * @param  view-string  $view
-     * @param  array<string, mixed>  $data
-     */
     private function render(string $view, array $data): string
     {
-        $variables = ['aptTimeout' => self::APT_LOCK_TIMEOUT, 'notRunning' => self::CONTAINER_NOT_RUNNING];
+        $variables = ['aptTimeout' => self::APT_LOCK_TIMEOUT];
 
         return "set -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\n"
             .view('ssh.servers.os.apt', $variables)->render()

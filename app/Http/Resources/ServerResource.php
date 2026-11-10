@@ -61,7 +61,7 @@ class ServerResource extends JsonResource
             'id' => $node->database->id,
             'name' => $node->database->name,
             'engine' => $node->database->engine,
-            'engine_icon' => $node->database->provider()->icon(),
+            'engine_icon' => $node->database->engine()->icon,
             'kind' => $node->kind->value,
             'node_id' => $node->id,
         ];

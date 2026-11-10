@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
+use App\DTOs\Databases\ConnectionProfile;
+use App\DTOs\Databases\ServiceConnection;
 use App\DTOs\Databases\VersionLine;
 use App\DTOs\Migrations\SourceForm;
 use App\Engines\Data\ServiceRecord;
@@ -12,8 +14,11 @@ final readonly class Engine
 {
     public const int MAX_STANDBYS = 2;
 
+    public const int MAX_READ_ONLY_NODES = 47;
+
     /**
      * @param  list<VersionLine>  $lines
+     * @param  array<string, string>  $environmentExtra
      */
     public function __construct(
         public string $id,
@@ -28,6 +33,12 @@ final readonly class Engine
         public bool $publicCertificate,
         public bool $persistenceChoice,
         public ?SourceForm $migrationSource,
+        public ConnectionProfile $connection,
+        public ?ConnectionProfile $publicConnection,
+        public ?ServiceConnection $serviceConnection,
+        public ?string $laravelConnection,
+        public array $environmentExtra,
+        public bool $readOnlyNodesVote,
     ) {}
 
     /**

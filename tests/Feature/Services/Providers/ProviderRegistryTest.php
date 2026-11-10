@@ -2,13 +2,10 @@
 
 declare(strict_types=1);
 
-use App\DatabaseProviders\Contracts\DatabaseDriver;
-use App\DatabaseProviders\Drivers\Postgres\Postgres;
 use App\DnsProviders\Contracts\DnsDriver;
 use App\DnsProviders\Drivers\Cloudflare\Cloudflare;
 use App\Enums\Servers\OperatingSystem;
 use App\Exceptions\Providers\UnknownProvider;
-use App\Models\Database;
 use App\Models\DnsProvider;
 use App\Models\ServerProvider;
 use App\Plugins\PluginContext;
@@ -21,11 +18,10 @@ it('registers every built-in provider with an icon on disk', function (string $m
     $providers = $model::providers();
 
     expect(array_keys($providers))->toBe($ids)
-        ->and(collect($providers)->every(fn (DnsDriver|ServerDriver|DatabaseDriver $provider): bool => is_file(public_path((string) $provider->config('icon')))))->toBeTrue();
+        ->and(collect($providers)->every(fn (DnsDriver|ServerDriver $provider): bool => is_file(public_path((string) $provider->config('icon')))))->toBeTrue();
 })->with([
     'dns' => [DnsProvider::class, ['cloudflare']],
     'server' => [ServerProvider::class, ['digitalocean', 'hetzner', 'vultr', 'linode']],
-    'database' => [Database::class, ['valkey', 'redis', 'mysql', 'postgres', 'mariadb', 'mongodb']],
 ]);
 
 it('lets each model build its driver around itself', function () {
@@ -44,8 +40,7 @@ it('boots again over a config cache that already holds the providers', function 
 
 it('refuses a provider nobody registered', function () {
     expect(fn () => (new ServerProvider(['type' => 'aws']))->provider())->toThrow(UnknownProvider::class, 'No provider is registered as "aws".')
-        ->and((new ServerProvider(['type' => 'aws']))->label())->toBe('aws (not installed)')
-        ->and(fn () => Database::providerFor('oracle'))->toThrow(UnknownProvider::class, 'No provider is registered as "oracle".');
+        ->and((new ServerProvider(['type' => 'aws']))->label())->toBe('aws (not installed)');
 });
 
 it('picks up a provider registered later, without touching the built-ins', function () {
@@ -54,12 +49,4 @@ it('picks up a provider registered later, without touching the built-ins', funct
     expect(ServerProvider::providerFor('acme')->toArray())->toMatchArray(['value' => 'acme', 'label' => 'Acme Cloud', 'icon' => asset('assets/icons/server-providers/acme.svg')])
         ->and(OperatingSystem::Debian13->toArray()['providers'])->toBe(['digitalocean', 'hetzner', 'vultr', 'linode', 'acme'])
         ->and(OperatingSystem::Debian12->toArray()['providers'])->toBe(['hetzner', 'vultr', 'linode']);
-});
-
-it('lets a database build its engine driver around itself', function () {
-    $database = new Database(['engine' => 'postgres']);
-
-    expect($database->provider())->toBeInstanceOf(Postgres::class)
-        ->and(Database::providerFor('postgres'))->toBeInstanceOf(Postgres::class)
-        ->and(Postgres::id())->toBe('postgres');
 });

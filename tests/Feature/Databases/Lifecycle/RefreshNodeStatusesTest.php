@@ -8,7 +8,6 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Models\DatabaseNode;
-use App\Services\Ssh\Ssh;
 use Illuminate\Support\Facades\Exceptions;
 
 it('reads only the given nodes but judges health from every node', function () {
@@ -24,7 +23,7 @@ it('reads only the given nodes but judges health from every node', function () {
 
 it('marks the database offline when every node is offline', function () {
     $database = idleDatabase('mysql', 2);
-    fakeSsh()->respond('', Ssh::CONTAINER_NOT_RUNNING);
+    fakeSsh()->respond('', 69);
 
     $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers());
 
@@ -44,7 +43,7 @@ it('keeps the database degraded when the primary answers and a replica does not'
 
 it('records a node whose container is stopped as offline', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
-    fakeSsh()->respond('', Ssh::CONTAINER_NOT_RUNNING);
+    fakeSsh()->respond('', 69);
 
     resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers());
 

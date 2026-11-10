@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Actions\Databases\Certificates\IssueNodeCertificates;
 use App\Actions\Databases\Lifecycle\CreateDatabase;
 use App\Contracts\Acme\CertificateAuthority;
 use App\Contracts\Images\ImageRegistry;
 use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Databases\NewDatabase;
-use App\DTOs\Databases\NodeFile;
 use App\DTOs\Migrations\MigrationSource;
 use App\Engines\Data\EngineField;
 use App\Engines\Payload;
@@ -30,7 +30,6 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StorageProvider;
 use App\Support\Projects\ProjectContext;
-use App\Support\Tls\OwnCertificateAuthority;
 use Database\Factories\ProjectFactory;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -127,7 +126,7 @@ function engineCapabilitiesPayload(string $engine): array
         default => [[], null],
     };
 
-    return ['commands' => $commands, 'passwordEncryptions' => $encryptions, 'defaultPasswordEncryption' => $default, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
+    return ['commands' => [...$commands, ...(in_array($engine, ['valkey', 'redis'], true) ? [] : ['archive status', 'restore start'])], 'passwordEncryptions' => $encryptions, 'defaultPasswordEncryption' => $default, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
 }
 
 /**
@@ -323,45 +322,6 @@ function javascriptErrorsIn(string $script): string
     return $result->successful() ? '' : $result->errorOutput();
 }
 
-function certificateOutput(string ...$files): string
-{
-    return collect($files)->map(fn (string $file) => "CERT {$file} ".base64_encode("{$file}-content"))->implode("\n")."\n";
-}
-
-/**
- * @param  array<string, mixed>  $data
- */
-function engineScript(string $engine, array $data = []): array
-{
-    $driver = Database::providerFor($engine);
-
-    return [...$driver->scriptVariables(), 'directory' => $driver->directory(), 'clientPort' => $driver->ports()->client, ...$data];
-}
-
-function renderedFile(Database $database, string $suffix, ?DatabaseNode $node = null): string
-{
-    $node ??= $database->seed();
-    $file = collect($database->provider()->configFiles($node))
-        ->first(fn (NodeFile $file): bool => str_ends_with($file->path, $suffix));
-
-    return $file?->content ?? '';
-}
-
-/**
- * @param  array<string, mixed>  $data
- */
-function accountSql(string $engine, string $statement, array $data): string
-{
-    return view(Database::providerFor($engine)->scriptView("accounts.{$statement}"), ['databases' => [], 'users' => [], 'encryption' => null, ...$data])->render();
-}
-
-function fileWrittenIn(string $script, string $path): string
-{
-    preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| put_file '".preg_quote($path, '/')."'/", $script, $match);
-
-    return (string) base64_decode($match[1] ?? '', true);
-}
-
 function newDatabase(string $engine, int $servers, DatabaseMode $mode = DatabaseMode::HighAvailability, string $name = 'main', ?string $versionLine = null): Database
 {
     $ids = Server::factory()->ready()->count($servers)->create()->pluck('id')->all();
@@ -408,21 +368,9 @@ function withReadOnlyNode(Database $database, array $attributes = []): DatabaseN
     ]);
 }
 
-function sqlSentIn(string $script): string
-{
-    preg_match("/echo '([A-Za-z0-9+\/=]+)' \| msql_from/", $script, $match);
-
-    return (string) base64_decode($match[1] ?? '', true);
-}
-
 function markRoles(Database $database, NodeRole ...$roles): void
 {
     $database->nodes()->get()->each(fn (DatabaseNode $node, int $index) => $node->update(['role' => $roles[$index] ?? NodeRole::Replica]));
-}
-
-function mysqlSourceReport(string $logBin = '1', string $grants = 'GRANT SELECT, RELOAD, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO `m`@`%`', string $gtidMode = 'ON', string $binlogExpireSeconds = '2592000'): string
-{
-    return 'REPORT '.json_encode(['reachable' => true, 'version' => '8.4.13', 'log_bin' => $logBin, 'binlog_format' => 'ROW', 'gtid_mode' => $gtidMode, 'binlog_expire_logs_seconds' => $binlogExpireSeconds, 'size_mb' => '12.5', 'grants' => $grants])."\n";
 }
 
 function migratingDatabase(string $engine): Database
@@ -522,21 +470,7 @@ function issuedPem(array $names, int $days = 365, bool $rsa = false): string
 
 function withCurrentCertificates(Database $database): Database
 {
-    $files = array_values(array_filter($database->provider()->tls()->files, fn (string $name): bool => $name !== 'ca.crt'));
-    $rsa = $database->provider()->tls()->rsaKey;
-    $own = fn (array $names): array => collect($files)->mapWithKeys(fn (string $name): array => [$name => str_ends_with($name, '.key') ? 'server-key' : issuedPem($names, rsa: $rsa)])->all();
-    $settings = $database->settings->withCertificates([...$database->settings->certificates, 'ca.crt' => 'authority-cert', 'ca.key' => 'authority-key', ...$own($database->certificateNames())]);
-    $database->nodes()->readOnly()->with(['server', 'database.dnsZone'])->get()
-        ->each(function (DatabaseNode $node) use (&$settings, $own): void {
-            $settings = $settings->withNodeCertificates($node->id, $own($node->certificateNames()));
-        });
-    $authority = resolve(OwnCertificateAuthority::class)->newAuthority('test CA');
-    $database->nodes()->with(['server', 'database.dnsZone'])->get()
-        ->each(function (DatabaseNode $node) use (&$settings, $authority): void {
-            $issued = resolve(OwnCertificateAuthority::class)->issue($authority, $node->displayName(), $node->ownCertificateNames());
-            $settings = $settings->withNodeCertificates($node->id, [...array_filter(['server.pem' => $settings->nodeCertificate($node->id, 'server.pem')]), 'server.crt' => $issued->certificate, 'server.key' => $issued->key]);
-        });
-    $database->update(['settings' => $settings]);
+    resolve(IssueNodeCertificates::class)->handle($database);
 
     return $database->fresh() ?? $database;
 }

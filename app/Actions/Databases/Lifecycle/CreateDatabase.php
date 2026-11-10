@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Lifecycle;
 
 use App\Actions\Databases\Flows\StartFlow;
-use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
+use App\Engines\Engine;
 use App\Engines\EngineSecrets;
 use App\Engines\Flows\CreateDatabaseFlow;
 use App\Engines\Flows\FlowContext;
@@ -16,6 +16,7 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
+use App\Support\Databases\DefaultAccount;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,8 +31,8 @@ final readonly class CreateDatabase
     public function handle(NewDatabase $data): Database
     {
         $draft = new Database(['engine' => $data->engine]);
-        $engine = $draft->provider();
-        $line = $data->versionLine ?? $engine->versions()->firstWhere('isDefault', true)->value ?? '';
+        $engine = $draft->engine();
+        $line = $data->versionLine ?? $engine->defaultLine;
         $image = $data->image ?? $this->newestImageOf($draft, $line);
 
         $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
@@ -66,10 +67,10 @@ final readonly class CreateDatabase
         $database->recordDefaultAccounts();
     }
 
-    private function settingsFor(NewDatabase $data, DatabaseDriver $engine): DatabaseSettings
+    private function settingsFor(NewDatabase $data, Engine $engine): DatabaseSettings
     {
         return new DatabaseSettings(
-            secrets: $data->secrets ?? [...$engine->generateSecrets(), ...EngineSecrets::generate()],
+            secrets: $data->secrets ?? [...($engine->laravelConnection === null ? [] : DefaultAccount::secrets()), ...EngineSecrets::generate()],
             config: $data->config,
             persistence: $data->persistence,
             restore: $data->restore,

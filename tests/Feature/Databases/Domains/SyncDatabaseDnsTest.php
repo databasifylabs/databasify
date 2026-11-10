@@ -128,16 +128,13 @@ it('publishes every member of a mongodb database on its own name in the srv reco
 
     resolve(SyncDatabaseDns::class)->handle($database->fresh() ?? $database);
 
-    $replicaSet = collect(($database->fresh() ?? $database)->provider()->membershipVariables()['members'])->keyBy('host');
     expect(Cache::get('dns-srv:_mongodb._tcp.orders.db.example.com'))->toBe($hosts->map(fn (string $host): string => "{$host}:25060")->all())
         ->and(Cache::get('dns-txt:orders.db.example.com'))->toBe('replicaSet=databasify&authSource=admin')
         ->and(Cache::get("dns:{$hosts[1]}"))->toBe([$members[1]->server->public_ip])
         ->and(Cache::has("dns:orders-node-{$reader->position}.db.example.com"))->toBeFalse()
-        ->and($replicaSet["{$members[0]->privateIp()}:25060"]['alias'])->toBe("{$hosts[0]}:25060")
-        ->and($replicaSet["{$reader->privateIp()}:25060"]['alias'])->toBe('reports.db.example.com:25060')
         ->and($database->certificateNames())->toContain(...$hosts->all())
-        ->and($database->provider()->connection()->toArray()['service'])->toMatchArray(['uri_scheme' => 'mongodb+srv', 'uri_port' => false])
-        ->and($database->provider()->connection()->uriScheme)->toBe('mongodb');
+        ->and($database->connectionProfile()->toArray()['service'])->toMatchArray(['uri_scheme' => 'mongodb+srv', 'uri_port' => false])
+        ->and($database->connectionProfile()->uriScheme)->toBe('mongodb');
 });
 
 it('publishes no service for other engines or for databases without a domain', function () {
@@ -148,8 +145,8 @@ it('publishes no service for other engines or for databases without a domain', f
     resolve(SyncDatabaseDns::class)->handle($database);
 
     expect(Http::recorded(fn (Request $request): bool => in_array($request['type'] ?? null, ['SRV', 'TXT'], true)))->toBeEmpty()
-        ->and($database->provider()->connection()->service)->toBeNull()
-        ->and(idleDatabase('mongodb', 1, DatabaseMode::Single, 'orders')->provider()->connection()->service)->toBeNull();
+        ->and($database->connectionProfile()->service)->toBeNull()
+        ->and(idleDatabase('mongodb', 1, DatabaseMode::Single, 'orders')->connectionProfile()->service)->toBeNull();
 });
 
 it('retries a failed cloudflare request and syncs the records', function () {

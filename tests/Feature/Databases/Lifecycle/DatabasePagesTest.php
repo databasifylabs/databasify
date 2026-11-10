@@ -24,7 +24,7 @@ beforeEach(function () {
 it('shows the laravel settings and adds a server', function () {
     $ids = Server::factory()->ready()->count(1)->create()->pluck('id')->all();
     $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'primary_server_id' => $ids[0]]);
-    $database = Database::query()->sole();
+    $database = withEngineDetails(Database::query()->sole());
     $database->finishOperation();
     $extra = Server::factory()->ready()->create();
 

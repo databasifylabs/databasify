@@ -16,6 +16,16 @@ final readonly class ServiceConnection
     ) {}
 
     /**
+     * @param  array<array-key, mixed>  $values
+     */
+    public static function fromArray(array $values): self
+    {
+        $text = fn (string $key): string => is_string($values[$key] ?? null) ? $values[$key] : '';
+
+        return new self($text('uri_scheme'), $text('uri_query'), $text('command'), $text('env_note'), $text('standby_uri_query'), $text('standby_command'));
+    }
+
+    /**
      * @return array{uri_scheme: string, uri_query: string, uri_port: false, command: string, env_note: string, standby_uri_query: string, standby_command: string}
      */
     public function toArray(): array

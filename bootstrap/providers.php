@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
-use App\Providers\DatabaseProviderServiceProvider;
 use App\Providers\DnsProviderServiceProvider;
 use App\Providers\EngineServiceProvider;
 use App\Providers\FortifyServiceProvider;
@@ -15,7 +14,6 @@ return [
     AppServiceProvider::class,
     FortifyServiceProvider::class,
     HorizonServiceProvider::class,
-    DatabaseProviderServiceProvider::class,
     EngineServiceProvider::class,
     DnsProviderServiceProvider::class,
     ServerProviderServiceProvider::class,

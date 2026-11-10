@@ -8,20 +8,14 @@ use App\Casts\AsDatabaseSettings;
 use App\Casts\AsEngineCapabilities;
 use App\Casts\AsEngineFields;
 use App\Contracts\Projects\Movable;
-use App\DatabaseProviders\Contracts\DatabaseDriver;
-use App\DatabaseProviders\Drivers\AbstractDatabaseDriver;
-use App\DatabaseProviders\Groups\EngineAccounts;
-use App\DatabaseProviders\Groups\EngineArchive;
-use App\DatabaseProviders\Groups\EngineMigration;
 use App\DTOs\Databases\ConfigField;
+use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\DatabaseEndpoints;
 use App\DTOs\Databases\DatabaseHostnames;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\IssuedCertificate;
 use App\DTOs\Databases\MaintenanceWindow;
-use App\DTOs\Databases\NodeFile;
-use App\DTOs\Databases\NodeResources;
 use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Databases\ServiceRecords;
 use App\DTOs\Databases\VersionLine;
@@ -33,6 +27,7 @@ use App\Engines\Data\EngineField;
 use App\Engines\Data\Grant;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
+use App\Engines\EngineSecrets;
 use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
@@ -41,12 +36,11 @@ use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\Persistence;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Exceptions\Databases\MissingCapability;
-use App\Exceptions\Providers\UnknownProvider;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Observers\DatabaseObserver;
+use App\Support\Databases\ClientPorts;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
@@ -107,7 +101,7 @@ class Database extends Model implements Movable
 
     public const string CERTIFICATE_AUTHORITY = 'ca.crt';
 
-    private const array AUTHORITY_FILES = ['ca.crt', 'ca.key'];
+    private const int AUTOMATIC_FAILOVER_MEMBERS = 3;
 
     /**
      * @return BelongsTo<DnsZone, $this>
@@ -137,17 +131,6 @@ class Database extends Model implements Movable
         return $this->engine()->publicCertificate ? $this->dnsZone : null;
     }
 
-    public function certificatesAreCurrent(): bool
-    {
-        return collect($this->ownCertificateFiles())->every(fn (string $name): bool => $this->settings->certificate($name) !== '')
-            && $this->servesCertificate($this->serverCertificate(), $this->certificateNames());
-    }
-
-    public function certificatesFit(): bool
-    {
-        return $this->certificatesAreCurrent() && $this->hasKeyFor($this->serverCertificate());
-    }
-
     public function allCertificatesCurrent(): bool
     {
         $zone = $this->publicCertificateZone();
@@ -159,97 +142,9 @@ class Database extends Model implements Movable
         return $this->nodesWithServers()->every(fn (DatabaseNode $node): bool => IssuedCertificate::fromPem($this->settings->nodeCertificate($node->id, 'server.crt') ?? '')?->isCurrentFor($node->ownCertificateNames()) === true);
     }
 
-    /**
-     * @param  list<string>  $names
-     */
-    public function servesCertificate(string $pem, array $names): bool
-    {
-        $zone = $this->publicCertificateZone();
-
-        if ($zone === null) {
-            return IssuedCertificate::fromPem($pem)?->isCurrentFor($names) ?? false;
-        }
-
-        return $zone->hasCurrentCertificate() && $pem === $zone->certificateBundle();
-    }
-
-    public function hasKeyFor(string $pem): bool
-    {
-        return ! $this->provider()->tls()->rsaKey || (IssuedCertificate::fromPem($pem)->rsaKey ?? false);
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function ownCertificateFiles(): array
-    {
-        return array_values(array_filter($this->provider()->tls()->files, fn (string $name): bool => $name !== self::CERTIFICATE_AUTHORITY));
-    }
-
-    public function serverCertificateFile(): string
-    {
-        return collect($this->ownCertificateFiles())->first(fn (string $name): bool => ! str_ends_with($name, '.key')) ?? self::CERTIFICATE_AUTHORITY;
-    }
-
-    private function serverCertificate(): string
-    {
-        return $this->settings->certificate($this->serverCertificateFile());
-    }
-
-    /**
-     * @param  array<string, string>  $certificates
-     */
-    public function mergeCertificates(array $certificates): void
-    {
-        $this->update(['settings' => $this->settings->mergingCertificates($certificates)]);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function certificateAuthority(): array
-    {
-        return array_filter(array_combine(self::AUTHORITY_FILES, array_map($this->settings->certificate(...), self::AUTHORITY_FILES)));
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function certificateFilesFor(DatabaseNode $node): array
-    {
-        $own = $node->isReadOnly() && $this->publicCertificateZone() === null;
-
-        return collect($this->provider()->tls()->files)
-            ->mapWithKeys(fn (string $name): array => [$name => ($own ? $this->settings->nodeCertificate($node->id, $name) : null) ?? $this->settings->certificate($name)])
-            ->all();
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function effectiveConfigFor(DatabaseNode $node): array
-    {
-        $engine = $this->provider();
-
-        return collect($engine->fields())
-            ->mapWithKeys(fn (ConfigField $field): array => [$field->key => $field->default])
-            ->merge($engine->tunedSettings($node->resources()))
-            ->merge($this->settings->config)
-            ->filter(fn (string $value): bool => $value !== '')
-            ->all();
-    }
-
     public function forgetNodeCertificates(DatabaseNode $node): void
     {
         $this->update(['settings' => $this->settings->withoutNodeCertificates($node->id)]);
-    }
-
-    /**
-     * @param  array<string, string>  $files
-     */
-    public function storeNodeCertificates(DatabaseNode $node, array $files): void
-    {
-        $this->update(['settings' => $this->settings->withNodeCertificates($node->id, array_diff_key($files, array_flip(self::AUTHORITY_FILES)))]);
     }
 
     public function isClustered(): bool
@@ -367,16 +262,15 @@ class Database extends Model implements Movable
     public function serviceRecords(?DnsZone $zone = null): ?ServiceRecords
     {
         $zone ??= $this->dnsZone;
-        $prefix = $this->provider()->config('service_record.prefix');
-        $options = $this->provider()->config('service_record.options');
+        $record = $this->engine()->serviceRecord;
 
-        if ($zone === null || ! is_string($prefix) || ! is_string($options)) {
+        if ($zone === null || $record === null) {
             return null;
         }
 
         $host = $this->hostnamesUnder($zone)->primary->public;
 
-        return new ServiceRecords($zone, $host, "{$prefix}.{$host}", $options, $this->name, $this->provider()->ports()->client);
+        return new ServiceRecords($zone, $host, "{$record->prefix}.{$host}", $record->options, $this->name, $this->clientPort());
     }
 
     public function moveToZone(?DnsZone $zone): void
@@ -666,8 +560,8 @@ class Database extends Model implements Movable
     public function nodeLimitOf(NodeKind $kind): int
     {
         return match ($kind) {
-            NodeKind::Member => $this->provider()->maxStandbys() + 1,
-            NodeKind::ReadOnly => $this->provider()->maxReadOnlyNodes(),
+            NodeKind::Member => Engine::MAX_STANDBYS + 1,
+            NodeKind::ReadOnly => Engine::MAX_READ_ONLY_NODES,
         };
     }
 
@@ -803,14 +697,6 @@ class Database extends Model implements Movable
         return array_values(array_unique(array_merge(array_keys(array_diff_assoc($config, $current)), array_keys(array_diff_assoc($current, $config)))));
     }
 
-    /**
-     * @param  list<string>  $keys
-     */
-    public function configChangeNeedsRestart(array $keys): bool
-    {
-        return collect($this->provider()->fields())->contains(fn (ConfigField $field): bool => $field->needsRestart() && in_array($field->key, $keys, true));
-    }
-
     public function updatePersistence(Persistence $persistence): void
     {
         $this->update(['settings' => $this->settings->withPersistence($persistence)]);
@@ -843,7 +729,7 @@ class Database extends Model implements Movable
 
     public function container(): string
     {
-        return $this->provider()->container();
+        return "databasify-{$this->engine}";
     }
 
     public function image(): EngineImage
@@ -927,7 +813,7 @@ class Database extends Model implements Movable
 
     public function endpointsAmong(DatabaseNodeCollection $nodes): DatabaseEndpoints
     {
-        $port = $this->provider()->ports()->client;
+        $port = $this->clientPort();
         $members = $nodes->members();
         $entry = $members->entry() ?? $this->seed();
         $hostnames = $this->hostnames();
@@ -938,7 +824,9 @@ class Database extends Model implements Movable
 
     public function canFailover(): bool
     {
-        return $this->provider()->canFailover($this->nodes()->get());
+        $voters = $this->engine()->readOnlyNodesVote ? $this->nodes() : $this->nodes()->members();
+
+        return $voters->count() >= self::AUTOMATIC_FAILOVER_MEMBERS;
     }
 
     public function dataKey(): string
@@ -987,14 +875,6 @@ class Database extends Model implements Movable
         return $archive;
     }
 
-    /**
-     * @return list<NodeFile>
-     */
-    public function archiveFiles(): array
-    {
-        return $this->pointInTimeRecovery === null ? [] : $this->provider()->archive()?->files($this->pointInTimeRecovery) ?? [];
-    }
-
     private function ensureArchivesForRecovery(): void
     {
         if (! $this->archivesForRecovery()) {
@@ -1004,17 +884,17 @@ class Database extends Model implements Movable
 
     public function archivesForRecovery(): bool
     {
-        return $this->provider()->archive() !== null && ($this->versionLine()->archives ?? true);
+        return $this->engine_capabilities?->offers('archive status') === true && ($this->versionLine()->archives ?? true);
     }
 
     public function missingRecoveryMessage(): string
     {
-        return $this->recoveryUnavailableMessage() ?? "{$this->provider()->label()} has no point-in-time recovery.";
+        return $this->recoveryUnavailableMessage() ?? "{$this->engine()->label} has no point-in-time recovery.";
     }
 
     public function recoveryUnavailableMessage(): ?string
     {
-        if ($this->provider()->archive() === null || $this->archivesForRecovery()) {
+        if ($this->engine_capabilities?->offers('archive status') !== true || $this->archivesForRecovery()) {
             return null;
         }
 
@@ -1023,22 +903,12 @@ class Database extends Model implements Movable
 
     public function versionLabel(): string
     {
-        return $this->versionLine()->label ?? "{$this->provider()->label()} {$this->version_line}";
+        return $this->versionLine()->label ?? "{$this->engine()->label} {$this->version_line}";
     }
 
     private function versionLine(): ?VersionLine
     {
-        return $this->provider()->versions()->firstWhere('value', $this->version_line);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function tunedConfig(): array
-    {
-        $smallest = $this->nodes->sortBy(fn (DatabaseNode $node): int => $node->server->memory_mb ?? 0)->first();
-
-        return $smallest === null ? [] : $this->provider()->tunedSettings(NodeResources::of($smallest->server));
+        return collect($this->engine()->lines)->firstWhere('value', $this->version_line);
     }
 
     /**
@@ -1047,11 +917,6 @@ class Database extends Model implements Movable
     public function processNames(): array
     {
         return $this->log_units ?? [];
-    }
-
-    public static function providerFor(string $engine): DatabaseDriver
-    {
-        return (new self(['engine' => $engine]))->provider();
     }
 
     /**
@@ -1074,14 +939,6 @@ class Database extends Model implements Movable
     }
 
     /**
-     * @return array<string, DatabaseDriver>
-     */
-    public static function providers(): array
-    {
-        return array_combine(self::engines(), array_map(self::providerFor(...), self::engines()));
-    }
-
-    /**
      * @return list<array<string, mixed>>
      */
     public static function catalog(): array
@@ -1097,6 +954,42 @@ class Database extends Model implements Movable
         return EngineCatalog::find($this->engine);
     }
 
+    public function clientPort(): int
+    {
+        return $this->engine_capabilities->ports->client ?? ClientPorts::CLIENT;
+    }
+
+    public function connectionProfile(): ConnectionProfile
+    {
+        $engine = $this->engine();
+        $profile = $this->publicCertificateZone() !== null && $engine->publicConnection !== null ? $engine->publicConnection : $engine->connection;
+
+        return $this->dnsZone === null || $engine->serviceConnection === null ? $profile : $profile->withService($engine->serviceConnection);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function environment(DatabaseEndpoints $endpoints): array
+    {
+        $engine = $this->engine();
+        $host = ['host' => $endpoints->public->host, 'port' => (string) $endpoints->public->port];
+
+        if ($engine->laravelConnection === null) {
+            return ['REDIS_CLIENT' => 'phpredis', 'REDIS_SCHEME' => 'tls', 'REDIS_HOST' => $host['host'], 'REDIS_PORT' => $host['port'], 'REDIS_PASSWORD' => $this->settings->secret(EngineSecrets::ADMIN)];
+        }
+
+        return [
+            'DB_CONNECTION' => $engine->laravelConnection,
+            'DB_HOST' => $host['host'],
+            'DB_PORT' => $host['port'],
+            'DB_DATABASE' => $this->settings->defaultSchema(),
+            'DB_USERNAME' => $this->settings->defaultUsername(),
+            'DB_PASSWORD' => $this->settings->defaultPassword(),
+            ...$engine->environmentExtra,
+        ];
+    }
+
     public function capabilities(): EngineCapabilities
     {
         return $this->engine_capabilities ?? throw new LogicException("{$this->name} has not read its engine capabilities yet.");
@@ -1108,38 +1001,6 @@ class Database extends Model implements Movable
     public function configFields(): array
     {
         return array_map(ConfigField::fromEngine(...), $this->config_fields);
-    }
-
-    public function provider(): DatabaseDriver
-    {
-        $handler = config("database-provider.providers.{$this->engine}.handler");
-
-        if (! is_string($handler) || ! is_subclass_of($handler, AbstractDatabaseDriver::class)) {
-            throw UnknownProvider::named($this->engine);
-        }
-
-        return new $handler($this);
-    }
-
-    public function engineAccounts(): EngineAccounts
-    {
-        $engine = $this->provider();
-
-        return $engine->accounts() ?? throw MissingCapability::rejectionOf($engine, 'accounts');
-    }
-
-    public function engineArchive(): EngineArchive
-    {
-        $engine = $this->provider();
-
-        return $engine->archive() ?? throw MissingCapability::of($engine, 'archive');
-    }
-
-    public function engineMigration(): EngineMigration
-    {
-        $engine = $this->provider();
-
-        return $engine->migration() ?? throw MissingCapability::of($engine, 'migration');
     }
 
     private function stopKey(): string

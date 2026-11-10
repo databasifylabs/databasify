@@ -22,7 +22,7 @@ class DatabaseUserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'password' => $this->password,
-            'password_encryption' => $this->password_encryption?->value,
+            'password_encryption' => $this->password_encryption,
             'is_default' => $this->isDefault(),
         ];
     }

@@ -188,31 +188,9 @@ class DatabaseNode extends Model
         $query->where('role', NodeRole::Primary);
     }
 
-    public function certificateIsCurrent(): bool
-    {
-        $database = $this->database;
-
-        if ($database->publicCertificateZone() !== null) {
-            return true;
-        }
-
-        return collect($database->ownCertificateFiles())->every(fn (string $name): bool => $database->settings->nodeCertificate($this->id, $name) !== null)
-            && $database->servesCertificate($this->serverCertificate(), $this->certificateNames());
-    }
-
-    public function certificateFits(): bool
-    {
-        return $this->certificateIsCurrent() && $this->database->hasKeyFor($this->serverCertificate());
-    }
-
-    public function serverCertificate(): string
-    {
-        return $this->database->settings->nodeCertificate($this->id, $this->database->serverCertificateFile()) ?? '';
-    }
-
     public function endpoints(): DatabaseEndpoints
     {
-        $pair = $this->endpointPair($this->hostnames(), $this->database->provider()->ports()->client);
+        $pair = $this->endpointPair($this->hostnames(), $this->database->clientPort());
 
         return new DatabaseEndpoints($pair->public, $pair->vpc);
     }

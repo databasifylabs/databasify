@@ -20,13 +20,13 @@ class DatabaseListResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $engine = $this->provider();
+        $engine = $this->engine();
 
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'engine_label' => $engine->label(),
-            'engine_icon' => $engine->icon(),
+            'engine_label' => $engine->label,
+            'engine_icon' => $engine->icon,
             'engine_version' => $this->image_release,
             'available_version' => $this->available_image_release,
             'available_update_refreshes_image' => $this->availableUpdateRefreshesImage(),

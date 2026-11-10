@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Pools\CreateConnectionPool;
 use App\DTOs\Databases\NewConnectionPool;
+use App\Engines\EngineCatalog;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\PoolMode;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
-use App\Models\Database;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 
@@ -31,7 +31,7 @@ it('refuses pools on engines without a pooler', function (string $engine) {
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
     expect(fn () => resolve(CreateConnectionPool::class)->handle($database, new NewConnectionPool('reports', 'app', PoolMode::Transaction, 15)))
-        ->toThrow(ValidationException::class, Database::providerFor($engine)->label().' databases have no connection pools.')
+        ->toThrow(ValidationException::class, EngineCatalog::find($engine)->label.' databases have no connection pools.')
         ->and($database->connectionPools()->count())->toBe(0);
     Queue::assertNothingPushed();
 })->with(['mysql', 'mariadb', 'valkey', 'redis']);

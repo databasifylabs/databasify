@@ -7,7 +7,6 @@ namespace App\Services\Databases;
 use App\DTOs\Concurrency\TaskFailure;
 use App\DTOs\Ssh\LogGroup;
 use App\Models\DatabaseNode;
-use App\Services\Ssh\Ssh;
 use App\Services\Ssh\SshSessions;
 use App\Support\Concurrency\Packed;
 use Closure;
@@ -19,6 +18,8 @@ use Throwable;
 
 final readonly class NodeRunner
 {
+    private const int TIMEOUT = 3600;
+
     private const int CONCURRENCY = 50;
 
     private const int GROUP_SHARE = 4;
@@ -65,7 +66,7 @@ final readonly class NodeRunner
             $failure = collect($tasks)
                 ->map(fn (Closure $task): Closure => $this->guarded($task))
                 ->chunk($concurrency ?? self::CONCURRENCY)
-                ->flatMap(fn (Collection $chunk): array => Concurrency::run($chunk->all(), $timeout ?? Ssh::LONG_TIMEOUT))
+                ->flatMap(fn (Collection $chunk): array => Concurrency::run($chunk->all(), $timeout ?? self::TIMEOUT))
                 ->map(Packed::open(...))
                 ->first(fn (mixed $result): bool => $result instanceof TaskFailure);
         } finally {
@@ -89,7 +90,7 @@ final readonly class NodeRunner
     {
         $values = $nodes->mapWithKeys(fn (DatabaseNode $node): array => [$node->id => $this->readOf($node, $read)])
             ->chunk($concurrency ?? self::CONCURRENCY)
-            ->flatMap(fn (Collection $chunk): array => Concurrency::run($chunk->all(), Ssh::LONG_TIMEOUT))
+            ->flatMap(fn (Collection $chunk): array => Concurrency::run($chunk->all(), self::TIMEOUT))
             ->map(Packed::open(...));
         $failure = $values->first(fn (mixed $value): bool => $value instanceof TaskFailure);
 

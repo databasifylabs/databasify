@@ -17,10 +17,8 @@ final readonly class CreateConnectionPool
     {
         $database->ensureIdle();
 
-        $engine = $database->provider();
-
-        if ($engine->ports()->pool === null) {
-            throw ValidationException::withMessages(['name' => "{$engine->label()} databases have no connection pools."]);
+        if ($database->engine_capabilities?->ports->pool === null) {
+            throw ValidationException::withMessages(['name' => "{$database->engine()->label} databases have no connection pools."]);
         }
 
         $pool = DB::transaction(function () use ($database, $data): ConnectionPool {

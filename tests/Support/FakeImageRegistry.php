@@ -6,8 +6,9 @@ namespace Tests\Support;
 
 use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Databases\VersionLine;
+use App\Engines\Engine;
+use App\Engines\EngineCatalog;
 use App\Exceptions\Images\ImageUnavailable;
-use App\Models\Database;
 
 final class FakeImageRegistry implements ImageRegistry
 {
@@ -19,19 +20,19 @@ final class FakeImageRegistry implements ImageRegistry
     public static function withEveryLine(): self
     {
         $registry = new self;
-        collect(Database::engines())->each(fn (string $engine) => Database::providerFor($engine)->versions()->each(fn (VersionLine $line) => $registry->publish($engine, "{$line->value}.0")));
+        EngineCatalog::all()->each(fn (Engine $engine) => collect($engine->lines)->each(fn (VersionLine $line) => $registry->publish($engine->id, "{$line->value}.0")));
 
         return $registry;
     }
 
     public static function digestFor(string $engine, string $tag): string
     {
-        return 'sha256:'.hash('sha256', Database::providerFor($engine)->imageRepository().":{$tag}");
+        return 'sha256:'.hash('sha256', EngineCatalog::find($engine)->imageRepository.":{$tag}");
     }
 
     public function publish(string $engine, string $tag, ?string $digest = null): self
     {
-        $this->digests[Database::providerFor($engine)->imageRepository()][$tag] = $digest ?? self::digestFor($engine, $tag);
+        $this->digests[EngineCatalog::find($engine)->imageRepository][$tag] = $digest ?? self::digestFor($engine, $tag);
 
         return $this;
     }

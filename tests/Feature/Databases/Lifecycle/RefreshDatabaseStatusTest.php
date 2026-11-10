@@ -10,7 +10,6 @@ use App\Events\DatabaseAlertRaised;
 use App\Jobs\Databases\RefreshDatabaseStatusJob;
 use App\Models\DatabaseNode;
 use App\Models\User;
-use App\Services\Ssh\Ssh;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
@@ -40,7 +39,7 @@ it('keeps the last known version while a node is unreachable', function () {
 
 it('reports a node whose engine container is stopped as offline instead of unreachable', function () {
     $database = idleDatabase('postgres', 2);
-    fakeSsh()->respond("databasify-postgres is not running on this server\n", Ssh::CONTAINER_NOT_RUNNING)->respond('', 255);
+    fakeSsh()->respond("databasify-postgres is not running on this server\n", 69)->respond('', 255);
 
     resolve(RefreshDatabaseStatus::class)->handle($database);
 

@@ -60,7 +60,7 @@ it('gives every named call its own log', function () {
     $server = Server::factory()->ready()->create();
 
     $server->ssh()->exec('ssh.databases.noop', [], 'First');
-    $server->ssh()->exec('ssh.databases.noop', [], 'Second', timeout: Ssh::LONG_TIMEOUT);
+    $server->ssh()->exec('ssh.servers.provision.facts', [], 'Second', timeout: 7200);
 
     expect($server->serverLogs()->pluck('name')->sort()->values()->all())->toBe(['First', 'Second']);
 });

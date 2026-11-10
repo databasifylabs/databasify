@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Exceptions\Ssh;
 
 use App\Models\Server;
-use App\Services\Ssh\Ssh;
 use RuntimeException;
 
 final class RemoteScriptFailed extends RuntimeException
@@ -21,11 +20,6 @@ final class RemoteScriptFailed extends RuntimeException
         $exception->script = $script;
 
         return $exception;
-    }
-
-    public function foundContainerStopped(): bool
-    {
-        return $this->getCode() === Ssh::CONTAINER_NOT_RUNNING;
     }
 
     /**

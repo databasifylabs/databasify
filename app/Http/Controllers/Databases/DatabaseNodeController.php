@@ -37,7 +37,7 @@ class DatabaseNodeController extends Controller
             'database' => new DatabaseResource($database->load(DatabaseResource::RELATIONS)),
             'node' => new DatabaseNodeResource($node->load('server')),
             'endpoints' => $endpoints->toArray(),
-            'appEnv' => $database->provider()->environment($endpoints),
+            'appEnv' => $database->environment($endpoints),
             'logs' => ServerLogListResource::collection(ServerLogQuery::of($database)->cursorPaginate()),
             'latestLogId' => fn () => ServerLogQuery::of($database)->latestId(),
             'log' => fn () => ServerLogQuery::of($database)->selected($request->string('log')->value())?->toResource(ServerLogResource::class)->resolve(),

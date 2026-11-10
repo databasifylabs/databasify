@@ -23,6 +23,31 @@ final readonly class ConnectionProfile
         public ?ServiceConnection $service = null,
     ) {}
 
+    /**
+     * @param  array<array-key, mixed>  $values
+     */
+    public static function fromArray(array $values): self
+    {
+        $text = fn (string $key): string => is_string($values[$key] ?? null) ? $values[$key] : '';
+        $optional = fn (string $key): ?string => is_string($values[$key] ?? null) ? $values[$key] : null;
+        $keys = is_array($values['env_keys'] ?? null) ? $values['env_keys'] : [];
+        $key = fn (string $name): ?string => is_string($keys[$name] ?? null) ? $keys[$name] : null;
+
+        return new self(
+            uriScheme: $text('uri_scheme'),
+            uriQuery: $text('uri_query'),
+            tlsParameter: $text('tls_parameter'),
+            tlsMode: $text('tls_mode'),
+            command: $text('command'),
+            fixedUsername: $optional('fixed_username'),
+            selectsDatabase: ($values['selects_database'] ?? false) === true,
+            envKeys: ['host' => $key('host') ?? '', 'port' => $key('port') ?? '', 'username' => $key('username'), 'password' => $key('password') ?? '', 'database' => $key('database')],
+            envNote: $optional('env_note'),
+            commandNote: $optional('command_note'),
+            service: is_array($values['service'] ?? null) ? ServiceConnection::fromArray($values['service']) : null,
+        );
+    }
+
     public function withService(ServiceConnection $service): self
     {
         return clone ($this, ['service' => $service]);

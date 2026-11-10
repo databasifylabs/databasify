@@ -59,7 +59,7 @@ class DatabaseController extends Controller
         return Inertia::render('databases/show', [
             'clientIp' => $request->ip(),
             'database' => new DatabaseResource($database->load(DatabaseResource::RELATIONS)),
-            'appEnv' => $database->provider()->environment($database->endpoints()),
+            'appEnv' => $database->environment($database->endpoints()),
             'availableServers' => $this->freeServers(),
             'dnsZones' => $this->dnsZones(),
             'storageProviders' => $this->storageProviders(),
