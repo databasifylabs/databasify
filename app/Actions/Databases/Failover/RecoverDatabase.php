@@ -22,7 +22,7 @@ final readonly class RecoverDatabase
 
     public function handle(Database $database, bool $othersAreDown = false): void
     {
-        $database->ensureIdle();
+        $database->ensureIdleOnAnyWrapper();
         $this->refresh->handle($database);
         $reachable = $database->reachableMembers();
         $this->ensureRecoverable($database, $reachable->count(), $othersAreDown);

@@ -9,22 +9,26 @@ use Illuminate\Support\Facades\Cache;
 
 final readonly class WrapperResolver
 {
-    private const int CACHE_SECONDS = 240;
-
     public function __construct(private ImageRegistry $registry) {}
 
-    public function newestFor(int $api): string
+    public function pinned(): string
     {
-        return Cache::remember("wrapper-image.{$api}", self::CACHE_SECONDS, function () use ($api): string {
-            $repository = self::repository();
-            $tag = "api-{$api}";
+        $version = self::version();
 
-            return "{$repository}:{$tag}@{$this->registry->digestOf($repository, $tag)}";
+        return Cache::rememberForever("wrapper-image.{$version}", function () use ($version): string {
+            $repository = self::repository();
+
+            return "{$repository}:{$version}@{$this->registry->digestOf($repository, $version)}";
         });
+    }
+
+    public static function version(): string
+    {
+        return config()->string('databasify.wrapper.version');
     }
 
     public static function repository(): string
     {
-        return config()->string('databasify.images.registry').'/'.config()->string('databasify.images.wrapper');
+        return config()->string('databasify.images.registry').'/'.config()->string('databasify.wrapper.repository');
     }
 }

@@ -15,7 +15,7 @@ When a database is created, `ImageResolver::newest()` asks the registry (`ghcr.i
 
 - `EngineImage::replaces()` decides whether an update is offered: a newer release in the line, or the same release with a new digest. `refreshes()` labels the same-release case as "Refresh image" instead of an upgrade.
 - Restores reuse the source database's image.
-- Both the deploy and the pull step refuse an image whose `io.databasify.wrapper` label is missing or older than `images.minimum_wrapper`.
+- The wrapper inside the image is not trusted for its version: every deploy that creates or replaces a container installs the wrapper version the app pins ([0036](0036-pinned-wrapper-version.md)).
 - The app repository holds no digest list. The engine repository publishes images, and the app discovers them.
 
 ## Alternatives considered

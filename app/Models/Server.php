@@ -203,7 +203,7 @@ class Server extends Model implements Movable
     public function ensureDatabasesSpareIt(): void
     {
         $this->databaseNodes()->with('database')->get()->each(function (DatabaseNode $node): void {
-            $node->database->ensureIdle();
+            $node->database->ensureIdleOnAnyWrapper();
 
             if ($node->isPrimary() && $node->database->hasStandby()) {
                 throw ValidationException::withMessages(['server' => "{$this->name} is the primary of {$node->database->name}, fail over first."]);

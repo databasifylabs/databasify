@@ -9,6 +9,7 @@ use App\DTOs\Databases\VersionLine;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Exceptions\Images\ImageUnavailable;
+use App\Services\Images\WrapperResolver;
 
 final class FakeImageRegistry implements ImageRegistry
 {
@@ -22,12 +23,17 @@ final class FakeImageRegistry implements ImageRegistry
         $registry = new self;
         EngineCatalog::all()->each(fn (Engine $engine) => collect($engine->lines)->each(fn (VersionLine $line) => $registry->publish($engine->id, "{$line->value}.0")));
 
-        return $registry;
+        return $registry->publishIn(WrapperResolver::repository(), WrapperResolver::version(), self::wrapperDigest());
     }
 
     public static function digestFor(string $engine, string $tag): string
     {
         return 'sha256:'.hash('sha256', EngineCatalog::find($engine)->imageRepository.":{$tag}");
+    }
+
+    public static function wrapperDigest(): string
+    {
+        return 'sha256:'.hash('sha256', WrapperResolver::repository().':'.WrapperResolver::version());
     }
 
     public function publish(string $engine, string $tag, ?string $digest = null): self

@@ -40,6 +40,7 @@ final readonly class UpgradeFlow implements Flow
             Step::finish('read what the engine offers', $this->steps->quick(function () use ($database): void {
                 $this->refresh->handle($database);
                 $this->learn->handle($database, $database->primaryOrSeed());
+                $database->recordPinnedWrapper();
             })),
         ];
     }

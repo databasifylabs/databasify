@@ -50,7 +50,7 @@ it('creates a single node through the create flow', function () {
     $database = createThroughFlow('postgres', 1);
 
     expect(commandsOn($database->seed()->server, engineCommandsIn($ssh)))->toBe([
-        'host deploy', 'tls install', 'engine capabilities', 'config fields', 'logs read', 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'node status',
+        'host deploy', 'host wrapper-update', 'tls install', 'engine capabilities', 'config fields', 'logs read', 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'node status',
     ])
         ->and($database->flows()->sole()->state)->toBe(FlowState::Succeeded)
         ->and($database->operation)->toBeNull()
@@ -64,7 +64,7 @@ it('creates a three node cluster and enables every member', function () {
     $commands = engineCommandsIn($ssh);
 
     $database->nodes->each(fn (DatabaseNode $node) => expect(commandsOn($node->server, $commands))->toBe([
-        'host deploy', 'tls install', ...($node->isSeed() ? ['engine capabilities', 'config fields', 'logs read'] : []), 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'cluster enable', 'operation status', 'node status',
+        'host deploy', 'host wrapper-update', 'tls install', ...($node->isSeed() ? ['engine capabilities', 'config fields', 'logs read'] : []), 'node configure', 'node start', 'node ready', 'operation status', 'node bootstrap', 'cluster enable', 'operation status', 'node status',
     ]));
     expect(array_search("{$database->nodes[2]->server->name}: node ready", $commands, true))->toBeLessThan(array_search("{$database->nodes[0]->server->name}: node bootstrap", $commands, true))
         ->and($database->flows()->sole()->state)->toBe(FlowState::Succeeded);

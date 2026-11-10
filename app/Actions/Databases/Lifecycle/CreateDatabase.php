@@ -17,6 +17,7 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
+use App\Services\Images\WrapperResolver;
 use App\Support\Databases\DefaultAccount;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -45,6 +46,7 @@ final readonly class CreateDatabase
                 'mode' => $data->mode(),
                 'status' => DatabaseStatus::Creating,
                 'settings' => $this->settingsFor($data, $engine),
+                'wrapper_version' => WrapperResolver::version(),
             ], $image->toRow()));
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));

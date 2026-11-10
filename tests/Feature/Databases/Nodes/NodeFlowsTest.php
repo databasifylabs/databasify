@@ -17,6 +17,7 @@ use App\Enums\Databases\NodeRole;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
+use App\Services\Images\WrapperResolver;
 use Tests\Support\FakeServerConnection;
 
 /**
@@ -63,7 +64,7 @@ it('adds a node in the documented order', function () {
     addThroughFlow($database, $server);
     $commands = engineCommandsIn($ssh);
 
-    expect(sentTo($server, $ssh))->toBe(['host deploy', 'tls install', 'node configure', 'node start', 'node ready', 'operation status', 'cluster enable', 'operation status', 'node status'])
+    expect(sentTo($server, $ssh))->toBe(['host deploy', 'host wrapper-update', 'tls install', 'node configure', 'node start', 'node ready', 'operation status', 'cluster enable', 'operation status', 'node status'])
         ->and($existing->map(fn (Server $peer): array => sentTo($peer, $ssh))->all())->each->toBe(['node configure', 'cluster membership', 'node status'])
         ->and(array_search("{$existing[0]->name}: cluster membership", $commands, true))->toBeGreaterThan(array_search("{$server->name}: node ready", $commands, true))
         ->and(count(requestOf($ssh, $existing[0], 'cluster membership')['members']))->toBe(3)
@@ -167,7 +168,7 @@ it('redeploys a cluster member and rejoins it', function () {
     resolve(StartFlow::class)->handle($database, resolve(RedeployNodeFlow::class), fn (): FlowContext => new FlowContext([$standby->id], $standby->id));
     advanceFlows();
 
-    expect(sentTo($standby->server, $ssh))->toBe(['host deploy', 'tls install', 'node ready', 'operation status', 'cluster rejoin', 'operation status', 'node status']);
+    expect(sentTo($standby->server, $ssh))->toBe(['host deploy', 'host wrapper-update', 'tls install', 'node ready', 'operation status', 'cluster rejoin', 'operation status', 'node status']);
 });
 
 it('reboots standbys first, fails over, then reboots the former primary', function () {
@@ -208,6 +209,6 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and($at($standby->server, 'host deploy'))->toBeLessThan($at($standby->server, 'node configure'))
         ->and($at($standby->server, 'node configure'))->toBeLessThan($at($standby->server, 'node ready'))
         ->and(requestOf($ssh, $primary->server, 'host deploy')['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
-        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()
+        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()->wrapper_version->toBe(WrapperResolver::version())
         ->and($database->fresh()->config_fields)->toHaveCount(1);
 });

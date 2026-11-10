@@ -12,7 +12,7 @@ final readonly class FailoverDatabase
 {
     public function handle(Database $database): void
     {
-        $database->ensureIdle();
+        $database->ensureIdleOnAnyWrapper();
 
         if (! $database->hasStandby()) {
             throw ValidationException::withMessages(['database' => 'Failover needs at least one standby node.']);

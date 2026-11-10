@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Databases;
 
-use App\Actions\Databases\Upgrades\UpdateDatabaseWrapper;
+use App\Actions\Databases\Upgrades\SyncDatabaseWrapper;
 use App\Enums\Queues\QueueGroup;
 use App\Models\Database;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -19,7 +19,7 @@ use Illuminate\Queue\Attributes\UniqueFor;
 #[Tries(1)]
 #[Timeout(120)]
 #[UniqueFor(240)]
-final class UpdateDatabaseWrapperJob implements ShouldBeUnique, ShouldQueue
+final class SyncDatabaseWrapperJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -30,7 +30,7 @@ final class UpdateDatabaseWrapperJob implements ShouldBeUnique, ShouldQueue
         return (string) $this->database->id;
     }
 
-    public function handle(UpdateDatabaseWrapper $action): void
+    public function handle(SyncDatabaseWrapper $action): void
     {
         $action->handle($this->database);
     }

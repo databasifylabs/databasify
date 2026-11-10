@@ -18,6 +18,7 @@ final readonly class DeployNode
         private IssueNodeCertificates $certificates,
         private EngineClient $engine,
         private InstallNodeCertificate $certificate,
+        private InstallPinnedWrapper $wrapper,
     ) {}
 
     public function handle(Database $database, DatabaseNode $node): void
@@ -28,7 +29,7 @@ final readonly class DeployNode
         $deployed = $this->engine->send($node, $this->deploymentOf($database, $node), "{$node->server->name}: deploying the engine");
 
         if ($deployed->created || $deployed->replaced) {
-            $database->forgetWrapperImage();
+            $this->wrapper->handle($node);
         }
 
         $this->certificate->handle($database->refresh(), $node);

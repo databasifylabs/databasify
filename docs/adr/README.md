@@ -72,4 +72,4 @@ Options that were tried or rejected, and why.
 | [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`              | Accepted |
 | [0034](0034-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                       | Accepted |
 | [0035](0035-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows  | Accepted |
-| [0036](0036-wrapper-updates-by-api-level.md)                | Wrapper fixes ship on their own, matched by API level    | Accepted |
+| [0036](0036-pinned-wrapper-version.md)                      | Each app release pins one wrapper version                | Accepted |
