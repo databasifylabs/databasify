@@ -7,7 +7,7 @@ namespace App\Actions\Storage;
 use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Storage\NewStorageProvider;
 use App\Engines\Flows\ArchiveFlow;
-use App\Engines\Flows\FlowContext;
+use App\Engines\Flows\RollingSteps;
 use App\Models\Database;
 use App\Models\StorageProvider;
 
@@ -34,7 +34,7 @@ final readonly class UpdateStorageProvider
 
         if ($rotated) {
             $archiving->each(function (Database $database): void {
-                $this->startFlow->handle($database, $this->archiveFlow, new FlowContext([]));
+                $this->startFlow->handle($database, $this->archiveFlow, RollingSteps::contextFor($database));
                 $database->retitleOperation('Update archive credentials');
             });
         }

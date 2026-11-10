@@ -6,7 +6,7 @@ namespace App\Actions\Databases\Recovery;
 
 use App\Actions\Databases\Flows\StartFlow;
 use App\Engines\Flows\ArchiveFlow;
-use App\Engines\Flows\FlowContext;
+use App\Engines\Flows\RollingSteps;
 use App\Jobs\Databases\DeleteRecoveryBackupsJob;
 use App\Models\Database;
 
@@ -24,7 +24,7 @@ final readonly class DisablePointInTimeRecovery
         $database->ensureIdle();
         $archive = $database->disableRecovery();
 
-        $this->startFlow->handle($database->refresh(), $this->flow, new FlowContext([]));
+        $this->startFlow->handle($database->refresh(), $this->flow, RollingSteps::contextFor($database));
 
         if ($deleteBackups) {
             dispatch(new DeleteRecoveryBackupsJob($database, $archive))->delay(now()->addMinutes(self::BACKUP_DELETE_DELAY_MINUTES));

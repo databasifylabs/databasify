@@ -265,3 +265,20 @@ it('configures every node with the archive when point-in-time recovery is turned
         ->and(json_decode($ssh->engineRequestAt($configures()->first()), true)['archive'])->retentionDays->toBe(7)->backupHour->toBe(3)
         ->and($database->fresh()->operation)->toBeNull();
 });
+
+it('applies the archive settings and restarts the nodes when the engine waits on a restart', function () {
+    $ssh = fakeEngine()->respondToEngine('config sync', ['restartedPrimary' => false])->respondToEngine('config apply', [])->respondToEngine('node restart', [])
+        ->respondToEngine('config show', ['values' => [['key' => 'archive_mode', 'value' => 'off', 'source' => 'default', 'pendingRestart' => true]]])
+        ->respondToEngine('archive status', ['backups' => 0, 'earliest' => null, 'latest' => null, 'lastBackup' => null, 'problem' => null]);
+    $database = withRecovery(idleDatabase('postgres', 2));
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$primary, $standby] = $database->nodes()->orderBy('position')->get()->map->server->all();
+
+    resolve(UpdateRecoverySchedule::class)->handle($database->fresh(), new RecoverySchedule(7, 3));
+    advanceFlows(40);
+
+    expect(engineCommandsIn($ssh))
+        ->toContain("{$primary->name}: config sync", "{$primary->name}: config apply", "{$primary->name}: node restart")
+        ->toContain("{$standby->name}: config apply", "{$standby->name}: node restart")
+        ->and($database->fresh()->operation)->toBeNull();
+});

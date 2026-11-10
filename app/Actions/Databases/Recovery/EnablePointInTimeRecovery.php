@@ -7,7 +7,7 @@ namespace App\Actions\Databases\Recovery;
 use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Recovery\RecoverySettings;
 use App\Engines\Flows\ArchiveFlow;
-use App\Engines\Flows\FlowContext;
+use App\Engines\Flows\RollingSteps;
 use App\Models\Database;
 
 final readonly class EnablePointInTimeRecovery
@@ -22,7 +22,7 @@ final readonly class EnablePointInTimeRecovery
         $database->ensureIdle();
         $database->enableRecovery($settings);
 
-        $this->startFlow->handle($database->refresh(), $this->flow, new FlowContext([]));
+        $this->startFlow->handle($database->refresh(), $this->flow, RollingSteps::contextFor($database));
         $database->retitleOperation('Turn on point-in-time recovery');
     }
 }

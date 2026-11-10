@@ -7,7 +7,7 @@ namespace App\Actions\Databases\Recovery;
 use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Recovery\RecoverySchedule;
 use App\Engines\Flows\ArchiveFlow;
-use App\Engines\Flows\FlowContext;
+use App\Engines\Flows\RollingSteps;
 use App\Models\Database;
 
 final readonly class UpdateRecoverySchedule
@@ -22,6 +22,6 @@ final readonly class UpdateRecoverySchedule
         $database->ensureIdle();
         $database->recoveryOrFail()->reschedule($schedule);
 
-        $this->startFlow->handle($database->refresh(), $this->flow, new FlowContext([]));
+        $this->startFlow->handle($database->refresh(), $this->flow, RollingSteps::contextFor($database));
     }
 }
