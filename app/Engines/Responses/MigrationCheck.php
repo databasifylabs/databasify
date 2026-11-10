@@ -15,6 +15,7 @@ final readonly class MigrationCheck implements EngineReply
      * @param  list<string>  $unowned
      * @param  list<string>  $occupied
      * @param  list<string>  $warnings
+     * @param  list<string>  $problems
      */
     public function __construct(
         public bool $reachable,
@@ -28,6 +29,7 @@ final readonly class MigrationCheck implements EngineReply
         public array $unowned,
         public array $occupied,
         public array $warnings,
+        public array $problems,
     ) {}
 
     public static function fromPayload(Payload $payload): static
@@ -44,6 +46,7 @@ final readonly class MigrationCheck implements EngineReply
             unowned: $payload->strings('unowned'),
             occupied: $payload->strings('occupied'),
             warnings: $payload->strings('warnings'),
+            problems: $payload->strings('problems'),
         );
     }
 }

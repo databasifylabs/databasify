@@ -41,6 +41,7 @@ final readonly class SourceReport
             problems: [
                 ...array_map(fn (string $database): string => "Databasify cannot read {$database} on the source.", $check->unreadable),
                 ...array_map(fn (string $database): string => "{$database} is not owned by the source user.", $check->unowned),
+                ...$check->problems,
             ],
             warnings: $check->warnings,
             databases: $check->databases,

@@ -21,7 +21,7 @@ function progressReply(string $copy, string $log, ?int $lag = null): array
 
 function checkReply(bool $reachable, bool $canReplicate, ?string $error = null): array
 {
-    return ['reachable' => $reachable, 'error' => $error, 'version' => '8.4.3', 'walLevel' => null, 'canReplicate' => $canReplicate, 'sizeMb' => 3, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'keys' => null, 'warnings' => []];
+    return ['reachable' => $reachable, 'error' => $error, 'version' => '8.4.3', 'walLevel' => null, 'canReplicate' => $canReplicate, 'sizeMb' => 3, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'keys' => null, 'warnings' => [], 'problems' => []];
 }
 
 function sourceAt(): MigrationSource
@@ -38,6 +38,14 @@ it('refuses a source the engine cannot reach or follow', function () {
     fakeEngine(fakeSsh()->respondToEngine('migration check', checkReply(true, false)));
 
     expect(fn () => resolve(StartMigration::class)->handle($database->fresh(), sourceAt(), MigrationMode::Continuous))->toThrow(ValidationException::class)
+        ->and($database->migrations()->count())->toBe(0);
+});
+
+it('refuses a source the engine says it cannot copy from', function () {
+    $database = migratingDatabase('mysql');
+    fakeEngine(fakeSsh()->respondToEngine('migration check', [...checkReply(true, false), 'problems' => ['MySQL Shell copies only as a source user with SELECT on mysql.*']]));
+
+    expect(fn () => resolve(StartMigration::class)->handle($database, sourceAt(), MigrationMode::OneTime))->toThrow(ValidationException::class, 'SELECT on mysql.*')
         ->and($database->migrations()->count())->toBe(0);
 });
 

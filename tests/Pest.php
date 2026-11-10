@@ -178,7 +178,7 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
         ->respondToEngine('pool update', [])
         ->respondToEngine('pool delete', [])
         ->respondToEngine('account list', ['users' => ['databasify'], 'databases' => ['defaultdb'], 'grants' => (object) []])
-        ->respondToEngine('migration check', ['reachable' => true, 'error' => null, 'version' => '8.4.3', 'walLevel' => null, 'canReplicate' => true, 'sizeMb' => 12, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'keys' => null, 'warnings' => []])
+        ->respondToEngine('migration check', ['reachable' => true, 'error' => null, 'version' => '8.4.3', 'walLevel' => null, 'canReplicate' => true, 'sizeMb' => 12, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'keys' => null, 'warnings' => [], 'problems' => []])
         ->respondToEngine('migration start', [])
         ->respondToEngine('migration progress', ['copy' => 'running', 'log' => 'copying shop', 'subscribedTables' => 0, 'readyTables' => 0, 'lagSeconds' => null, 'lagUnknown' => true])
         ->respondToEngine('migration stop', [])
