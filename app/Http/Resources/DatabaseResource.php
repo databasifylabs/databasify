@@ -52,7 +52,7 @@ class DatabaseResource extends DatabaseListResource
             'services' => $this->processNames(),
             'config' => $this->settings->config,
             'tuned_config' => $this->tunedConfig(),
-            'config_fields' => array_map(fn (ConfigField $field): array => $field->toArray(), $engine->fields()),
+            'config_fields' => array_map(fn (ConfigField $field): array => $field->toArray(), $this->configFields()),
             'endpoints' => $this->endpointsAmong($this->nodes)->toArray(),
             'users' => DatabaseUserResource::collection($this->users),
             'schemas' => DatabaseSchemaResource::collection($this->schemas),

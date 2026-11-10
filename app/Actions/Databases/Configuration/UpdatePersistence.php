@@ -4,27 +4,35 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Configuration;
 
+use App\Actions\Databases\Flows\StartFlow;
+use App\Engines\Flows\ApplySettingsFlow;
+use App\Engines\Flows\RollingSteps;
 use App\Enums\Databases\Persistence;
-use App\Jobs\Databases\ApplyDatabaseConfigJob;
 use App\Models\Database;
 use Illuminate\Validation\ValidationException;
 
 final readonly class UpdatePersistence
 {
-    private const string MEMORY_LIMIT_KEY = 'maxmemory';
+    private const string APPEND_ONLY = 'appendonly';
+
+    public function __construct(
+        private StartFlow $startFlow,
+        private ApplySettingsFlow $flow,
+    ) {}
 
     public function handle(Database $database, Persistence $persistence): void
     {
         $database->ensureIdle();
+        $engine = $database->engine();
 
-        $engine = $database->provider();
-
-        if (! $engine->supportsPersistence()) {
-            throw ValidationException::withMessages(['persistence' => "{$engine->label()} always keeps its data on disk."]);
+        if (! $engine->persistenceChoice) {
+            throw ValidationException::withMessages(['persistence' => "{$engine->label} always keeps its data on disk."]);
         }
 
+        $config = array_diff_key($database->settings->config, [self::APPEND_ONLY => true]);
         $database->updatePersistence($persistence);
-        $database->startOperation($persistence === Persistence::Off ? 'Turn off persistence' : 'Turn on snapshots');
-        dispatch(new ApplyDatabaseConfigJob($database, [self::MEMORY_LIMIT_KEY]));
+        $database->updateConfig($persistence === Persistence::Off ? [...$config, self::APPEND_ONLY => 'no'] : $config);
+
+        $this->startFlow->handle($database, $this->flow, RollingSteps::contextFor($database));
     }
 }

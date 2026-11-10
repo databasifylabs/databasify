@@ -248,6 +248,20 @@ class DatabaseNode extends Model
         return array_values(array_unique(array_merge($this->hostnames()?->all() ?? [], [$this->server->address(), $this->privateIp()])));
     }
 
+    /**
+     * @return list<string>
+     */
+    public function ownCertificateNames(): array
+    {
+        $records = $this->database->serviceRecords();
+
+        return array_values(array_unique([
+            ...($this->database->hostnames()?->all() ?? []),
+            ...($records === null ? [] : [$records->memberHostOf($this)]),
+            ...$this->certificateNames(),
+        ]));
+    }
+
     public function hostnames(): ?HostPair
     {
         $zone = $this->database->dnsZone;

@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Nodes;
 
 use App\Actions\Databases\Domains\EnsureHostnamesFree;
+use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Databases\NewDatabaseNode;
 use App\DTOs\Dns\HostPair;
+use App\Engines\Flows\AddNodeFlow;
+use App\Engines\Flows\FlowContext;
 use App\Enums\Databases\NodeKind;
-use App\Jobs\Databases\AddDatabaseNodeJob;
 use App\Models\Database;
-use App\Models\DatabaseNode;
-use Illuminate\Support\Facades\DB;
 
 final readonly class AddDatabaseNode
 {
-    public function __construct(private EnsureHostnamesFree $free) {}
+    public function __construct(
+        private EnsureHostnamesFree $free,
+        private StartFlow $startFlow,
+        private AddNodeFlow $flow,
+    ) {}
 
     public function handle(Database $database, NewDatabaseNode $data): void
     {
@@ -24,12 +28,11 @@ final readonly class AddDatabaseNode
         $name = $data->kind === NodeKind::ReadOnly ? $data->name : null;
         $this->ensureNamesFree($database, $name);
 
-        $node = DB::transaction(function () use ($database, $data, $name): DatabaseNode {
-            $database->startOperation("Add {$data->kind->label()} node ".($name ?? $data->server->name));
+        $this->startFlow->handle($database, $this->flow, function () use ($database, $data, $name): FlowContext {
+            $node = $database->addNode($data->server->id, $data->kind, $name);
 
-            return $database->addNode($data->server->id, $data->kind, $name);
+            return new FlowContext(array_values(array_filter($database->nodes()->pluck('id')->all(), is_string(...))), $node->id);
         });
-        dispatch(new AddDatabaseNodeJob($database, $node));
     }
 
     private function ensureNamesFree(Database $database, ?string $name): void

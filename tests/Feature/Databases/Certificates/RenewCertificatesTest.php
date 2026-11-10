@@ -57,32 +57,6 @@ it('re-issues member certificates under the same authority once the database get
         ->and($database->fresh()->settings)->certificate('server.crt')->toBe('server.crt-content')->certificate('ca.crt')->toBe('authority-cert');
 });
 
-it('renews stale member and node certificates, then reloads every node', function () {
-    $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $reader = withReadOnlyNode($database, ['name' => 'reports']);
-    $database = withCurrentCertificates($database);
-    $database->update(['settings' => $database->settings
-        ->withCertificates([...$database->settings->certificates, 'server.crt' => issuedPem($database->certificateNames(), days: 10)])
-        ->withNodeCertificates($reader->id, ['server.crt' => issuedPem($reader->certificateNames(), days: 10), 'server.key' => 'key'])]);
-    $database->startOperation('Renew certificates');
-    $ssh = fakeSsh()->respond(certificateOutput('server.crt', 'server.key'))->respond(certificateOutput('server.crt', 'server.key'));
-
-    runJob(new RenewCertificatesJob($database->fresh()));
-
-    $scripts = collect($ssh->runs)->pluck('script');
-    expect($scripts->filter(fn (string $script): bool => str_contains($script, 'subjectAltName=')))->toHaveCount(2)
-        ->and(collect($ssh->runs)->slice(2)->pluck('server')->all())->toBe([$database->seed()->server->name, $reader->server->name])
-        ->and($database->fresh()->operation)->toBeNull()
-        ->and($database->serverLogs()->pluck('name')->all())->toBe([
-            "{$database->seed()->server->name}: issuing certificates",
-            "{$database->seed()->server->name}: issuing the certificate of {$reader->server->name}",
-            "{$database->seed()->server->name}: reloading certificates",
-            "{$reader->server->name}: reloading certificates",
-        ])
-        ->and($database->serverLogs()->pluck('output')->implode(''))->not->toContain('CERT ')
-        ->and($database->serverLogs()->pluck('status')->unique()->all())->toBe([ServerLogStatus::Succeeded]);
-});
-
 it('queues a renewal only for an idle ready database with a stale certificate', function () {
     $stale = idleDatabase('valkey', 1, DatabaseMode::Single, 'stale');
     $current = withCurrentCertificates(idleDatabase('valkey', 1, DatabaseMode::Single, 'current'));

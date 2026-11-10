@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Certificates;
 
+use App\Actions\Dns\EnsureZoneCertificate;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
@@ -11,19 +12,28 @@ use App\Services\Databases\NodeRunner;
 final readonly class RenewCertificates
 {
     public function __construct(
-        private ReissueStaleCertificates $reissue,
-        private ReloadNodeCertificates $reload,
+        private EnsureZoneCertificate $zoneCertificate,
+        private IssueNodeCertificates $issue,
+        private InstallNodeCertificate $install,
         private NodeRunner $nodeRunner,
     ) {}
 
     public function handle(Database $database): void
     {
-        $this->reissue->handle($database);
+        $zone = $database->publicCertificateZone();
+
+        if ($zone !== null) {
+            $this->zoneCertificate->handle($zone);
+        }
+
+        $this->issue->handle($database);
+        $database->refresh();
         $nodes = $database->nodesWithServers();
+
         $this->nodeRunner->each(
             $nodes,
-            fn (DatabaseNode $node) => $this->reload->handle($database, $node),
-            "reloading certificates on {$nodes->count()} nodes",
+            fn (DatabaseNode $node) => $this->install->handle($database, $node),
+            "installing certificates on {$nodes->count()} nodes",
         );
     }
 }

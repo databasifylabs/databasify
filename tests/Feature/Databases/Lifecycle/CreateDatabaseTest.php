@@ -8,7 +8,6 @@ use App\Engines\Flows\CreateDatabaseFlow;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
-use App\Jobs\Databases\AddDatabaseNodeJob;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -20,7 +19,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
 it('offers only ready servers that are not in a database', function () {
-    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->actingAs(User::factory()->create());
     Server::factory()->ready()->create(['name' => 'free']);
     Server::factory()->create(['name' => 'pending']);
@@ -34,7 +33,7 @@ it('offers only ready servers that are not in a database', function () {
 });
 
 it('creates a database from a primary and its standbys', function () {
-    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->actingAs(User::factory()->create());
     [$primary, $first, $second] = Server::factory()->ready()->count(3)->create()->pluck('id')->all();
 
@@ -67,7 +66,7 @@ it('creates a single primary, or a primary with one standby', function (array $s
 ]);
 
 it('validates the primary and the standbys', function () {
-    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->actingAs(User::factory()->create());
     [$primary, $standby] = Server::factory()->ready()->count(2)->create()->pluck('id')->all();
     $pending = Server::factory()->create();

@@ -23,17 +23,6 @@ it('serves the zone wildcard on every valkey node and offers no ca file', functi
         ->and($database->provider()->connection()->envNote)->toBeNull();
 });
 
-it('asks for a reload once the zone certificate is renewed', function () {
-    $database = withZone(idleDatabase('redis', 1, DatabaseMode::Single, 'cache'));
-    withZoneCertificate($database->dnsZone);
-    fakeSsh()->respond(certificateOutput('ca.crt', 'ca.key', 'server.pem'));
-    resolve(IssueCertificates::class)->handle($database->fresh());
-
-    withZoneCertificate($database->dnsZone);
-
-    expect($database->fresh()?->allCertificatesCurrent())->toBeFalse();
-});
-
 it('issues one zone certificate for every key-value database on the zone', function () {
     $valkey = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
     $redis = idleDatabase('redis', 1, DatabaseMode::Single, 'queue');

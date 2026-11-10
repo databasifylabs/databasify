@@ -27,7 +27,7 @@ final readonly class ApplyNodeFirewall
      */
     private function rulesFor(Database $database, DatabaseNode $node, array $sources): array
     {
-        $ports = $database->provider()->ports();
+        $ports = $database->capabilities()->ports;
 
         return [
             'table' => $database->firewallTable(),

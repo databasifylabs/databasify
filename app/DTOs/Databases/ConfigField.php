@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Databases;
 
+use App\Engines\Data\EngineField;
 use App\Enums\Databases\ConfigApply;
 
 final readonly class ConfigField
@@ -29,6 +30,33 @@ final readonly class ConfigField
         public ConfigApply $apply = ConfigApply::Dynamic,
         public bool $tuned = false,
     ) {}
+
+    public static function fromEngine(EngineField $field): self
+    {
+        $ranged = in_array($field->kind, ['integer', 'decimal'], true);
+
+        return new self(
+            key: $field->key,
+            label: $field->label,
+            description: $field->description,
+            pattern: match ($field->kind) {
+                'integer' => self::INTEGER_PATTERN,
+                'decimal' => self::DECIMAL_PATTERN,
+                'choice' => self::alternationOf($field->options),
+                'flags' => '('.self::alternationOf($field->options).'(,'.self::alternationOf($field->options).')*)?',
+                'text' => $field->pattern ?? '.*',
+                default => '.+',
+            },
+            default: $field->default,
+            options: $field->options,
+            multiple: $field->kind === 'flags',
+            unit: $field->unit,
+            min: $ranged ? $field->min : null,
+            max: $ranged ? $field->max : null,
+            apply: $field->restart ? ConfigApply::Restart : ConfigApply::Dynamic,
+            tuned: $field->tuned,
+        );
+    }
 
     public static function text(string $key, string $label, string $description, string $pattern, string $default): self
     {

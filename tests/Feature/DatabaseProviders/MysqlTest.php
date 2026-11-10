@@ -7,7 +7,6 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\PasswordEncryption;
-use App\Jobs\Databases\RetuneDatabaseJob;
 use App\Models\Database;
 use App\Models\Network;
 use App\Models\Server;
@@ -422,72 +421,4 @@ it('offers the change buffer default of the default line without a database', fu
 
 it('offers the password encryptions of the default line without a database', function () {
     expect(Database::providerFor('mysql')->accounts()?->passwordEncryptions())->toBe(PasswordEncryption::cases());
-});
-
-it('retunes without switching the primary when no setting needs a restart', function () {
-    $database = withCurrentCertificates(idleDatabase('mysql', 3));
-    $primary = $database->seed();
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond("runs the current configuration\n")->respond()->respond()->respond()->respond()
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'set_primary_instance')))->toBeEmpty()
-        ->and($ssh->runs[14]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(14))->toContain('echo "image=$(running_image')->not->toContain('deployed configuration')
-        ->and($ssh->scriptAt(15))->toContain("image='{$database->image()->reference()}'")
-        ->and($ssh->scriptAt(16))->toContain('databasify step mysql.lines.8_4.lifecycle.runs-current-config')->toContain("if runs_current_config && in_the_group; then\n")
-        ->and($ssh->runs[19]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(19))->toContain('mysql already runs this configuration, no restart needed')
-        ->and($database->fresh()->operation)->toBeNull();
-});
-
-it('switches the primary off before a retune restarts it', function () {
-    $database = withCurrentCertificates(idleDatabase('mysql', 3));
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond()
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond()
-        ->respond("SECONDARY ONLINE\n")->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect($ssh->scriptAt(16))->toContain('lifecycle.runs-current-config')
-        ->and($ssh->scriptAt(20))->toContain('set_primary_instance')
-        ->and($database->fresh()->operation)->toBeNull();
-});
-
-it('switches the primary off before configuring it when its container runs another image', function () {
-    $database = withCurrentCertificates(idleDatabase('mysql', 3));
-    $primary = $database->seed();
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond('image=ghcr.io/databasifylabs/databasify-mysql@sha256:'.str_repeat('e', 64)."\n")
-        ->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond()
-        ->respond("SECONDARY ONLINE\n")->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    $onPrimaryBeforeFailover = collect($ssh->runs)->slice(14, 4)->filter(fn (array $run): bool => $run['server'] === $primary->server->name)->pluck('script');
-
-    expect($ssh->scriptAt(18))->toContain('set_primary_instance')
-        ->and($onPrimaryBeforeFailover->filter(fn (string $script): bool => str_contains($script, 'deployed configuration') || str_contains($script, 'runs-current-config')))->toBeEmpty()
-        ->and($database->fresh()->operation)->toBeNull();
 });

@@ -9,6 +9,9 @@ use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Databases\NewDatabase;
 use App\DTOs\Databases\NodeFile;
 use App\DTOs\Migrations\MigrationSource;
+use App\Engines\Data\EngineField;
+use App\Engines\Payload;
+use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeKind;
@@ -27,6 +30,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StorageProvider;
 use App\Support\Projects\ProjectContext;
+use App\Support\Tls\OwnCertificateAuthority;
 use Database\Factories\ProjectFactory;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -94,6 +98,48 @@ function fakeSsh(): FakeServerConnection
     return $fake;
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function engineCapabilitiesPayload(string $engine): array
+{
+    $ports = match ($engine) {
+        'postgres' => ['client' => 25060, 'pool' => 25061, 'peers' => [8008, 2379, 2380]],
+        'mysql' => ['client' => 25060, 'pool' => null, 'peers' => [33061]],
+        'mariadb' => ['client' => 25060, 'pool' => null, 'peers' => [4444, 4567, 4568]],
+        'valkey', 'redis' => ['client' => 25061, 'pool' => null, 'peers' => [6379, 26379]],
+        default => ['client' => 25060, 'pool' => null, 'peers' => []],
+    };
+
+    [$users, $databases] = match ($engine) {
+        'postgres' => [['postgres', 'replicator', 'pgbouncer', 'patroni', 'admin'], ['postgres', 'template0', 'template1']],
+        'mysql' => [['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'databasify_repl', 'databasify_agent'], ['mysql', 'sys', 'performance_schema', 'information_schema']],
+        'mariadb' => [['root', 'mysql', 'mariadb.sys', 'databasify_sst', 'databasify_repl', 'databasify_agent'], ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify']],
+        'mongodb' => [['root', 'databasify_pbm', '__system'], ['admin', 'local', 'config']],
+        default => [[], []],
+    };
+
+    return ['commands' => ['node status'], 'passwordEncryptions' => [], 'defaultPasswordEncryption' => null, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function engineFieldPayload(): array
+{
+    return ['key' => 'max_connections', 'label' => 'Max connections', 'description' => 'Connections at once.', 'kind' => 'integer', 'default' => '100', 'options' => [], 'unit' => null, 'min' => 10, 'max' => 10000, 'pattern' => null, 'restart' => true, 'tuned' => false];
+}
+
+function withEngineDetails(Database $database): Database
+{
+    $database->update([
+        'engine_capabilities' => EngineCapabilities::fromPayload(new Payload(engineCapabilitiesPayload($database->engine))),
+        'config_fields' => [EngineField::fromPayload(new Payload(engineFieldPayload()))],
+    ]);
+
+    return $database;
+}
+
 function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
 {
     $operation = fn (string $state): array => ['key' => 'k', 'kind' => 'long', 'state' => $state, 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-10T00:00:00Z', 'finishedAt' => null, 'error' => null];
@@ -107,8 +153,16 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
         ->respondToEngine('node bootstrap', [])
         ->respondToEngine('node ready', $operation('running'))
         ->respondToEngine('cluster enable', $operation('running'))
+        ->respondToEngine('cluster rejoin', $operation('running'))
+        ->respondToEngine('cluster membership', [])
+        ->respondToEngine('cluster disable', ['droppedSlots' => 0])
+        ->respondToEngine('cluster failover', [])
+        ->respondToEngine('member forget', [])
+        ->respondToEngine('node reset', [])
         ->respondToEngine('operation status', $operation('succeeded'))
-        ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0']);
+        ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0'])
+        ->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))
+        ->respondToEngine('config fields', ['fields' => [engineFieldPayload()]]);
 }
 
 function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $role, ?string $version = null): FakeServerConnection
@@ -290,6 +344,7 @@ function newDatabase(string $engine, int $servers, DatabaseMode $mode = Database
 
     $database = inProjectDuring(fn (): Database => resolve(CreateDatabase::class)->handle(new NewDatabase($name, $engine, $ids[0], array_slice($ids, 1), versionLine: $versionLine)));
     Queue::swap($queue);
+    withEngineDetails($database);
     $database->update(['mode' => $mode]);
 
     return $database;
@@ -448,6 +503,12 @@ function withCurrentCertificates(Database $database): Database
     $database->nodes()->readOnly()->with(['server', 'database.dnsZone'])->get()
         ->each(function (DatabaseNode $node) use (&$settings, $own): void {
             $settings = $settings->withNodeCertificates($node->id, $own($node->certificateNames()));
+        });
+    $authority = resolve(OwnCertificateAuthority::class)->newAuthority('test CA');
+    $database->nodes()->with(['server', 'database.dnsZone'])->get()
+        ->each(function (DatabaseNode $node) use (&$settings, $authority): void {
+            $issued = resolve(OwnCertificateAuthority::class)->issue($authority, $node->displayName(), $node->ownCertificateNames());
+            $settings = $settings->withNodeCertificates($node->id, [...array_filter(['server.pem' => $settings->nodeCertificate($node->id, 'server.pem')]), 'server.crt' => $issued->certificate, 'server.key' => $issued->key]);
         });
     $database->update(['settings' => $settings]);
 

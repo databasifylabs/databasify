@@ -100,7 +100,7 @@ class DatabaseFlow extends Model
 
     public function title(): string
     {
-        $title = $this->definition()->name($this->database);
+        $title = $this->definition()->name($this->database, $this->context);
 
         if ($this->phase === null || $this->phase === '') {
             return $title;

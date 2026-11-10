@@ -8,6 +8,7 @@ use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
 use App\Actions\Databases\Nodes\BuildNodeRequest;
 use App\Actions\Databases\Nodes\DeployNode;
+use App\Actions\Databases\Nodes\LearnEngine;
 use App\Contracts\Engines\Flow;
 use App\Engines\Data\DefaultAccount;
 use App\Engines\Data\Secrets;
@@ -22,20 +23,21 @@ use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
-use Closure;
 use Throwable;
 
 final readonly class CreateDatabaseFlow implements Flow
 {
     public function __construct(
+        private FlowSteps $steps,
         private EngineClient $engine,
         private DeployNode $deploy,
         private BuildNodeRequest $nodeRequest,
         private ApplyNodeFirewall $firewall,
         private RefreshDatabaseStatus $refresh,
+        private LearnEngine $learn,
     ) {}
 
-    public function name(Database $database): string
+    public function name(Database $database, FlowContext $context): string
     {
         return "Create {$database->engine()->label} database";
     }
@@ -49,7 +51,7 @@ final readonly class CreateDatabaseFlow implements Flow
             ...$nodes->flatMap($this->prepareStepsFor(...))->all(),
             ...$nodes->map($this->bootstrapStepFor(...))->all(),
             ...$joinSteps,
-            Step::finish('refresh the status', $this->quick(fn (DatabaseFlow $flow) => $this->refresh->handle($flow->database))),
+            Step::finish('refresh the status', $this->steps->quick(fn (DatabaseFlow $flow) => $this->refresh->handle($flow->database))),
         ];
     }
 
@@ -78,17 +80,18 @@ final readonly class CreateDatabaseFlow implements Flow
         $database = $node->database;
 
         return [
-            Step::prepare("deploy {$server}", $this->quick(fn () => $this->deploy->handle($database, $node))),
-            Step::prepare("configure {$server}", $this->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$server}: configuring the node"))),
-            Step::prepare("open the firewall on {$server}", $this->quick(fn () => $this->firewall->handle($database, $node, $database->trustedCidrs()))),
-            Step::prepare("start {$server}", $this->quick(fn () => $this->engine->send($node, new NodeStart, "{$server}: starting the engine"))),
-            Step::prepare("wait for {$server}", fn (DatabaseFlow $flow): StartedOperation => $this->startOn($node, $flow, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()))),
+            Step::prepare("deploy {$server}", $this->steps->quick(fn () => $this->deploy->handle($database, $node))),
+            ...($node->isSeed() ? [Step::prepare('read what the engine offers', $this->steps->quick(fn () => $this->learn->handle($database, $node)))] : []),
+            Step::prepare("configure {$server}", $this->steps->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$server}: configuring the node"))),
+            Step::prepare("open the firewall on {$server}", $this->steps->quick(fn () => $this->firewall->handle($database, $node, $database->trustedCidrs()))),
+            Step::prepare("start {$server}", $this->steps->send($node, new NodeStart, 'starting the engine')),
+            Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()))),
         ];
     }
 
     private function bootstrapStepFor(DatabaseNode $node): Step
     {
-        return Step::finish("bootstrap {$node->server->name}", $this->quick(function () use ($node): void {
+        return Step::finish("bootstrap {$node->server->name}", $this->steps->quick(function () use ($node): void {
             $settings = $node->database->settings;
 
             try {
@@ -100,31 +103,7 @@ final readonly class CreateDatabaseFlow implements Flow
 
     private function joinStepFor(DatabaseNode $node): Step
     {
-        return Step::catchUp("join {$node->server->name} to the cluster", fn (DatabaseFlow $flow): StartedOperation => $this->startOn($node, $flow, fn (string $key): ClusterEnable => new ClusterEnable($key)));
-    }
-
-    /**
-     * @param  Closure(DatabaseFlow): mixed  $work
-     * @return Closure(DatabaseFlow): null
-     */
-    private function quick(Closure $work): Closure
-    {
-        return function (DatabaseFlow $flow) use ($work): null {
-            $work($flow);
-
-            return null;
-        };
-    }
-
-    /**
-     * @param  Closure(string): (NodeReady|ClusterEnable)  $request
-     */
-    private function startOn(DatabaseNode $node, DatabaseFlow $flow, Closure $request): StartedOperation
-    {
-        $key = $flow->newOperationKey();
-        $this->engine->send($node, $request($key));
-
-        return new StartedOperation($node->id, $key);
+        return Step::catchUp("join {$node->server->name} to the cluster", $this->steps->long($node, fn (string $key): ClusterEnable => new ClusterEnable($key)));
     }
 
     private function nodesOf(DatabaseFlow $flow): DatabaseNodeCollection

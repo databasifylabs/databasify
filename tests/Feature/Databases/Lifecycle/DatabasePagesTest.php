@@ -7,7 +7,6 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Databases\AddDatabaseNodeJob;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
@@ -18,7 +17,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
-    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->actingAs(User::factory()->create());
 });
 
@@ -35,7 +34,7 @@ it('shows the laravel settings and adds a server', function () {
         ->where('availableServers.data.0.id', $extra->id));
 
     $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $extra->id])->assertRedirect();
-    Queue::assertPushed(AddDatabaseNodeJob::class);
+    Queue::assertPushed(AdvanceDatabaseFlow::class);
 });
 
 it('lists every database with its nodes', function () {

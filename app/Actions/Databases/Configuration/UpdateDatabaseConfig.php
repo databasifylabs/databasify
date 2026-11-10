@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Configuration;
 
-use App\Actions\Databases\Lifecycle\RedeployDatabase;
-use App\Jobs\Databases\ApplyDatabaseConfigJob;
+use App\Actions\Databases\Flows\StartFlow;
+use App\Engines\Flows\ApplySettingsFlow;
+use App\Engines\Flows\RollingSteps;
 use App\Models\Database;
 
 final readonly class UpdateDatabaseConfig
 {
-    private const string TITLE = 'Apply settings';
-
-    public function __construct(private RedeployDatabase $redeploy) {}
+    public function __construct(
+        private StartFlow $startFlow,
+        private ApplySettingsFlow $flow,
+    ) {}
 
     /**
      * @param  array<string, string>  $config
@@ -20,15 +22,8 @@ final readonly class UpdateDatabaseConfig
     public function handle(Database $database, array $config): void
     {
         $database->ensureIdle();
-        $changed = $database->updateConfig($config);
+        $database->updateConfig($config);
 
-        if ($database->configChangeNeedsRestart($changed)) {
-            $this->redeploy->handle($database, self::TITLE);
-
-            return;
-        }
-
-        $database->startOperation(self::TITLE);
-        dispatch(new ApplyDatabaseConfigJob($database, $changed));
+        $this->startFlow->handle($database, $this->flow, RollingSteps::contextFor($database));
     }
 }

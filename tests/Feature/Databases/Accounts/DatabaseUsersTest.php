@@ -89,7 +89,7 @@ it('rejects user names that are invalid, reserved or taken', function (string $e
     'too long' => ['mysql', str_repeat('a', 33)],
     'taken' => ['mysql', 'databasify'],
     'mysql reserved' => ['mysql', 'root'],
-    'mariadb reserved' => ['mariadb', 'sst'],
+    'mariadb reserved' => ['mariadb', 'databasify_sst'],
     'postgres reserved' => ['postgres', 'pgbouncer'],
 ]);
 

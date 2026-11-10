@@ -2,13 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Actions\Databases\Nodes\UpdateDatabaseMembership;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySource;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\PoolMode;
-use App\Jobs\Databases\RetuneDatabaseJob;
 use App\Models\Database;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -230,19 +228,6 @@ it('forgets a removed etcd member only while etcd keeps its majority', function 
         ->toContain('peer="http://$ip:2380"');
 });
 
-it('points patroni at the etcd members left after a membership change', function () {
-    $database = idleDatabase('postgres', 2);
-    $etcdHosts = $database->nodes()->members()->get()->map(fn ($member): string => "{$member->privateIp()}:2379")->implode(',');
-    $ssh = fakeSsh();
-
-    resolve(UpdateDatabaseMembership::class)->handle($database);
-
-    expect($ssh->runs)->toHaveCount(2)
-        ->and(collect($ssh->runs)->pluck('script'))->each->toContain("etcd_hosts='{$etcdHosts}'")
-        ->and($ssh->scriptAt(0))->toContain('sed -i "s|^  hosts: .*|  hosts: \'$etcd_hosts\'|" "$dir/conf/patroni.yml"')->toContain('databasify ctl reload databasify-patroni')
-        ->and(view('ssh.engines.postgres.lifecycle.cleanup')->render())->toContain('rm -f /etc/sysctl.d/99-postgres.conf');
-});
-
 it('drops the slots and patroni state of former members once postgres runs on its own', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
 
@@ -378,26 +363,4 @@ it('changes no other node when a read-only node joins', function () {
     expect($database->provider()->cluster()->membershipChangesFor($reader))->toBeFalse()
         ->and($database->provider()->cluster()->membershipChangesFor($database->seed()))->toBeTrue()
         ->and(idleDatabase('mongodb', 3, name: 'orders')->provider()->cluster()->membershipChangesFor($reader))->toBeTrue();
-});
-
-it('switches the primary off before a retune, since patroni restarts it on every redeploy', function () {
-    $database = withCurrentCertificates(idleDatabase('postgres', 3));
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $primary = "role:primary\nstate:running\n";
-    $replica = "role:replica\nstate:streaming\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)->respond($primary)->respond($replica)->respond($replica);
-    foreach (range(1, 9) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond($primary)->respond($replica)->respond($replica)->respond()
-        ->respond($replica)->respond($primary)->respond($replica);
-
-    runJob(new RetuneDatabaseJob($database));
-
-    $scripts = collect($ssh->runs)->pluck('script');
-
-    expect($scripts->filter(fn (string $script): bool => str_contains($script, 'patroni_ctl switchover')))->toHaveCount(1)
-        ->and($scripts->filter(fn (string $script): bool => str_contains($script, 'runs-current-config')))->toBeEmpty()
-        ->and($database->fresh()->operation)->toBeNull();
 });

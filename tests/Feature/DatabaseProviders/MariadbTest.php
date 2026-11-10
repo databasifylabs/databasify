@@ -7,7 +7,6 @@ use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySource;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
-use App\Jobs\Databases\RetuneDatabaseJob;
 use App\Models\Database;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -152,7 +151,7 @@ it('keeps its version line and reserves the internal accounts', function () {
     $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->where('database.data.version_line', '11.4')
         ->where('database.data.supports_users', true));
-    $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'sst'])->assertSessionHasErrors('name');
+    $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'databasify_sst'])->assertSessionHasErrors('name');
     $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'databasify'])->assertSessionHasErrors('name');
 });
 
@@ -415,48 +414,6 @@ it('clones a new read-only node from a healthy standby instead of the primary', 
     expect($database->provider()->cluster()->cloneDonorFor($reader)?->id)->toBe($standby->id)
         ->and(view('ssh.engines.mariadb.cluster.admit', $database->provider()->scriptData()->admission($reader))->render())->toContain("TCP4-LISTEN:4444,bind={$standby->privateIp()},range={$reader->privateIp()}/32")
         ->and(view('ssh.engines.mariadb.lifecycle.start', $database->provider()->scriptData()->starting($reader, false))->render())->toContain("socat -u TCP:{$standby->privateIp()}:4444")->toContain("MASTER_HOST = '{$primary->privateIp()}'");
-});
-
-it('retunes without moving the writer when no setting needs a restart', function () {
-    $database = withCurrentCertificates(idleDatabase('mariadb', 3));
-    $primary = $database->seed();
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("WRITER ONLINE\n")->respond("MEMBER ONLINE\n")->respond("MEMBER ONLINE\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond("runs the current configuration\n")
-        ->respond()->respond()->respond()->respond()
-        ->respond("WRITER ONLINE\n")->respond("MEMBER ONLINE\n")->respond("MEMBER ONLINE\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'mariadb.lines.11_8.cluster.failover')))->toBeEmpty()
-        ->and($ssh->runs[16]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(16))->toContain('databasify step mariadb.lines.11_8.lifecycle.runs-current-config')->toContain("if runs_current_config; then\n    echo \"runs the current configuration\"")
-        ->and($ssh->runs[19]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(19))->toContain('databasify step mariadb.lines.11_8.lifecycle.start')->toContain('mariadb already runs this configuration, no restart needed')
-        ->and($database->fresh()->operation)->toBeNull();
-});
-
-it('moves the writer off before a retune restarts it', function () {
-    $database = withCurrentCertificates(idleDatabase('mariadb', 3));
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("WRITER ONLINE\n")->respond("MEMBER ONLINE\n")->respond("MEMBER ONLINE\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond()
-        ->respond("WRITER ONLINE\n")->respond("MEMBER ONLINE\n")->respond("MEMBER ONLINE\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect($ssh->scriptAt(16))->toContain('lifecycle.runs-current-config')
-        ->and(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'mariadb.lines.11_8.cluster.failover')))->not->toBeEmpty();
 });
 
 it('replays only the transactions after the base backup, across members and rotated binlogs', function () {

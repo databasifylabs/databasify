@@ -7,7 +7,6 @@ namespace App\Actions\Databases\Certificates;
 use App\DTOs\Databases\IssuedCertificate;
 use App\DTOs\Databases\KeyPair;
 use App\Models\Database;
-use App\Models\DatabaseNode;
 use App\Support\Tls\OwnCertificateAuthority;
 
 final readonly class IssueNodeCertificates
@@ -24,10 +23,9 @@ final readonly class IssueNodeCertificates
     {
         $authority = $this->authorityOf($database);
         $settings = $database->settings->mergingCertificates([Database::CERTIFICATE_AUTHORITY => $authority->certificate, self::AUTHORITY_KEY => $authority->key]);
-        $databaseNames = $database->certificateNames();
 
         foreach ($database->nodes()->with('server')->get() as $node) {
-            $names = $this->namesOf($node, $databaseNames);
+            $names = $node->ownCertificateNames();
 
             if (IssuedCertificate::fromPem($settings->nodeCertificate($node->id, self::CERTIFICATE) ?? '')?->isCurrentFor($names) === true) {
                 continue;
@@ -50,14 +48,5 @@ final readonly class IssueNodeCertificates
         }
 
         return $this->authority->newAuthority("{$database->name} CA");
-    }
-
-    /**
-     * @param  list<string>  $databaseNames
-     * @return list<string>
-     */
-    private function namesOf(DatabaseNode $node, array $databaseNames): array
-    {
-        return array_values(array_unique([...$databaseNames, ...$node->certificateNames()]));
     }
 }

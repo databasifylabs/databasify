@@ -22,7 +22,7 @@ class StoreSchemaRequest extends FormRequest
         return [
             'name' => [
                 'required', 'string', 'max:64', 'regex:'.SchemaName::PATTERN,
-                Rule::notIn($this->routeDatabase()->provider()->accounts()?->reservedDatabases() ?? []),
+                Rule::notIn($this->routeDatabase()->engine_capabilities->reservedDatabases ?? []),
                 Rule::unique('schemas', 'name')->where('database_id', $this->routeDatabase()->id),
             ],
         ];

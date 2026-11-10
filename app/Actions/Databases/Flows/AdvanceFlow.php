@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Flows;
 
 use App\Engines\EngineClient;
+use App\Engines\Flows\StartedOperation;
 use App\Engines\Flows\Step;
+use App\Engines\Requests\OperationCancel;
 use App\Engines\Requests\OperationStatus;
 use App\Engines\Responses\Operation;
 use App\Enums\Databases\FlowState;
@@ -14,6 +16,7 @@ use App\Enums\Databases\StepKind;
 use App\Exceptions\Engines\EngineNotFound;
 use App\Exceptions\Engines\EngineNotRunning;
 use App\Exceptions\Engines\EngineUnavailable;
+use App\Exceptions\Engines\StepNotReady;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -28,6 +31,10 @@ final readonly class AdvanceFlow
 
     public function handle(DatabaseFlow $flow): void
     {
+        if ($this->stoppedByOwner($flow)) {
+            return;
+        }
+
         while ($flow->isRunning()) {
             $advanced = $flow->isWaiting() ? $this->settleOperationOf($flow) : $this->runStepOf($flow);
 
@@ -48,7 +55,9 @@ final readonly class AdvanceFlow
         }
 
         try {
-            $operation = $step->runFor($flow);
+            $operation = $this->operationStartedBy($step, $flow);
+        } catch (StepNotReady) {
+            return false;
         } catch (Throwable $exception) {
             return $this->stepFailed($flow, $step, $exception->getMessage());
         }
@@ -60,6 +69,15 @@ final readonly class AdvanceFlow
         }
 
         return $this->moveOn($flow);
+    }
+
+    private function operationStartedBy(Step $step, DatabaseFlow $flow): ?StartedOperation
+    {
+        if ($step->kind !== StepKind::Finish) {
+            return $step->runFor($flow);
+        }
+
+        return $flow->database->ignoringStop(fn (): ?StartedOperation => $step->runFor($flow));
     }
 
     private function settleOperationOf(DatabaseFlow $flow): bool
@@ -78,6 +96,21 @@ final readonly class AdvanceFlow
             OperationState::Interrupted => $this->forget($flow),
             OperationState::Failed, OperationState::Cancelled => $this->stepFailed($flow, $this->currentStepOf($flow), $this->failureOf($operation)),
         };
+    }
+
+    private function stoppedByOwner(DatabaseFlow $flow): bool
+    {
+        if (! $flow->isRunning() || ! $flow->database->isStopRequested() || $this->currentStepOf($flow)?->kind === StepKind::Finish) {
+            return false;
+        }
+
+        if ($flow->isWaiting()) {
+            rescue(fn () => $this->engine->send($this->operationNodeOf($flow), new OperationCancel((string) $flow->operation_key)), report: false);
+        }
+
+        $this->fail->handle($flow, 'Stopped by you.');
+
+        return true;
     }
 
     private function track(DatabaseFlow $flow, Operation $operation): bool

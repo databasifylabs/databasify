@@ -10,7 +10,6 @@ use App\DTOs\Recovery\RecoverySchedule;
 use App\DTOs\Recovery\RecoverySettings;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
-use App\Jobs\Databases\RetuneDatabaseJob;
 use App\Models\Database;
 use App\Models\StorageProvider;
 use Illuminate\Support\Facades\Process;
@@ -262,48 +261,6 @@ it('offers 9.0 without point-in-time recovery because percona backup does not su
         ->and(idleDatabase('mongodb', 1, DatabaseMode::Single, 'eight', '8.0')->archivesForRecovery())->toBeTrue()
         ->and(fn () => resolve(EnablePointInTimeRecovery::class)->handle($nine, new RecoverySettings($storage->id, new RecoverySchedule(7, 3))))
         ->toThrow(ValidationException::class, 'Point-in-time recovery is not available for MongoDB 9.0 at this moment.');
-});
-
-it('retunes without moving the primary when mongod keeps its configuration', function () {
-    $database = withCurrentCertificates(idleDatabase('mongodb', 3));
-    $primary = $database->seed();
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("role:primary\n")->respond("role:secondary\n")->respond("role:secondary\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond("runs the current configuration\n")
-        ->respond()->respond()->respond()->respond()
-        ->respond("role:primary\n")->respond("role:secondary\n")->respond("role:secondary\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'mongodb.lines.8_0.cluster.failover')))->toBeEmpty()
-        ->and($ssh->runs[16]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(16))->toContain('databasify step mongodb.lines.8_0.lifecycle.runs-current-config')->toContain("if runs_current_config; then\n    echo \"runs the current configuration\"")
-        ->and($ssh->runs[19]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(19))->toContain('databasify step mongodb.lines.8_0.lifecycle.start')
-        ->and($database->fresh()->operation)->toBeNull();
-});
-
-it('moves the primary off before a retune restarts mongod', function () {
-    $database = withCurrentCertificates(idleDatabase('mongodb', 3));
-    $database->startOperation('Retune for server size');
-    $facts = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n";
-    $ssh = fakeSsh()->respond($facts)->respond($facts)->respond($facts)
-        ->respond("role:primary\n")->respond("role:secondary\n")->respond("role:secondary\n");
-    foreach (range(1, 8) as $ignored) {
-        $ssh->respond();
-    }
-    $ssh->respond("image={$database->image()->reference()}\n")->respond()->respond()
-        ->respond("role:primary\n")->respond("role:secondary\n")->respond("role:secondary\n");
-
-    runJob(new RetuneDatabaseJob($database));
-
-    expect($ssh->scriptAt(16))->toContain('lifecycle.runs-current-config')
-        ->and(collect($ssh->runs)->pluck('script')->filter(fn (string $script): bool => str_contains($script, 'mongodb.lines.8_0.cluster.failover')))->not->toBeEmpty();
 });
 
 it('moves the primary to the target only once the old primary stepped down', function (string $stepDown, array $expected, array $absent) {

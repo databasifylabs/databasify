@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsDatabaseSettings;
+use App\Casts\AsEngineCapabilities;
+use App\Casts\AsEngineFields;
 use App\Contracts\Projects\Movable;
 use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DatabaseProviders\Drivers\AbstractDatabaseDriver;
@@ -27,8 +29,10 @@ use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
+use App\Engines\Data\EngineField;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
+use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
@@ -60,6 +64,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * @property string $id
@@ -81,13 +86,15 @@ use Illuminate\Validation\ValidationException;
  * @property int $maintenance_day
  * @property int $maintenance_hour
  * @property DatabaseSettings $settings
+ * @property EngineCapabilities|null $engine_capabilities
+ * @property list<EngineField> $config_fields
  * @property string|null $dns_zone_id
  * @property-read DnsZone|null $dnsZone
  * @property-read PointInTimeRecovery|null $pointInTimeRecovery
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -125,7 +132,7 @@ class Database extends Model implements Movable
 
     public function publicCertificateZone(): ?DnsZone
     {
-        return $this->provider()->tls()->publicCertificate ? $this->dnsZone : null;
+        return $this->engine()->publicCertificate ? $this->dnsZone : null;
     }
 
     public function certificatesAreCurrent(): bool
@@ -141,7 +148,13 @@ class Database extends Model implements Movable
 
     public function allCertificatesCurrent(): bool
     {
-        return $this->certificatesAreCurrent() && $this->readOnlyNodes()->every(fn (DatabaseNode $node): bool => $node->certificateIsCurrent());
+        $zone = $this->publicCertificateZone();
+
+        if ($zone !== null) {
+            return $zone->hasCurrentCertificate();
+        }
+
+        return $this->nodesWithServers()->every(fn (DatabaseNode $node): bool => IssuedCertificate::fromPem($this->settings->nodeCertificate($node->id, 'server.crt') ?? '')?->isCurrentFor($node->ownCertificateNames()) === true);
     }
 
     /**
@@ -1058,6 +1071,19 @@ class Database extends Model implements Movable
         return EngineCatalog::find($this->engine);
     }
 
+    public function capabilities(): EngineCapabilities
+    {
+        return $this->engine_capabilities ?? throw new LogicException("{$this->name} has not read its engine capabilities yet.");
+    }
+
+    /**
+     * @return list<ConfigField>
+     */
+    public function configFields(): array
+    {
+        return array_map(ConfigField::fromEngine(...), $this->config_fields);
+    }
+
     public function provider(): DatabaseDriver
     {
         $handler = config("database-provider.providers.{$this->engine}.handler");
@@ -1109,6 +1135,8 @@ class Database extends Model implements Movable
     protected function casts(): array
     {
         return [
+            'engine_capabilities' => AsEngineCapabilities::class,
+            'config_fields' => AsEngineFields::class,
             'mode' => DatabaseMode::class,
             'status' => DatabaseStatus::class,
             'settings' => AsDatabaseSettings::class,

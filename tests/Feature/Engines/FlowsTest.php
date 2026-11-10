@@ -8,6 +8,7 @@ use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\StartedOperation;
 use App\Engines\Flows\Step;
 use App\Enums\Databases\FlowState;
+use App\Exceptions\Engines\StepNotReady;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
@@ -184,4 +185,55 @@ it('keeps the lock of a database whose flow still runs past the abandoned-work c
     resolve(ReleaseAbandonedWork::class)->handle();
 
     expect($this->database->fresh()->operation)->toBe('Scripted flow');
+});
+
+it('cancels the operation and fails the flow when the owner stops it', function () {
+    $keys = [];
+    $flow = ScriptedFlow::bind([longStep($keys)]);
+    $record = startScripted($this->database, $flow);
+    $ssh = fakeSsh()->respondToEngine('operation cancel', []);
+    $this->database->requestStop();
+
+    runJob(new AdvanceDatabaseFlow($record));
+
+    expect($record->fresh())->state->toBe(FlowState::Failed)->error->toBe('Stopped by you.')
+        ->and($flow->cleanups)->toBe(1)
+        ->and($ssh->scriptAt(0))->toContain('| databasify operation cancel ')
+        ->and(json_decode($ssh->engineRequestAt(0), true))->toBe(['key' => $keys[0]]);
+});
+
+it('finishes a finish step even when the owner asks to stop', function () {
+    $ran = 0;
+    $flow = ScriptedFlow::bind([Step::finish('finish step', function () use (&$ran): null {
+        $ran++;
+
+        return null;
+    })]);
+    $this->database->startOperation('Scripted flow');
+    $record = $this->database->flows()->create(['flow' => ScriptedFlow::class, 'context' => new FlowContext([]), 'state' => FlowState::Running]);
+    $this->database->requestStop();
+
+    runJob(new AdvanceDatabaseFlow($record));
+
+    expect($ran)->toBe(1)
+        ->and($record->fresh()->state)->toBe(FlowState::Succeeded)
+        ->and($flow->cleanups)->toBe(0);
+});
+
+it('waits on a step that is not ready yet without failing it', function () {
+    $ready = false;
+    $flow = ScriptedFlow::bind([Step::prepare('wait', function () use (&$ready): null {
+        throw_unless($ready, StepNotReady::class);
+
+        return null;
+    })]);
+
+    $record = startScripted($this->database, $flow);
+
+    expect($record->fresh())->state->toBe(FlowState::Running)->error->toBeNull();
+
+    $ready = true;
+    runJob(new AdvanceDatabaseFlow($record));
+
+    expect($record->fresh()->state)->toBe(FlowState::Succeeded);
 });

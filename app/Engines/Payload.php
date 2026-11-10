@@ -69,6 +69,64 @@ final readonly class Payload
         return $value === null || is_int($value) ? $value : throw $this->unexpected($key);
     }
 
+    public function nullableFloat(string $key): ?float
+    {
+        $value = $this->valueOf($key);
+
+        return match (true) {
+            $value === null => null,
+            is_int($value), is_float($value) => (float) $value,
+            default => throw $this->unexpected($key),
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function strings(string $key): array
+    {
+        $values = $this->listOf($key);
+
+        return array_filter($values, is_string(...)) === $values ? $values : throw $this->unexpected($key);
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function ints(string $key): array
+    {
+        $values = $this->listOf($key);
+
+        return array_filter($values, is_int(...)) === $values ? $values : throw $this->unexpected($key);
+    }
+
+    /**
+     * @return list<self>
+     */
+    public function objects(string $key): array
+    {
+        return array_map(fn (mixed $value): self => is_array($value) ? new self($value) : throw $this->unexpected($key), $this->listOf($key));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function stringMap(string $key): array
+    {
+        $value = $this->valueOf($key);
+        $map = is_array($value) ? $value : throw $this->unexpected($key);
+
+        return array_filter($map, fn (mixed $item, int|string $name): bool => is_string($item) && is_string($name), ARRAY_FILTER_USE_BOTH) === $map ? $map : throw $this->unexpected($key);
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    public function toArray(): array
+    {
+        return $this->values;
+    }
+
     public function nullableObject(string $key): ?self
     {
         $value = $this->valueOf($key);
@@ -81,6 +139,16 @@ final readonly class Payload
         $value = $this->valueOf($key);
 
         return is_array($value) ? new self($value) : throw $this->unexpected($key);
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function listOf(string $key): array
+    {
+        $value = $this->valueOf($key);
+
+        return is_array($value) && array_is_list($value) ? $value : throw $this->unexpected($key);
     }
 
     private function valueOf(string $key): mixed

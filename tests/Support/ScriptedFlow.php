@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Contracts\Engines\Flow;
+use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\Step;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
@@ -30,7 +31,7 @@ final class ScriptedFlow implements Flow
         return $flow;
     }
 
-    public function name(Database $database): string
+    public function name(Database $database, FlowContext $context): string
     {
         return 'Scripted flow';
     }

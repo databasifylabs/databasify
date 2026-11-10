@@ -39,7 +39,7 @@ it('rejects database names that are invalid, reserved or taken', function (strin
     'space' => ['mysql', 'my db'],
     'too long' => ['mysql', str_repeat('a', 65)],
     'taken' => ['mysql', 'defaultdb'],
-    'mysql reserved' => ['mysql', 'mysql_innodb_cluster_metadata'],
+    'mysql reserved' => ['mysql', 'sys'],
     'mariadb reserved' => ['mariadb', 'databasify'],
     'postgres reserved' => ['postgres', 'template1'],
 ]);

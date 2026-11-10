@@ -10,14 +10,25 @@ use App\Enums\Databases\FlowState;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
+use Closure;
+use Illuminate\Support\Facades\DB;
 
 final readonly class StartFlow
 {
-    public function handle(Database $database, Flow $flow, FlowContext $context): DatabaseFlow
-    {
-        $database->startOperation($flow->name($database));
+    private const string CLAIM = 'Starting';
 
-        $record = $database->flows()->create(['flow' => $flow::class, 'context' => $context, 'state' => FlowState::Running]);
+    /**
+     * @param  FlowContext|Closure(): FlowContext  $context
+     */
+    public function handle(Database $database, Flow $flow, FlowContext|Closure $context): DatabaseFlow
+    {
+        $record = DB::transaction(function () use ($database, $flow, $context): DatabaseFlow {
+            $database->startOperation(self::CLAIM);
+            $resolved = $context instanceof FlowContext ? $context : $context();
+            $database->retitleOperation($flow->name($database, $resolved));
+
+            return $database->flows()->create(['flow' => $flow::class, 'context' => $resolved, 'state' => FlowState::Running]);
+        });
 
         dispatch(new AdvanceDatabaseFlow($record));
 

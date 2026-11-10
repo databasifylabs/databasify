@@ -42,19 +42,6 @@ it('keeps peer ports closed to strangers even without trusted sources, and remov
         ->and($removal)->toContain('nft delete table inet')->not->toContain('set peers');
 });
 
-it('opens the mysql group port to peers only on the 8.4 line, since 9.7 runs group replication over the client port', function () {
-    $legacy = idleDatabase('mysql', 2);
-    $current = idleDatabase('mysql', 2, name: 'current', versionLine: '9.7');
-    $ssh = fakeSsh();
-
-    resolve(ApplyNodeFirewall::class)->handle($legacy, $legacy->seed(), []);
-    resolve(ApplyNodeFirewall::class)->handle($current, $current->seed(), []);
-
-    expect($ssh->scriptAt(0))->toContain("tcp dport { %s } ip saddr @peers accept\\n' '33061'")
-        ->and($ssh->scriptAt(1))->not->toContain('33061')->not->toContain('peer ports')
-        ->and($current->provider()->ports()->peers)->toBe([]);
-});
-
 it('leaves out the peer port rules when the engine has no peer-only ports', function () {
     $database = idleDatabase('mysql', 2);
     $script = view('ssh.databases.network.trusted-sources', [

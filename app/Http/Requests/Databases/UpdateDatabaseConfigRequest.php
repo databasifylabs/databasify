@@ -70,7 +70,7 @@ class UpdateDatabaseConfigRequest extends FormRequest
      */
     private function allowedFields(): array
     {
-        return collect($this->routeDatabase()->provider()->fields())
+        return collect($this->routeDatabase()->configFields())
             ->keyBy(fn (ConfigField $field): string => $field->key)
             ->all();
     }

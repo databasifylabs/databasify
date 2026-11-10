@@ -15,7 +15,7 @@ final readonly class FailFlow
         $flow->update(['state' => FlowState::Failed, 'error' => $error, 'operation_node_id' => null, 'operation_key' => null]);
 
         try {
-            $flow->definition()->cleanup($flow);
+            $flow->database->ignoringStop(fn () => $flow->definition()->cleanup($flow));
         } catch (Throwable $exception) {
             report($exception);
         } finally {
