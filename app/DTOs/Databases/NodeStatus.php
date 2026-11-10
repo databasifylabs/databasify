@@ -28,4 +28,9 @@ final readonly class NodeStatus
     {
         return new self(NodeRole::Unknown, null);
     }
+
+    public function isUnreachable(): bool
+    {
+        return $this->role === NodeRole::Unknown;
+    }
 }

@@ -38,18 +38,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property NodeRole $role
  * @property string|null $engine_version
  * @property string|null $certificate_fingerprint
+ * @property int $missed_status_reads
  * @property-read Database $database
  * @property-read Server $server
  * @property-read Collection<int, NodeAlert> $openAlerts
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint'])]
+#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
 {
     use HasUuids;
+
+    private const int MISSED_READS_BEFORE_UNREACHABLE = 3;
+
+    /** @var array<string, mixed> */
+    protected $attributes = ['missed_status_reads' => 0];
 
     /**
      * @return BelongsTo<Database, $this>
@@ -139,7 +145,15 @@ class DatabaseNode extends Model
 
     public function recordStatus(NodeStatus $status): void
     {
-        $this->update(['role' => $status->role, 'engine_version' => $status->version ?? $this->engine_version]);
+        $missed = $status->isUnreachable() ? $this->missed_status_reads + 1 : 0;
+
+        if ($missed > 0 && $missed < self::MISSED_READS_BEFORE_UNREACHABLE) {
+            $this->update(['missed_status_reads' => $missed]);
+
+            return;
+        }
+
+        $this->update(['role' => $status->role, 'engine_version' => $status->version ?? $this->engine_version, 'missed_status_reads' => $missed]);
     }
 
     public function rename(string $name): void
@@ -259,6 +273,7 @@ class DatabaseNode extends Model
             'kind' => NodeKind::class,
             'role' => NodeRole::class,
             'position' => 'integer',
+            'missed_status_reads' => 'integer',
         ];
     }
 

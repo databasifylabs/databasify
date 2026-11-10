@@ -49,6 +49,7 @@ return new class extends Migration
             $table->string('role')->default('unknown');
             $table->string('engine_version', 40)->nullable();
             $table->string('certificate_fingerprint', 64)->nullable();
+            $table->unsignedTinyInteger('missed_status_reads')->default(0);
             $table->timestamps();
             $table->unique(['database_id', 'server_id']);
         });

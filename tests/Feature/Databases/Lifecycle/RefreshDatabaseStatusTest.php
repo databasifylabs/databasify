@@ -7,6 +7,7 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Events\DatabaseAlertRaised;
+use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Jobs\Databases\RefreshDatabaseStatusJob;
 use App\Models\DatabaseNode;
 use App\Models\User;
@@ -125,4 +126,45 @@ it('queues a status check for databases that are neither creating nor failed', f
 
     Queue::assertPushed(RefreshDatabaseStatusJob::class, 1);
     Queue::assertPushed(RefreshDatabaseStatusJob::class, fn (RefreshDatabaseStatusJob $job): bool => $job->database->is($ready));
+});
+
+it('keeps the last known role through two missed reads and marks the node unreachable on the third', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    $database->update(['status' => DatabaseStatus::Ready]);
+    markRoles($database, NodeRole::Primary);
+    fakeSsh()->failWith(new SshConnectionFailed('Connection closed due to timeout'));
+
+    $missed = [resolve(RefreshDatabaseStatus::class)->handle($database), resolve(RefreshDatabaseStatus::class)->handle($database)];
+
+    expect($missed)->toBe([DatabaseStatus::Ready, DatabaseStatus::Ready])
+        ->and($database->nodes()->sole()->role)->toBe(NodeRole::Primary);
+    Event::assertNotDispatched(DatabaseAlertRaised::class);
+
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Offline)
+        ->and($database->nodes()->sole()->role)->toBe(NodeRole::Unknown);
+    Event::assertDispatchedTimes(DatabaseAlertRaised::class, 1);
+});
+
+it('counts missed reads again from zero after a node answers', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    $database->update(['status' => DatabaseStatus::Ready]);
+    markRoles($database, NodeRole::Primary);
+    $server = $database->nodes()->sole()->server;
+    $missOnce = function () use ($database): void {
+        fakeSsh()->failWith(new SshConnectionFailed('Connection closed due to timeout'));
+        resolve(RefreshDatabaseStatus::class)->handle($database);
+    };
+
+    $missOnce();
+    $missOnce();
+    answerNodeStatus(fakeSsh(), $server, 'primary');
+    resolve(RefreshDatabaseStatus::class)->handle($database);
+    $missOnce();
+    $missOnce();
+
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($database->nodes()->sole()->role)->toBe(NodeRole::Primary);
+    Event::assertNotDispatched(DatabaseAlertRaised::class);
 });
