@@ -198,6 +198,20 @@ it('installs the pinned docker release with live restore and without touching th
         ->and(collect($ssh->runs)->map(fn (array $run) => bashErrorsIn($run['script']))->filter()->all())->toBe([]);
 });
 
+it('restarts the docker socket with the service after an upgrade replaced its unit', function () {
+    $ssh = fakeSsh()->respond('{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":1,"memory_mb":1024,"disk_gb":25}'."\n");
+    $server = Server::factory()->create();
+
+    resolve(ProvisionServer::class)->handle($server, false);
+
+    $docker = $ssh->scriptAt(5);
+    expect($docker)
+        ->toContain('systemctl daemon-reload')
+        ->toContain('systemctl reset-failed docker.socket docker.service')
+        ->toContain('systemctl restart docker.socket docker.service')
+        ->and(strpos($docker, 'systemctl daemon-reload'))->toBeGreaterThan(strpos($docker, 'apt-mark hold'));
+});
+
 it('marks the server failed and stops at the step that fails', function () {
     fakeSsh()->respond('{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":1,"memory_mb":1024,"disk_gb":25}'."\n")->respond()->respond()->respond("apt failed\n", 100);
     $server = Server::factory()->create();
