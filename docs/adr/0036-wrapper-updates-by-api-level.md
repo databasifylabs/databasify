@@ -41,4 +41,4 @@ All engine logic lives in the `databasify` wrapper inside each engine image ([00
 - `app/Services/Images/WrapperResolver.php`
 - `app/Actions/Databases/Nodes/DeployNode.php`
 - `config/databasify.php`
-- `database/migrations/2026_11_10_112206_add_wrapper_image_to_databases_table.php`
+- `database/migrations/2026_10_22_000003_create_databases_table.php`

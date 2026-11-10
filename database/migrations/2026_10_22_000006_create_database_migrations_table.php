@@ -23,6 +23,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('unhealthy_checks')->default(0);
             $table->timestamp('started_at')->nullable();
             $table->timestamp('finished_at')->nullable();
+            $table->timestamp('cleanup_failed_at')->nullable();
             $table->timestamps();
         });
     }

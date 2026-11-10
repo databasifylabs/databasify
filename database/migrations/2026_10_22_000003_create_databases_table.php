@@ -25,12 +25,16 @@ return new class extends Migration
             $table->string('available_image_repository')->nullable();
             $table->string('available_image_digest', 80)->nullable();
             $table->string('available_image_release', 40)->nullable();
+            $table->string('wrapper_image')->nullable();
             $table->timestamp('retune_needed_at')->nullable();
             $table->unsignedTinyInteger('maintenance_day')->default(0);
             $table->unsignedTinyInteger('maintenance_hour')->default(3);
             $table->text('settings');
             $table->string('operation')->nullable();
             $table->timestamp('operation_started_at')->nullable();
+            $table->json('engine_capabilities')->nullable();
+            $table->json('config_fields')->nullable();
+            $table->json('log_units')->nullable();
             $table->timestamps();
         });
 
