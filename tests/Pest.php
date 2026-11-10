@@ -258,6 +258,11 @@ function idleDatabase(string $engine, int $servers, DatabaseMode $mode = Databas
     return $database;
 }
 
+function engineNode(): DatabaseNode
+{
+    return idleDatabase('postgres', 1)->nodes()->sole();
+}
+
 /**
  * @param  array<string, mixed>  $attributes
  */

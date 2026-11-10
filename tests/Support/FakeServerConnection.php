@@ -47,6 +47,29 @@ final class FakeServerConnection implements ServerConnection
         return $this;
     }
 
+    /**
+     * @param  array<string, mixed>  $reply
+     */
+    public function respondToEngine(string $command, array $reply, int $exit = 0): self
+    {
+        return $this->respondWhen(
+            fn (string $server, string $script): bool => str_contains($script, "| databasify {$command} "),
+            json_encode((object) $reply, JSON_THROW_ON_ERROR),
+            $exit,
+        );
+    }
+
+    public function engineRequestAt(int $index): string
+    {
+        if (preg_match("/^printf '%s' '([A-Za-z0-9+\/=]+)' \| base64 -d \| databasify /m", $this->scriptAt($index), $payload) !== 1) {
+            return '';
+        }
+
+        $request = base64_decode($payload[1], true);
+
+        return $request === false ? '' : $request;
+    }
+
     public function failWith(Throwable $failure): self
     {
         $this->failure = $failure;
