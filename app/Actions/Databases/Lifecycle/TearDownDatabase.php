@@ -6,8 +6,9 @@ namespace App\Actions\Databases\Lifecycle;
 
 use App\Actions\Databases\Domains\ClearDatabaseDns;
 use App\Actions\Databases\Network\RemoveNodeFirewall;
-use App\Actions\Databases\Nodes\StopDatabaseNode;
 use App\Actions\Databases\Recovery\DeleteArchive;
+use App\Engines\EngineClient;
+use App\Engines\Requests\HostRemove;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
@@ -21,7 +22,7 @@ final readonly class TearDownDatabase
         private ClearDatabaseDns $dns,
         private DeleteArchive $archive,
         private NodeRunner $nodeRunner,
-        private StopDatabaseNode $stop,
+        private EngineClient $engine,
     ) {}
 
     public function handle(Database $database, bool $eraseData, bool $force, bool $deleteBackups = false): void
@@ -44,7 +45,7 @@ final readonly class TearDownDatabase
     private function tearDown(Database $database, DatabaseNode $node, bool $eraseData, bool $force): void
     {
         try {
-            $this->stop->handle($database, $node, $eraseData, $this->stopLogFor($node, $eraseData));
+            $this->engine->send($node, new HostRemove($database->id, erase: $eraseData), $this->stopLogFor($node, $eraseData), EngineClient::REMOVE_TIMEOUT);
             $this->firewall->handle($database, $node);
         } catch (Throwable $exception) {
             throw_unless($force, $exception);

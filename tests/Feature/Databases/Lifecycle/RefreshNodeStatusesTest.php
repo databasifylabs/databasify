@@ -15,7 +15,7 @@ it('reads only the given nodes but judges health from every node', function () {
     $database = idleDatabase('mysql', 3);
     markRoles($database, NodeRole::Primary, NodeRole::Unknown, NodeRole::Replica);
     $primary = $database->nodes()->get()[0];
-    $ssh = fakeSsh()->respond("PRIMARY ONLINE\n");
+    $ssh = answerNodeStatus(fakeSsh(), $database->nodes()->orderBy('position')->first()->server, 'primary');
 
     $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
 
@@ -35,7 +35,7 @@ it('keeps the database degraded when the primary answers and a replica does not'
     $database = idleDatabase('mysql', 2);
     markRoles($database, NodeRole::Primary, NodeRole::Unknown);
     $primary = $database->nodes()->get()[0];
-    fakeSsh()->respond("PRIMARY ONLINE\n");
+    answerNodeStatus(fakeSsh(), $primary->server, 'primary');
 
     $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
 

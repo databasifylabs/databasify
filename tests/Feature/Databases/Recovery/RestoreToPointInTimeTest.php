@@ -6,7 +6,7 @@ use App\Actions\Databases\Lifecycle\BootstrapDatabase;
 use App\DTOs\Recovery\RecoverySource;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\Persistence;
-use App\Jobs\Databases\BootstrapDatabaseJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
@@ -33,7 +33,7 @@ it('restores into a new database with the same engine line, secrets and accounts
     $source->schemas()->create(['name' => 'analytics']);
     $server = Server::factory()->ready()->create();
     $target = now()->subHour()->startOfSecond();
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     withImage('postgres', '17.99');
 
     $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => $target->toIso8601String()])
@@ -53,14 +53,14 @@ it('restores into a new database with the same engine line, secrets and accounts
         ->and($restored->users()->pluck('name')->all())->toBe(['databasify', 'reporting'])
         ->and($restored->schemas()->pluck('name')->all())->toBe(['analytics', 'defaultdb'])
         ->and($source->fresh()?->nodes()->count())->toBe(1);
-    Queue::assertPushed(BootstrapDatabaseJob::class);
+    Queue::assertPushed(AdvanceDatabaseFlow::class);
 });
 
 it('restores with the settings the source database runs with', function () {
     $source = restorableDatabase('postgres');
     $source->update(['settings' => $source->settings->withConfig(['work_mem' => '64MB', 'log_min_duration_statement' => '500'])->withPersistence(Persistence::Off)]);
     $server = Server::factory()->ready()->create();
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
 
     $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => $server->id, 'target' => now()->subHour()->toIso8601String()])
         ->assertSessionHasNoErrors();
@@ -68,7 +68,7 @@ it('restores with the settings the source database runs with', function () {
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     expect($restored->settings->config)->toBe(['work_mem' => '64MB', 'log_min_duration_statement' => '500'])
         ->and($restored->settings->persistence)->toBe(Persistence::Off);
-    Queue::assertPushed(BootstrapDatabaseJob::class, fn (BootstrapDatabaseJob $job): bool => $job->database->is($restored) && $job->database->settings->config === $restored->settings->config);
+    Queue::assertPushed(AdvanceDatabaseFlow::class, fn (BootstrapDatabaseJob $job): bool => $job->database->is($restored) && $job->database->settings->config === $restored->settings->config);
 });
 
 it('refuses a moment outside the restorable window', function () {
@@ -105,7 +105,7 @@ it('validates the restore request', function (array $input, string $field) {
 it('restores the archive onto the new seed before it starts and keeps its accounts', function () {
     $this->travelTo('2026-10-26 07:30:15');
     $source = restorableDatabase();
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     $source->pointInTimeRecovery?->update(['earliest_restorable_at' => null]);
@@ -136,7 +136,7 @@ it('restores the archive onto the new seed before it starts and keeps its accoun
 it('restores postgres with pgbackrest up to the target and clears the recovery settings', function () {
     $this->travelTo('2026-10-26 07:30:15');
     $source = restorableDatabase('postgres');
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     $this->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => '2026-10-26T06:30:15+00:00']);
     $restored = Database::query()->where('name', 'orders-restored')->sole();
     $ssh = fakeSsh()->respond(certificateOutput('ca.crt', 'server.crt', 'server.key', 'ca.key'));

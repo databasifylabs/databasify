@@ -27,6 +27,9 @@ final class FakeServerConnection implements ServerConnection
 
     private ?Throwable $failure = null;
 
+    /** @var (Closure(string): string)|null */
+    private ?Closure $bootIds = null;
+
     /** @var list<array{matches: Closure(string, string): bool, output: string, exit: int}> */
     private array $rules = [];
 
@@ -70,6 +73,23 @@ final class FakeServerConnection implements ServerConnection
         return $request === false ? '' : $request;
     }
 
+    public function bootIdChangesAfterReboot(): self
+    {
+        $reboots = [];
+        $this->respondWhen(function (string $server, string $script) use (&$reboots): bool {
+            if (str_contains($script, 'sleep 2; reboot')) {
+                $reboots[$server] = ($reboots[$server] ?? 0) + 1;
+            }
+
+            return false;
+        });
+        $this->bootIds = function (string $server) use (&$reboots): string {
+            return 'boot-'.($reboots[$server] ?? 0);
+        };
+
+        return $this;
+    }
+
     public function failWith(Throwable $failure): self
     {
         $this->failure = $failure;
@@ -85,7 +105,7 @@ final class FakeServerConnection implements ServerConnection
             throw $this->failure;
         }
 
-        $response = $this->ruleFor($server->name, $script) ?? array_shift($this->responses) ?? ['output' => '', 'exit' => 0];
+        $response = $this->bootIdOf($server->name, $script) ?? $this->ruleFor($server->name, $script) ?? array_shift($this->responses) ?? ['output' => '', 'exit' => 0];
         $onOutput($response['output']);
 
         return $response['exit'];
@@ -109,6 +129,18 @@ final class FakeServerConnection implements ServerConnection
     public function scriptAt(int $index): string
     {
         return $this->runs[$index]['script'] ?? '';
+    }
+
+    /**
+     * @return array{output: string, exit: int}|null
+     */
+    private function bootIdOf(string $server, string $script): ?array
+    {
+        if ($this->bootIds === null || ! str_contains($script, '/proc/sys/kernel/random/boot_id')) {
+            return null;
+        }
+
+        return ['output' => ($this->bootIds)($server)."\n", 'exit' => 0];
     }
 
     /**

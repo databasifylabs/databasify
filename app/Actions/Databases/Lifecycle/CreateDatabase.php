@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Lifecycle;
 
+use App\Actions\Databases\Flows\StartFlow;
 use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
 use App\Engines\EngineSecrets;
+use App\Engines\Flows\CreateDatabaseFlow;
+use App\Engines\Flows\FlowContext;
 use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
-use App\Jobs\Databases\BootstrapDatabaseJob;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,11 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class CreateDatabase
 {
-    public function __construct(private ImageResolver $newestImage) {}
+    public function __construct(
+        private ImageResolver $newestImage,
+        private StartFlow $startFlow,
+        private CreateDatabaseFlow $createFlow,
+    ) {}
 
     public function handle(NewDatabase $data): Database
     {
@@ -44,8 +50,7 @@ final readonly class CreateDatabase
             return $database;
         });
 
-        $database->startOperation("Create {$database->provider()->label()} database");
-        dispatch(new BootstrapDatabaseJob($database));
+        $this->startFlow->handle($database, $this->createFlow, new FlowContext(array_values(array_filter($database->nodes()->pluck('id')->all(), is_string(...)))));
 
         return $database;
     }

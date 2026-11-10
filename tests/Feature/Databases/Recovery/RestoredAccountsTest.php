@@ -11,7 +11,7 @@ use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\PasswordEncryption;
 use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Databases\OperationStopped;
-use App\Jobs\Databases\BootstrapDatabaseJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
@@ -29,7 +29,7 @@ function restoredOrders(): Database
     $source->users()->create(['name' => 'late', 'password' => 'late-pass', 'password_encryption' => PasswordEncryption::Default]);
     $source->schemas()->create(['name' => 'analytics']);
     $source->schemas()->create(['name' => 'late_db']);
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
     test()->post(projectUrl("/databases/{$source->id}/recovery/restore"), ['name' => 'orders-restored', 'server_id' => Server::factory()->ready()->create()->id, 'target' => now()->subHour()->toIso8601String()]);
 
     return Database::query()->where('name', 'orders-restored')->sole();

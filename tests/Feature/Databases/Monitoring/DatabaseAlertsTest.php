@@ -15,9 +15,11 @@ it('raises an alert when a database degrades and when it recovers', function () 
     $database = idleDatabase('valkey', 2);
     $database->update(['status' => DatabaseStatus::Ready]);
     Event::fake([DatabaseAlertRaised::class]);
-    fakeSsh()->respond("role:master\n")->respond('', 1)->respond("role:master\n")->respond("role:slave\nmaster_link_status:up\nmaster_sync_in_progress:0\n");
+    [$primary, $replica] = $database->nodes()->orderBy('position')->get()->map->server;
 
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, null);
     resolve(RefreshDatabaseStatus::class)->handle($database);
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica');
     resolve(RefreshDatabaseStatus::class)->handle($database->fresh() ?? $database);
 
     $down = $database->nodes()->with('server')->get()[1]->server->name;

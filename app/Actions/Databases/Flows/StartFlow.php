@@ -15,7 +15,7 @@ final readonly class StartFlow
 {
     public function handle(Database $database, Flow $flow, FlowContext $context): DatabaseFlow
     {
-        $database->startOperation($flow->name());
+        $database->startOperation($flow->name($database));
 
         $record = $database->flows()->create(['flow' => $flow::class, 'context' => $context, 'state' => FlowState::Running]);
 

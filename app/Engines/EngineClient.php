@@ -20,6 +20,8 @@ final readonly class EngineClient
 {
     public const int TIMEOUT = 900;
 
+    public const int REMOVE_TIMEOUT = 1200;
+
     private const int INVALID_REQUEST = 64;
 
     private const int NOT_RUNNING = 69;

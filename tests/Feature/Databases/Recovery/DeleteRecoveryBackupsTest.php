@@ -106,7 +106,7 @@ it('deletes the backups under its own operation and finishes it', function () {
 it('deletes the backups while deleting the database only when asked', function (bool $deleteBackups, int $bucketRequests) {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
     fakeArchiveBucket([['mysql/orders/a'], []]);
-    fakeSsh();
+    fakeEngine();
 
     $this->delete(projectUrl("/databases/{$database->id}"), ['erase_data' => true, 'delete_backups' => $deleteBackups])->assertRedirect(projectUrl('/databases'));
 
@@ -120,7 +120,7 @@ it('deletes the backups while deleting the database only when asked', function (
 it('deletes the database even when the bucket refuses to delete its backups', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
     Http::fake(fn () => Http::response('<Error><Code>AccessDenied</Code><Message>nope</Message></Error>', 403));
-    fakeSsh();
+    fakeEngine();
 
     $this->delete(projectUrl("/databases/{$database->id}"), ['erase_data' => true, 'delete_backups' => true])->assertRedirect(projectUrl('/databases'));
 

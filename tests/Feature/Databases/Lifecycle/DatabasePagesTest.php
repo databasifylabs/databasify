@@ -8,7 +8,7 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Jobs\Databases\AddDatabaseNodeJob;
-use App\Jobs\Databases\BootstrapDatabaseJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\ServerLog;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
-    Queue::fake([BootstrapDatabaseJob::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
     $this->actingAs(User::factory()->create());
 });
 

@@ -12,14 +12,12 @@ final readonly class EngineSecrets
 
     public const string AGENT = 'ENGINE_AGENT';
 
-    public const string DEFAULT_ACCOUNT_PASSWORD = 'DEFAULT_ACCOUNT_PASSWORD';
-
     /**
      * @return array<string, string>
      */
     public static function generate(): array
     {
-        $names = [self::ADMIN, self::REPLICATION, self::AGENT, self::DEFAULT_ACCOUNT_PASSWORD];
+        $names = [self::ADMIN, self::REPLICATION, self::AGENT];
 
         return array_combine($names, array_map(fn (): string => new_password(), $names));
     }

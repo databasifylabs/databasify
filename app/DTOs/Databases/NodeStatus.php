@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs\Databases;
 
 use App\DatabaseProviders\Contracts\DatabaseDriver;
+use App\Engines\Responses\NodeStatus as EngineNodeStatus;
 use App\Enums\Databases\NodeRole;
 
 final readonly class NodeStatus
@@ -19,6 +20,11 @@ final readonly class NodeStatus
         $role = $engine->role($output);
 
         return new self($role === NodeRole::Unknown ? NodeRole::Offline : $role, self::versionIn($output));
+    }
+
+    public static function fromEngine(EngineNodeStatus $status): self
+    {
+        return new self($status->role === NodeRole::Unknown ? NodeRole::Offline : $status->role, $status->version);
     }
 
     public static function stopped(): self

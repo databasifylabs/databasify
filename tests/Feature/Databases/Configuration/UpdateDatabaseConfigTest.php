@@ -6,8 +6,8 @@ use App\Actions\Databases\Configuration\ApplyDatabaseConfig;
 use App\Actions\Databases\Configuration\UpdateDatabaseConfig;
 use App\Enums\Databases\DatabaseMode;
 use App\Jobs\Databases\AddDatabaseNodeJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Jobs\Databases\ApplyDatabaseConfigJob;
-use App\Jobs\Databases\BootstrapDatabaseJob;
 use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -42,7 +42,7 @@ it('rejects engine settings that would crash mysql', function () {
 });
 
 it('describes each engine setting with its default and choices', function () {
-    Queue::fake([BootstrapDatabaseJob::class, AddDatabaseNodeJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class, AddDatabaseNodeJob::class]);
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 

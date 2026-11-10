@@ -10,12 +10,14 @@ use App\DTOs\Databases\NewDatabase;
 use App\DTOs\Databases\NodeFile;
 use App\DTOs\Migrations\MigrationSource;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Databases\BootstrapDatabaseJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
+use App\Models\DatabaseFlow;
 use App\Models\DatabaseMigration;
 use App\Models\DatabaseNode;
 use App\Models\DnsZone;
@@ -90,6 +92,52 @@ function fakeSsh(): FakeServerConnection
     app()->instance(ServerConnection::class, $fake);
 
     return $fake;
+}
+
+function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
+{
+    $operation = fn (string $state): array => ['key' => 'k', 'kind' => 'long', 'state' => $state, 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-10T00:00:00Z', 'finishedAt' => null, 'error' => null];
+
+    return ($ssh ?? fakeSsh())
+        ->respondToEngine('host deploy', ['engine' => 'engine', 'container' => 'databasify-engine', 'created' => true, 'replaced' => false])
+        ->respondToEngine('host remove', [])
+        ->respondToEngine('tls install', [])
+        ->respondToEngine('node configure', ['changed' => true])
+        ->respondToEngine('node start', [])
+        ->respondToEngine('node bootstrap', [])
+        ->respondToEngine('node ready', $operation('running'))
+        ->respondToEngine('cluster enable', $operation('running'))
+        ->respondToEngine('operation status', $operation('succeeded'))
+        ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0']);
+}
+
+function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $role, ?string $version = null): FakeServerConnection
+{
+    $reply = $role === null ? ['error' => ['code' => 'unavailable', 'message' => 'unreachable', 'details' => (object) []]] : ['role' => $role, 'version' => $version];
+
+    return $ssh->respondWhen(
+        fn (string $name, string $script): bool => $name === $server->name && str_contains($script, '| databasify node status '),
+        json_encode($reply, JSON_THROW_ON_ERROR),
+        $role === null ? 1 : 0,
+    );
+}
+
+/**
+ * @return list<string>
+ */
+function engineCommandsIn(FakeServerConnection $ssh): array
+{
+    return array_values(collect($ssh->runs)
+        ->map(fn (array $run): ?string => preg_match('/\\| databasify ([a-z-]+ [a-z-]+) 2>/', $run['script'], $match) === 1 ? "{$run['server']}: {$match[1]}" : null)
+        ->filter()
+        ->all());
+}
+
+function advanceFlows(int $ticks = 20): void
+{
+    foreach (range(1, $ticks) as $tick) {
+        DatabaseFlow::query()->running()->get()->each(fn (DatabaseFlow $flow) => runJob(new AdvanceDatabaseFlow($flow)));
+    }
 }
 
 function runJob(ShouldQueue $job): void
@@ -236,10 +284,12 @@ function fileWrittenIn(string $script, string $path): string
 
 function newDatabase(string $engine, int $servers, DatabaseMode $mode = DatabaseMode::HighAvailability, string $name = 'main', ?string $versionLine = null): Database
 {
-    Queue::fake([BootstrapDatabaseJob::class]);
     $ids = Server::factory()->ready()->count($servers)->create()->pluck('id')->all();
+    $queue = Queue::getFacadeRoot();
+    Queue::fake([AdvanceDatabaseFlow::class]);
 
     $database = inProjectDuring(fn (): Database => resolve(CreateDatabase::class)->handle(new NewDatabase($name, $engine, $ids[0], array_slice($ids, 1), versionLine: $versionLine)));
+    Queue::swap($queue);
     $database->update(['mode' => $mode]);
 
     return $database;
@@ -253,6 +303,7 @@ function withImage(string $engine, string $release, ?string $digest = null): voi
 function idleDatabase(string $engine, int $servers, DatabaseMode $mode = DatabaseMode::HighAvailability, string $name = 'main', ?string $versionLine = null): Database
 {
     $database = newDatabase($engine, $servers, $mode, $name, $versionLine);
+    $database->flows()->update(['state' => FlowState::Succeeded]);
     $database->finishOperation();
 
     return $database;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
-use App\Jobs\Databases\BootstrapDatabaseJob;
+use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
@@ -15,7 +15,7 @@ use Illuminate\Testing\TestResponse;
 beforeEach(function () {
     $this->freezeSecond();
     $this->actingAs(User::factory()->create());
-    Queue::fake([BootstrapDatabaseJob::class]);
+    Queue::fake([AdvanceDatabaseFlow::class]);
 });
 
 function staleWindowDatabase(): Database

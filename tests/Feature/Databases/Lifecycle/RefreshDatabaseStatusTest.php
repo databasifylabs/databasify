@@ -8,6 +8,7 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Events\DatabaseAlertRaised;
 use App\Jobs\Databases\RefreshDatabaseStatusJob;
+use App\Models\DatabaseNode;
 use App\Models\User;
 use App\Services\Ssh\Ssh;
 use Illuminate\Support\Facades\Event;
@@ -16,7 +17,8 @@ use Inertia\Testing\AssertableInertia;
 
 it('records the database server version each node reports', function () {
     $database = idleDatabase('valkey', 2);
-    fakeSsh()->respond("role:master\nversion:8.1.4\n")->respond("role:slave\nmaster_link_status:up\nmaster_sync_in_progress:0\nversion:8.1.3\n");
+    [$primary, $replica] = $database->nodes()->orderBy('position')->get()->map->server;
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary', '8.1.4'), $replica, 'replica', '8.1.3');
 
     resolve(RefreshDatabaseStatus::class)->handle($database);
 
@@ -49,13 +51,14 @@ it('alerts when a ready database degrades and again when it heals', function () 
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 2);
     $database->update(['status' => DatabaseStatus::Ready]);
-    $unreachable = $database->nodes()->get()[1]->server->name;
-    $ssh = fakeSsh()->respond("role:master\n")->respond('', 255);
+    [$primary, $replica] = $database->nodes()->orderBy('position')->get()->map->server;
+    $unreachable = $replica->name;
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, null);
 
     expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Degraded);
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main is degraded' && $alert->message === "Unreachable: {$unreachable}.");
 
-    $ssh->respond("role:master\n")->respond("role:slave\nmaster_link_status:up\nmaster_sync_in_progress:0\n");
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica');
 
     expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Ready)
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
@@ -66,7 +69,8 @@ it('reports a database without a single primary as degraded', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 2);
     $database->update(['status' => DatabaseStatus::Ready]);
-    fakeSsh()->respond("role:master\n")->respond("role:master\n");
+    $ssh = fakeSsh();
+    $database->nodes->each(fn (DatabaseNode $node) => answerNodeStatus($ssh, $node->server, 'primary'));
 
     expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Degraded);
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === '2 nodes claim to be primary.');

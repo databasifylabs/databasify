@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use App\Contracts\Engines\Flow;
 use App\Engines\Flows\Step;
+use App\Models\Database;
 use App\Models\DatabaseFlow;
 use Closure;
 
@@ -29,7 +30,7 @@ final class ScriptedFlow implements Flow
         return $flow;
     }
 
-    public function name(): string
+    public function name(Database $database): string
     {
         return 'Scripted flow';
     }

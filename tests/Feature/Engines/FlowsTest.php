@@ -160,7 +160,7 @@ it('refuses a second flow while one runs', function () {
     startScripted($this->database, ScriptedFlow::bind([longStep($keys)]));
 
     expect(fn () => startScripted($this->database->fresh(), ScriptedFlow::bind([longStep($keys)])))->toThrow(ValidationException::class)
-        ->and(DatabaseFlow::query()->count())->toBe(1)
+        ->and(DatabaseFlow::query()->where('flow', ScriptedFlow::class)->count())->toBe(1)
         ->and($keys)->toHaveCount(1);
 });
 
