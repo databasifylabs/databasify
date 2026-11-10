@@ -12,6 +12,7 @@ use App\Exceptions\Databases\ServerSizeUnknown;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
+use Illuminate\Database\Eloquent\Builder;
 
 final readonly class BuildNodeRequest
 {
@@ -51,7 +52,7 @@ final readonly class BuildNodeRequest
 
     private function nodesOf(Database $database, ?DatabaseNode $without): DatabaseNodeCollection
     {
-        return $database->nodes()->with('server')->when($without, fn ($query, DatabaseNode $leaving) => $query->whereKeyNot($leaving->id))->orderBy('position')->get();
+        return $database->nodes()->with('server')->when($without, fn (Builder $query, DatabaseNode $leaving): Builder => $query->whereKeyNot($leaving->id))->orderBy('position')->get();
     }
 
     private function memberOf(DatabaseNode $node): Member
