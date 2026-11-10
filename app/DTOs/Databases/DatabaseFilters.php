@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\DTOs\Databases;
 
-use App\DatabaseProviders\Contracts\DatabaseDriver;
+use App\Engines\Engine;
+use App\Engines\EngineCatalog;
 use App\Enums\Databases\DatabaseStatus;
 use App\Models\Database;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ final readonly class DatabaseFilters
     {
         return [
             'statuses' => array_map(fn (DatabaseStatus $status): string => $status->value, DatabaseStatus::cases()),
-            'engines' => array_values(collect(Database::providers())->map(fn (DatabaseDriver $engine, string $id): array => ['value' => $id, 'label' => $engine->label()])->all()),
+            'engines' => array_values(EngineCatalog::all()->map(fn (Engine $engine): array => ['value' => $engine->id, 'label' => $engine->label])->all()),
         ];
     }
 

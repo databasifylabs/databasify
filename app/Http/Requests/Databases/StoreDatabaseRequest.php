@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Databases;
 
-use App\DatabaseProviders\Contracts\DatabaseDriver;
 use App\DTOs\Databases\NewDatabase;
 use App\DTOs\Databases\VersionLine;
+use App\Engines\Engine;
+use App\Engines\EngineCatalog;
 use App\Http\Requests\Concerns\DatabaseValidationRules;
 use App\Http\Requests\Concerns\ReadsTypedInput;
 use App\Models\Database;
@@ -32,9 +33,9 @@ class StoreDatabaseRequest extends FormRequest
         return [
             'name' => $this->databaseNameRules(),
             'engine' => ['required', Rule::in(Database::engines())],
-            'version_line' => ['nullable', 'string', Rule::in($engine?->versions()->map(fn (VersionLine $line): string => $line->value)->all() ?? [])],
+            'version_line' => ['nullable', 'string', Rule::in(array_map(fn (VersionLine $line): string => $line->value, $engine->lines ?? []))],
             'primary_server_id' => ['required', 'uuid', new AvailableServer, $this->eachServerOnce(...)],
-            'standby_server_ids' => ['array', 'max:'.($engine?->maxStandbys() ?? 0)],
+            'standby_server_ids' => ['array', 'max:'.($engine === null ? 0 : Engine::MAX_STANDBYS)],
             'standby_server_ids.*' => array_merge($this->serverIdRules(), [new SharesPrivateNetwork(Server::query()->find($this->string('primary_server_id')->value()))]),
         ];
     }
@@ -50,15 +51,9 @@ class StoreDatabaseRequest extends FormRequest
         );
     }
 
-    private function chosenEngine(): ?DatabaseDriver
+    private function chosenEngine(): ?Engine
     {
-        $engine = $this->string('engine')->value();
-
-        if (! in_array($engine, Database::engines(), true)) {
-            return null;
-        }
-
-        return Database::providerFor($engine);
+        return EngineCatalog::all()->get($this->string('engine')->value());
     }
 
     private function eachServerOnce(string $attribute, mixed $value, Closure $fail): void

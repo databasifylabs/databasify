@@ -27,6 +27,8 @@ use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
+use App\Engines\Engine;
+use App\Engines\EngineCatalog;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
@@ -995,8 +997,8 @@ class Database extends Model implements Movable
      */
     public static function enginesLabelledLike(string $term): array
     {
-        return array_values(collect(self::providers())
-            ->filter(fn (DatabaseDriver $engine): bool => str_contains(strtolower($engine->label()), strtolower($term)))
+        return array_values(EngineCatalog::all()
+            ->filter(fn (Engine $engine): bool => str_contains(strtolower($engine->label), strtolower($term)))
             ->keys()
             ->all());
     }
@@ -1006,7 +1008,7 @@ class Database extends Model implements Movable
      */
     public static function engines(): array
     {
-        return array_values(array_filter(array_keys(config()->array('database-provider.providers', [])), is_string(...)));
+        return array_values(EngineCatalog::all()->keys()->all());
     }
 
     /**
@@ -1022,10 +1024,15 @@ class Database extends Model implements Movable
      */
     public static function catalog(): array
     {
-        return array_values(collect(self::providers())
-            ->sortBy(fn (DatabaseDriver $engine): string => $engine->category())
-            ->map(fn (DatabaseDriver $engine): array => $engine->toArray())
+        return array_values(EngineCatalog::all()
+            ->sortBy(fn (Engine $engine): string => $engine->category)
+            ->map(fn (Engine $engine): array => $engine->toArray())
             ->all());
+    }
+
+    public function engine(): Engine
+    {
+        return EngineCatalog::find($this->engine);
     }
 
     public function provider(): DatabaseDriver

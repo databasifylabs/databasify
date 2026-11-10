@@ -15,10 +15,10 @@ final readonly class ImageResolver
 
     public function newest(Database $database, string $line): EngineImage
     {
-        $engine = $database->provider();
-        $repository = $engine->imageRepository();
+        $engine = $database->engine();
+        $repository = $engine->imageRepository;
         $release = $this->newestReleaseIn($this->registry->tagsOf($repository), $line)
-            ?? throw ImageUnavailable::noReleaseOf("{$engine->label()} {$line}", $repository);
+            ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $repository);
 
         return new EngineImage($repository, $this->registry->digestOf($repository, $release), $release);
     }

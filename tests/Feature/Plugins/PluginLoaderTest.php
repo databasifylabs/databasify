@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Exceptions\Databases\MissingEngineScript;
+use App\Engines\EngineCatalog;
 use App\Models\Database;
 use App\Models\Plugin;
 use App\Models\User;
-use App\Providers\DatabaseProviderServiceProvider;
+use App\Providers\EngineServiceProvider;
 use App\Services\Plugins\PluginLoader;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +30,7 @@ function pluginZip(string $namespace, string $id, string $register, string $vers
     $class = "{$namespace}Plugin";
     $files = [
         'composer.json' => json_encode(['name' => "acme/{$id}", 'version' => $version, 'autoload' => ['psr-4' => ["Tests\\Plugins\\{$namespace}\\" => 'src/']], 'extra' => ['databasify' => array_filter(['plugin' => "Tests\\Plugins\\{$namespace}\\{$class}", 'requires' => $requires])]]),
-        "src/{$class}.php" => "<?php\nnamespace Tests\\Plugins\\{$namespace};\nuse App\\DatabaseProviders\\Drivers\\Valkey\\Valkey;\nfinal class {$class} extends \\App\\Plugins\\AbstractPlugin\n{\n    public function register(): void\n    {\n        \$this->app->instance('{$id}.registered', true);\n    }\n\n    public function boot(): void\n    {\n        \$this->loadViewsFrom(__DIR__.'/../resources/views', '{$id}');\n        \$this->loadMigrationsFrom(__DIR__.'/../database/migrations');\n        {$register}\n    }\n\n    public function install(): void\n    {\n        \\Illuminate\\Support\\Facades\\Schema::create('{$id}_items', fn (\\Illuminate\\Database\\Schema\\Blueprint \$table) => \$table->id());\n    }\n\n    public function uninstall(): void\n    {\n        \\Illuminate\\Support\\Facades\\Schema::dropIfExists('{$id}_items');\n    }\n}\n",
+        "src/{$class}.php" => "<?php\nnamespace Tests\\Plugins\\{$namespace};\nfinal class {$class} extends \\App\\Plugins\\AbstractPlugin\n{\n    public function register(): void\n    {\n        \$this->app->instance('{$id}.registered', true);\n    }\n\n    public function boot(): void\n    {\n        \$this->loadViewsFrom(__DIR__.'/../resources/views', '{$id}');\n        \$this->loadMigrationsFrom(__DIR__.'/../database/migrations');\n        {$register}\n    }\n\n    public function install(): void\n    {\n        \\Illuminate\\Support\\Facades\\Schema::create('{$id}_items', fn (\\Illuminate\\Database\\Schema\\Blueprint \$table) => \$table->id());\n    }\n\n    public function uninstall(): void\n    {\n        \\Illuminate\\Support\\Facades\\Schema::dropIfExists('{$id}_items');\n    }\n}\n",
         "resources/views/ssh/engines/{$id}/lines/25_8/lifecycle/start.blade.php" => 'echo started',
         "public/icons/database-providers/{$id}.svg" => '<svg xmlns="http://www.w3.org/2000/svg"/>',
         'public/icon.svg' => '<svg xmlns="http://www.w3.org/2000/svg"/>',
@@ -62,7 +62,7 @@ function fakeGithub(string $zip): void
 }
 
 it('installs a plugin from a GitHub repository and runs its engine from its own folder', function () {
-    fakeGithub(pluginZip('Clickhouse', 'clickhouse', "\$this->databasify()->database('clickhouse')->label('ClickHouse')->handler(Valkey::class)->image('ghcr.io/acme/databasify-clickhouse')->scripts('clickhouse::ssh.engines.clickhouse')->versions('25.8', [['value' => '25.8', 'label' => 'ClickHouse 25.8']])->register();"));
+    fakeGithub(pluginZip('Clickhouse', 'clickhouse', "\$this->databasify()->database('clickhouse')->label('ClickHouse')->image('ghcr.io/acme/databasify-clickhouse')->versions('25.8', [['value' => '25.8', 'label' => 'ClickHouse 25.8']])->register();"));
 
     $this->post('/plugins', ['source' => 'https://github.com/acme/plugin'])->assertRedirect()->assertSessionHasNoErrors();
 
@@ -71,11 +71,9 @@ it('installs a plugin from a GitHub repository and runs its engine from its own 
         ->version->toBe('1.2.0')
         ->enabled->toBeTrue()
         ->and(app('clickhouse.registered'))->toBeTrue()
-        ->and(Database::providerFor('clickhouse')->scriptView('lifecycle.start'))->toBe('clickhouse::ssh.engines.clickhouse.lines.25_8.lifecycle.start')
-        ->and(fn () => Database::providerFor('clickhouse')->scriptView('lifecycle.wake'))->toThrow(MissingEngineScript::class, 'The clickhouse engine has no lifecycle.wake script: clickhouse::ssh.engines.clickhouse.lines.25_8.lifecycle.wake does not exist.')
-        ->and(Database::providerFor('clickhouse')->imageRepository())->toBe('ghcr.io/acme/databasify-clickhouse')
-        ->and(Database::providerFor('mysql')->imageRepository())->toBe('ghcr.io/databasifylabs/databasify-mysql')
-        ->and(Database::providerFor('clickhouse')->icon())->toBe(asset('plugin-assets/clickhouse/icons/database-providers/clickhouse.svg'));
+        ->and(EngineCatalog::find('clickhouse')->imageRepository)->toBe('ghcr.io/acme/databasify-clickhouse')
+        ->and(EngineCatalog::find('mysql')->imageRepository)->toBe('ghcr.io/databasifylabs/databasify-mysql')
+        ->and(EngineCatalog::find('clickhouse')->icon)->toBe(asset('plugin-assets/clickhouse/icons/database-providers/clickhouse.svg'));
 
     $this->get('/plugin-assets/clickhouse/icons/database-providers/clickhouse.svg')->assertOk();
     $this->get('/plugin-assets/clickhouse/composer.json')->assertNotFound();
@@ -89,18 +87,18 @@ it('installs a plugin from a GitHub repository and runs its engine from its own 
 });
 
 it('loads enabled plugins on boot and skips disabled ones', function () {
-    fakeGithub(pluginZip('Keydb', 'keydb', "\$this->databasify()->database('keydb')->label('KeyDB')->handler(Valkey::class)->register();"));
+    fakeGithub(pluginZip('Keydb', 'keydb', "\$this->databasify()->database('keydb')->label('KeyDB')->register();"));
     $this->post('/plugins', ['source' => 'acme/plugin'])->assertSessionHasNoErrors();
 
     $this->put('/plugins/keydb', ['enabled' => false])->assertSessionHasNoErrors();
     resolve(PluginLoader::class)->reset();
-    (new DatabaseProviderServiceProvider(app()))->boot();
+    (new EngineServiceProvider(app()))->boot();
     resolve(PluginLoader::class)->boot();
     expect(Database::engines())->not->toContain('keydb');
 
     $this->put('/plugins/keydb', ['enabled' => true])->assertSessionHasNoErrors();
     resolve(PluginLoader::class)->reset();
-    (new DatabaseProviderServiceProvider(app()))->boot();
+    (new EngineServiceProvider(app()))->boot();
     resolve(PluginLoader::class)->boot();
     expect(Database::engines())->toContain('keydb');
 
@@ -119,7 +117,7 @@ it('loads enabled plugins on boot and skips disabled ones', function () {
 
 it('resets only the migrations of the uninstalled plugin, not a sibling sharing its name prefix', function () {
     foreach (['Keydb' => 'keydb', 'Keydbx' => 'keydbx'] as $namespace => $id) {
-        $zip = UploadedFile::fake()->createWithContent("{$id}.zip", pluginZip($namespace, $id, "\$this->databasify()->database('{$id}')->label('{$id}')->handler(Valkey::class)->register();"));
+        $zip = UploadedFile::fake()->createWithContent("{$id}.zip", pluginZip($namespace, $id, "\$this->databasify()->database('{$id}')->label('{$id}')->register();"));
         $this->post('/plugins', ['archive' => $zip])->assertSessionHasNoErrors();
     }
 
@@ -131,7 +129,7 @@ it('resets only the migrations of the uninstalled plugin, not a sibling sharing 
 });
 
 it('does not reset any migrations when the plugin directory is gone', function () {
-    $zip = UploadedFile::fake()->createWithContent('keydb.zip', pluginZip('Keydb', 'keydb', "\$this->databasify()->database('keydb')->label('KeyDB')->handler(Valkey::class)->register();"));
+    $zip = UploadedFile::fake()->createWithContent('keydb.zip', pluginZip('Keydb', 'keydb', "\$this->databasify()->database('keydb')->label('KeyDB')->register();"));
     $this->post('/plugins', ['archive' => $zip])->assertSessionHasNoErrors();
     $applied = DB::table('migrations')->count();
     File::deleteDirectory(Plugin::root().'/keydb');
@@ -144,22 +142,22 @@ it('does not reset any migrations when the plugin directory is gone', function (
 });
 
 it('refuses a plugin that fails half way and leaves the built-in engines alone', function () {
-    fakeGithub(pluginZip('Broken', 'broken', "\$this->databasify()->database('broken')->label('Broken')->handler(Valkey::class)->register();\n        \$this->databasify()->database('mysql')->label('Not MySQL')->handler(Valkey::class)->register();"));
+    fakeGithub(pluginZip('Broken', 'broken', "\$this->databasify()->database('broken')->label('Broken')->register();\n        \$this->databasify()->database('mysql')->label('Not MySQL')->register();"));
 
     $this->post('/plugins', ['source' => 'acme/plugin'])->assertSessionHasErrors(['source' => 'The plugin failed to load: A provider is already registered as "mysql".']);
 
     expect(Plugin::query()->count())->toBe(0)
         ->and(Database::engines())->toBe(['valkey', 'redis', 'mysql', 'postgres', 'mariadb', 'mongodb'])
-        ->and(Database::providerFor('mysql')->label())->toBe('MySQL');
+        ->and(EngineCatalog::find('mysql')->label)->toBe('MySQL');
 });
 
 it('installs a plugin from an uploaded zip', function () {
-    $zip = UploadedFile::fake()->createWithContent('pgvector.zip', pluginZip('Pgvector', 'pgvector', "\$this->databasify()->database('pgvector')->label('pgvector')->handler(Valkey::class)->register();"));
+    $zip = UploadedFile::fake()->createWithContent('pgvector.zip', pluginZip('Pgvector', 'pgvector', "\$this->databasify()->database('pgvector')->label('pgvector')->register();"));
 
     $this->post('/plugins', ['archive' => $zip])->assertRedirect()->assertSessionHasNoErrors();
 
     expect(Plugin::query()->find('pgvector'))->source->toBe('pgvector.zip (uploaded)')
-        ->and(Database::providerFor('pgvector')->label())->toBe('pgvector');
+        ->and(EngineCatalog::find('pgvector')->label)->toBe('pgvector');
     $this->post('/plugins', [])->assertSessionHasErrors(['source', 'archive']);
 });
 
@@ -171,15 +169,15 @@ it('refuses a zip that is not a Databasify plugin', function () {
 });
 
 it('refuses a plugin built for another Databasify version and skips one that stopped matching', function () {
-    fakeGithub(pluginZip('Future', 'future', "\$this->databasify()->database('future')->label('Future')->handler(Valkey::class)->register();", requires: '^9.0'));
+    fakeGithub(pluginZip('Future', 'future', "\$this->databasify()->database('future')->label('Future')->register();", requires: '^9.0'));
     $this->post('/plugins', ['source' => 'acme/plugin'])->assertSessionHasErrors(['source' => 'Needs Databasify ^9.0; this is 0.1.0.']);
     expect(Plugin::query()->count())->toBe(0);
 
-    $zip = UploadedFile::fake()->createWithContent('current.zip', pluginZip('Current', 'current', "\$this->databasify()->database('current')->label('Current')->handler(Valkey::class)->register();", requires: '^0.1'));
+    $zip = UploadedFile::fake()->createWithContent('current.zip', pluginZip('Current', 'current', "\$this->databasify()->database('current')->label('Current')->register();", requires: '^0.1'));
     $this->post('/plugins', ['archive' => $zip])->assertSessionHasNoErrors();
     Plugin::query()->whereKey('current')->update(['requires' => '^9.0']);
     resolve(PluginLoader::class)->reset();
-    (new DatabaseProviderServiceProvider(app()))->boot();
+    (new EngineServiceProvider(app()))->boot();
     resolve(PluginLoader::class)->boot();
 
     expect(Database::engines())->not->toContain('current')
@@ -192,8 +190,8 @@ it('updates a plugin in place from its repository', function () {
             ->push(['zipball_url' => 'https://api.github.com/repos/acme/plugin/zipball/v1.2.0'])
             ->push(['zipball_url' => 'https://api.github.com/repos/acme/plugin/zipball/v1.3.0'])
             ->push(['zipball_url' => 'https://api.github.com/repos/acme/plugin/zipball/other']),
-        'api.github.com/repos/acme/plugin/zipball/v1.2.0' => Http::response(pluginZip('Tidb', 'tidb', "\$this->databasify()->database('tidb')->label('TiDB')->handler(Valkey::class)->register();")),
-        'api.github.com/repos/acme/plugin/zipball/v1.3.0' => Http::response(pluginZip('Tidb', 'tidb', "\$this->databasify()->database('tidb')->label('TiDB')->handler(Valkey::class)->register();", version: '1.3.0')),
+        'api.github.com/repos/acme/plugin/zipball/v1.2.0' => Http::response(pluginZip('Tidb', 'tidb', "\$this->databasify()->database('tidb')->label('TiDB')->register();")),
+        'api.github.com/repos/acme/plugin/zipball/v1.3.0' => Http::response(pluginZip('Tidb', 'tidb', "\$this->databasify()->database('tidb')->label('TiDB')->register();", version: '1.3.0')),
         'api.github.com/repos/acme/plugin/zipball/other' => Http::response(pluginZip('Other', 'other', '')),
     ]);
     $this->post('/plugins', ['source' => 'acme/plugin'])->assertSessionHasNoErrors();
@@ -207,7 +205,7 @@ it('updates a plugin in place from its repository', function () {
 });
 
 it('updates an uploaded plugin from a newer zip', function () {
-    $register = "\$this->databasify()->database('vitess')->label('Vitess')->handler(Valkey::class)->register();";
+    $register = "\$this->databasify()->database('vitess')->label('Vitess')->register();";
     $this->post('/plugins', ['archive' => UploadedFile::fake()->createWithContent('vitess.zip', pluginZip('Vitess', 'vitess', $register))])->assertSessionHasNoErrors();
 
     $this->post('/plugins/vitess/upgrade')->assertSessionHasErrors(['archive' => 'acme/vitess was uploaded, so upload its newer zip.']);

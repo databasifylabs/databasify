@@ -63,15 +63,3 @@ it('lets a database build its engine driver around itself', function () {
         ->and(Database::providerFor('postgres'))->toBeInstanceOf(Postgres::class)
         ->and(Postgres::id())->toBe('postgres');
 });
-
-it('reads the fixed settings of an engine from its registration, so a plugin can reuse a driver under its own id', function () {
-    (new PluginContext('assets'))->database('keydb')->label('KeyDB')->handler(Postgres::class)->port(6380)->peerPorts([16380])->persistenceChoice()->register();
-    $keydb = Database::providerFor('keydb');
-    $mysql = Database::providerFor('mysql');
-
-    expect([$keydb->directory(), $keydb->systemUser(), $keydb->ports()->client, $keydb->ports()->pool, $keydb->ports()->peers, $keydb->supportsPersistence()])->toBe(['/srv/keydb', 'keydb', 6380, null, [16380], true])
-        ->and($keydb->tls()->files)->toBe(['ca.crt', 'server.crt', 'server.key'])
-        ->and([$mysql->ports()->client, $mysql->ports()->peers, $mysql->tls()->rsaKey, $mysql->tls()->publicCertificate])->toBe([25060, [33061], true, false])
-        ->and(Database::providerFor('mariadb')->systemUser())->toBe('mysql')
-        ->and(Database::providerFor('postgres')->ports()->pool)->toBe(25061);
-});

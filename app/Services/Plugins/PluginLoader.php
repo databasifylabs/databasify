@@ -16,7 +16,7 @@ use Throwable;
 
 final readonly class PluginLoader
 {
-    private const array REGISTRIES = ['database-provider', 'dns-provider', 'server-provider'];
+    private const array REGISTRIES = ['database-provider', 'engine', 'dns-provider', 'server-provider'];
 
     public function __construct(private Application $app) {}
 

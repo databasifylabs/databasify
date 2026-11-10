@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\DTOs\Dashboard;
 
-use App\DatabaseProviders\Contracts\DatabaseDriver;
+use App\Engines\Engine;
+use App\Engines\EngineCatalog;
 use App\Enums\Servers\OperatingSystem;
-use App\Models\Database;
 
 final readonly class SystemRequirements
 {
@@ -19,7 +19,7 @@ final readonly class SystemRequirements
     {
         return new self(
             systems: OperatingSystem::supportedSummary(),
-            engines: collect(Database::providers())->map(fn (DatabaseDriver $engine): string => $engine->label())->join(', ', ' or '),
+            engines: EngineCatalog::all()->map(fn (Engine $engine): string => $engine->label)->join(', ', ' or '),
         );
     }
 

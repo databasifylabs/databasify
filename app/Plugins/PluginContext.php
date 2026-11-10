@@ -8,9 +8,9 @@ final readonly class PluginContext
 {
     public function __construct(private string $assets) {}
 
-    public function database(string $id): RegisterDatabaseProvider
+    public function database(string $id): RegisterEngine
     {
-        return RegisterDatabaseProvider::make($id)->icon($this->asset("icons/database-providers/{$id}.svg"));
+        return RegisterEngine::make($id)->icon($this->asset("icons/database-providers/{$id}.svg"));
     }
 
     public function dns(string $id): RegisterDnsProvider

@@ -6,7 +6,6 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\Persistence;
 use App\Models\Database;
-use App\Plugins\PluginContext;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Symfony\Component\Finder\SplFileInfo;
@@ -176,14 +175,6 @@ it('recovers through the generic path: quorum without script data, offsets from 
         ->and($render('cluster.rejoin'))->toContain('held back from promotion until its first full sync finishes')->toContain('rejoined as a replica of $primary')
         ->and($render('lifecycle.wake'))->toContain("databasify ctl stop databasify-{$engine}-sentinel ")->toContain("databasify ctl kill -s KILL databasify-{$engine} ")->toContain("databasify ctl stop databasify-{$engine} ")->toContain('stopped without saving');
 })->with('sentinel engines');
-
-it('counts the quorum from the directory of a plugin engine built on a sentinel driver', function (string $engine, string $line) {
-    (new PluginContext('assets'))->database('example-cache')->label('Example Cache')->handler(Database::providerFor($engine)::class)->scripts("ssh.engines.{$engine}")->directory('/srv/example-cache')->versions($line, [['value' => $line, 'label' => 'Example Cache']])->register();
-
-    expect(view(Database::providerFor('example-cache')->scriptView('cluster.quorum'), engineScript('example-cache'))->render())
-        ->toContain('password=/srv/example-cache/conf/password')
-        ->not->toContain("/srv/{$engine}");
-})->with([['valkey', '9'], ['redis', '8']]);
 
 it('passes the password only through the cli variable of its own engine', function (string $engine, string $own, string $other) {
     $scripts = collect(File::allFiles(resource_path("views/ssh/engines/{$engine}")))->map(fn (SplFileInfo $file): string => $file->getContents())->implode("\n");
