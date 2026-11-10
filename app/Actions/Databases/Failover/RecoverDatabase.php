@@ -39,7 +39,7 @@ final readonly class RecoverDatabase
         }
 
         $this->startFlow->handle($database, $this->flow, new FlowContext(
-            nodeIds: array_values(array_filter($reachable->modelKeys(), is_string(...))),
+            nodeIds: $this->idsOf($reachable),
             force: $othersAreDown,
         ));
     }
@@ -68,7 +68,16 @@ final readonly class RecoverDatabase
             throw $this->rejection("{$database->name} still has a majority, use failover instead.");
         }
 
-        $this->startFlow->handle($database, $this->rejoin, new FlowContext(nodeIds: array_values(array_filter($outsiders->modelKeys(), is_string(...)))));
+        $this->startFlow->handle($database, $this->rejoin, new FlowContext(nodeIds: $this->idsOf($outsiders)));
+    }
+
+    /**
+     * @param  Collection<int, DatabaseNode>  $nodes
+     * @return list<string>
+     */
+    private function idsOf(Collection $nodes): array
+    {
+        return array_values(array_filter($nodes->modelKeys(), is_string(...)));
     }
 
     private function rejection(string $message): ValidationException

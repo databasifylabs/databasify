@@ -37,7 +37,11 @@ final readonly class IssuedCertificate
 
     public static function fingerprintOf(string $pem): ?string
     {
-        $fingerprint = $pem === '' ? false : openssl_x509_fingerprint($pem, 'sha256');
+        if ($pem === '') {
+            return null;
+        }
+
+        $fingerprint = openssl_x509_fingerprint($pem, 'sha256');
 
         return $fingerprint === false ? null : $fingerprint;
     }

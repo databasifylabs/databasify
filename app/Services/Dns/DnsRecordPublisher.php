@@ -9,6 +9,7 @@ use App\DTOs\Dns\ServiceTarget;
 use App\Enums\Dns\DnsRecordType;
 use App\Models\DnsZone;
 use Closure;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 
 final readonly class DnsRecordPublisher
@@ -49,7 +50,7 @@ final readonly class DnsRecordPublisher
     {
         $key = $this->cacheKeyOf($type, $name);
 
-        Cache::lock("{$key}:lock", self::LOCK_SECONDS)->block(self::WAIT_SECONDS, function () use ($zone, $type, $name, $key): void {
+        $this->lockOn($key)->block(self::WAIT_SECONDS, function () use ($zone, $type, $name, $key): void {
             $this->sync($zone, $type, $name, []);
             Cache::put($key, [], self::RECHECK_SECONDS);
         });
@@ -93,7 +94,7 @@ final readonly class DnsRecordPublisher
     {
         $key = $this->cacheKeyOf($type, $name);
 
-        Cache::lock("{$key}:lock", self::LOCK_SECONDS)->block(self::WAIT_SECONDS, function () use ($key, $wanted, $apply): void {
+        $this->lockOn($key)->block(self::WAIT_SECONDS, function () use ($key, $wanted, $apply): void {
             if (Cache::get($key) === $wanted) {
                 return;
             }
@@ -101,6 +102,11 @@ final readonly class DnsRecordPublisher
             $apply();
             Cache::put($key, $wanted, self::RECHECK_SECONDS);
         });
+    }
+
+    private function lockOn(string $key): Lock
+    {
+        return Cache::lock("{$key}:lock", self::LOCK_SECONDS);
     }
 
     private function cacheKeyOf(DnsRecordType $type, string $name): string
