@@ -39,6 +39,11 @@ final readonly class FlowContext
         );
     }
 
+    public function survivedBy(string $nodeId): self
+    {
+        return clone ($this, ['targetNodeId' => $nodeId]);
+    }
+
     public function needingRestart(bool $restart): self
     {
         return clone ($this, ['restart' => $restart]);

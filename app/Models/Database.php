@@ -30,13 +30,14 @@ use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
 use App\Engines\Data\EngineField;
+use App\Engines\Data\Grant;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
+use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeKind;
-use App\Enums\Databases\PasswordEncryption;
 use App\Enums\Databases\Persistence;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
@@ -706,29 +707,44 @@ class Database extends Model implements Movable
     }
 
     /**
-     * @return list<PasswordEncryption>
+     * @return list<string>
      */
     public function passwordEncryptions(): array
     {
-        return $this->provider()->accounts()?->passwordEncryptions() ?? [];
+        return $this->engine_capabilities->passwordEncryptions ?? [];
     }
 
-    public function passwordEncryptionFor(?PasswordEncryption $chosen): ?PasswordEncryption
+    public function passwordEncryptionFor(?string $chosen): ?string
     {
-        $default = $this->provider()->accounts()?->passwordEncryption();
+        $default = $this->engine_capabilities?->defaultPasswordEncryption;
 
         return $default === null ? null : $chosen ?? $default;
     }
 
-    public function recordDefaultAccounts(): void
+    public function ensureManagesAccounts(): void
     {
-        $accounts = $this->provider()->accounts();
-
-        if ($accounts === null) {
+        if ($this->engine_capabilities?->offers('user create') === true) {
             return;
         }
 
-        $this->users()->create(['name' => $this->settings->defaultUsername(), 'password' => $this->settings->defaultPassword(), 'password_encryption' => $accounts->passwordEncryption()]);
+        throw ValidationException::withMessages(['database' => "{$this->engine()->label} databases have no users or databases to manage."]);
+    }
+
+    /**
+     * @return list<Grant>
+     */
+    public function writeGrants(): array
+    {
+        return array_map(fn (string $schema): Grant => new Grant($schema, GrantAccess::Write), $this->schemaNames());
+    }
+
+    public function recordDefaultAccounts(): void
+    {
+        if ($this->settings->defaultUsername() === '') {
+            return;
+        }
+
+        $this->users()->create(['name' => $this->settings->defaultUsername(), 'password' => $this->settings->defaultPassword()]);
         $this->schemas()->create(['name' => $this->settings->defaultSchema()]);
     }
 

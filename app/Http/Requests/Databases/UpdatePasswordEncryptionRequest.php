@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Databases;
 
-use App\Enums\Databases\PasswordEncryption;
 use App\Http\Requests\Concerns\ResolvesRouteModel;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -20,12 +19,12 @@ class UpdatePasswordEncryptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password_encryption' => ['required', Rule::enum(PasswordEncryption::class)->only($this->routeDatabase()->passwordEncryptions())],
+            'password_encryption' => ['required', 'string', Rule::in($this->routeDatabase()->passwordEncryptions())],
         ];
     }
 
-    public function encryption(): PasswordEncryption
+    public function encryption(): string
     {
-        return PasswordEncryption::from($this->string('password_encryption')->value());
+        return $this->string('password_encryption')->value();
     }
 }

@@ -20,12 +20,12 @@ it('adds connection pools for known databases and applies them on every node', f
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'missing', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('schema');
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasNoErrors();
     $pool = $database->connectionPools()->sole();
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     runJob(new ApplyConnectionPoolsJob($database->fresh()));
 
-    expect(renderedFile($database, 'pgbouncer.ini'))->toContain("app_pool = host=127.0.0.1 port=25060 dbname=defaultdb pool_size=20 pool_mode=transaction\n")
-        ->and($ssh->scriptAt(0))->toContain(base64_encode(renderedFile($database, 'pgbouncer.ini')))->toContain('databasify ctl reload databasify-pgbouncer');
+    expect($ssh->scriptAt(1))->toContain('| databasify pool create ')
+        ->and(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'app_pool', 'database' => 'defaultdb', 'size' => 20, 'mode' => 'transaction']);
     Queue::assertPushed(ApplyConnectionPoolsJob::class);
 
     $this->delete(projectUrl("/databases/{$database->id}/pools/{$pool->id}"))->assertSessionHasNoErrors();
@@ -34,11 +34,11 @@ it('adds connection pools for known databases and applies them on every node', f
 
 it('applies a new pool on the nodes straight away when the queue runs it', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'session', 'size' => 5])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(fileWrittenIn($ssh->scriptAt(0), '/srv/postgres/conf/pgbouncer.ini'))->toContain("reports = host=127.0.0.1 port=25060 dbname=defaultdb pool_size=5 pool_mode=session\n")
+    expect(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'reports', 'database' => 'defaultdb', 'size' => 5, 'mode' => 'session'])
         ->and($database->fresh()->operation)->toBeNull()
         ->and($database->serverLogs()->sole())
         ->name->toBe("{$database->seed()->server->name}: updating connection pools")

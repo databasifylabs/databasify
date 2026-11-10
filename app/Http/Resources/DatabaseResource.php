@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\DTOs\Databases\ConfigField;
-use App\Enums\Databases\PasswordEncryption;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Http\Request;
@@ -67,7 +66,7 @@ class DatabaseResource extends DatabaseListResource
     }
 
     /**
-     * @param  list<PasswordEncryption>  $encryptions
+     * @param  list<string>  $encryptions
      * @return list<array{value: string, label: string}>
      */
     private function encryptionChoicesOf(array $encryptions): array
@@ -76,7 +75,7 @@ class DatabaseResource extends DatabaseListResource
             return [];
         }
 
-        return array_map(fn (PasswordEncryption $encryption): array => $encryption->toOption(), $encryptions);
+        return array_map(fn (string $encryption): array => ['value' => $encryption, 'label' => $encryption], $encryptions);
     }
 
     private function networkOfNodes(): ?NetworkResource

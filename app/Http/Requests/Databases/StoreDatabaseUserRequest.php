@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Databases;
 
-use App\Enums\Databases\PasswordEncryption;
 use App\Http\Requests\Concerns\ResolvesRouteModel;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,7 +24,7 @@ class StoreDatabaseUserRequest extends FormRequest
                 Rule::notIn($this->routeDatabase()->engine_capabilities->reservedUsers ?? []),
                 Rule::unique('database_users', 'name')->where('database_id', $this->routeDatabase()->id),
             ],
-            'password_encryption' => ['nullable', Rule::enum(PasswordEncryption::class)->only($this->routeDatabase()->passwordEncryptions())],
+            'password_encryption' => ['nullable', 'string', Rule::in($this->routeDatabase()->passwordEncryptions())],
         ];
     }
 
@@ -34,8 +33,8 @@ class StoreDatabaseUserRequest extends FormRequest
         return $this->string('name')->value();
     }
 
-    public function encryption(): ?PasswordEncryption
+    public function encryption(): ?string
     {
-        return $this->enum('password_encryption', PasswordEncryption::class);
+        return $this->filled('password_encryption') ? $this->string('password_encryption')->value() : null;
     }
 }

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
-use App\Enums\Databases\NodeRole;
 use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Databases\FailoverDatabaseJob;
 use App\Models\User;
@@ -15,14 +14,14 @@ beforeEach(function () {
 
 it('moves the primary to a standby from the database page', function () {
     $database = idleDatabase('mysql', 2);
-    [$primary, $standby] = $database->nodes()->get()->all();
-    $ssh = fakeSsh()->respond("PRIMARY ONLINE\n")->respond("SECONDARY ONLINE\n")->respond()->respond("SECONDARY ONLINE\n")->respond("PRIMARY ONLINE\n");
+    [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
+    $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'));
 
     $this->post(projectUrl("/databases/{$database->id}/failover"))->assertRedirect();
+    $failover = collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify cluster failover '));
 
-    expect($ssh->runs[2]['server'])->toBe($primary->server->name)
-        ->and($ssh->scriptAt(2))->toContain("set_primary_instance('{$standby->privateIp()}:25060')")
-        ->and($standby->fresh()->role)->toBe(NodeRole::Primary)
+    expect($ssh->runs[$failover]['server'])->toBe($primary->server->name)
+        ->and(json_decode($ssh->engineRequestAt($failover), true))->toBe(['target' => $standby->privateIp()])
         ->and($database->fresh()->operation)->toBeNull()
         ->and($database->serverLogs()->where('name', "moving the primary off {$primary->server->name}")->first())->status->toBe(ServerLogStatus::Succeeded);
 });

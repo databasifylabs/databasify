@@ -119,7 +119,15 @@ function engineCapabilitiesPayload(string $engine): array
         default => [[], []],
     };
 
-    return ['commands' => ['node status'], 'passwordEncryptions' => [], 'defaultPasswordEncryption' => null, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
+    $commands = in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password'];
+    [$encryptions, $default] = match ($engine) {
+        'mysql' => [['caching_sha2_password', 'mysql_native_password'], 'caching_sha2_password'],
+        'mariadb' => [['mysql_native_password', 'ed25519', 'parsec'], 'mysql_native_password'],
+        'mongodb' => [['SCRAM-SHA-256', 'SCRAM-SHA-1'], 'SCRAM-SHA-256'],
+        default => [[], null],
+    };
+
+    return ['commands' => $commands, 'passwordEncryptions' => $encryptions, 'defaultPasswordEncryption' => $default, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
 }
 
 /**
@@ -159,6 +167,16 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
         ->respondToEngine('cluster failover', [])
         ->respondToEngine('member forget', [])
         ->respondToEngine('node reset', [])
+        ->respondToEngine('user create', ['created' => true])
+        ->respondToEngine('user set-password', [])
+        ->respondToEngine('user drop', ['dropped' => true])
+        ->respondToEngine('user grant', [])
+        ->respondToEngine('database create', ['created' => true])
+        ->respondToEngine('database drop', ['dropped' => true])
+        ->respondToEngine('pool list', ['pools' => []])
+        ->respondToEngine('pool create', [])
+        ->respondToEngine('pool update', [])
+        ->respondToEngine('pool delete', [])
         ->respondToEngine('operation status', $operation('succeeded'))
         ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0'])
         ->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))

@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Failover;
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
+use App\Engines\EngineClient;
+use App\Engines\Requests\ClusterFailover;
 use App\Models\Database;
 use RuntimeException;
 
 final readonly class PromoteStandby
 {
-    public function __construct(private RefreshDatabaseStatus $refresh) {}
+    public function __construct(
+        private RefreshDatabaseStatus $refresh,
+        private EngineClient $engine,
+    ) {}
 
     public function handle(Database $database): void
     {
@@ -21,7 +26,7 @@ final readonly class PromoteStandby
 
         throw_if($primary === null || $target === null, RuntimeException::class, 'No healthy primary and standby to switch between.');
 
-        $database->provider()->cluster()->failoverTo($primary, $target);
+        $this->engine->send($primary, new ClusterFailover($target->privateIp()), "moving the primary off {$primary->server->name}");
         $this->refresh->handle($database);
     }
 }

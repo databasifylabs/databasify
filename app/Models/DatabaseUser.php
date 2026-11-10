@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\Databases\PasswordEncryption;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -18,7 +17,7 @@ use Illuminate\Validation\ValidationException;
  * @property string $database_id
  * @property string $name
  * @property string $password
- * @property PasswordEncryption|null $password_encryption
+ * @property string|null $password_encryption
  * @property-read Database $database
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -51,11 +50,11 @@ class DatabaseUser extends Model
 
     public function hasEncryptionChoice(): bool
     {
-        return $this->password_encryption !== null;
+        return count($this->database->passwordEncryptions()) > 1;
     }
 
     protected function casts(): array
     {
-        return ['password' => 'encrypted', 'password_encryption' => PasswordEncryption::class];
+        return ['password' => 'encrypted'];
     }
 }

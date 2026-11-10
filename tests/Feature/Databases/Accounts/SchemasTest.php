@@ -14,20 +14,20 @@ it('creates and deletes databases over http', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $database->seed()->update(['role' => NodeRole::Primary]);
     idleDatabase('postgres', 1, DatabaseMode::Single, 'other')->schemas()->create(['name' => 'analytics']);
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'analytics'])->assertRedirect()->assertSessionHasNoErrors();
     $schema = $database->schemas()->where('name', 'analytics')->sole();
     $this->delete(projectUrl("/databases/{$database->id}/schemas/{$schema->id}"))->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($ssh->scriptAt(0))->toContain('pg_from')
-        ->and($ssh->scriptAt(1))->toContain("echo '".base64_encode("DROP DATABASE IF EXISTS \"analytics\" WITH (FORCE);\n")."' | pg_from")
+    expect($ssh->scriptAt(0))->toContain('| databasify database create ')
+        ->and(json_decode($ssh->engineRequestAt(count($ssh->runs) - 1), true))->toBe(['name' => 'analytics'])
         ->and($database->schemas()->pluck('name')->all())->toBe(['defaultdb']);
 });
 
 it('rejects database names that are invalid, reserved or taken', function (string $engine, mixed $name) {
     $database = idleDatabase($engine, 1, DatabaseMode::Single);
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => $name])->assertSessionHasErrors('name');
 
@@ -55,7 +55,7 @@ it('refuses databases on sentinel databases over http', function (string $engine
 it('only deletes databases of the database in the url', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     $foreign = idleDatabase('mysql', 1, DatabaseMode::Single, 'other')->schemas()->sole();
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     $this->delete(projectUrl("/databases/{$database->id}/schemas/{$foreign->id}"))->assertNotFound();
 
@@ -66,7 +66,7 @@ it('only deletes databases of the database in the url', function () {
 it('refuses to delete the default database over http', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $schema = $database->schemas()->sole();
-    $ssh = fakeSsh();
+    $ssh = fakeEngine();
 
     $this->delete(projectUrl("/databases/{$database->id}/schemas/{$schema->id}"))->assertSessionHasErrors(['schema' => "defaultdb is the default database and can't be deleted."]);
 

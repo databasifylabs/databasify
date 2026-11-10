@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Failover;
 
+use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
-use App\Jobs\Databases\RecoverDatabaseJob;
+use App\Engines\Flows\FlowContext;
+use App\Engines\Flows\RecoverClusterFlow;
 use App\Models\Database;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +16,8 @@ final readonly class RecoverDatabase
     public function __construct(
         private RefreshDatabaseStatus $refresh,
         private DetectQuorum $quorum,
+        private StartFlow $startFlow,
+        private RecoverClusterFlow $flow,
     ) {}
 
     public function handle(Database $database, bool $othersAreDown = false): void
@@ -22,8 +26,12 @@ final readonly class RecoverDatabase
         $this->refresh->handle($database);
         $this->ensureRecoverable($database, $othersAreDown);
 
-        $database->startOperation('Recover from a lost primary');
-        dispatch(new RecoverDatabaseJob($database, $othersAreDown));
+        $reachable = $database->reachableMembers();
+
+        $this->startFlow->handle($database, $this->flow, new FlowContext(
+            nodeIds: array_values(array_filter($reachable->modelKeys(), is_string(...))),
+            force: $othersAreDown || $reachable->count() === $database->memberCount(),
+        ));
     }
 
     private function ensureRecoverable(Database $database, bool $othersAreDown): void

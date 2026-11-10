@@ -7,7 +7,6 @@ use App\Actions\Databases\Certificates\EnsureNodeCertificates;
 use App\Actions\Databases\Certificates\QueueCertificateRenewal;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
-use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Databases\RenewCertificatesJob;
 use Illuminate\Support\Facades\Queue;
 
