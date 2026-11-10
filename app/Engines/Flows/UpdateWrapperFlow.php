@@ -17,6 +17,7 @@ final readonly class UpdateWrapperFlow implements Flow
         private FlowSteps $steps,
         private RollingSteps $rolling,
         private InstallPinnedWrapper $wrapper,
+        private WrapperResolver $wrappers,
     ) {}
 
     public function name(Database $database, FlowContext $context): string
@@ -30,7 +31,7 @@ final readonly class UpdateWrapperFlow implements Flow
             ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [
                 Step::finish("update {$node->server->name}", $this->steps->quick(fn () => $this->wrapper->handle($node))),
             ], failover: false),
-            Step::finish('record the wrapper version', $this->steps->quick(fn () => $flow->database->recordPinnedWrapper())),
+            Step::finish('record the wrapper version', $this->steps->quick(fn () => $flow->database->recordWrapper($this->wrappers->pinned()))),
         ];
     }
 

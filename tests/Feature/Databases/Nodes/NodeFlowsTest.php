@@ -18,6 +18,7 @@ use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
 use App\Services\Images\WrapperResolver;
+use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeServerConnection;
 
 /**
@@ -209,6 +210,6 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and($at($standby->server, 'host deploy'))->toBeLessThan($at($standby->server, 'node configure'))
         ->and($at($standby->server, 'node configure'))->toBeLessThan($at($standby->server, 'node ready'))
         ->and(requestOf($ssh, $primary->server, 'host deploy')['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
-        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()->wrapper_version->toBe(WrapperResolver::version())
+        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()->wrapper_version->toBe(WrapperResolver::version())->wrapper_digest->toBe(FakeImageRegistry::wrapperDigest())
         ->and($database->fresh()->config_fields)->toHaveCount(1);
 });

@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('available_image_digest', 80)->nullable();
             $table->string('available_image_release', 40)->nullable();
             $table->string('wrapper_version', 40)->nullable();
+            $table->string('wrapper_digest', 80)->nullable();
             $table->timestamp('retune_needed_at')->nullable();
             $table->unsignedTinyInteger('maintenance_day')->default(0);
             $table->unsignedTinyInteger('maintenance_hour')->default(3);

@@ -18,6 +18,8 @@ final readonly class InstallPinnedWrapper
 
     public function handle(DatabaseNode $node): void
     {
-        $this->engine->send($node, new HostWrapperUpdate($this->wrappers->pinned()), "{$node->server->name}: installing databasify ".WrapperResolver::version());
+        $wrapper = $this->wrappers->pinned();
+
+        $this->engine->send($node, new HostWrapperUpdate($wrapper->reference()), "{$node->server->name}: installing databasify {$wrapper->version}");
     }
 }

@@ -12,6 +12,7 @@ use App\Contracts\Engines\Flow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
+use App\Services\Images\WrapperResolver;
 
 final readonly class UpgradeFlow implements Flow
 {
@@ -22,6 +23,7 @@ final readonly class UpgradeFlow implements Flow
         private LearnEngine $learn,
         private LearnLogUnits $logUnits,
         private RefreshDatabaseStatus $refresh,
+        private WrapperResolver $wrappers,
     ) {}
 
     public function name(Database $database, FlowContext $context): string
@@ -43,7 +45,7 @@ final readonly class UpgradeFlow implements Flow
                 $this->refresh->handle($database);
                 $this->learn->handle($database, $database->primaryOrSeed());
                 $this->logUnits->handle($database, $database->primaryOrSeed());
-                $database->recordPinnedWrapper();
+                $database->recordWrapper($this->wrappers->pinned());
             })),
         ];
     }

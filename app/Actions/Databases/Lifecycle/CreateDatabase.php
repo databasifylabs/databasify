@@ -19,6 +19,7 @@ use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use App\Services\Images\WrapperResolver;
 use App\Support\Databases\DefaultAccount;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +30,7 @@ final readonly class CreateDatabase
         private StartFlow $startFlow,
         private CreateDatabaseFlow $createFlow,
         private EnsureNodesSized $sized,
+        private WrapperResolver $wrappers,
     ) {}
 
     public function handle(NewDatabase $data): Database
@@ -36,9 +38,10 @@ final readonly class CreateDatabase
         $draft = new Database(['engine' => $data->engine]);
         $engine = $draft->engine();
         $line = $data->versionLine ?? $engine->defaultLine;
-        $image = $data->image ?? $this->newestImageOf($draft, $line);
+        $image = $data->image ?? $this->unlessUnavailable(fn (): EngineImage => $this->newestImage->newest($draft, $line));
+        $wrapper = $this->unlessUnavailable($this->wrappers->pinned(...));
 
-        $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
+        $database = DB::transaction(function () use ($data, $engine, $line, $image, $wrapper): Database {
             $database = Database::query()->create(array_merge([
                 'name' => $data->name,
                 'engine' => $data->engine,
@@ -46,8 +49,7 @@ final readonly class CreateDatabase
                 'mode' => $data->mode(),
                 'status' => DatabaseStatus::Creating,
                 'settings' => $this->settingsFor($data, $engine),
-                'wrapper_version' => WrapperResolver::version(),
-            ], $image->toRow()));
+            ], $image->toRow(), $wrapper->toRow()));
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));
             $this->sized->handle($database);
@@ -98,10 +100,16 @@ final readonly class CreateDatabase
         return DefaultAccount::secrets();
     }
 
-    private function newestImageOf(Database $database, string $line): EngineImage
+    /**
+     * @template TImage
+     *
+     * @param  Closure(): TImage  $resolve
+     * @return TImage
+     */
+    private function unlessUnavailable(Closure $resolve): mixed
     {
         try {
-            return $this->newestImage->newest($database, $line);
+            return $resolve();
         } catch (ImageUnavailable $unavailable) {
             throw ValidationException::withMessages(['version_line' => "{$unavailable->getMessage()} Try again in a moment."]);
         }
