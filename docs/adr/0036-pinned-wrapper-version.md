@@ -1,6 +1,6 @@
 # 0036. Each app release pins one wrapper version
 
-- Status: Accepted
+- Status: Superseded by 0037
 - Date: 2026-11-10
 
 ## Context
