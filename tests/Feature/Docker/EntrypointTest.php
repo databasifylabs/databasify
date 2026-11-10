@@ -19,7 +19,7 @@ it('generates no secrets and sizes no Horizon workers inside the image', functio
 });
 
 it('runs the bundled Redis only when no external Redis is set', function (array $env, string $expected) {
-    $result = Process::env($env + ['REDIS_HOST' => false, 'REDIS_URL' => false])->run(['sh', '-c', '. "$0" --functions-only; uses_local_redis && echo bundled || echo external', base_path('docker/entrypoint.sh')]);
+    $result = Process::env($env + ['REDIS_HOST' => false, 'REDIS_URL' => false])->run(['sh', '-c', 'set -- --functions-only; . "$0"; uses_local_redis && echo bundled || echo external', base_path('docker/entrypoint.sh')]);
 
     expect(trim($result->output()))->toBe($expected);
 })->with([
