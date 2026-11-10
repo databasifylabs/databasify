@@ -71,3 +71,4 @@ Options that were tried or rejected, and why.
 | [0032](0032-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers              | Accepted           |
 | [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`                        | Accepted           |
 | [0034](0034-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                                 | Accepted           |
+| [0035](0035-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows            | Accepted           |

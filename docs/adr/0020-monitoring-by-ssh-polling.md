@@ -10,7 +10,7 @@ The app needs node status, resource metrics and alerts. Exporters or agents on e
 ## Decision
 
 - Every minute the scheduler queues unique status and metrics jobs for each database on the `monitoring` queue.
-- They run each engine's `lifecycle.status` and `monitoring.metrics` scripts over SSH and store the samples in the app database (`NodeMetricSample`).
+- They send `databasify node status` and `databasify node metrics` to each node, read the host's CPU, memory and disk with a small facts script (`ssh.databases.monitoring.metrics`), and store the samples in the app database (`NodeMetricSample`).
 - Alert thresholds are fixed in code: usage at or above 90% for 5 consecutive samples (`EvaluateResourceAlerts`).
 - The status refresh also keeps DNS records following the primary ([0014](0014-dns-hostnames.md)).
 - There is no Prometheus, exporter or agent.

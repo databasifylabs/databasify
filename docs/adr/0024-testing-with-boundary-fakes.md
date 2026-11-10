@@ -28,6 +28,6 @@ Most behaviour ends in an SSH script, a registry call or a provider API. CI cann
 
 - `tests/Pest.php`
 - `tests/Support/FakeServerConnection.php`
-- `tests/Feature/DatabaseProviders/ScriptSyntaxTest.php`
+- `tests/Support/FakeServerConnection.php`
 - `.claude/skills/adding-database-engine/rules/testing.md`
 - `.claude/agents/e2e-engine-tester.md`

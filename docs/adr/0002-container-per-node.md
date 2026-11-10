@@ -37,8 +37,8 @@ The host only runs Docker Engine, pinned to a fixed Docker and containerd versio
 
 ## Evidence
 
-- `app/DTOs/Databases/ContainerSpec.php`
+- `app/Actions/Databases/Nodes/DeployNode.php`
 - `resources/views/ssh/servers/docker/daemon.blade.php`
-- `resources/views/ssh/databases/nodes/deploy.blade.php`
+- `resources/views/ssh/databases/nodes/install-host-binary.blade.php`
 - `app/Rules/AvailableServer.php`
 - `config/databasify.php`

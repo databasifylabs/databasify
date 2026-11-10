@@ -28,5 +28,5 @@ When a database is created, `ImageResolver::newest()` asks the registry (`ghcr.i
 - `app/Services/Images/ImageResolver.php`
 - `app/Services/Images/OciRegistry.php`
 - `app/DTOs/Databases/EngineImage.php`
-- `resources/views/ssh/databases/containers/pull-image.blade.php`
+- `app/Engines/Requests/HostDeploy.php`
 - `config/databasify.php`

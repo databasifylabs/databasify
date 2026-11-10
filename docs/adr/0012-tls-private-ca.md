@@ -9,7 +9,7 @@ Every engine should serve TLS. Public certificates need a domain and a DNS provi
 
 ## Decision
 
-- Each database gets its own private CA (EC P-256, valid 10 years) and a server certificate per node (valid 825 days), minted on a node over SSH by `certificates/generate.blade.php` and read back. For MySQL (`rsaServerKey()`) the server key is RSA 2048 instead of EC; the CA stays EC P-256. A combined `server.pem` adds the `clientAuth` usage.
+- Each database gets its own private CA (EC P-256, valid 10 years) and a certificate per node (EC P-256, valid 825 days, `serverAuth` and `clientAuth`), issued by the app with PHP's openssl extension (`OwnCertificateAuthority`, `IssueNodeCertificates`). A node's certificate names the database hostnames, its SRV member host and its own addresses and hostnames. Each node gets its certificate, key and the CA with `databasify tls install`, which writes the files the engine needs and reloads it.
 - CA and certificates are stored in the encrypted database settings ([0013](0013-secrets-and-ssh-keys.md)).
 - Engines serve TLS themselves on fixed ports (`ClientPorts`): 25060 for SQL engines and MongoDB, 25061 for PgBouncer pools and for Valkey and Redis.
 - Engines registered with `publicCertificate()` (Valkey and Redis) use a Let's Encrypt wildcard `*.db.<zone>`, issued over ACME DNS-01 and stored on the DNS zone, whenever the database has a DNS zone.
@@ -27,10 +27,10 @@ Every engine should serve TLS. Public certificates need a domain and a DNS provi
 
 ## Evidence
 
-- `resources/views/ssh/databases/certificates/generate.blade.php`
+- `app/Support/Tls/OwnCertificateAuthority.php`
 - `app/Support/Databases/ClientPorts.php`
 - `app/Services/Acme/LetsEncrypt.php`
 - `app/Actions/Dns/IssueZoneCertificate.php`
 - `routes/console.php`
 - `app/Actions/Databases/Certificates/QueueCertificateRenewal.php`
-- `app/DatabaseProviders/Drivers/Postgres/Postgres.php`, `Mysql/Mysql.php`, `Mariadb/Mariadb.php`, `Mongodb/Mongodb.php` and `AbstractSentinelDriver.php` (`connection()`)
+- `app/Actions/Databases/Certificates/IssueNodeCertificates.php`
