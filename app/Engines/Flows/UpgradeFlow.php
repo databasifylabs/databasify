@@ -7,6 +7,7 @@ namespace App\Engines\Flows;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\LearnEngine;
+use App\Actions\Databases\Nodes\LearnLogUnits;
 use App\Contracts\Engines\Flow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
@@ -19,6 +20,7 @@ final readonly class UpgradeFlow implements Flow
         private RollingSteps $rolling,
         private DeployNode $deploy,
         private LearnEngine $learn,
+        private LearnLogUnits $logUnits,
         private RefreshDatabaseStatus $refresh,
     ) {}
 
@@ -40,6 +42,7 @@ final readonly class UpgradeFlow implements Flow
             Step::finish('read what the engine offers', $this->steps->quick(function () use ($database): void {
                 $this->refresh->handle($database);
                 $this->learn->handle($database, $database->primaryOrSeed());
+                $this->logUnits->handle($database, $database->primaryOrSeed());
                 $database->recordPinnedWrapper();
             })),
         ];

@@ -8,6 +8,7 @@ use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\LearnEngine;
+use App\Actions\Databases\Nodes\LearnLogUnits;
 use App\Actions\Databases\Recovery\ReconcileRestoredAccounts;
 use App\Contracts\Engines\Flow;
 use App\Engines\Data\DefaultAccount;
@@ -37,6 +38,7 @@ final readonly class CreateDatabaseFlow implements Flow
         private ApplyNodeFirewall $firewall,
         private RefreshDatabaseStatus $refresh,
         private LearnEngine $learn,
+        private LearnLogUnits $logUnits,
         private ReconcileRestoredAccounts $restoredAccounts,
     ) {}
 
@@ -55,7 +57,10 @@ final readonly class CreateDatabaseFlow implements Flow
             ...$nodes->map($this->bootstrapStepFor(...))->all(),
             ...$this->restoreStepsOf($flow),
             ...$joinSteps,
-            Step::finish('refresh the status', $this->steps->quick(fn (DatabaseFlow $flow) => $this->refresh->handle($flow->database))),
+            Step::finish('refresh the status', $this->steps->quick(function (DatabaseFlow $flow): void {
+                rescue(fn () => $this->logUnits->handle($flow->database, $flow->database->seed()));
+                $this->refresh->handle($flow->database);
+            })),
         ];
     }
 
