@@ -884,7 +884,12 @@ class Database extends Model implements Movable
 
     public function archivesForRecovery(): bool
     {
-        return $this->engine_capabilities?->offers('archive status') === true && ($this->versionLine()->archives ?? true);
+        return $this->offersArchives() && ($this->versionLine()->archives ?? true);
+    }
+
+    private function offersArchives(): bool
+    {
+        return $this->engine_capabilities?->offers('archive status') === true;
     }
 
     public function missingRecoveryMessage(): string
@@ -894,7 +899,7 @@ class Database extends Model implements Movable
 
     public function recoveryUnavailableMessage(): ?string
     {
-        if ($this->engine_capabilities?->offers('archive status') !== true || $this->archivesForRecovery()) {
+        if (! $this->offersArchives() || $this->archivesForRecovery()) {
             return null;
         }
 
@@ -962,9 +967,13 @@ class Database extends Model implements Movable
     public function connectionProfile(): ConnectionProfile
     {
         $engine = $this->engine();
-        $profile = $this->publicCertificateZone() !== null && $engine->publicConnection !== null ? $engine->publicConnection : $engine->connection;
+        $profile = ($this->publicCertificateZone() === null ? null : $engine->publicConnection) ?? $engine->connection;
 
-        return $this->dnsZone === null || $engine->serviceConnection === null ? $profile : $profile->withService($engine->serviceConnection);
+        if ($this->dnsZone === null || $engine->serviceConnection === null) {
+            return $profile;
+        }
+
+        return $profile->withService($engine->serviceConnection);
     }
 
     /**
@@ -973,16 +982,23 @@ class Database extends Model implements Movable
     public function environment(DatabaseEndpoints $endpoints): array
     {
         $engine = $this->engine();
-        $host = ['host' => $endpoints->public->host, 'port' => (string) $endpoints->public->port];
+        $host = $endpoints->public->host;
+        $port = (string) $endpoints->public->port;
 
         if ($engine->laravelConnection === null) {
-            return ['REDIS_CLIENT' => 'phpredis', 'REDIS_SCHEME' => 'tls', 'REDIS_HOST' => $host['host'], 'REDIS_PORT' => $host['port'], 'REDIS_PASSWORD' => $this->settings->secret(EngineSecrets::ADMIN)];
+            return [
+                'REDIS_CLIENT' => 'phpredis',
+                'REDIS_SCHEME' => 'tls',
+                'REDIS_HOST' => $host,
+                'REDIS_PORT' => $port,
+                'REDIS_PASSWORD' => $this->settings->secret(EngineSecrets::ADMIN),
+            ];
         }
 
         return [
             'DB_CONNECTION' => $engine->laravelConnection,
-            'DB_HOST' => $host['host'],
-            'DB_PORT' => $host['port'],
+            'DB_HOST' => $host,
+            'DB_PORT' => $port,
             'DB_DATABASE' => $this->settings->defaultSchema(),
             'DB_USERNAME' => $this->settings->defaultUsername(),
             'DB_PASSWORD' => $this->settings->defaultPassword(),

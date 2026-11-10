@@ -70,11 +70,23 @@ final readonly class CreateDatabase
     private function settingsFor(NewDatabase $data, Engine $engine): DatabaseSettings
     {
         return new DatabaseSettings(
-            secrets: $data->secrets ?? [...($engine->laravelConnection === null ? [] : DefaultAccount::secrets()), ...EngineSecrets::generate()],
+            secrets: $data->secrets ?? [...$this->accountSecretsOf($engine), ...EngineSecrets::generate()],
             config: $data->config,
             persistence: $data->persistence,
             restore: $data->restore,
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function accountSecretsOf(Engine $engine): array
+    {
+        if ($engine->laravelConnection === null) {
+            return [];
+        }
+
+        return DefaultAccount::secrets();
     }
 
     private function newestImageOf(Database $database, string $line): EngineImage

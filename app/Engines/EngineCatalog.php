@@ -53,9 +53,9 @@ final readonly class EngineCatalog
             publicCertificate: $flag('public_certificate'),
             persistenceChoice: $flag('persistence_choice'),
             migrationSource: self::migrationSourceOf($entry['migration_source'] ?? null),
-            connection: ConnectionProfile::fromArray(is_array($entry['connection'] ?? null) ? $entry['connection'] : []),
-            publicConnection: is_array($entry['public_connection'] ?? null) ? ConnectionProfile::fromArray($entry['public_connection']) : null,
-            serviceConnection: is_array($entry['service_connection'] ?? null) ? ServiceConnection::fromArray($entry['service_connection']) : null,
+            connection: self::connectionOf($entry['connection'] ?? null) ?? ConnectionProfile::fromArray([]),
+            publicConnection: self::connectionOf($entry['public_connection'] ?? null),
+            serviceConnection: self::serviceConnectionOf($entry['service_connection'] ?? null),
             laravelConnection: is_string($environment['connection'] ?? null) ? $environment['connection'] : null,
             environmentExtra: self::stringMapOf($environment['extra'] ?? []),
             readOnlyNodesVote: $flag('read_only_nodes_vote'),
@@ -85,7 +85,21 @@ final readonly class EngineCatalog
      */
     private static function stringMapOf(mixed $values): array
     {
-        return is_array($values) ? array_filter($values, fn (mixed $value, int|string $key): bool => is_string($value) && is_string($key), ARRAY_FILTER_USE_BOTH) : [];
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_filter($values, fn (mixed $value, int|string $key): bool => is_string($value) && is_string($key), ARRAY_FILTER_USE_BOTH);
+    }
+
+    private static function connectionOf(mixed $connection): ?ConnectionProfile
+    {
+        return is_array($connection) ? ConnectionProfile::fromArray($connection) : null;
+    }
+
+    private static function serviceConnectionOf(mixed $connection): ?ServiceConnection
+    {
+        return is_array($connection) ? ServiceConnection::fromArray($connection) : null;
     }
 
     private static function migrationSourceOf(mixed $source): ?SourceForm
