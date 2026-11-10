@@ -20,13 +20,13 @@ final readonly class RecordMigratedSchemas
     public function handle(DatabaseMigration $migration): void
     {
         $database = $migration->database;
-        $default = $database->settings->defaultUsername();
 
         if (! $database->managesAccounts()) {
             return;
         }
 
         $copied = $this->record->handle($database, $this->sourceDatabasesOf($migration));
+        $default = $database->settings->defaultUsername();
 
         if ($copied === [] || $default === '') {
             return;

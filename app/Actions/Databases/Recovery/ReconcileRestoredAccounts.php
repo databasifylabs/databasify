@@ -22,19 +22,25 @@ final readonly class ReconcileRestoredAccounts
     public function handle(Database $database): void
     {
         $source = $database->settings->restore;
+
         if ($source === null || ! $database->managesAccounts()) {
             return;
         }
 
         try {
             $listed = $this->verifiedAccountsOf($database);
-            $database->users()->whereIn('name', $listed->users)->get()->each(fn (DatabaseUser $user) => $this->primary->handle($database, new UserSetPassword($user->name, $user->password, $user->password_encryption), "Reset the restored password of {$user->name}"));
+            $database->users()->whereIn('name', $listed->users)->get()->each(fn (DatabaseUser $user) => $this->resetPasswordOf($database, $user));
             $database->forgetAccountsMissingFrom($listed);
         } catch (OperationStopped $stopped) {
             throw $stopped;
         } catch (Throwable $exception) {
             $this->logUnverifiedAccountsOf($database, $source, $exception);
         }
+    }
+
+    private function resetPasswordOf(Database $database, DatabaseUser $user): void
+    {
+        $this->primary->handle($database, new UserSetPassword($user->name, $user->password, $user->password_encryption), "Reset the restored password of {$user->name}");
     }
 
     private function verifiedAccountsOf(Database $database): ServerAccounts

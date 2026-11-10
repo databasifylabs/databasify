@@ -35,8 +35,10 @@ final readonly class RefreshRecoveryStatus
             return ArchiveStatus::unreadable("{$database->name} has no healthy primary to read the archive from.");
         }
 
+        $log = $backUpNow ? "{$primary->server->name}: backing up now" : null;
+
         try {
-            return ArchiveStatus::fromEngine($this->engine->send($primary, new EngineArchiveStatus($backUpNow), $backUpNow ? "{$primary->server->name}: backing up now" : null));
+            return ArchiveStatus::fromEngine($this->engine->send($primary, new EngineArchiveStatus($backUpNow), $log));
         } catch (EngineError|SshConnectionFailed|SshAccessDenied) {
             return $this->unreachable($primary);
         } catch (Throwable $exception) {

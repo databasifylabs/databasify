@@ -31,11 +31,23 @@ final readonly class ArchiveFlow implements Flow
         $database = $flow->database;
 
         return [
-            ...$database->nodes()->with('server')->orderBy('position')->get()->toBase()
-                ->map(fn (DatabaseNode $node): Step => Step::prepare("configure {$node->server->name}", $this->steps->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the archive"))))
-                ->all(),
-            Step::finish('take a first backup', $this->steps->quick(fn () => $database->pointInTimeRecovery === null ? null : $this->refresh->handle($database->pointInTimeRecovery, backUpNow: true))),
+            ...$database->nodesWithServers()->toBase()->map(fn (DatabaseNode $node): Step => $this->configureStepFor($database, $node))->all(),
+            Step::finish('take a first backup', $this->steps->quick(fn () => $this->backUp($database))),
         ];
+    }
+
+    private function configureStepFor(Database $database, DatabaseNode $node): Step
+    {
+        return Step::prepare("configure {$node->server->name}", $this->steps->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the archive")));
+    }
+
+    private function backUp(Database $database): void
+    {
+        if ($database->pointInTimeRecovery === null) {
+            return;
+        }
+
+        $this->refresh->handle($database->pointInTimeRecovery, backUpNow: true);
     }
 
     public function cleanup(DatabaseFlow $flow): void {}

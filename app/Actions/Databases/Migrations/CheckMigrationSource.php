@@ -17,6 +17,8 @@ final readonly class CheckMigrationSource
 
     public function handle(Database $database, MigrationSource $source): SourceReport
     {
-        return SourceReport::fromEngine($this->primary->handle($database, new MigrationCheck(EngineSource::of($source), $source->databases), 'Check the migration source'));
+        $check = new MigrationCheck(EngineSource::of($source), $source->databases);
+
+        return SourceReport::fromEngine($this->primary->handle($database, $check, 'Check the migration source'));
     }
 }

@@ -36,11 +36,19 @@ final readonly class ReadDatabaseMetrics
     private function metricsOf(Database $database, DatabaseNode $node): NodeMetrics
     {
         try {
-            $host = KeyValueOutput::parse($node->ssh()->exec('ssh.databases.monitoring.metrics', ['directory' => "/srv/{$database->engine}"]));
+            $values = [...$this->hostMetricsOf($database, $node), ...$this->engine->send($node, new EngineNodeMetrics)->toValues()];
 
-            return new NodeMetrics($node->id, $node->server->name, true, [...$host, ...$this->engine->send($node, new EngineNodeMetrics)->toValues()]);
+            return new NodeMetrics($node->id, $node->server->name, true, $values);
         } catch (Throwable) {
             return NodeMetrics::unreachable($node);
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function hostMetricsOf(Database $database, DatabaseNode $node): array
+    {
+        return KeyValueOutput::parse($node->ssh()->exec('ssh.databases.monitoring.metrics', ['directory' => "/srv/{$database->engine}"]));
     }
 }

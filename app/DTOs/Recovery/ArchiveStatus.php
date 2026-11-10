@@ -26,9 +26,9 @@ final readonly class ArchiveStatus
     {
         return new self(
             backups: $status->backups,
-            earliest: $status->earliest === null ? null : CarbonImmutable::parse($status->earliest),
-            latest: $status->latest === null ? null : CarbonImmutable::parse($status->latest),
-            lastBackup: $status->lastBackup === null ? null : CarbonImmutable::parse($status->lastBackup),
+            earliest: self::timeOf($status->earliest),
+            latest: self::timeOf($status->latest),
+            lastBackup: self::timeOf($status->lastBackup),
             problem: $status->problem,
         );
     }
@@ -101,6 +101,11 @@ final readonly class ArchiveStatus
     private function isStaleAt(CarbonInterface $now): bool
     {
         return $this->backups > 0 && ($this->latest === null || $this->latest->diffInMinutes($now) > self::STALE_AFTER_MINUTES);
+    }
+
+    private static function timeOf(?string $time): ?CarbonImmutable
+    {
+        return $time === null ? null : CarbonImmutable::parse($time);
     }
 
     private static function momentOf(string $epoch): ?CarbonImmutable

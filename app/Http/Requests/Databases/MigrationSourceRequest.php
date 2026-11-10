@@ -35,7 +35,11 @@ class MigrationSourceRequest extends FormRequest
         $database = $this->routeDatabase();
         $form = $database->engine()->migrationSource;
 
-        return $form === null ? null : new SourceForm($form->defaultPort, $form->credentialsRequired, $form->selectsDatabases, $database->engine_capabilities->reservedDatabases ?? []);
+        if ($form === null) {
+            return null;
+        }
+
+        return new SourceForm($form->defaultPort, $form->credentialsRequired, $form->selectsDatabases, $database->engine_capabilities->reservedDatabases ?? []);
     }
 
     public function source(): MigrationSource
