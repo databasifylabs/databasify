@@ -24,7 +24,7 @@ final readonly class ApplyConnectionPools
 
     public function handle(Database $database): void
     {
-        $wanted = $database->connectionPools()->get()->map(fn (ConnectionPool $pool): Pool => new Pool($pool->name, $pool->schema, $pool->size, $pool->mode->value))->keyBy('name');
+        $wanted = $database->connectionPools()->get()->map($this->poolOf(...))->keyBy(fn (Pool $pool): string => $pool->name);
         $nodes = $database->nodesWithServers();
 
         $this->nodeRunner->each(
@@ -32,6 +32,11 @@ final readonly class ApplyConnectionPools
             fn (DatabaseNode $node) => $this->syncOn($node, $wanted->all()),
             "updating connection pools on {$nodes->count()} nodes",
         );
+    }
+
+    private function poolOf(ConnectionPool $pool): Pool
+    {
+        return new Pool($pool->name, $pool->schema, $pool->size, $pool->mode->value);
     }
 
     /**

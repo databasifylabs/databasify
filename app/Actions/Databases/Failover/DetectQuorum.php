@@ -16,10 +16,10 @@ final readonly class DetectQuorum
 
     public function handle(Database $database): bool
     {
-        return $database->reachableMembers()->contains(fn (DatabaseNode $node): bool => $this->seesMajority($database, $node));
+        return $database->reachableMembers()->contains($this->seesMajority(...));
     }
 
-    private function seesMajority(Database $database, DatabaseNode $node): bool
+    private function seesMajority(DatabaseNode $node): bool
     {
         try {
             return $this->engine->send($node, new ClusterQuorum)->hasMajority();

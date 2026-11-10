@@ -19,10 +19,11 @@ use Tests\Support\FakeServerConnection;
 
 function payloadsOf(FakeServerConnection $ssh, string $command): array
 {
-    return array_values(collect($ssh->runs)->keys()
+    return collect($ssh->runs)->keys()
         ->filter(fn (int $index): bool => str_contains($ssh->scriptAt($index), "| databasify {$command} "))
         ->map(fn (int $index): array => ['server' => $ssh->runs[$index]['server'], 'request' => json_decode($ssh->engineRequestAt($index), true)])
-        ->all());
+        ->values()
+        ->all();
 }
 
 it('creates a user with grants on the primary', function () {
@@ -33,9 +34,10 @@ it('creates a user with grants on the primary', function () {
 
     resolve(CreateDatabaseUser::class)->handle($database, 'reporting');
 
-    expect(payloadsOf($ssh, 'user create'))->toHaveCount(1)
-        ->and(payloadsOf($ssh, 'user create')[0]['server'])->toBe($primary->name)
-        ->and(payloadsOf($ssh, 'user create')[0]['request'])->name->toBe('reporting')->grants->toBe([['database' => $database->settings->defaultSchema(), 'access' => 'write']]);
+    $creates = payloadsOf($ssh, 'user create');
+    expect($creates)->toHaveCount(1)
+        ->and($creates[0]['server'])->toBe($primary->name)
+        ->and($creates[0]['request'])->name->toBe('reporting')->grants->toBe([['database' => $database->settings->defaultSchema(), 'access' => 'write']]);
 });
 
 it('retries on the new primary after not_primary', function () {
@@ -103,7 +105,7 @@ it('rejoins each node after a forced quorum on the most advanced member', functi
 
     expect(payloadsOf($ssh, 'cluster force-quorum'))->toBe([['server' => $servers[1]->name, 'request' => ['othersDown' => true]]])
         ->and(collect(payloadsOf($ssh, 'cluster rejoin'))->pluck('server')->sort()->values()->all())->toBe(collect([$servers[0]->name, $servers[2]->name])->sort()->values()->all())
-        ->and(collect(payloadsOf($ssh, 'node wake'))->pluck('server')->count())->toBe(3)
+        ->and(payloadsOf($ssh, 'node wake'))->toHaveCount(3)
         ->and($database->fresh()->operation)->toBeNull();
 });
 

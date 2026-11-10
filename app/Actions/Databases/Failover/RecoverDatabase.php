@@ -24,9 +24,8 @@ final readonly class RecoverDatabase
     {
         $database->ensureIdle();
         $this->refresh->handle($database);
-        $this->ensureRecoverable($database, $othersAreDown);
-
         $reachable = $database->reachableMembers();
+        $this->ensureRecoverable($database, $reachable->count(), $othersAreDown);
 
         $this->startFlow->handle($database, $this->flow, new FlowContext(
             nodeIds: array_values(array_filter($reachable->modelKeys(), is_string(...))),
@@ -34,9 +33,8 @@ final readonly class RecoverDatabase
         ));
     }
 
-    private function ensureRecoverable(Database $database, bool $othersAreDown): void
+    private function ensureRecoverable(Database $database, int $reachable, bool $othersAreDown): void
     {
-        $reachable = $database->reachableMembers()->count();
         $members = $database->memberCount();
 
         if ($reachable === 0) {
