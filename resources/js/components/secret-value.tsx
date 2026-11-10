@@ -19,7 +19,7 @@ export default function SecretValue({
 
     return (
         <div className={cn('flex min-w-0 items-center gap-1', className)}>
-            <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all whitespace-normal">
+            <code className="rounded bg-muted px-2 py-1 font-mono text-xs whitespace-nowrap">
                 {revealed ? value : MASK}
             </code>
             <Button
