@@ -17,6 +17,7 @@ it('runs every command on its own schedule on one server only', function () {
         'databases:refresh-recovery' => ['*/5 * * * *', true, true],
         'networks:reconcile' => ['*/5 * * * *', true, true],
         'servers:release-abandoned-work' => ['*/5 * * * *', true, true],
+        'databases:update-wrappers' => ['*/5 * * * *', true, true],
         'databases:apply-maintenance' => ['0 * * * *', false, true],
         'databases:check-upgrades' => ['0 0 * * *', false, true],
         'databases:renew-certificates' => ['0 2 * * *', true, true],

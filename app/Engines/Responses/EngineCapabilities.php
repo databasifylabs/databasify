@@ -23,6 +23,7 @@ final readonly class EngineCapabilities implements EngineReply
         public array $reservedUsers,
         public array $reservedDatabases,
         public Ports $ports,
+        public int $wrapperApi = 0,
     ) {}
 
     public static function fromPayload(Payload $payload): static
@@ -34,6 +35,7 @@ final readonly class EngineCapabilities implements EngineReply
             reservedUsers: $payload->strings('reservedUsers'),
             reservedDatabases: $payload->strings('reservedDatabases'),
             ports: Ports::fromPayload($payload->object('ports')),
+            wrapperApi: $payload->nullableInt('wrapperApi') ?? 0,
         );
     }
 
@@ -43,7 +45,7 @@ final readonly class EngineCapabilities implements EngineReply
     }
 
     /**
-     * @return array{commands: list<string>, passwordEncryptions: list<string>, defaultPasswordEncryption: ?string, reservedUsers: list<string>, reservedDatabases: list<string>, ports: array{client: int, pool: ?int, peers: list<int>}}
+     * @return array{commands: list<string>, passwordEncryptions: list<string>, defaultPasswordEncryption: ?string, reservedUsers: list<string>, reservedDatabases: list<string>, ports: array{client: int, pool: ?int, peers: list<int>}, wrapperApi: int}
      */
     public function toArray(): array
     {
@@ -54,6 +56,7 @@ final readonly class EngineCapabilities implements EngineReply
             'reservedUsers' => $this->reservedUsers,
             'reservedDatabases' => $this->reservedDatabases,
             'ports' => $this->ports->toArray(),
+            'wrapperApi' => $this->wrapperApi,
         ];
     }
 }

@@ -6,7 +6,6 @@ namespace App\Engines\Flows;
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
-use App\Actions\Databases\Nodes\BuildNodeRequest;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\LearnEngine;
 use App\Actions\Databases\Recovery\ReconcileRestoredAccounts;
@@ -35,7 +34,6 @@ final readonly class CreateDatabaseFlow implements Flow
         private FlowSteps $steps,
         private EngineClient $engine,
         private DeployNode $deploy,
-        private BuildNodeRequest $nodeRequest,
         private ApplyNodeFirewall $firewall,
         private RefreshDatabaseStatus $refresh,
         private LearnEngine $learn,
@@ -108,7 +106,7 @@ final readonly class CreateDatabaseFlow implements Flow
         return [
             Step::prepare("deploy {$server}", $this->steps->quick(fn () => $this->deploy->handle($database, $node))),
             ...($node->isSeed() ? [Step::prepare('read what the engine offers', $this->steps->quick(fn () => $this->learn->handle($database, $node)))] : []),
-            Step::prepare("configure {$server}", $this->steps->quick(fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$server}: configuring the node"))),
+            $this->steps->configure($database, $node),
             Step::prepare("open the firewall on {$server}", $this->steps->quick(fn () => $this->firewall->handle($database, $node, $database->trustedCidrs()))),
             Step::prepare("start {$server}", $this->steps->send($node, new NodeStart, 'starting the engine')),
             Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()))),

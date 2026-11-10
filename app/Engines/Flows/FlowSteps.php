@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Engines\Flows;
 
+use App\Actions\Databases\Nodes\BuildNodeRequest;
 use App\Contracts\Engines\EngineReply;
 use App\Contracts\Engines\EngineRequest;
 use App\Engines\EngineClient;
+use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
 use Closure;
 
 final readonly class FlowSteps
 {
-    public function __construct(private EngineClient $engine) {}
+    public function __construct(
+        private EngineClient $engine,
+        private BuildNodeRequest $nodeRequest,
+    ) {}
 
     /**
      * @param  Closure(DatabaseFlow): mixed  $work
@@ -35,6 +40,13 @@ final readonly class FlowSteps
     public function send(DatabaseNode $node, EngineRequest $request, string $log): Closure
     {
         return $this->quick(fn () => $this->engine->send($node, $request, "{$node->server->name}: {$log}"));
+    }
+
+    public function configure(Database $database, DatabaseNode $node): Step
+    {
+        return Step::prepare("configure {$node->server->name}", $this->quick(
+            fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node"),
+        ));
     }
 
     /**

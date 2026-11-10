@@ -10,6 +10,7 @@ use App\Console\Commands\Databases\RefreshDatabaseStatusCommand;
 use App\Console\Commands\Databases\RefreshMigrationsCommand;
 use App\Console\Commands\Databases\RefreshRecoveryStatusCommand;
 use App\Console\Commands\Databases\RenewCertificatesCommand;
+use App\Console\Commands\Databases\UpdateDatabaseWrappersCommand;
 use App\Console\Commands\Networks\ReconcileNetworksCommand;
 use App\Console\Commands\Servers\ReleaseAbandonedWorkCommand;
 use App\Models\NodeMetricSample;
@@ -24,6 +25,7 @@ Schedule::onOneServer()->group(function () {
     Schedule::command(RefreshRecoveryStatusCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ReconcileNetworksCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ReleaseAbandonedWorkCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
+    Schedule::command(UpdateDatabaseWrappersCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ApplyMaintenanceCommand::class)->hourly();
     Schedule::command(CheckDatabaseUpgradesCommand::class)->daily();
     Schedule::command(RenewCertificatesCommand::class)->dailyAt('02:00')->withoutOverlapping(240);

@@ -34,6 +34,7 @@ final readonly class UpgradeFlow implements Flow
         return [
             ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [
                 Step::prepare("deploy {$node->server->name}", $this->steps->quick(fn () => $this->deploy->handle($node->database, $node))),
+                $this->steps->configure($database, $node),
                 ...$this->rolling->backOnline($flow, $node),
             ]),
             Step::finish('read what the engine offers', $this->steps->quick(function () use ($database): void {

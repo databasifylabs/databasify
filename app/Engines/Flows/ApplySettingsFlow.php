@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Engines\Flows;
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
-use App\Actions\Databases\Nodes\BuildNodeRequest;
 use App\Contracts\Engines\Flow;
 use App\Engines\EngineClient;
 use App\Engines\Requests\ConfigApply;
@@ -21,7 +20,6 @@ final readonly class ApplySettingsFlow implements Flow
         private FlowSteps $steps,
         private RollingSteps $rolling,
         private EngineClient $engine,
-        private BuildNodeRequest $nodeRequest,
         private RefreshDatabaseStatus $refresh,
     ) {}
 
@@ -36,7 +34,7 @@ final readonly class ApplySettingsFlow implements Flow
         $primary = $database->nodes()->with('server')->findOrFail($flow->context->targetNodeId);
 
         return [
-            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->configureStepOn($database, $node)], failover: false),
+            ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->steps->configure($database, $node)], failover: false),
             Step::prepare('sync the settings', $this->steps->send($primary, new ConfigSync, 'syncing the settings')),
             ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->applyStepOn($node)], failover: false),
             Step::prepare('check for a restart', $this->steps->quick(fn (DatabaseFlow $flow) => $this->checkRestartOn($flow, $primary))),
@@ -48,13 +46,6 @@ final readonly class ApplySettingsFlow implements Flow
     public function cleanup(DatabaseFlow $flow): void
     {
         rescue(fn () => $this->refresh->handle($flow->database));
-    }
-
-    private function configureStepOn(Database $database, DatabaseNode $node): Step
-    {
-        return Step::prepare("configure {$node->server->name}", $this->steps->quick(
-            fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node"),
-        ));
     }
 
     private function applyStepOn(DatabaseNode $node): Step

@@ -32,7 +32,12 @@ final class FakeImageRegistry implements ImageRegistry
 
     public function publish(string $engine, string $tag, ?string $digest = null): self
     {
-        $this->digests[EngineCatalog::find($engine)->imageRepository][$tag] = $digest ?? self::digestFor($engine, $tag);
+        return $this->publishIn(EngineCatalog::find($engine)->imageRepository, $tag, $digest ?? self::digestFor($engine, $tag));
+    }
+
+    public function publishIn(string $repository, string $tag, string $digest): self
+    {
+        $this->digests[$repository][$tag] = $digest;
 
         return $this;
     }

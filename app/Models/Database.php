@@ -77,6 +77,7 @@ use LogicException;
  * @property string|null $available_image_repository
  * @property string|null $available_image_digest
  * @property string|null $available_image_release
+ * @property string|null $wrapper_image
  * @property CarbonImmutable|null $retune_needed_at
  * @property int $maintenance_day
  * @property int $maintenance_hour
@@ -90,7 +91,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'wrapper_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -754,6 +755,21 @@ class Database extends Model implements Movable
     public function recordInstalledImage(EngineImage $image): void
     {
         $this->update($image->toInstalledRow());
+    }
+
+    public function wrapperApi(): int
+    {
+        return $this->engine_capabilities->wrapperApi ?? 0;
+    }
+
+    public function wrapperImage(): string
+    {
+        return $this->wrapper_image ?? throw new LogicException("{$this->name} has no wrapper to install.");
+    }
+
+    public function forgetWrapperImage(): void
+    {
+        $this->update(['wrapper_image' => null]);
     }
 
     public function availableUpdateRefreshesImage(): bool

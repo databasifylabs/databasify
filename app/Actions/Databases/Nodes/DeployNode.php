@@ -25,7 +25,12 @@ final readonly class DeployNode
         $this->certificates->handle($database);
         $this->hostBinary->handle($node);
 
-        $this->engine->send($node, $this->deploymentOf($database, $node), "{$node->server->name}: deploying the engine");
+        $deployed = $this->engine->send($node, $this->deploymentOf($database, $node), "{$node->server->name}: deploying the engine");
+
+        if ($deployed->created || $deployed->replaced) {
+            $database->forgetWrapperImage();
+        }
+
         $this->certificate->handle($database->refresh(), $node);
     }
 

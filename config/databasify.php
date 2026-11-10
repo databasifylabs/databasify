@@ -8,6 +8,7 @@ return [
     'images' => [
         'registry' => env('DATABASIFY_IMAGE_REGISTRY', 'ghcr.io/databasifylabs'),
         'repository' => env('DATABASIFY_IMAGE_REPOSITORY', 'databasify-{engine}'),
+        'wrapper' => env('DATABASIFY_WRAPPER_REPOSITORY', 'databasify-wrapper'),
         'minimum_wrapper' => '0.1.0',
     ],
 
