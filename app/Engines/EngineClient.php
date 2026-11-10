@@ -10,6 +10,7 @@ use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Ssh\LogGroup;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineNotRunning;
+use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 use App\Models\Server;
@@ -53,7 +54,13 @@ final readonly class EngineClient
 
         $serverLog?->finish($exitCode);
 
-        return $request->reply()::fromPayload($this->payloadOf($output, $exitCode, $server));
+        try {
+            return $request->reply()::fromPayload($this->payloadOf($output, $exitCode, $server));
+        } catch (EngineUnsupported $unsupported) {
+            $serverLog?->skip($unsupported->getMessage());
+
+            throw $unsupported;
+        }
     }
 
     /**

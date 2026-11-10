@@ -99,6 +99,12 @@ class ServerLog extends Model
         $this->saveOutput(['status' => ServerLogStatus::Failed]);
     }
 
+    public function skip(string $reason): void
+    {
+        $this->buffer(self::noteOf("Skipped: {$reason}"));
+        $this->saveOutput(['status' => ServerLogStatus::Succeeded]);
+    }
+
     public function failBecauseOf(?Throwable $exception): void
     {
         $this->fail($exception?->getMessage() ?? 'the job stopped unexpectedly');

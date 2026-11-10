@@ -14,6 +14,7 @@ use App\Engines\Flows\RedeployNodeFlow;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
+use App\Enums\Servers\ServerLogStatus;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
@@ -142,7 +143,10 @@ it('falls back to node reset when member forget is unsupported', function () {
     advanceFlows();
 
     expect(sentTo($staying->server, $ssh))->toBe(['node status', 'node configure', 'member forget', 'node reset', 'cluster membership', 'node status'])
-        ->and(requestOf($ssh, $staying->server, 'node reset'))->toBe(['peers' => 1, 'hosts' => [$primary->privateIp(), $staying->privateIp()]]);
+        ->and(requestOf($ssh, $staying->server, 'node reset'))->toBe(['peers' => 1, 'hosts' => [$primary->privateIp(), $staying->privateIp()]])
+        ->and($staying->server->serverLogs()->where('name', 'like', '%forgetting%')->sole())
+        ->status->toBe(ServerLogStatus::Succeeded)
+        ->output->toContain('Skipped: use node reset');
 });
 
 it('fails over before removing the primary', function () {
