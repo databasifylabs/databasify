@@ -27,7 +27,7 @@ final readonly class IssueNodeCertificates
         foreach ($database->nodes()->with('server')->get() as $node) {
             $names = $node->ownCertificateNames();
 
-            if (IssuedCertificate::fromPem($settings->nodeCertificate($node->id, self::CERTIFICATE) ?? '')?->isCurrentFor($names) === true) {
+            if (IssuedCertificate::fromPem($settings->nodeCertificate($node->id, self::CERTIFICATE) ?? '')?->isCurrentForOnly($names) === true) {
                 continue;
             }
 

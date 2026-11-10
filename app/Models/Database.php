@@ -154,7 +154,7 @@ class Database extends Model implements Movable
             return $zone->hasCurrentCertificate() && $this->servesPublicCertificate();
         }
 
-        return $this->nodesWithServers()->every(fn (DatabaseNode $node): bool => IssuedCertificate::fromPem($this->settings->nodeCertificate($node->id, 'server.crt') ?? '')?->isCurrentFor($node->ownCertificateNames()) === true);
+        return $this->nodesWithServers()->every(fn (DatabaseNode $node): bool => IssuedCertificate::fromPem($this->settings->nodeCertificate($node->id, 'server.crt') ?? '')?->isCurrentForOnly($node->ownCertificateNames()) === true);
     }
 
     public function forgetNodeCertificates(DatabaseNode $node): void

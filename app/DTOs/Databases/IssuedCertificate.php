@@ -50,6 +50,14 @@ final readonly class IssuedCertificate
         return array_diff($names, $this->names) === [] && $this->expiresAt->isAfter(now()->addDays(self::RENEW_DAYS));
     }
 
+    /**
+     * @param  list<string>  $names
+     */
+    public function isCurrentForOnly(array $names): bool
+    {
+        return array_diff($this->names, $names) === [] && $this->isCurrentFor($names);
+    }
+
     private static function hasRsaKey(string $pem): bool
     {
         $key = openssl_pkey_get_public($pem);

@@ -13,7 +13,7 @@ Every engine should serve TLS. Public certificates need a domain and a DNS provi
 - CA and certificates are stored in the encrypted database settings ([0013](0013-secrets-and-ssh-keys.md)).
 - Engines serve TLS themselves on fixed ports (`ClientPorts`): 25060 for SQL engines and MongoDB, 25061 for PgBouncer pools and for Valkey and Redis.
 - Engines registered with `publicCertificate()` (Valkey and Redis) use a Let's Encrypt wildcard `*.db.<zone>`, issued over ACME DNS-01 and stored on the DNS zone, whenever the database has a DNS zone. Each node deploy issues the wildcard first when the zone has none, and each node records the fingerprint of the certificate it was given. The connection details switch to the public profile only once every node serves the current wildcard; if issuing fails, the nodes keep the private CA until the daily check succeeds.
-- A daily check at 02:00 renews certificates that expire within 30 days or no longer cover every hostname, or that a node does not serve yet, on ready and degraded databases; an offline database is renewed by the first check after it serves again.
+- A daily check at 02:00 renews certificates that expire within 30 days, no longer cover every hostname or still name a hostname the database left, or that a node does not serve yet, on ready and degraded databases; an offline database is renewed by the first check after it serves again.
 
 ## Consequences
 
