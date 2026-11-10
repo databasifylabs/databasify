@@ -47,6 +47,7 @@ use App\Support\Databases\ClientPorts;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -103,6 +104,8 @@ class Database extends Model implements Movable
     use BelongsToProject, HasUuids, MovesBetweenProjects;
 
     private const int STOP_TTL_SECONDS = 86400;
+
+    private const int DNS_LOCK_SECONDS = 300;
 
     public const string CERTIFICATE_AUTHORITY = 'ca.crt';
 
@@ -283,6 +286,11 @@ class Database extends Model implements Movable
         $host = $this->hostnamesUnder($zone)->primary->public;
 
         return new ServiceRecords($zone, $host, "{$record->prefix}.{$host}", $record->options, $this->name, $this->clientPort());
+    }
+
+    public function dnsLock(): Lock
+    {
+        return Cache::lock("database-dns:{$this->id}", self::DNS_LOCK_SECONDS);
     }
 
     public function moveToZone(?DnsZone $zone): void

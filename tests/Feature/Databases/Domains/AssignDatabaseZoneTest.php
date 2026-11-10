@@ -93,3 +93,15 @@ it('keeps the domain while the database is busy', function () {
         ->and($database->fresh()->dns_zone_id)->toBeNull();
     Http::assertNothingSent();
 });
+
+it('keeps the database in its domain when its records cannot be removed', function () {
+    Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false], 403)]);
+    $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
+    Queue::fake([AdvanceDatabaseFlow::class]);
+
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => null])->assertSessionHasErrors('dns_zone_id');
+
+    expect($database->fresh()->dns_zone_id)->toBe($database->dns_zone_id)
+        ->and($database->fresh()->operation)->toBeNull();
+    Queue::assertNothingPushed();
+});

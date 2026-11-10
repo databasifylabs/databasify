@@ -24,7 +24,7 @@ final readonly class DnsRecordPublisher
      */
     public function point(DnsZone $zone, string $name, array $addresses): void
     {
-        $this->onceChanged("dns:{$name}", $addresses, fn () => $this->sync($zone, DnsRecordType::A, $name, $addresses));
+        $this->onceChanged(DnsRecordType::A, $name, $addresses, fn () => $this->sync($zone, DnsRecordType::A, $name, $addresses));
     }
 
     /**
@@ -35,12 +35,24 @@ final readonly class DnsRecordPublisher
         $wanted = array_map(fn (ServiceTarget $target): string => $target->key(), $targets);
         $contents = array_map(fn (ServiceTarget $target): string => $target->toContent(), $targets);
 
-        $this->onceChanged("dns-srv:{$name}", $wanted, fn () => $this->sync($zone, DnsRecordType::Srv, $name, $contents));
+        $this->onceChanged(DnsRecordType::Srv, $name, $wanted, fn () => $this->sync($zone, DnsRecordType::Srv, $name, $contents));
     }
 
     public function describe(DnsZone $zone, string $host, ?string $value): void
     {
-        $this->onceChanged("dns-txt:{$host}", $value ?? '', fn () => $this->sync($zone, DnsRecordType::Txt, $host, $value === null ? [] : [$value]));
+        $values = $value === null ? [] : [$value];
+
+        $this->onceChanged(DnsRecordType::Txt, $host, $values, fn () => $this->sync($zone, DnsRecordType::Txt, $host, $values));
+    }
+
+    public function clear(DnsZone $zone, DnsRecordType $type, string $name): void
+    {
+        $key = $this->cacheKeyOf($type, $name);
+
+        Cache::lock("{$key}:lock", self::LOCK_SECONDS)->block(self::WAIT_SECONDS, function () use ($zone, $type, $name, $key): void {
+            $this->sync($zone, $type, $name, []);
+            Cache::put($key, [], self::RECHECK_SECONDS);
+        });
     }
 
     public function addTxt(DnsZone $zone, string $name, string $value): void
@@ -75,10 +87,12 @@ final readonly class DnsRecordPublisher
     }
 
     /**
-     * @param  list<string>|string  $wanted
+     * @param  list<string>  $wanted
      */
-    private function onceChanged(string $key, array|string $wanted, Closure $apply): void
+    private function onceChanged(DnsRecordType $type, string $name, array $wanted, Closure $apply): void
     {
+        $key = $this->cacheKeyOf($type, $name);
+
         Cache::lock("{$key}:lock", self::LOCK_SECONDS)->block(self::WAIT_SECONDS, function () use ($key, $wanted, $apply): void {
             if (Cache::get($key) === $wanted) {
                 return;
@@ -87,5 +101,14 @@ final readonly class DnsRecordPublisher
             $apply();
             Cache::put($key, $wanted, self::RECHECK_SECONDS);
         });
+    }
+
+    private function cacheKeyOf(DnsRecordType $type, string $name): string
+    {
+        return match ($type) {
+            DnsRecordType::A => "dns:{$name}",
+            DnsRecordType::Srv => "dns-srv:{$name}",
+            DnsRecordType::Txt => "dns-txt:{$name}",
+        };
     }
 }

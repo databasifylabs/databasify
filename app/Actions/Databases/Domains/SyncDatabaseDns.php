@@ -25,6 +25,11 @@ final readonly class SyncDatabaseDns
 
     public function handle(Database $loaded): void
     {
+        $loaded->dnsLock()->get(fn () => $this->syncCurrent($loaded));
+    }
+
+    private function syncCurrent(Database $loaded): void
+    {
         $database = $loaded->fresh();
         $zone = $database?->dnsZone;
         $hostnames = $database?->hostnames();

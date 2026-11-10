@@ -129,7 +129,7 @@ it('publishes every member of a mongodb database on its own name in the srv reco
     resolve(SyncDatabaseDns::class)->handle($database->fresh() ?? $database);
 
     expect(Cache::get('dns-srv:_mongodb._tcp.orders.db.example.com'))->toBe($hosts->map(fn (string $host): string => "{$host}:25060")->all())
-        ->and(Cache::get('dns-txt:orders.db.example.com'))->toBe('replicaSet=databasify&authSource=admin')
+        ->and(Cache::get('dns-txt:orders.db.example.com'))->toBe(['replicaSet=databasify&authSource=admin'])
         ->and(Cache::get("dns:{$hosts[1]}"))->toBe([$members[1]->server->public_ip])
         ->and(Cache::has("dns:orders-node-{$reader->position}.db.example.com"))->toBeFalse()
         ->and($database->certificateNames())->toContain(...$hosts->all())
@@ -205,4 +205,14 @@ it('logs a failing dns sync once until it recovers', function () {
     $sync();
 
     expect($failures())->toBe(2);
+});
+
+it('leaves the records alone while the domain of the database changes', function () {
+    fakeCloudflare([]);
+    $database = withZone(idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db'));
+    $database->dnsLock()->get();
+
+    resolve(SyncDatabaseDns::class)->handle($database);
+
+    Http::assertNothingSent();
 });

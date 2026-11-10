@@ -14,6 +14,7 @@ use App\Models\DatabaseNode;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeServerConnection;
@@ -98,6 +99,21 @@ it('removes the database dns records while deleting', function () {
 
     expect(Database::query()->count())->toBe(0);
     expect(Http::recorded(fn (Request $request): bool => $request->method() === 'DELETE'))->toHaveCount(4);
+});
+
+it('removes every name the database claimed at the provider, whatever the cache says', function () {
+    fakeCloudflare();
+    $database = withZone(idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db'));
+    withReadOnlyNode($database, ['name' => 'reports']);
+    $names = $database->hostnamesClaimedUnder($database->dnsZone);
+    collect($names)->each(fn (string $name) => Cache::put("dns:{$name}", [], 3600));
+    fakeEngine();
+
+    resolve(TearDownDatabase::class)->handle($database->fresh() ?? $database, eraseData: false, force: false);
+
+    $read = collect(Http::recorded(fn (Request $request): bool => $request->method() === 'GET'))->map(fn (array $pair): string => $pair[0]['name']);
+    expect($read->sort()->values()->all())->toBe(collect($names)->sort()->values()->all())
+        ->and(Http::recorded(fn (Request $request): bool => $request->method() === 'DELETE'))->toHaveCount(count($names));
 });
 
 it('deletes the database even when cloudflare refuses to remove its records, and says so on the server', function () {

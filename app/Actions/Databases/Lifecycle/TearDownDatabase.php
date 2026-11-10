@@ -17,6 +17,8 @@ use Throwable;
 
 final readonly class TearDownDatabase
 {
+    private const int DNS_WAIT_SECONDS = 60;
+
     public function __construct(
         private RemoveNodeFirewall $firewall,
         private ClearDatabaseDns $dns,
@@ -33,13 +35,15 @@ final readonly class TearDownDatabase
             fn (DatabaseNode $node) => $this->tearDown($database, $node, $eraseData, $force),
             "tearing down {$nodes->count()} nodes",
         );
-        $this->clearDnsOf($database);
 
         if ($deleteBackups) {
             $this->deleteBackupsOf($database);
         }
 
-        DB::transaction(fn () => $database->delete());
+        $database->dnsLock()->block(self::DNS_WAIT_SECONDS, function () use ($database): void {
+            $this->clearDnsOf($database);
+            DB::transaction(fn () => $database->delete());
+        });
     }
 
     private function tearDown(Database $database, DatabaseNode $node, bool $eraseData, bool $force): void

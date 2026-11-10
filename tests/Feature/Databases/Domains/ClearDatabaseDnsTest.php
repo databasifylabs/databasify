@@ -43,3 +43,14 @@ it('withdraws the mongodb service, its options and every member name', function 
         ->and(Cache::get('dns-srv:_mongodb._tcp.orders.db.example.com'))->toBe([]);
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
 });
+
+it('removes the records at the provider even when the cache says the names are already empty', function () {
+    fakeCloudflare();
+    $database = withZone(idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db'));
+    withReadOnlyNode($database, ['name' => 'reports']);
+    collect($database->hostnamesClaimedUnder($database->dnsZone))->each(fn (string $name) => Cache::put("dns:{$name}", [], 3600));
+
+    resolve(ClearDatabaseDns::class)->handle($database);
+
+    expect(Http::recorded(fn (Request $request): bool => $request->method() === 'DELETE'))->toHaveCount(6);
+});

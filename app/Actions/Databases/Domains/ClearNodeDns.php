@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Domains;
 
+use App\Enums\Dns\DnsRecordType;
 use App\Models\DatabaseNode;
 use App\Services\Dns\DnsRecordPublisher;
 
@@ -32,7 +33,7 @@ final readonly class ClearNodeDns
         $records = $node->database->serviceRecords();
 
         if ($records !== null && $node->isMember()) {
-            $this->dns->point($records->zone, $records->memberHostOf($node), []);
+            $this->dns->clear($records->zone, DnsRecordType::A, $records->memberHostOf($node));
         }
     }
 }
