@@ -55,6 +55,27 @@ final readonly class Payload
         return is_bool($value) ? $value : throw $this->unexpected($key);
     }
 
+    public function int(string $key): int
+    {
+        $value = $this->valueOf($key);
+
+        return is_int($value) ? $value : throw $this->unexpected($key);
+    }
+
+    public function nullableInt(string $key): ?int
+    {
+        $value = $this->valueOf($key);
+
+        return $value === null || is_int($value) ? $value : throw $this->unexpected($key);
+    }
+
+    public function nullableObject(string $key): ?self
+    {
+        $value = $this->valueOf($key);
+
+        return $value === null ? null : $this->object($key);
+    }
+
     public function object(string $key): self
     {
         $value = $this->valueOf($key);

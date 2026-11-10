@@ -10,6 +10,7 @@ it('runs every command on its own schedule on one server only', function () {
         ->mapWithKeys(fn (Event $event): array => [(string) preg_replace("/^.*'artisan' /", '', (string) $event->command) => [$event->expression, $event->withoutOverlapping, $event->onOneServer]]);
 
     expect($events->all())->toBe([
+        'databases:advance-flows' => ['* * * * *', true, true],
         'databases:refresh-status' => ['* * * * *', true, true],
         'databases:record-metrics' => ['* * * * *', true, true],
         'databases:refresh-migrations' => ['* * * * *', true, true],

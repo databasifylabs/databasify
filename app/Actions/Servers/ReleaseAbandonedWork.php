@@ -17,7 +17,7 @@ final readonly class ReleaseAbandonedWork
 
         ServerLog::query()->running()->startedBefore($cutoff)->lazyById()
             ->each(fn (ServerLog $log) => $log->fail('the worker stopped before this finished'));
-        Database::query()->operationStartedBefore($cutoff)->lazyById()
+        Database::query()->operationStartedBefore($cutoff)->withoutRunningFlow()->lazyById()
             ->each(fn (Database $database) => $database->finishOperation());
     }
 }

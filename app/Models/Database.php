@@ -486,6 +486,15 @@ class Database extends Model implements Movable
      * @param  Builder<self>  $query
      */
     #[Scope]
+    protected function withoutRunningFlow(Builder $query): void
+    {
+        $query->whereDoesntHave('flows', fn (Builder $flows) => $flows->running());
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
     protected function operationStartedBefore(Builder $query, CarbonInterface $moment): void
     {
         $query->whereNotNull('operation')->where('operation_started_at', '<', $moment);
@@ -512,6 +521,12 @@ class Database extends Model implements Movable
         }
 
         $this->forgetStopFlags();
+    }
+
+    public function retitleOperation(string $title): void
+    {
+        self::query()->whereKey($this->id)->whereNotNull('operation')->update(['operation' => $title]);
+        $this->forceFill(['operation' => $title])->syncOriginalAttributes(['operation']);
     }
 
     public function finishOperation(): void
@@ -552,6 +567,14 @@ class Database extends Model implements Movable
     public function isBusy(): bool
     {
         return $this->operation !== null;
+    }
+
+    /**
+     * @return HasMany<DatabaseFlow, $this>
+     */
+    public function flows(): HasMany
+    {
+        return $this->hasMany(DatabaseFlow::class);
     }
 
     /**
