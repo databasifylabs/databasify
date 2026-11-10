@@ -49,9 +49,7 @@ Options that were tried or rejected, and why.
 | [0003](0003-go-wrapper-pid1.md)                             | Go wrapper is PID 1 and reads a process manifest                   | Accepted           |
 | [0004](0004-image-digest-pinning.md)                        | Engine images pinned by digest per database                        | Accepted           |
 | [0005](0005-engine-uid-64999.md)                            | Engine user is uid/gid 64999, data under `/srv/<engine>`           | Accepted           |
-| [0006](0006-step-shim-exit-69.md)                           | Engine steps run through a host shim; exit 69                      | Accepted           |
 | [0007](0007-operations-and-server-logs.md)                  | One operation per database, one server log per SSH call            | Accepted           |
-| [0008](0008-driver-contract.md)                             | One driver contract and a fluent engine registration               | Superseded by 0025 |
 | [0009](0009-ha-per-engine.md)                               | Each engine keeps its own HA mechanism                             | Accepted           |
 | [0010](0010-private-networking.md)                          | Provider VPC, custom network or WireGuard mesh                     | Accepted           |
 | [0011](0011-nftables-firewall.md)                           | One nftables table per database                                    | Accepted           |
@@ -65,14 +63,9 @@ Options that were tried or rejected, and why.
 | [0019](0019-providers-order-vm-only.md)                     | Cloud providers only order the server                              | Accepted           |
 | [0020](0020-monitoring-by-ssh-polling.md)                   | Monitoring is the app polling over SSH                             | Accepted           |
 | [0021](0021-app-state-sqlite-and-redis.md)                  | App state in SQLite, queues in Redis                               | Accepted           |
-| [0022](0022-safe-values-in-scripts.md)                      | Values reach rendered scripts only in safe forms                   | Accepted           |
 | [0023](0023-live-ui-by-polling.md)                          | Live UI by polling, Reverb only for streams                        | Accepted           |
 | [0024](0024-testing-with-boundary-fakes.md)                 | Tests fake the boundaries; real servers tested by hand             | Accepted           |
-| [0025](0025-database-driver-runs-server-steps.md)           | The database driver is one contract that runs its own server steps | Superseded by 0026 |
-| [0026](0026-database-driver-groups.md)                      | Database driver groups                                             | Accepted           |
-| [0027](0027-provider-http-client.md)                        | One provider HTTP client with timeouts and safe retries            | Superseded by 0030 |
 | [0028](0028-wireguard-address-blocks.md)                    | WireGuard address blocks of a chosen size, CGNAT only              | Accepted           |
-| [0029](0029-engine-scripts-per-version-line.md)             | Engine scripts per version line                                    | Accepted           |
 | [0030](0030-provider-http-client-with-dns-write-retries.md) | One provider HTTP client; DNS record writes retry too              | Accepted           |
 | [0031](0031-projects-as-a-global-scope.md)                  | Projects as a global scope                                         | Accepted           |
 | [0032](0032-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers              | Accepted           |

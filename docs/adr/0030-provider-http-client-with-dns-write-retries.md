@@ -5,7 +5,7 @@
 
 ## Context
 
-[0027](0027-provider-http-client.md) gave every provider one HTTP client and retried only `GET`, because a repeated server create orders a second server. DNS record writes do not carry that cost. In a live run a single dropped connection while Cloudflare deleted the record of a removed node failed the whole DNS sync, the every-minute status refresh swallowed the error, and the replica name kept pointing at the removed node with nothing on screen to say why.
+The first provider HTTP client gave every provider one client and retried only `GET`, because a repeated server create orders a second server. DNS record writes do not carry that cost. In a live run a single dropped connection while Cloudflare deleted the record of a removed node failed the whole DNS sync, the every-minute status refresh swallowed the error, and the replica name kept pointing at the removed node with nothing on screen to say why.
 
 ## Decision
 
