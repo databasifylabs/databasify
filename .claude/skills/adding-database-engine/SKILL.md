@@ -47,10 +47,10 @@ Pick the engine package whose replication model matches and copy its shape, not 
 
 | New engine replicates like                                              | Template repository and package                                 |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Built-in elections, the engine picks the primary (replica sets, Galera) | `engine-mongodb` (non-SQL), `engine-mariadb` (SQL, on `engine-mysql/family`) |
+| Built-in elections, the engine picks the primary (replica sets, Galera) | `engine-mongodb` (non-SQL), `engine-mariadb` (SQL, on `engine-mysql-family`) |
 | External HA manager plus a DCS (Patroni + etcd)                         | `engine-postgres`                                               |
-| Async replicas watched by a sentinel process                            | `engine-valkey/sentinel` (Valkey and Redis are two flavors of one package) |
-| Group replication with a shell (InnoDB Cluster)                         | `engine-mysql` (on its `family/` package)                       |
+| Async replicas watched by a sentinel process                            | `engine-sentinel-family` (Valkey and Redis are two flavors of one package) |
+| Group replication with a shell (InnoDB Cluster)                         | `engine-mysql` (on `engine-mysql-family`)                       |
 
 ## Non-negotiables
 

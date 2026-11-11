@@ -30,7 +30,7 @@ The engine is a Go package on the public engine SDK, in its own repository creat
 
 - `catalog.go` declares the fields users may edit with the SDK's `settings` package (`settings.Integer`, `Choice`, `Text`, `.Restarting()`, `.TunedFromServer()`, `.In("MB")`). Offer exactly what DigitalOcean offers for that engine.
 - Tuned values come from the server's CPU and memory (`config tune`) and stay automatic. `config fields` and `config show` are what the app's Settings tab renders.
-- A setting that differs per line reads `DATABASIFY_LINE` (set in the image), as `engine-valkey`'s `sentinel/catalog.go` does for `io-threads`.
+- A setting that differs per line reads `DATABASIFY_LINE` (set in the image), as `engine-sentinel-family`'s `catalog.go` does for `io-threads`.
 
 ## Processes and files
 
