@@ -66,7 +66,7 @@ it('shares the list fields with the database page', function () {
 it('lists the engines the create page offers', function () {
     $this->get(projectUrl('/databases/create'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('engines', count(Database::engines()))
-        ->has('engines.0', fn ($engine) => $engine->hasAll(['value', 'label', 'icon', 'category', 'max_standbys', 'lines']))
+        ->has('engines.0', fn ($engine) => $engine->hasAll(['value', 'label', 'icon', 'category', 'max_standbys', 'lines', 'community', 'author']))
         ->has('servers.data'));
 });
 

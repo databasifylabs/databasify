@@ -6,35 +6,41 @@ namespace App\Actions\Plugins;
 
 use App\DTOs\Plugins\PluginPackage;
 use App\DTOs\Plugins\PluginSource;
+use App\Models\Database;
 use App\Models\Plugin;
 use App\Services\Plugins\PluginDownloader;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final readonly class UpdatePlugin
 {
-    public function __construct(private PluginDownloader $downloader) {}
+    public function __construct(
+        private PluginDownloader $downloader,
+        private ConfirmCommunityEngines $confirmCommunityEngines,
+    ) {}
 
-    public function handle(Plugin $plugin, ?PluginSource $upload = null): Plugin
+    public function handle(Plugin $plugin, PluginSource $source): Plugin
     {
-        if ($upload === null && $plugin->wasUploaded()) {
+        if ($source->archivePath === null && $plugin->wasUploaded()) {
             throw ValidationException::withMessages(['archive' => "{$plugin->name} was uploaded, so upload its newer zip."]);
         }
 
-        $source = $upload->label ?? $plugin->source;
-        $download = $this->downloader->download($source, $upload?->archivePath);
+        $download = $this->downloader->download($source->label, $source->archivePath);
 
         try {
             $files = $this->downloader->packageIn($download);
             $package = PluginPackage::read($files);
             $this->ensureReplaces($plugin, $package);
+            $this->ensureKeepsEnginesInUse($plugin, $package);
+            $this->confirmCommunityEngines->handle(array_values(array_diff($package->engines, $plugin->engines)), $package->author, $source);
             $this->swap($plugin, $files);
         } finally {
             File::deleteDirectory($download);
         }
 
-        $plugin->update($package->toUpdateRow($source));
+        $plugin->update($package->toUpdateRow($source->label));
         Artisan::call('migrate', ['--force' => true]);
         Artisan::call('queue:restart');
 
@@ -51,6 +57,17 @@ final readonly class UpdatePlugin
 
         if ($incompatibility !== null) {
             throw ValidationException::withMessages(['source' => $incompatibility]);
+        }
+    }
+
+    private function ensureKeepsEnginesInUse(Plugin $plugin, PluginPackage $package): void
+    {
+        foreach (array_diff($plugin->engines, $package->engines) as $engine) {
+            $databases = Database::query()->withoutProject()->where('engine', $engine)->count();
+
+            if ($databases > 0) {
+                throw ValidationException::withMessages(['source' => "This update removes the {$engine} engine, still used by {$databases} ".Str::plural('database', $databases).'.']);
+            }
         }
     }
 

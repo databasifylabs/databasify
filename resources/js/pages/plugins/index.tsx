@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { Puzzle } from 'lucide-react';
 import PluginController from '@/actions/App/Http/Controllers/Plugins/PluginController';
 import BrandIcon from '@/components/brand-icon';
+import CommunityBadge from '@/components/community-badge';
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
@@ -23,6 +24,9 @@ function Plugin({ plugin }: { plugin: InstalledPlugin }) {
                         <div className="font-medium">
                             {plugin.name}{' '}
                             <Badge variant="outline">{plugin.version}</Badge>
+                            {plugin.community && (
+                                <CommunityBadge author={plugin.author} />
+                            )}
                         </div>
                         <div className="truncate font-mono text-xs text-muted-foreground">
                             {plugin.source}

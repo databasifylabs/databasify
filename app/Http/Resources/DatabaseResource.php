@@ -30,6 +30,8 @@ class DatabaseResource extends DatabaseListResource
             'engine' => $this->engine,
             'version_line' => $this->version_line,
             'version_label' => $this->versionLabel(),
+            'engine_community' => $engine->isCommunity(),
+            'engine_author' => $engine->author,
             'retune_needed' => $this->retune_needed_at !== null,
             'maintenance' => $this->maintenanceWindow()->toArray(now()),
             'domain' => $this->hostnames()?->primary->public,

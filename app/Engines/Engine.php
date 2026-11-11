@@ -39,10 +39,17 @@ final readonly class Engine
         public ?string $laravelConnection,
         public array $environmentExtra,
         public bool $readOnlyNodesVote,
+        public ?string $plugin,
+        public ?string $author,
     ) {}
 
+    public function isCommunity(): bool
+    {
+        return $this->plugin !== null;
+    }
+
     /**
-     * @return array{value: string, label: string, icon: ?string, category: string, max_standbys: int, lines: list<array{value: string, label: string, default: bool}>}
+     * @return array{value: string, label: string, icon: ?string, category: string, max_standbys: int, lines: list<array{value: string, label: string, default: bool}>, community: bool, author: ?string}
      */
     public function toArray(): array
     {
@@ -53,6 +60,8 @@ final readonly class Engine
             'category' => $this->category,
             'max_standbys' => self::MAX_STANDBYS,
             'lines' => array_map(fn (VersionLine $line): array => $line->toArray(), $this->lines),
+            'community' => $this->isCommunity(),
+            'author' => $this->author,
         ];
     }
 }

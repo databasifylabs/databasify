@@ -13,10 +13,12 @@ return new class extends Migration
         Schema::create('plugins', function (Blueprint $table) {
             $table->string('id', 40)->primary();
             $table->string('name');
+            $table->string('author');
             $table->string('version', 40);
             $table->string('source');
             $table->string('class');
             $table->json('autoload');
+            $table->json('engines');
             $table->string('requires', 100)->nullable();
             $table->string('icon')->nullable();
             $table->boolean('enabled')->default(true);

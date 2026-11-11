@@ -45,7 +45,7 @@ class PluginController extends Controller
 
     public function upgrade(UpdatePluginRequest $request, Plugin $plugin, UpdatePlugin $update): RedirectResponse
     {
-        $update->handle($plugin, $request->toPluginSource());
+        $update->handle($plugin, $request->toPluginSource($plugin));
 
         return back();
     }

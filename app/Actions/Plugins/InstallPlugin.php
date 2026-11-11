@@ -19,6 +19,7 @@ final readonly class InstallPlugin
     public function __construct(
         private PluginDownloader $downloader,
         private PluginLoader $loader,
+        private ConfirmCommunityEngines $confirmCommunityEngines,
     ) {}
 
     public function handle(PluginSource $source): Plugin
@@ -26,7 +27,7 @@ final readonly class InstallPlugin
         $download = $this->downloader->download($source->label, $source->archivePath);
 
         try {
-            $plugin = $this->stage($source->label, $this->downloader->packageIn($download));
+            $plugin = $this->stage($source, $this->downloader->packageIn($download));
         } finally {
             File::deleteDirectory($download);
         }
@@ -66,7 +67,7 @@ final readonly class InstallPlugin
         }
     }
 
-    private function stage(string $source, string $staging): Plugin
+    private function stage(PluginSource $source, string $staging): Plugin
     {
         $package = PluginPackage::read($staging);
         $incompatibility = Plugin::incompatibilityWith($package->requires);
@@ -79,7 +80,8 @@ final readonly class InstallPlugin
             throw ValidationException::withMessages(['source' => "A plugin called \"{$package->id}\" is already installed or the name is not allowed."]);
         }
 
-        $plugin = new Plugin($package->toInstallRow($source));
+        $this->confirmCommunityEngines->handle($package->engines, $package->author, $source);
+        $plugin = new Plugin($package->toInstallRow($source->label));
         File::ensureDirectoryExists(Plugin::root());
         File::copyDirectory($staging, $plugin->directory());
 

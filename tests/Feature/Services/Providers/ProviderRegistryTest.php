@@ -7,6 +7,7 @@ use App\DnsProviders\Drivers\Cloudflare\Cloudflare;
 use App\Enums\Servers\OperatingSystem;
 use App\Exceptions\Providers\UnknownProvider;
 use App\Models\DnsProvider;
+use App\Models\Plugin;
 use App\Models\ServerProvider;
 use App\Plugins\PluginContext;
 use App\Providers\DnsProviderServiceProvider;
@@ -44,9 +45,9 @@ it('refuses a provider nobody registered', function () {
 });
 
 it('picks up a provider registered later, without touching the built-ins', function () {
-    (new PluginContext('assets'))->server('acme')->label('Acme Cloud')->handler(Vultr::class)->images(['debian-13' => 'acme-debian'])->register();
+    (new PluginContext(new Plugin(['id' => 'acme'])))->server('acme')->label('Acme Cloud')->handler(Vultr::class)->images(['debian-13' => 'acme-debian'])->register();
 
-    expect(ServerProvider::providerFor('acme')->toArray())->toMatchArray(['value' => 'acme', 'label' => 'Acme Cloud', 'icon' => asset('assets/icons/server-providers/acme.svg')])
+    expect(ServerProvider::providerFor('acme')->toArray())->toMatchArray(['value' => 'acme', 'label' => 'Acme Cloud', 'icon' => asset('plugin-assets/acme/icons/server-providers/acme.svg')])
         ->and(OperatingSystem::Debian13->toArray()['providers'])->toBe(['digitalocean', 'hetzner', 'vultr', 'linode', 'acme'])
         ->and(OperatingSystem::Debian12->toArray()['providers'])->toBe(['hetzner', 'vultr', 'linode']);
 });

@@ -173,6 +173,8 @@ export type Database = {
     operation: string | null;
     network: NetworkSummary | null;
     version_line: string;
+    engine_community: boolean;
+    engine_author: string | null;
     version_label: string;
     engine_version: string | null;
     available_version: string | null;

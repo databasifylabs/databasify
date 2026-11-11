@@ -36,6 +36,7 @@ final readonly class EngineCatalog
 
         $setting = fn (string $key): string => config()->string(self::CONFIG.".{$id}.{$key}", '');
         $flag = fn (string $key): bool => config()->boolean(self::CONFIG.".{$id}.{$key}", false);
+        $optional = fn (string $key): ?string => is_string($entry[$key] ?? null) ? $entry[$key] : null;
         $icon = $setting('icon');
         $defaultLine = $setting('default_line');
         $environment = is_array($entry['environment'] ?? null) ? $entry['environment'] : [];
@@ -59,6 +60,8 @@ final readonly class EngineCatalog
             laravelConnection: is_string($environment['connection'] ?? null) ? $environment['connection'] : null,
             environmentExtra: self::stringMapOf($environment['extra'] ?? []),
             readOnlyNodesVote: $flag('read_only_nodes_vote'),
+            plugin: $optional('plugin'),
+            author: $optional('author'),
         );
     }
 

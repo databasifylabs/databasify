@@ -19,6 +19,7 @@ import {
     specsOf,
 } from '@/components/databases/describe';
 import BrandIcon from '@/components/brand-icon';
+import CommunityBadge from '@/components/community-badge';
 import StatusDot from '@/components/status-dot';
 import OperationLabel from '@/components/databases/operation-label';
 import StopOperationButton from '@/components/databases/stop-operation-button';
@@ -130,6 +131,11 @@ export default function ShowDatabase({
                                     {database.name}
                                 </h1>
                                 <StatusBadge status={database.status} />
+                                {database.engine_community && (
+                                    <CommunityBadge
+                                        author={database.engine_author}
+                                    />
+                                )}
                                 {database.operation && (
                                     <>
                                         <OperationLabel

@@ -20,6 +20,7 @@ import {
     Radio,
 } from '@/components/form/choice';
 import BrandIcon from '@/components/brand-icon';
+import CommunityBadge from '@/components/community-badge';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import NetworkMark, { networkSource } from '@/components/servers/network-mark';
@@ -48,6 +49,8 @@ type EngineOption = {
     category: string;
     max_standbys: number;
     lines: VersionLine[];
+    community: boolean;
+    author: string | null;
 };
 
 type Props = {
@@ -113,6 +116,11 @@ function EngineList({
                                         <span className="min-w-0 flex-1 truncate font-medium">
                                             {option.label}
                                         </span>
+                                        {option.community && (
+                                            <CommunityBadge
+                                                author={option.author}
+                                            />
+                                        )}
                                         {option.lines.length > 1 ? (
                                             <Select
                                                 value={line}

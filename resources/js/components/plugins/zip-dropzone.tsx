@@ -13,14 +13,21 @@ export default function ZipDropzone({
     id,
     name,
     hint,
+    onFileChange,
 }: {
     id: string;
     name: string;
     hint: string;
+    onFileChange?: () => void;
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [dragging, setDragging] = useState(false);
+
+    const choose = (chosen: File | null) => {
+        setFile(chosen);
+        onFileChange?.();
+    };
 
     const drop = (event: DragEvent<HTMLLabelElement>) => {
         event.preventDefault();
@@ -29,7 +36,7 @@ export default function ZipDropzone({
 
         if (input.current && dropped.length > 0) {
             input.current.files = dropped;
-            setFile(dropped[0]);
+            choose(dropped[0]);
         }
     };
 
@@ -38,7 +45,7 @@ export default function ZipDropzone({
             input.current.value = '';
         }
 
-        setFile(null);
+        choose(null);
     };
 
     return (
@@ -50,7 +57,7 @@ export default function ZipDropzone({
                 type="file"
                 accept=".zip,application/zip"
                 className="sr-only"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => choose(event.target.files?.[0] ?? null)}
             />
             {file ? (
                 <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">

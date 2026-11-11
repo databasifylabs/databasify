@@ -7,7 +7,7 @@ use App\Models\Plugin;
 use Illuminate\Support\Facades\DB;
 
 it('reads an autoload saved before the cast', function () {
-    $plugin = Plugin::query()->create(['id' => 'acme/backup', 'name' => 'Backup', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Backup', 'autoload' => new PluginAutoload([]), 'enabled' => true]);
+    $plugin = Plugin::query()->create(['id' => 'acme/backup', 'name' => 'Backup', 'author' => 'acme', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Backup', 'autoload' => new PluginAutoload([]), 'engines' => [], 'enabled' => true]);
 
     DB::table('plugins')->where('id', $plugin->id)->update(['autoload' => '{"Acme\\\\Backup\\\\":"src\/"}']);
 
@@ -15,7 +15,7 @@ it('reads an autoload saved before the cast', function () {
 });
 
 it('stores the autoload as the same json map', function () {
-    $plugin = Plugin::query()->create(['id' => 'acme/backup', 'name' => 'Backup', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Backup', 'autoload' => new PluginAutoload(['Acme\\Backup\\' => 'src/']), 'enabled' => true]);
+    $plugin = Plugin::query()->create(['id' => 'acme/backup', 'name' => 'Backup', 'author' => 'acme', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Backup', 'autoload' => new PluginAutoload(['Acme\\Backup\\' => 'src/']), 'engines' => [], 'enabled' => true]);
 
     expect(json_decode((string) DB::table('plugins')->where('id', $plugin->id)->value('autoload'), true))->toBe(['Acme\\Backup\\' => 'src/']);
 });

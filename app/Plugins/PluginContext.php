@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Exceptions\Plugins\UndeclaredEngine;
+use App\Models\Plugin;
+
 final readonly class PluginContext
 {
-    public function __construct(private string $assets) {}
+    public function __construct(private Plugin $plugin) {}
 
     public function database(string $id): RegisterEngine
     {
-        return RegisterEngine::make($id)->icon($this->asset("icons/database-providers/{$id}.svg"));
+        if (! in_array($id, $this->plugin->engines, true)) {
+            throw UndeclaredEngine::named($id);
+        }
+
+        return RegisterEngine::make($id)
+            ->icon($this->asset("icons/database-providers/{$id}.svg"))
+            ->community($this->plugin->id, $this->plugin->author);
     }
 
     public function dns(string $id): RegisterDnsProvider
@@ -25,6 +34,6 @@ final readonly class PluginContext
 
     public function asset(string $path): string
     {
-        return "{$this->assets}/{$path}";
+        return "plugin-assets/{$this->plugin->id}/{$path}";
     }
 }

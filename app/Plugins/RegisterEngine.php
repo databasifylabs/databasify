@@ -27,6 +27,11 @@ final class RegisterEngine extends AbstractProviderRegistrar
         return $this->set('default_line', $default)->set('lines', $lines);
     }
 
+    public function community(string $plugin, string $author): static
+    {
+        return $this->set('plugin', $plugin)->set('author', $author);
+    }
+
     public function failoverHint(string $hint): static
     {
         return $this->set('failover_hint', $hint);

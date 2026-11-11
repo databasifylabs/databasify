@@ -50,8 +50,8 @@ it('scopes ready databases, primary nodes, enabled plugins and old samples', fun
     $primary->update(['role' => NodeRole::Primary]);
     $old = NodeMetricSample::query()->create(['database_node_id' => $primary->id, 'sampled_at' => now()->subDays(2), 'cpu_percent' => 1, 'memory_percent' => 1, 'disk_percent' => 1]);
     NodeMetricSample::query()->create(['database_node_id' => $primary->id, 'sampled_at' => now(), 'cpu_percent' => 1, 'memory_percent' => 1, 'disk_percent' => 1]);
-    $enabled = Plugin::query()->create(['id' => 'acme/on', 'name' => 'On', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\On', 'autoload' => new PluginAutoload([]), 'enabled' => true]);
-    Plugin::query()->create(['id' => 'acme/off', 'name' => 'Off', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Off', 'autoload' => new PluginAutoload([]), 'enabled' => false]);
+    $enabled = Plugin::query()->create(['id' => 'acme/on', 'name' => 'On', 'author' => 'acme', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\On', 'autoload' => new PluginAutoload([]), 'engines' => [], 'enabled' => true]);
+    Plugin::query()->create(['id' => 'acme/off', 'name' => 'Off', 'author' => 'acme', 'version' => '1.0.0', 'source' => 'local', 'class' => 'Acme\\Off', 'autoload' => new PluginAutoload([]), 'engines' => [], 'enabled' => false]);
 
     expect(Database::query()->ready()->pluck('id')->all())->toBe([$ready->id])
         ->and(DatabaseNode::query()->primary()->pluck('id')->all())->toBe([$primary->id])

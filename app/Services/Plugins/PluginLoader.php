@@ -58,7 +58,7 @@ final readonly class PluginLoader
 
     private function providerOf(Plugin $plugin): AbstractPlugin
     {
-        return $this->instantiate($plugin)->useContext(new PluginContext("plugin-assets/{$plugin->id}"));
+        return $this->instantiate($plugin)->useContext(new PluginContext($plugin));
     }
 
     private function start(AbstractPlugin $provider): void

@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import PluginController from '@/actions/App/Http/Controllers/Plugins/PluginController';
 import InputError from '@/components/input-error';
+import CommunityEngineWarning from '@/components/plugins/community-engine-warning';
 import ZipDropzone from '@/components/plugins/zip-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,7 +43,7 @@ export default function UpdatePluginDialog({
                     onSuccess={() => setOpen(false)}
                     className="space-y-5"
                 >
-                    {({ processing, errors }) => (
+                    {({ processing, errors, clearErrors }) => (
                         <>
                             {!plugin.uploaded && (
                                 <p className="rounded-xl border bg-muted/30 p-3 text-sm">
@@ -62,9 +63,15 @@ export default function UpdatePluginDialog({
                                         ? 'Upload the newer zip of this plugin, up to 50 MB.'
                                         : 'Or upload a newer zip of this plugin, up to 50 MB.'
                                 }
+                                onFileChange={() =>
+                                    clearErrors('community_engines')
+                                }
                             />
                             <InputError
                                 message={errors.source ?? errors.archive}
+                            />
+                            <CommunityEngineWarning
+                                message={errors.community_engines}
                             />
                             <DialogFooter>
                                 <DialogClose asChild>
@@ -74,7 +81,11 @@ export default function UpdatePluginDialog({
                                 </DialogClose>
                                 <Button disabled={processing}>
                                     <RefreshCw />
-                                    {processing ? 'Updating…' : 'Update'}
+                                    {processing
+                                        ? 'Updating…'
+                                        : errors.community_engines
+                                          ? 'Accept and update'
+                                          : 'Update'}
                                 </Button>
                             </DialogFooter>
                         </>

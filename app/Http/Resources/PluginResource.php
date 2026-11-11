@@ -21,6 +21,8 @@ class PluginResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'author' => $this->author,
+            'community' => $this->isCommunity(),
             'version' => $this->version,
             'source' => $this->source,
             'icon' => $this->iconUrl(),

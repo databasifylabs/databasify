@@ -19,6 +19,7 @@ class InstallPluginRequest extends FormRequest
         return [
             'source' => ['required_without:archive', 'nullable', 'string', 'max:255'],
             'archive' => ['required_without:source', 'nullable', 'file', 'mimes:zip', 'max:51200'],
+            'accepts_community_engines' => ['boolean'],
         ];
     }
 
@@ -26,8 +27,10 @@ class InstallPluginRequest extends FormRequest
     {
         $archive = $this->file('archive');
 
+        $accepts = $this->boolean('accepts_community_engines');
+
         return $archive instanceof UploadedFile
-            ? PluginSource::fromUpload($archive)
-            : new PluginSource($this->string('source')->trim()->value());
+            ? PluginSource::fromUpload($archive, $accepts)
+            : new PluginSource($this->string('source')->trim()->value(), acceptsCommunityEngines: $accepts);
     }
 }

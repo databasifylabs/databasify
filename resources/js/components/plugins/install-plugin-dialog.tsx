@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CommunityEngineWarning from '@/components/plugins/community-engine-warning';
 import ZipDropzone from '@/components/plugins/zip-dropzone';
 
 export default function InstallPluginDialog() {
@@ -41,7 +42,7 @@ export default function InstallPluginDialog() {
                     resetOnSuccess
                     className="space-y-5"
                 >
-                    {({ processing, errors }) => (
+                    {({ processing, errors, clearErrors }) => (
                         <>
                             <Tabs defaultValue="link" className="gap-4">
                                 <TabsList className="w-full">
@@ -64,6 +65,9 @@ export default function InstallPluginDialog() {
                                         name="source"
                                         placeholder="owner/repo or https://example.com/plugin.zip"
                                         autoComplete="off"
+                                        onChange={() =>
+                                            clearErrors('community_engines')
+                                        }
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         A repository installs its latest
@@ -80,10 +84,16 @@ export default function InstallPluginDialog() {
                                         id="plugin-archive"
                                         name="archive"
                                         hint="Up to 50 MB, with the plugin's composer.json at its root or in one top folder."
+                                        onFileChange={() =>
+                                            clearErrors('community_engines')
+                                        }
                                     />
                                     <InputError message={errors.archive} />
                                 </TabsContent>
                             </Tabs>
+                            <CommunityEngineWarning
+                                message={errors.community_engines}
+                            />
                             <DialogFooter>
                                 <DialogClose asChild>
                                     <Button type="button" variant="outline">
@@ -92,7 +102,11 @@ export default function InstallPluginDialog() {
                                 </DialogClose>
                                 <Button disabled={processing}>
                                     <Download />
-                                    {processing ? 'Installing…' : 'Install'}
+                                    {processing
+                                        ? 'Installing…'
+                                        : errors.community_engines
+                                          ? 'Accept and install'
+                                          : 'Install'}
                                 </Button>
                             </DialogFooter>
                         </>

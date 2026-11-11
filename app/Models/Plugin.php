@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsEngineIds;
 use App\Casts\AsPluginAutoload;
 use App\DTOs\Plugins\PluginAutoload;
 use App\Models\Concerns\OrdersByName;
@@ -17,10 +18,12 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property string $id
  * @property string $name
+ * @property string $author
  * @property string $version
  * @property string $source
  * @property string $class
  * @property PluginAutoload $autoload
+ * @property list<string> $engines
  * @property bool $enabled
  * @property string|null $requires
  * @property string|null $icon
@@ -28,7 +31,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['id', 'name', 'version', 'source', 'class', 'autoload', 'requires', 'icon', 'enabled', 'error'])]
+#[Fillable(['id', 'name', 'author', 'version', 'source', 'class', 'autoload', 'engines', 'requires', 'icon', 'enabled', 'error'])]
 class Plugin extends Model
 {
     use OrdersByName;
@@ -85,6 +88,11 @@ class Plugin extends Model
         return str_ends_with($this->source, ' (uploaded)');
     }
 
+    public function isCommunity(): bool
+    {
+        return $this->engines !== [];
+    }
+
     public function setEnabled(bool $enabled): void
     {
         $this->update(['enabled' => $enabled, 'error' => null]);
@@ -101,6 +109,7 @@ class Plugin extends Model
     {
         return [
             'autoload' => AsPluginAutoload::class,
+            'engines' => AsEngineIds::class,
             'enabled' => 'boolean',
         ];
     }
