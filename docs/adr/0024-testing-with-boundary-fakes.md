@@ -13,7 +13,7 @@ Most behaviour ends in an SSH script, a registry call or a provider API. CI cann
 - Provider and DNS APIs are faked with `Http::fake`.
 - Scripts are tested as rendered text and syntax-checked (`bash -n`, `node --check`).
 - CI runs `composer ci:check`: Pest with 100% type coverage, PHPStan at max, Pint and the frontend checks. It never touches real servers.
-- Engine behaviour on real servers is checked by an end-to-end run on three provider servers (`.claude/agents/e2e-engine-tester.md`), outside CI.
+- Engine behaviour on real servers is checked by an end-to-end run on three provider servers through the app's own actions, outside CI (`.claude/skills/adding-database-engine/rules/testing.md`).
 
 ## Consequences
 
@@ -30,4 +30,4 @@ Most behaviour ends in an SSH script, a registry call or a provider API. CI cann
 - `tests/Support/FakeServerConnection.php`
 - `tests/Support/FakeServerConnection.php`
 - `.claude/skills/adding-database-engine/rules/testing.md`
-- `.claude/agents/e2e-engine-tester.md`
+- `.claude/skills/adding-database-engine/rules/testing.md`

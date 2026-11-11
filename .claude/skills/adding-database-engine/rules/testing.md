@@ -29,7 +29,7 @@ Tests with fixed dates rot (restore targets fall out of the restorable window); 
 
 ## Live e2e
 
-Use the `e2e-engine-tester` agent (`.claude/agents/e2e-engine-tester.md`) with the engine and three servers, after updating that file for the engine. Read [lessons.md](lessons.md) first.
+Run it on three provider servers through the app's own actions, from tinker or the UI, and reach servers only through `App\Contracts\Ssh\ServerConnection`. Read [lessons.md](lessons.md) first.
 
 - Ordering servers needs the user's go-ahead. Order them through the app's server provider (`OrderProviderServer` with a `ProviderServerOrder`), and agree up front whether to destroy them (`DeleteServer(destroyAtProvider: true)`) or keep them.
 - Never seed, wipe or migrate the app's own database: it holds the user's account and provider keys.

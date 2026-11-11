@@ -9,7 +9,6 @@ The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 00
 | `app/Providers/EngineServiceProvider.php`             | One `RegisterEngine` chain in `boot()`, built from the `engine()` or `sentinel()` helper. The id is the image's engine name. |
 | `public/assets/icons/database-providers/<engine>.svg` | The logo, square SVG, named after the engine id (the registration's default icon path).                                     |
 | `README.md`                                           | The engine and its lines in the supported list.                                                                             |
-| `.claude/agents/e2e-engine-tester.md`                 | The engine in its description and any engine-specific steps.                                                                |
 | ADRs in `docs/adr/`                                   | Update any ADR that lists the engines (0009 HA per engine, 0012 TLS, 0014 DNS hostnames) in the same change.                |
 
 ## The registration
