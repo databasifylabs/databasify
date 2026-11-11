@@ -155,7 +155,6 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
     return ($ssh ?? fakeSsh())
         ->respondToEngine('host deploy', ['engine' => 'engine', 'container' => 'databasify-engine', 'created' => true, 'replaced' => false])
         ->respondToEngine('host remove', [])
-        ->respondToEngine('host wrapper-update', ['wrapper' => '0.2.0+abc', 'updated' => true])
         ->respondToEngine('tls install', [])
         ->respondToEngine('node configure', ['changed' => true])
         ->respondToEngine('node start', [])

@@ -19,7 +19,7 @@ final readonly class RetryDatabaseSetup
 
     public function handle(Database $database): void
     {
-        $database->ensureIdleOnAnyWrapper();
+        $database->ensureNotBusy();
 
         if (! $database->hasFailed()) {
             throw ValidationException::withMessages(['database' => "{$database->name} finished its setup, there is nothing to retry."]);

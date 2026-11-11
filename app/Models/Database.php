@@ -20,7 +20,6 @@ use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Databases\ServiceRecords;
 use App\DTOs\Databases\VersionLine;
 use App\DTOs\Dns\HostPair;
-use App\DTOs\Images\WrapperImage;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
@@ -37,12 +36,10 @@ use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\Persistence;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Databases\SyncDatabaseWrapperJob;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Observers\DatabaseObserver;
-use App\Services\Images\WrapperResolver;
 use App\Support\Databases\ClientPorts;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -81,8 +78,6 @@ use LogicException;
  * @property string|null $available_image_repository
  * @property string|null $available_image_digest
  * @property string|null $available_image_release
- * @property string|null $wrapper_version
- * @property string|null $wrapper_digest
  * @property CarbonImmutable|null $retune_needed_at
  * @property int $maintenance_day
  * @property int $maintenance_hour
@@ -96,7 +91,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'wrapper_version', 'wrapper_digest', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'available_image_repository', 'available_image_digest', 'available_image_release', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -523,21 +518,10 @@ class Database extends Model implements Movable
 
     public function ensureIdle(): void
     {
-        $this->ensureIdleOnAnyWrapper();
-        $pinned = WrapperResolver::cached();
-
-        if ($pinned !== null && $this->runsWrapper($pinned)) {
-            return;
-        }
-
-        dispatch(new SyncDatabaseWrapperJob($this));
-
-        if ($pinned !== null) {
-            throw ValidationException::withMessages(['database' => "{$this->name} is installing databasify {$pinned->version}, try again in a few minutes."]);
-        }
+        $this->ensureNotBusy();
     }
 
-    public function ensureIdleOnAnyWrapper(): void
+    public function ensureNotBusy(): void
     {
         if ($this->isBusy()) {
             throw $this->busyError();
@@ -797,16 +781,6 @@ class Database extends Model implements Movable
     public function recordInstalledImage(EngineImage $image): void
     {
         $this->update($image->toInstalledRow());
-    }
-
-    public function runsWrapper(WrapperImage $wrapper): bool
-    {
-        return $this->wrapper_version === $wrapper->version && $this->wrapper_digest === $wrapper->digest;
-    }
-
-    public function recordWrapper(WrapperImage $wrapper): void
-    {
-        $this->update($wrapper->toRow());
     }
 
     public function availableUpdateRefreshesImage(): bool

@@ -19,7 +19,7 @@ final readonly class UpgradeDatabase
 
     public function handle(Database $database): void
     {
-        $database->ensureIdleOnAnyWrapper();
+        $database->ensureNotBusy();
         $image = $database->availableImage()
             ?? throw ValidationException::withMessages(['version' => "{$database->name} already runs the newest {$database->versionLabel()} release."]);
 

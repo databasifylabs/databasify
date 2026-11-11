@@ -72,5 +72,6 @@ Options that were tried or rejected, and why.
 | [0033](0033-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`              | Accepted           |
 | [0034](0034-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                       | Accepted           |
 | [0035](0035-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows  | Accepted           |
-| [0036](0036-pinned-wrapper-version.md)                      | Each app release pins one wrapper version                | Superseded by 0037 |
-| [0037](0037-follow-the-pinned-wrapper-digest.md)            | Follow the digest of the pinned wrapper version          | Accepted           |
+| [0036](0036-pinned-wrapper-version.md)                      | Each app release pins one wrapper version                | Superseded by 0038 |
+| [0037](0037-follow-the-pinned-wrapper-digest.md)            | Follow the digest of the pinned wrapper version          | Superseded by 0038 |
+| [0038](0038-engines-ship-only-as-images.md)                 | Engines ship only as images                              | Accepted           |

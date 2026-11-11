@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\InstallHostBinary;
-use App\Services\Images\WrapperResolver;
-use Tests\Support\FakeImageRegistry;
 
 it('installs the host binary only when missing', function () {
     $ssh = fakeSsh();
@@ -23,7 +21,6 @@ it('installs the host binary only when missing', function () {
 it('deploys then installs the node certificate', function () {
     $ssh = fakeSsh()
         ->respondToEngine('host deploy', ['engine' => 'postgres', 'container' => 'databasify-postgres', 'created' => true, 'replaced' => false])
-        ->respondToEngine('host wrapper-update', ['wrapper' => '0.1.0+abc', 'updated' => true])
         ->respondToEngine('tls install', []);
     $node = engineNode();
     $database = $node->database;
@@ -34,11 +31,10 @@ it('deploys then installs the node certificate', function () {
     $engineCalls = collect($ssh->runs)->slice($before)->keys()->map(fn (int $index): string => $ssh->engineRequestAt($index))->filter()->values();
     $database->refresh();
 
-    expect(collect($ssh->runs)->slice($before)->pluck('script')->map(fn (string $script): string => preg_match('/databasify (host deploy|host wrapper-update|tls install)/', $script, $match) === 1 ? $match[1] : 'script')->all())
-        ->toBe(['script', 'host deploy', 'host wrapper-update', 'tls install'])
+    expect(collect($ssh->runs)->slice($before)->pluck('script')->map(fn (string $script): string => preg_match('/databasify (host deploy|tls install)/', $script, $match) === 1 ? $match[1] : 'script')->all())
+        ->toBe(['script', 'host deploy', 'tls install'])
         ->and(json_decode($engineCalls[0], true))->toBe(['image' => "{$database->image_repository}:{$database->image_release}@{$database->image_digest}", 'databaseId' => $database->id, 'nodeId' => $node->id])
-        ->and(json_decode($engineCalls[1], true))->toBe(['image' => WrapperResolver::repository().':'.WrapperResolver::version().'@'.FakeImageRegistry::wrapperDigest()])
-        ->and(json_decode($engineCalls[2], true))->toBe([
+        ->and(json_decode($engineCalls[1], true))->toBe([
             'certificate' => $database->settings->nodeCertificate($node->id, 'server.crt'),
             'key' => $database->settings->nodeCertificate($node->id, 'server.key'),
             'ca' => $database->settings->certificate('ca.crt'),

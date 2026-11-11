@@ -17,7 +17,6 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
-use App\Services\Images\WrapperResolver;
 use App\Support\Databases\DefaultAccount;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +29,6 @@ final readonly class CreateDatabase
         private StartFlow $startFlow,
         private CreateDatabaseFlow $createFlow,
         private EnsureNodesSized $sized,
-        private WrapperResolver $wrappers,
     ) {}
 
     public function handle(NewDatabase $data): Database
@@ -39,9 +37,8 @@ final readonly class CreateDatabase
         $engine = $draft->engine();
         $line = $data->versionLine ?? $engine->defaultLine;
         $image = $data->image ?? $this->unlessUnavailable(fn (): EngineImage => $this->newestImage->newest($draft, $line));
-        $wrapper = $this->unlessUnavailable($this->wrappers->pinned(...));
 
-        $database = DB::transaction(function () use ($data, $engine, $line, $image, $wrapper): Database {
+        $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
             $database = Database::query()->create(array_merge([
                 'name' => $data->name,
                 'engine' => $data->engine,
@@ -49,7 +46,7 @@ final readonly class CreateDatabase
                 'mode' => $data->mode(),
                 'status' => DatabaseStatus::Creating,
                 'settings' => $this->settingsFor($data, $engine),
-            ], $image->toRow(), $wrapper->toRow()));
+            ], $image->toRow()));
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));
             $this->sized->handle($database);

@@ -1,6 +1,6 @@
 # 0037. Follow the digest of the pinned wrapper version
 
-- Status: Accepted
+- Status: Superseded by 0038
 - Date: 2026-11-10
 
 ## Context

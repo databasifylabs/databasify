@@ -10,11 +10,6 @@ return [
         'repository' => env('DATABASIFY_IMAGE_REPOSITORY', 'databasify-{engine}'),
     ],
 
-    'wrapper' => [
-        'repository' => env('DATABASIFY_WRAPPER_REPOSITORY', 'databasify-wrapper'),
-        'version' => '0.1.0',
-    ],
-
     'docker' => [
         'version' => '29.9.2',
         'containerd' => '2.4.2',

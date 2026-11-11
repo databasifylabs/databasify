@@ -11,7 +11,7 @@ final readonly class DeleteDatabase
 {
     public function handle(Database $database, bool $eraseData = false, bool $force = false, bool $deleteBackups = false): void
     {
-        $database->ensureIdleOnAnyWrapper();
+        $database->ensureNotBusy();
         $database->startOperation($eraseData ? 'Delete database and erase data' : 'Delete database');
         dispatch(new DeleteDatabaseJob($database, $eraseData, $force, $deleteBackups));
     }
