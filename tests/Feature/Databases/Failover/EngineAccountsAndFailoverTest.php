@@ -190,3 +190,18 @@ it('leaves a member that just stopped answering out of a recovery', function () 
     expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'use failover instead')
         ->and(payloadsOf($ssh, 'cluster rejoin'))->toBe([]);
 });
+
+it('starts a member whose container stopped before it rejoins the group', function () {
+    $database = idleDatabase('mysql', 3);
+    [$primary, $replica, $stopped] = $database->nodes()->orderBy('position')->get()->map->server->all();
+    $ssh = answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica')
+        ->respondFirstWhen(fn (string $name, string $script): bool => $name === $stopped->name && str_contains($script, '| databasify node status '), '', 69);
+    fakeEngine($ssh)->respondToEngine('cluster quorum', ['total' => 3, 'online' => 2]);
+
+    resolve(RecoverDatabase::class)->handle($database);
+    advanceFlows();
+
+    expect(collect(payloadsOf($ssh, 'host deploy'))->pluck('server')->all())->toBe([$stopped->name])
+        ->and(collect(payloadsOf($ssh, 'cluster rejoin'))->pluck('server')->all())->toBe([$stopped->name])
+        ->and($database->fresh()->operation)->toBeNull();
+});
