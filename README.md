@@ -31,6 +31,11 @@ An open-source, self-hostable DBaaS alternative to DigitalOcean Managed Database
 - Migrations from an existing database
 - Automatic updates in a weekly maintenance window
 - Servers over SSH, or created on DigitalOcean, Hetzner, Vultr or Linode
+- Plugins for more DNS providers, server providers and community database engines
+
+## Engines
+
+Each engine lives in its own repository and ships as container images built on the public [engine SDK](https://github.com/databasifylabs/engine-sdk): [PostgreSQL](https://github.com/databasifylabs/engine-postgres), [MySQL](https://github.com/databasifylabs/engine-mysql), [MariaDB](https://github.com/databasifylabs/engine-mariadb), [MongoDB](https://github.com/databasifylabs/engine-mongodb), [Valkey](https://github.com/databasifylabs/engine-valkey) and [Redis](https://github.com/databasifylabs/engine-redis). To add your own, start from [engine-template](https://github.com/databasifylabs/engine-template) and register it with a plugin made from [plugin-example-database](https://github.com/databasifylabs/plugin-example-database).
 
 ## Installation
 

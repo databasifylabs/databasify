@@ -34,4 +34,4 @@ Derived automatically, with no change:
 
 ## When the engine needs a new command or field
 
-Add the command in the engines repo first (phase 1), then mirror it here name for name: a request in `app/Engines/Requests` with its `command()` and `toPayload()`, a reply in `app/Engines/Responses` with `fromPayload()`, and shared data in `app/Engines/Data`. Send it with `EngineClient::send()` from an action, or from a flow step through `FlowSteps` (`send()` for quick commands with a server log name, `long()` for operations). Never add an engine-specific branch to a flow: an engine difference belongs in the engine.
+Add the command to `engine-sdk` first and implement it in the engine (phase 1), then mirror it here name for name: a request in `app/Engines/Requests` with its `command()` and `toPayload()`, a reply in `app/Engines/Responses` with `fromPayload()`, and shared data in `app/Engines/Data`. Send it with `EngineClient::send()` from an action, or from a flow step through `FlowSteps` (`send()` for quick commands with a server log name, `long()` for operations). Never add an engine-specific branch to a flow: an engine difference belongs in the engine.

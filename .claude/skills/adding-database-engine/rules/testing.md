@@ -29,12 +29,12 @@ Tests with fixed dates rot (restore targets fall out of the restorable window); 
 
 ## Live e2e
 
-It needs the engine's published release images, so it runs once the engines pull request has merged, or a maintainer runs it before merging. Run it on three provider servers through the app's own actions, from tinker or the UI, and reach servers only through `App\Contracts\Ssh\ServerConnection`. Read [lessons.md](lessons.md) first. Put the step-by-step results in the app pull request.
+It needs the engine's published release images, so it runs once the engine pull request has merged, or a maintainer runs it before merging. Run it on three provider servers through the app's own actions, from tinker or the UI, and reach servers only through `App\Contracts\Ssh\ServerConnection`. Read [lessons.md](lessons.md) first. Put the step-by-step results in the app pull request.
 
 - Ordering servers needs the user's go-ahead. Order them through the app's server provider (`OrderProviderServer` with a `ProviderServerOrder`), and agree up front whether to destroy them (`DeleteServer(destroyAtProvider: true)`) or keep them.
 - Never seed, wipe or migrate the app's own database: it holds the user's account and provider keys.
 - Run `php artisan queue:restart` after PHP changes; Horizon runs under `composer run dev`.
-- Engine fixes go in the engines repository, as commits on its pull request, instead of patches to a container by hand. A merged fix reaches running nodes through `host wrapper-update`.
+- Engine fixes go in the engine repository, as commits on its pull request, instead of patches to a container by hand. A merged fix reaches running nodes as a rebuilt image, through an upgrade or the maintenance window.
 - Run the full step list on the default line, then a shorter pass (create, cluster, failover, backup and restore) on every other line.
 - Watch each database's Activity tab: every engine step, long ones included, writes a named server log.
 - DNS steps create public records in the user's zone: ask first, then check records with `dig +tcp @<zone nameserver>`, connect by name, fail over and connect again.
