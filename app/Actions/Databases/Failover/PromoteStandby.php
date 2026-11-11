@@ -8,6 +8,7 @@ use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Engines\EngineClient;
 use App\Engines\Requests\ClusterFailover;
 use App\Models\Database;
+use App\Models\DatabaseNode;
 use RuntimeException;
 
 final readonly class PromoteStandby
@@ -20,7 +21,7 @@ final readonly class PromoteStandby
     public function handle(Database $database): void
     {
         $this->refresh->handle($database);
-        $members = $database->membersWithServers();
+        $members = $database->membersWithServers()->filter(fn (DatabaseNode $node): bool => $node->isAnswering());
         $primary = $members->primary();
         $target = $members->replica();
 

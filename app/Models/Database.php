@@ -813,7 +813,7 @@ class Database extends Model implements Movable
     public function reachableMembers(): Collection
     {
         return $this->membersWithServers()
-            ->filter(fn (DatabaseNode $node): bool => $node->role->isReachable())
+            ->filter(fn (DatabaseNode $node): bool => $node->role->isReachable() && $node->isAnswering())
             ->sortByDesc(fn (DatabaseNode $node): bool => $node->isPrimary())
             ->values();
     }

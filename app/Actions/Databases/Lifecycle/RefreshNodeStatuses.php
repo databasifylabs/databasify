@@ -7,6 +7,7 @@ namespace App\Actions\Databases\Lifecycle;
 use App\Actions\Databases\Domains\SyncDatabaseDns;
 use App\DTOs\Databases\NodeStatus;
 use App\Enums\Databases\DatabaseStatus;
+use App\Enums\Databases\NodeRole;
 use App\Events\DatabaseAlertRaised;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
@@ -34,7 +35,8 @@ final readonly class RefreshNodeStatuses
             fn (DatabaseNode $node): NodeStatus => $this->readStatus->handle($database, $node),
             NodeStatus::class,
         );
-        $nodes->values()->each(fn (DatabaseNode $node, int $index) => $node->recordStatus($statuses[$index] ?? NodeStatus::unreachable()));
+        $anotherAnswersAsPrimary = collect($statuses)->contains(fn (NodeStatus $status): bool => $status->role === NodeRole::Primary);
+        $nodes->values()->each(fn (DatabaseNode $node, int $index) => $this->record($node, $statuses[$index] ?? NodeStatus::unreachable(), $anotherAnswersAsPrimary));
 
         $all = $database->nodesWithServers();
         $status = $all->healthStatus();
@@ -43,6 +45,17 @@ final readonly class RefreshNodeStatuses
         rescue(fn () => $this->dns->handle($database));
 
         return $status;
+    }
+
+    private function record(DatabaseNode $node, NodeStatus $status, bool $anotherAnswersAsPrimary): void
+    {
+        if ($status->isUnreachable() && $anotherAnswersAsPrimary && $node->isPrimary()) {
+            $node->markUnreachable();
+
+            return;
+        }
+
+        $node->recordStatus($status);
     }
 
     private function announceChange(Database $database, DatabaseNodeCollection $nodes, DatabaseStatus $previous, DatabaseStatus $status): void

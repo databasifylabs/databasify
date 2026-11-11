@@ -179,3 +179,14 @@ it('rejoins only the members outside a group that still has its majority', funct
         ->and(payloadsOf($ssh, 'node wake'))->toBe([])
         ->and($database->fresh()->operation)->toBeNull();
 });
+
+it('leaves a member that just stopped answering out of a recovery', function () {
+    $database = idleDatabase('mysql', 3);
+    [$primary, $replica, $silent] = $database->nodes()->orderBy('position')->get()->all();
+    markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Offline);
+    $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $replica->server, 'replica'), $silent->server, null))
+        ->respondToEngine('cluster quorum', ['total' => 3, 'online' => 2]);
+
+    expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'use failover instead')
+        ->and(payloadsOf($ssh, 'cluster rejoin'))->toBe([]);
+});

@@ -19,6 +19,7 @@ use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
 use App\Services\Images\WrapperResolver;
+use Illuminate\Validation\ValidationException;
 use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeServerConnection;
 
@@ -216,4 +217,13 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and(requestOf($ssh, $primary->server, 'host deploy')['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
         ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()->wrapper_version->toBe(WrapperResolver::version())->wrapper_digest->toBe(FakeImageRegistry::wrapperDigest())
         ->and($database->fresh()->config_fields)->toHaveCount(1);
+});
+
+it('refuses to reboot while a node has just stopped answering', function () {
+    $database = idleDatabase('mysql', 3);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
+    [$primary, $standby, $silent] = $database->nodes()->orderBy('position')->get()->all();
+    answerNodeStatus(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'), $silent->server, null);
+
+    expect(fn () => resolve(RebootDatabase::class)->handle($database))->toThrow(ValidationException::class, "{$silent->server->name} does not answer");
 });

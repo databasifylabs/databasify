@@ -168,3 +168,15 @@ it('counts missed reads again from zero after a node answers', function () {
         ->and($database->nodes()->sole()->role)->toBe(NodeRole::Primary);
     Event::assertNotDispatched(DatabaseAlertRaised::class);
 });
+
+it('drops a silent node from primary at once when another node now answers as primary', function () {
+    $database = idleDatabase('valkey', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$old, $new] = $database->nodes()->orderBy('position')->get()->all();
+    answerNodeStatus(answerNodeStatus(fakeSsh(), $old->server, null), $new->server, 'primary');
+
+    resolve(RefreshDatabaseStatus::class)->handle($database);
+
+    expect($old->fresh()->role)->toBe(NodeRole::Unknown)
+        ->and($database->nodesWithServers()->soloPrimary()?->is($new))->toBeTrue();
+});

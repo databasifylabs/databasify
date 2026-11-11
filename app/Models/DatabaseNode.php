@@ -156,6 +156,16 @@ class DatabaseNode extends Model
         $this->update(['role' => $status->role, 'engine_version' => $status->version ?? $this->engine_version, 'missed_status_reads' => $missed]);
     }
 
+    public function markUnreachable(): void
+    {
+        $this->update(['role' => NodeRole::Unknown, 'missed_status_reads' => self::MISSED_READS_BEFORE_UNREACHABLE]);
+    }
+
+    public function isAnswering(): bool
+    {
+        return $this->missed_status_reads === 0;
+    }
+
     public function rename(string $name): void
     {
         $this->update(['name' => $name]);

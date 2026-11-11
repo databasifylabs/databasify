@@ -41,14 +41,29 @@ final readonly class RebootDatabase
         throw ValidationException::withMessages(['database' => "{$notReady->server->name} is not ready yet."]);
     }
 
+    private function ensureEveryNodeAnswers(Database $database): void
+    {
+        $silent = $database->nodesWithServers()->first(fn (DatabaseNode $node): bool => ! $node->isAnswering());
+
+        if ($silent === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['database' => "{$silent->server->name} does not answer, bring every node back before rebooting its servers one by one."]);
+    }
+
     private function ensureHealthy(Database $database): void
     {
         $status = $this->refresh->handle($database);
 
-        if ($status === DatabaseStatus::Ready || ! $database->hasStandby()) {
+        if (! $database->hasStandby()) {
             return;
         }
 
-        throw ValidationException::withMessages(['database' => "{$database->name} is {$status->value}, bring every node back before rebooting its servers one by one."]);
+        if ($status !== DatabaseStatus::Ready) {
+            throw ValidationException::withMessages(['database' => "{$database->name} is {$status->value}, bring every node back before rebooting its servers one by one."]);
+        }
+
+        $this->ensureEveryNodeAnswers($database);
     }
 }
