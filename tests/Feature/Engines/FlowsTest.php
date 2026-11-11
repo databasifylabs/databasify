@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Servers\ReleaseAbandonedWork;
+use App\Engines\EngineClient;
 use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\StartedOperation;
 use App\Engines\Flows\Step;
 use App\Enums\Databases\FlowState;
+use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Engines\StepNotReady;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
+use App\Models\ServerLog;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\ScriptedFlow;
 
@@ -30,7 +33,9 @@ function longStep(array &$keys, string $kind = 'prepare'): Step
     return Step::{$kind}('long step', function (DatabaseFlow $flow) use (&$keys): StartedOperation {
         $keys[] = $key = $flow->newOperationKey();
 
-        return new StartedOperation($flow->database->nodes->firstOrFail()->id, $key);
+        $node = $flow->database->nodes->firstOrFail();
+
+        return new StartedOperation($node->id, $key, resolve(EngineClient::class)->openLog($node, 'long step')->id);
     });
 }
 
@@ -196,7 +201,8 @@ it('cancels the operation and fails the flow when the owner stops it', function 
 
     runJob(new AdvanceDatabaseFlow($record));
 
-    expect($record->fresh())->state->toBe(FlowState::Failed)->error->toBe('Stopped by you.')
+    expect($record->fresh())->state->toBe(FlowState::Failed)->error->toBe('Stopped by you.')->operation_log_id->toBeNull()
+        ->and(ServerLog::query()->sole())->status->toBe(ServerLogStatus::Failed)->output->toContain('Stopped by you.')
         ->and($flow->cleanups)->toBe(1)
         ->and($ssh->scriptAt(0))->toContain('| databasify operation cancel ')
         ->and(json_decode($ssh->engineRequestAt(0), true))->toBe(['key' => $keys[0]]);

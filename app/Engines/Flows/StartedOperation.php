@@ -9,5 +9,6 @@ final readonly class StartedOperation
     public function __construct(
         public string $nodeId,
         public string $key,
+        public string $logId,
     ) {}
 }

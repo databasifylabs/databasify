@@ -14,6 +14,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('database_id')->index();
             $table->foreignUuid('operation_node_id')->nullable();
+            $table->foreignUuid('operation_log_id')->nullable();
             $table->string('flow');
             $table->unsignedSmallInteger('step')->default(0);
             $table->unsignedSmallInteger('attempt')->default(0);

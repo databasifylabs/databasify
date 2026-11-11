@@ -11,6 +11,7 @@ use App\DTOs\Recovery\PointInTimeRestore;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeRole;
+use App\Enums\Servers\ServerLogStatus;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
@@ -68,6 +69,28 @@ it('creates a three node cluster and enables every member', function () {
     ]));
     expect(array_search("{$database->nodes[2]->server->name}: node ready", $commands, true))->toBeLessThan(array_search("{$database->nodes[0]->server->name}: node bootstrap", $commands, true))
         ->and($database->flows()->sole()->state)->toBe(FlowState::Succeeded);
+});
+
+it('keeps a long step in one server log that closes when the operation succeeds', function () {
+    fakeEngine();
+
+    $database = createThroughFlow('postgres', 1);
+    $server = $database->seed()->server;
+
+    expect($server->serverLogs()->where('name', "{$server->name}: waiting for the node")->sole()->status)->toBe(ServerLogStatus::Succeeded)
+        ->and($database->flows()->sole()->operation_log_id)->toBeNull();
+});
+
+it('fails the server log of a long step with the engine error', function () {
+    fakeEngine(fakeSsh()->respondToEngine('operation status', ['key' => 'k', 'kind' => 'long', 'state' => 'failed', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-10T00:00:00Z', 'finishedAt' => null, 'error' => ['code' => 'internal', 'message' => 'the node never became ready']]));
+
+    $database = createThroughFlow('postgres', 1);
+    $server = $database->seed()->server;
+    $log = $server->serverLogs()->where('name', "{$server->name}: waiting for the node")->sole();
+
+    expect($log->status)->toBe(ServerLogStatus::Failed)
+        ->and($log->output)->toContain('the node never became ready')
+        ->and($database->flows()->sole()->state)->toBe(FlowState::Failed);
 });
 
 it('learns the log units once the nodes run', function () {

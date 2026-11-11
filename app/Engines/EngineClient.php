@@ -37,8 +37,26 @@ final readonly class EngineClient
      */
     public function send(DatabaseNode $node, EngineRequest $request, ?string $log = null, ?int $timeout = null): EngineReply
     {
+        $serverLog = $log === null ? null : $this->openLog($node, $log);
+
+        try {
+            return $this->sendInto($node, $request, $serverLog, $timeout);
+        } finally {
+            if ($serverLog?->isRunning() === true) {
+                $serverLog->finish(0);
+            }
+        }
+    }
+
+    /**
+     * @template TReply of EngineReply
+     *
+     * @param  EngineRequest<TReply>  $request
+     * @return TReply
+     */
+    public function sendInto(DatabaseNode $node, EngineRequest $request, ?ServerLog $serverLog, ?int $timeout = null): EngineReply
+    {
         $server = $node->server;
-        $serverLog = $log === null ? null : $this->logOn($node, $log);
         $output = '';
 
         try {
@@ -52,7 +70,9 @@ final readonly class EngineClient
             throw $exception;
         }
 
-        $serverLog?->finish($exitCode);
+        if ($exitCode !== 0) {
+            $serverLog?->finish($exitCode);
+        }
 
         try {
             return $request->reply()::fromPayload($this->payloadOf($output, $exitCode, $server));
@@ -98,7 +118,7 @@ final readonly class EngineClient
         throw new EngineError('internal', "The engine on {$server->name} failed with exit code {$exitCode}.");
     }
 
-    private function logOn(DatabaseNode $node, string $name): ServerLog
+    public function openLog(DatabaseNode $node, string $name): ServerLog
     {
         $group = LogGroup::fromContext();
 

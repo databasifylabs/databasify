@@ -79,7 +79,7 @@ final readonly class CreateDatabaseFlow implements Flow
         $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
 
         return [
-            Step::catchUp('restore the archive', $this->steps->long($database->seed(), fn (string $key): RestoreStart => new RestoreStart($key, $storage, $source->target))),
+            Step::catchUp('restore the archive', $this->steps->long($database->seed(), fn (string $key): RestoreStart => new RestoreStart($key, $storage, $source->target), 'restoring the archive')),
             Step::finish('check the restored accounts', $this->steps->quick(fn () => $this->restoredAccounts->handle($database))),
         ];
     }
@@ -114,7 +114,7 @@ final readonly class CreateDatabaseFlow implements Flow
             $this->steps->configure($database, $node),
             Step::prepare("open the firewall on {$server}", $this->steps->quick(fn () => $this->firewall->handle($database, $node, $database->trustedCidrs()))),
             Step::prepare("start {$server}", $this->steps->send($node, new NodeStart, 'starting the engine')),
-            Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()))),
+            Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()), 'waiting for the node')),
         ];
     }
 
@@ -132,7 +132,7 @@ final readonly class CreateDatabaseFlow implements Flow
 
     private function joinStepFor(DatabaseNode $node): Step
     {
-        return Step::catchUp("join {$node->server->name} to the cluster", $this->steps->long($node, fn (string $key): ClusterEnable => new ClusterEnable($key)));
+        return Step::catchUp("join {$node->server->name} to the cluster", $this->steps->long($node, fn (string $key): ClusterEnable => new ClusterEnable($key), 'joining the cluster'));
     }
 
     private function nodesOf(DatabaseFlow $flow): DatabaseNodeCollection

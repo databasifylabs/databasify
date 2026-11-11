@@ -27,7 +27,7 @@ it('keeps a deterministic key when starting a long step breaks, so the next tick
     $database = idleDatabase('postgres', 1);
     $node = $database->seed();
     fakeSsh()->failWith(SshConnectionFailed::onServer($node->server, 'connection reset'));
-    $flow = ScriptedFlow::bind([Step::catchUp('copy', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false)))]);
+    $flow = ScriptedFlow::bind([Step::catchUp('copy', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false), 'waiting'))]);
 
     $record = resolve(StartFlow::class)->handle($database, $flow, new FlowContext([$node->id]))->fresh();
 
@@ -44,7 +44,7 @@ it('starts a lost operation again under the next attempt key', function () {
     $database = idleDatabase('postgres', 1);
     $node = $database->seed();
     fakeEngine();
-    $flow = ScriptedFlow::bind([Step::prepare('wait', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false)))]);
+    $flow = ScriptedFlow::bind([Step::prepare('wait', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false), 'waiting'))]);
     Queue::fake([AdvanceDatabaseFlow::class]);
     $record = resolve(StartFlow::class)->handle($database, $flow, new FlowContext([$node->id]));
     runJob(new AdvanceDatabaseFlow($record));

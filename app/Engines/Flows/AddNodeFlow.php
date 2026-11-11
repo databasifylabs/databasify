@@ -51,10 +51,10 @@ final readonly class AddNodeFlow implements Flow
             ...$database->nodes()->with('server')->get()->toBase()->map(fn (DatabaseNode $node): Step => $this->firewallStepOn($database, $node))->all(),
             Step::prepare('configure the new node', $this->steps->quick(fn () => $this->configure($database, $joiner))),
             Step::prepare('start the new node', $this->steps->send($joiner, new NodeStart, 'starting the engine')),
-            Step::prepare('wait for the new node', $this->steps->long($joiner, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: false))),
+            Step::prepare('wait for the new node', $this->steps->long($joiner, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: false), 'waiting for the node')),
             ...$existing->flatMap(fn (DatabaseNode $node): array => $this->membershipStepsOn($database, $node))->all(),
             ...$this->clusterStepsOnLonePeerOf($existing),
-            Step::catchUp('copy the data to the new node', $this->steps->long($joiner, fn (string $key): ClusterEnable => new ClusterEnable($key))),
+            Step::catchUp('copy the data to the new node', $this->steps->long($joiner, fn (string $key): ClusterEnable => new ClusterEnable($key), 'copying the data')),
             Step::finish('refresh the status', $this->steps->quick(function () use ($database): void {
                 $database->matchModeToMembers();
                 $this->refresh->handle($database);
@@ -100,7 +100,7 @@ final readonly class AddNodeFlow implements Flow
 
         $peer = $existing->sole();
 
-        return [Step::finish("enable the cluster on {$peer->server->name}", $this->steps->long($peer, fn (string $key): ClusterEnable => new ClusterEnable($key)))];
+        return [Step::finish("enable the cluster on {$peer->server->name}", $this->steps->long($peer, fn (string $key): ClusterEnable => new ClusterEnable($key), 'enabling the cluster'))];
     }
 
     /**

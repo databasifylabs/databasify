@@ -76,12 +76,12 @@ final readonly class RollingSteps
     public function backOnline(DatabaseFlow $flow, DatabaseNode $node): array
     {
         $expectPrimary = $node->id === $flow->context->targetNodeId && $flow->context->failoverTo === null;
-        $ready = Step::prepare("wait for {$node->server->name}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, $expectPrimary)));
+        $ready = Step::prepare("wait for {$node->server->name}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, $expectPrimary), 'waiting for the node'));
 
         if (! $node->database->isClustered()) {
             return [$ready];
         }
 
-        return [$ready, Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, $node->isReadOnly())))];
+        return [$ready, Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, $node->isReadOnly()), 'rejoining the cluster'))];
     }
 }

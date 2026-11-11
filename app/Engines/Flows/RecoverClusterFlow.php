@@ -80,7 +80,7 @@ final readonly class RecoverClusterFlow implements Flow
 
     private function rejoinStepFor(DatabaseNode $node): Step
     {
-        return Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, readOnly: false)));
+        return Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, readOnly: false), 'rejoining the cluster'));
     }
 
     /**

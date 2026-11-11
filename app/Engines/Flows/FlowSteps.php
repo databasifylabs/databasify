@@ -53,12 +53,13 @@ final readonly class FlowSteps
      * @param  Closure(string): EngineRequest<EngineReply>  $request
      * @return Closure(DatabaseFlow): StartedOperation
      */
-    public function long(DatabaseNode $node, Closure $request): Closure
+    public function long(DatabaseNode $node, Closure $request, string $log): Closure
     {
-        return function (DatabaseFlow $flow) use ($node, $request): StartedOperation {
-            $operation = new StartedOperation($node->id, $flow->newOperationKey());
+        return function (DatabaseFlow $flow) use ($node, $request, $log): StartedOperation {
+            $serverLog = $this->engine->openLog($node, "{$node->server->name}: {$log}");
+            $operation = new StartedOperation($node->id, $flow->newOperationKey(), $serverLog->id);
             $flow->waitFor($operation);
-            $this->engine->send($node, $request($operation->key));
+            $this->engine->sendInto($node, $request($operation->key), $serverLog);
 
             return $operation;
         };
