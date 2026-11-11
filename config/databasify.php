@@ -11,7 +11,7 @@ return [
     ],
 
     'sdk' => [
-        'host' => '0.1.0',
+        'host' => '0.1.1',
         'host_repository' => 'databasify-host',
         'range' => '^0.1',
     ],

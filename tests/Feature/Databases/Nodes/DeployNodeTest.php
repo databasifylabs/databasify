@@ -12,7 +12,7 @@ it('installs the pinned host binary before every deploy', function () {
     $ssh = fakeSsh();
     $node = engineNode();
     $before = count($ssh->runs);
-    $digest = FakeImageRegistry::digestIn('ghcr.io/databasifylabs/databasify-host', '0.1.0');
+    $digest = FakeImageRegistry::digestIn('ghcr.io/databasifylabs/databasify-host', '0.1.1');
 
     resolve(InstallHostBinary::class)->handle($node);
 
@@ -32,7 +32,7 @@ it('fails a deploy before touching the server when the host binary cannot be res
     Cache::flush();
     $before = count($ssh->runs);
 
-    expect(fn () => resolve(DeployNode::class)->handle($node->database, $node))->toThrow(ImageUnavailable::class, 'databasify-host:0.1.0')
+    expect(fn () => resolve(DeployNode::class)->handle($node->database, $node))->toThrow(ImageUnavailable::class, 'databasify-host:0.1.1')
         ->and(count($ssh->runs))->toBe($before);
 });
 

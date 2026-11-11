@@ -28,7 +28,7 @@ final class FakeImageRegistry implements ImageRegistry
     public static function withEveryLine(): self
     {
         $registry = new self;
-        $registry->publishIn(self::HOST_REPOSITORY, '0.1.0', self::digestIn(self::HOST_REPOSITORY, '0.1.0'));
+        $registry->publishIn(self::HOST_REPOSITORY, '0.1.1', self::digestIn(self::HOST_REPOSITORY, '0.1.1'));
         EngineCatalog::all()->each(fn (Engine $engine) => collect($engine->lines)->each(fn (VersionLine $line) => $registry->publish($engine->id, "{$line->value}.0")));
 
         return $registry;
