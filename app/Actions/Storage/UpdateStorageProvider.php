@@ -26,7 +26,7 @@ final readonly class UpdateStorageProvider
         $rotated = $provider->bucket()->credentials() !== $data->bucket->credentials();
 
         if ($rotated) {
-            $archiving->each(fn (Database $database) => $database->ensureIdle());
+            $archiving->each(fn (Database $database) => $database->ensureNotBusy());
         }
 
         $this->access->handle($data->bucket);

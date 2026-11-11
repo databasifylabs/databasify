@@ -32,7 +32,7 @@ final readonly class RestoreToPointInTime
             restore: $recovery->sourceAt($data->target),
             config: $source->settings->config,
             persistence: $source->settings->persistence,
-            image: $source->image(),
+            image: $source->runsSupportedSdk() ? $source->image() : null,
             accountsFrom: $source,
             recovery: $recovery->settings(),
         ));

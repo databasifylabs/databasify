@@ -23,7 +23,7 @@ final readonly class RebootDatabase
 
     public function handle(Database $database): void
     {
-        $database->ensureIdle();
+        $database->ensureNotBusy();
         $this->ensureServersReady($database);
         $this->ensureHealthy($database);
 

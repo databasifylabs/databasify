@@ -50,6 +50,10 @@ final readonly class DeployNode
 
     private function ensureSupportedSdkOn(Database $database, DatabaseNode $node): void
     {
+        if (! $database->runsSupportedSdk()) {
+            return;
+        }
+
         $sdk = $this->engine->send($node, new EngineInfo)->sdk;
 
         if (SdkRange::allows($sdk)) {
