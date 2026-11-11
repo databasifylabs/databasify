@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Images\HostBinaryImage;
 use Illuminate\Support\Str;
 
 return [
@@ -133,6 +134,8 @@ return [
     |
     */
 
-    'serializable_classes' => false,
+    'serializable_classes' => [
+        HostBinaryImage::class,
+    ],
 
 ];
