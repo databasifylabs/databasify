@@ -92,6 +92,18 @@ it('keeps the current image when the newest one is outside the range', function 
         && $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
 });
 
+it('offers the newest supported release and warns about a newer refused one', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    withImage('valkey', '9.1.2');
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    withImage('valkey', '9.1.3');
+    withImage('valkey', '9.1.4', sdk: '0.2.0');
+
+    expect(resolve(CheckDatabaseUpgrade::class)->handle($database)?->release)->toBe('9.1.3')
+        ->and($database->fresh()->availableImage()?->release)->toBe('9.1.3');
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
+});
+
 it('raises the refusal alert once per refused image', function () {
     Event::fake([DatabaseAlertRaised::class]);
     withImage('valkey', '9.1.3');

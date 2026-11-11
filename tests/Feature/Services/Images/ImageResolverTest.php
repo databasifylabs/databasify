@@ -42,8 +42,26 @@ it('reads v-prefixed and build-tagged SDK versions', function (string $sdk) {
 })->with(['v0.1.3', '0.1.3+abc']);
 
 it('refuses an image without an SDK label', function () {
+    withImage('valkey', '9.0', sdk: null);
     withImage('valkey', '9.0.3', sdk: null);
 
     expect(fn () => resolve(ImageResolver::class)->newest(new Database(['engine' => 'valkey']), '9'))
         ->toThrow(ImageUnavailable::class, 'Valkey 9.0.3 is built on SDK unknown; this Databasify supports ^0.1.');
+});
+
+it('falls back to the newest release of the line built on a supported SDK', function () {
+    withImage('valkey', '9.0.2');
+    withImage('valkey', '9.0.3');
+    withImage('valkey', '9.0.4', sdk: '0.2.0');
+
+    expect(resolve(ImageResolver::class)->newest(new Database(['engine' => 'valkey']), '9')->release)->toBe('9.0.3');
+});
+
+it('refuses with the newest release when no release of the line is supported', function () {
+    withImage('valkey', '9.0', sdk: '0.0.9');
+    withImage('valkey', '9.0.3', sdk: '0.0.9');
+    withImage('valkey', '9.0.4', sdk: '0.2.0');
+
+    expect(fn () => resolve(ImageResolver::class)->newest(new Database(['engine' => 'valkey']), '9'))
+        ->toThrow(ImageUnavailable::class, 'Valkey 9.0.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
 });

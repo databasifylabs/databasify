@@ -6,9 +6,11 @@ namespace App\Services\Images;
 
 use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Databases\EngineImage;
+use App\DTOs\Images\LineImages;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Support\Engines\SdkRange;
+use Illuminate\Support\LazyCollection;
 
 final readonly class ImageResolver
 {
@@ -16,25 +18,38 @@ final readonly class ImageResolver
 
     public function newest(Database $database, string $line): EngineImage
     {
-        $engine = $database->engine();
-        $repository = $engine->imageRepository;
-        $release = $this->newestReleaseIn($this->registry->tagsOf($repository), $line)
-            ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $repository);
-        $digest = $this->registry->digestOf($repository, $release);
+        $images = $this->imagesOf($database, $line);
 
-        return SdkRange::supported($engine->label, new EngineImage($repository, $digest, $release, $this->registry->labelsOf($repository, $digest)->sdk));
+        return $images->supported ?? throw ImageUnavailable::unsupportedSdk($database->engine()->label, $images->newest, $images->newest->sdk);
+    }
+
+    public function imagesOf(Database $database, string $line): LineImages
+    {
+        $engine = $database->engine();
+        $images = $this->releasesIn($engine->imageRepository, $line)->remember();
+        $newest = $images->first() ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $engine->imageRepository);
+
+        return new LineImages($newest, $images->first(fn (EngineImage $image): bool => SdkRange::allows($image->sdk)));
     }
 
     /**
-     * @param  list<string>  $tags
+     * @return LazyCollection<int, EngineImage>
      */
-    private function newestReleaseIn(array $tags, string $line): ?string
+    private function releasesIn(string $repository, string $line): LazyCollection
     {
         $pattern = '/^'.preg_quote($line, '/').'(\.\d+)+$/';
 
-        return collect($tags)
+        return LazyCollection::make($this->registry->tagsOf($repository))
             ->filter(fn (string $tag): bool => preg_match($pattern, $tag) === 1)
-            ->sort(fn (string $a, string $b): int => version_compare($a, $b))
-            ->last();
+            ->sort(fn (string $a, string $b): int => version_compare($b, $a))
+            ->values()
+            ->map(fn (string $release): EngineImage => $this->imageOf($repository, $release));
+    }
+
+    private function imageOf(string $repository, string $release): EngineImage
+    {
+        $digest = $this->registry->digestOf($repository, $release);
+
+        return new EngineImage($repository, $digest, $release, $this->registry->labelsOf($repository, $digest)->sdk);
     }
 }

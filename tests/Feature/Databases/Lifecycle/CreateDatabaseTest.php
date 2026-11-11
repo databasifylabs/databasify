@@ -165,6 +165,7 @@ it('refuses to create a database from an image built on an SDK outside the range
     Queue::fake([AdvanceDatabaseFlow::class]);
     $this->actingAs(User::factory()->create());
     $server = Server::factory()->ready()->create();
+    withImage('valkey', '9.0', sdk: $sdk);
     withImage('valkey', '9.0.3', sdk: $sdk);
 
     $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'version_line' => '9', 'primary_server_id' => $server->id])

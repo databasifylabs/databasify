@@ -101,6 +101,7 @@ it('gives the restored database its own point-in-time recovery on the same stora
 it('refuses to restore when no image of the line is built on an SDK inside the range', function () {
     $source = staleWindowDatabase();
     $source->update(['image' => new EngineImage($source->image->repository, $source->image->digest, $source->image->release, '0.0.9')]);
+    withImage('mysql', '8.4.0', sdk: '0.2.0');
     withImage('mysql', '8.4.99', sdk: '0.2.0');
     $ssh = fakeEngine();
 
