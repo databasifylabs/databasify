@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Dns;
 
+use App\Actions\Databases\Certificates\QueueCertificateRenewal;
+use App\Models\Database;
 use App\Models\DnsZone;
 use Illuminate\Support\Facades\Cache;
 
@@ -11,7 +13,10 @@ final readonly class EnsureZoneCertificate
 {
     private const int LOCK_SECONDS = 600;
 
-    public function __construct(private IssueZoneCertificate $issue) {}
+    public function __construct(
+        private IssueZoneCertificate $issue,
+        private QueueCertificateRenewal $renewal,
+    ) {}
 
     public function handle(DnsZone $zone): void
     {
@@ -27,6 +32,9 @@ final readonly class EnsureZoneCertificate
             }
 
             $this->issue->handle($zone);
+            $zone->databases()->get()->each(function (Database $database): void {
+                $this->renewal->handle($database);
+            });
         });
     }
 }
