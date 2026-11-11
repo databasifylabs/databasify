@@ -84,7 +84,7 @@ final readonly class PluginLoader
     {
         foreach (array_keys(array_diff_key(config()->array(EngineCatalog::CONFIG, []), $before)) as $id) {
             if (! in_array($id, $plugin->engines, true)) {
-                throw UndeclaredEngine::named("{$id}");
+                throw UndeclaredEngine::named($id);
             }
 
             config([EngineCatalog::CONFIG.".{$id}.plugin" => $plugin->id, EngineCatalog::CONFIG.".{$id}.author" => $plugin->author]);

@@ -26,7 +26,6 @@ class InstallPluginRequest extends FormRequest
     public function toPluginSource(): PluginSource
     {
         $archive = $this->file('archive');
-
         $accepts = $this->boolean('accepts_community_engines');
 
         return $archive instanceof UploadedFile
