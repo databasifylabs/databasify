@@ -26,7 +26,7 @@ final readonly class UpgradeFlow implements Flow
 
     public function name(Database $database, FlowContext $context): string
     {
-        return "Install {$database->engine()->label} {$database->image_release}";
+        return "Install {$database->engine()->label} {$database->image->release}";
     }
 
     public function steps(DatabaseFlow $flow): array

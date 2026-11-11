@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Databases\EngineImage;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
@@ -99,11 +100,11 @@ it('gives the restored database its own point-in-time recovery on the same stora
 
 it('refuses to restore onto an image built on an SDK outside the range', function () {
     $source = staleWindowDatabase();
-    $source->update(['image_sdk' => '0.0.9']);
+    $source->update(['image' => new EngineImage($source->image->repository, $source->image->digest, $source->image->release, '0.0.9')]);
     $ssh = fakeEngine();
 
     restoreTo($source, now()->subHour())
-        ->assertSessionHasErrors(['version_line' => "MySQL {$source->image_release} is built on SDK 0.0.9; this Databasify supports ^0.1."]);
+        ->assertSessionHasErrors(['version_line' => "MySQL {$source->image->release} is built on SDK 0.0.9; this Databasify supports ^0.1."]);
 
     expect(Database::query()->where('name', 'orders-restored')->exists())->toBeFalse()
         ->and($ssh->runs)->toBe([]);

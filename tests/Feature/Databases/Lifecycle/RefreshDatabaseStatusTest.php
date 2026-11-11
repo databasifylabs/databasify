@@ -25,7 +25,7 @@ it('records the database server version each node reports', function () {
     expect($database->nodes()->orderBy('position')->pluck('engine_version')->all())->toBe(['8.1.4', '8.1.3']);
     $this->actingAs(User::factory()->create())
         ->get(projectUrl("/databases/{$database->id}"))
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('database.data.nodes.0.engine_version', '8.1.4')->where('database.data.engine_version', $database->image_release));
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('database.data.nodes.0.engine_version', '8.1.4')->where('database.data.engine_version', $database->image->release));
 });
 
 it('keeps the last known version while a node is unreachable', function () {

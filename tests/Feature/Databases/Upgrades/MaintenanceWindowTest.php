@@ -101,7 +101,7 @@ it('skips a busy database in the maintenance window and keeps the upgrade on off
 
     resolve(ApplyMaintenance::class)->handle($database);
 
-    expect($database->fresh())->available_image_release->toBe('9.1.2')->operation->toBe('Back up now');
+    expect($database->fresh())->available_image->release->toBe('9.1.2')->operation->toBe('Back up now');
     Queue::assertNothingPushed();
 });
 

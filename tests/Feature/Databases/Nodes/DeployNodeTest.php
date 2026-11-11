@@ -52,7 +52,7 @@ it('deploys then installs the node certificate', function () {
 
     expect(collect($ssh->runs)->slice($before)->pluck('script')->map(fn (string $script): string => preg_match('/databasify (host deploy|engine info|tls install)/', $script, $match) === 1 ? $match[1] : 'script')->all())
         ->toBe(['script', 'host deploy', 'engine info', 'tls install'])
-        ->and(json_decode($engineCalls[0], true))->toBe(['image' => "{$database->image_repository}:{$database->image_release}@{$database->image_digest}", 'databaseId' => $database->id, 'nodeId' => $node->id])
+        ->and(json_decode($engineCalls[0], true))->toBe(['image' => "{$database->image->repository}:{$database->image->release}@{$database->image->digest}", 'databaseId' => $database->id, 'nodeId' => $node->id])
         ->and(json_decode($engineCalls[2], true))->toBe([
             'certificate' => $database->settings->nodeCertificate($node->id, 'server.crt'),
             'key' => $database->settings->nodeCertificate($node->id, 'server.key'),
@@ -66,7 +66,7 @@ it('fails the deploy when the running engine reports an SDK outside the range', 
     $database = $node->database;
 
     expect(fn () => resolve(DeployNode::class)->handle($database, $node))
-        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image_release} is built on SDK 0.2.0; this Databasify supports ^0.1.")
+        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK 0.2.0; this Databasify supports ^0.1.")
         ->and(engineCommandsIn($ssh))->not->toContain("{$node->server->name}: tls install");
 });
 
@@ -76,5 +76,5 @@ it('names the SDK unknown when the running engine reports none', function () {
     $database = $node->database;
 
     expect(fn () => resolve(DeployNode::class)->handle($database, $node))
-        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image_release} is built on SDK unknown; this Databasify supports ^0.1.");
+        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK unknown; this Databasify supports ^0.1.");
 });

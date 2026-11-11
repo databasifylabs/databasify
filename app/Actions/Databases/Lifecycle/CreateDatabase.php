@@ -40,14 +40,15 @@ final readonly class CreateDatabase
         $image = $this->unlessUnavailable(fn (): EngineImage => SdkRange::supported($engine->label, $data->image ?? $this->newestImage->newest($draft, $line)));
 
         $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
-            $database = Database::query()->create(array_merge([
+            $database = Database::query()->create([
                 'name' => $data->name,
                 'engine' => $data->engine,
                 'version_line' => $line,
                 'mode' => $data->mode(),
                 'status' => DatabaseStatus::Creating,
+                'image' => $image,
                 'settings' => $this->settingsFor($data, $engine),
-            ], $image->toRow()));
+            ]);
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));
             $this->sized->handle($database);

@@ -19,15 +19,8 @@ return new class extends Migration
             $table->string('version_line', 20);
             $table->string('mode');
             $table->string('status')->default('creating');
-            $table->string('image_repository');
-            $table->string('image_digest', 80);
-            $table->string('image_release', 40);
-            $table->string('image_sdk', 40)->nullable();
-            $table->string('available_image_repository')->nullable();
-            $table->string('available_image_digest', 80)->nullable();
-            $table->string('available_image_release', 40)->nullable();
-            $table->string('available_image_sdk', 40)->nullable();
-            $table->string('refused_image_digest', 80)->nullable();
+            $table->json('image');
+            $table->json('available_image')->nullable();
             $table->timestamp('retune_needed_at')->nullable();
             $table->unsignedTinyInteger('maintenance_day')->default(0);
             $table->unsignedTinyInteger('maintenance_hour')->default(3);

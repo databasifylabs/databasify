@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\DTOs\Databases;
 
+use App\Engines\Payload;
+
 final readonly class EngineImage
 {
     public function __construct(
@@ -36,34 +38,20 @@ final readonly class EngineImage
     }
 
     /**
-     * @return array{image_repository: string, image_digest: string, image_release: string, image_sdk: string|null}
+     * @param  array<array-key, mixed>  $values
      */
-    public function toRow(): array
+    public static function fromArray(array $values): self
     {
-        return ['image_repository' => $this->repository, 'image_digest' => $this->digest, 'image_release' => $this->release, 'image_sdk' => $this->sdk];
+        $payload = new Payload($values);
+
+        return new self($payload->string('repository'), $payload->string('digest'), $payload->string('release'), $payload->nullableString('sdk'));
     }
 
     /**
-     * @return array{image_repository: string, image_digest: string, image_release: string, image_sdk: string|null, available_image_repository: null, available_image_digest: null, available_image_release: null, available_image_sdk: null}
+     * @return array{repository: string, digest: string, release: string, sdk: string|null}
      */
-    public function toInstalledRow(): array
+    public function toArray(): array
     {
-        return array_merge($this->toRow(), self::noneAvailableRow());
-    }
-
-    /**
-     * @return array{available_image_repository: string, available_image_digest: string, available_image_release: string, available_image_sdk: string|null}
-     */
-    public function toAvailableRow(): array
-    {
-        return ['available_image_repository' => $this->repository, 'available_image_digest' => $this->digest, 'available_image_release' => $this->release, 'available_image_sdk' => $this->sdk];
-    }
-
-    /**
-     * @return array{available_image_repository: null, available_image_digest: null, available_image_release: null, available_image_sdk: null}
-     */
-    public static function noneAvailableRow(): array
-    {
-        return ['available_image_repository' => null, 'available_image_digest' => null, 'available_image_release' => null, 'available_image_sdk' => null];
+        return ['repository' => $this->repository, 'digest' => $this->digest, 'release' => $this->release, 'sdk' => $this->sdk];
     }
 }

@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Casts\AsDatabaseSettings;
 use App\Casts\AsEngineCapabilities;
 use App\Casts\AsEngineFields;
+use App\Casts\AsEngineImage;
 use App\Contracts\Projects\Movable;
 use App\DTOs\Databases\ConfigField;
 use App\DTOs\Databases\ConnectionProfile;
@@ -72,15 +73,8 @@ use LogicException;
  * @property DatabaseStatus $status
  * @property string|null $operation
  * @property CarbonImmutable|null $operation_started_at
- * @property string $image_repository
- * @property string $image_digest
- * @property string $image_release
- * @property string|null $image_sdk
- * @property string|null $available_image_repository
- * @property string|null $available_image_digest
- * @property string|null $available_image_release
- * @property string|null $available_image_sdk
- * @property string|null $refused_image_digest
+ * @property EngineImage $image
+ * @property EngineImage|null $available_image
  * @property CarbonImmutable|null $retune_needed_at
  * @property int $maintenance_day
  * @property int $maintenance_hour
@@ -94,7 +88,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image_repository', 'image_digest', 'image_release', 'image_sdk', 'available_image_repository', 'available_image_digest', 'available_image_release', 'available_image_sdk', 'refused_image_digest', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -764,31 +758,22 @@ class Database extends Model implements Movable
 
     public function image(): EngineImage
     {
-        return new EngineImage($this->image_repository, $this->image_digest, $this->image_release, $this->image_sdk);
+        return $this->image;
     }
 
     public function availableImage(): ?EngineImage
     {
-        if ($this->available_image_repository === null || $this->available_image_digest === null || $this->available_image_release === null) {
-            return null;
-        }
-
-        return new EngineImage($this->available_image_repository, $this->available_image_digest, $this->available_image_release, $this->available_image_sdk);
+        return $this->available_image;
     }
 
     public function recordAvailableImage(?EngineImage $image): void
     {
-        $this->update($image?->toAvailableRow() ?? EngineImage::noneAvailableRow());
-    }
-
-    public function recordRefusedImage(?EngineImage $image): void
-    {
-        $this->update(['refused_image_digest' => $image?->digest]);
+        $this->update(['available_image' => $image]);
     }
 
     public function recordInstalledImage(EngineImage $image): void
     {
-        $this->update($image->toInstalledRow());
+        $this->update(['image' => $image, 'available_image' => null]);
     }
 
     public function availableUpdateRefreshesImage(): bool
@@ -1078,6 +1063,8 @@ class Database extends Model implements Movable
     protected function casts(): array
     {
         return [
+            'image' => AsEngineImage::class,
+            'available_image' => AsEngineImage::class,
             'engine_capabilities' => AsEngineCapabilities::class,
             'config_fields' => AsEngineFields::class,
             'log_units' => 'array',

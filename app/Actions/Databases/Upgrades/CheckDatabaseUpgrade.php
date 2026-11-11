@@ -9,9 +9,12 @@ use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
+use Illuminate\Support\Facades\Cache;
 
 final readonly class CheckDatabaseUpgrade
 {
+    private const int REFUSAL_TTL_DAYS = 30;
+
     public function __construct(private ImageResolver $newest) {}
 
     public function handle(Database $database): ?EngineImage
@@ -24,7 +27,7 @@ final readonly class CheckDatabaseUpgrade
 
         $image = $newest->replaces($database->image()) ? $newest : null;
         $database->recordAvailableImage($image);
-        $database->recordRefusedImage(null);
+        Cache::forget($this->refusalKeyOf($database));
 
         return $image;
     }
@@ -33,13 +36,18 @@ final readonly class CheckDatabaseUpgrade
     {
         $refused = $unavailable->refused ?? throw $unavailable;
 
-        if ($database->refused_image_digest === $refused->digest) {
+        if (Cache::get($this->refusalKeyOf($database)) === $refused->digest) {
             return null;
         }
 
-        $database->recordRefusedImage($refused);
-        event(new DatabaseAlertRaised($database, "{$database->name} stays on {$database->engine()->label} {$database->image_release}", $unavailable->getMessage()));
+        Cache::put($this->refusalKeyOf($database), $refused->digest, now()->addDays(self::REFUSAL_TTL_DAYS));
+        event(new DatabaseAlertRaised($database, "{$database->name} stays on {$database->engine()->label} {$database->image->release}", $unavailable->getMessage()));
 
         return null;
+    }
+
+    private function refusalKeyOf(Database $database): string
+    {
+        return "sdk-refused:{$database->id}";
     }
 }
