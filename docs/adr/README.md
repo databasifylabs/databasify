@@ -76,3 +76,4 @@ Options that were tried or rejected, and why.
 | [0037](0037-follow-the-pinned-wrapper-digest.md)            | Follow the digest of the pinned wrapper version          | Superseded by 0038 |
 | [0038](0038-engines-ship-only-as-images.md)                 | Engines ship only as images                              | Accepted           |
 | [0039](0039-community-engines.md)                           | Plugin engines are community engines                     | Accepted           |
+| [0040](0040-one-sdk-range-per-app-release.md)               | Each app release runs one engine SDK range               | Accepted           |

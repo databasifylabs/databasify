@@ -6,16 +6,22 @@ namespace Tests\Support;
 
 use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Databases\VersionLine;
+use App\DTOs\Images\ImageLabels;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Exceptions\Images\ImageUnavailable;
 
 final class FakeImageRegistry implements ImageRegistry
 {
+    private const string SDK = '0.1.0';
+
     private const string HOST_REPOSITORY = 'ghcr.io/databasifylabs/databasify-host';
 
     /** @var array<string, array<string, string>> */
     private array $digests = [];
+
+    /** @var array<string, array<string, string|null>> */
+    private array $sdks = [];
 
     private bool $down = false;
 
@@ -38,14 +44,15 @@ final class FakeImageRegistry implements ImageRegistry
         return 'sha256:'.hash('sha256', "{$repository}:{$tag}");
     }
 
-    public function publish(string $engine, string $tag, ?string $digest = null): self
+    public function publish(string $engine, string $tag, ?string $digest = null, ?string $sdk = self::SDK): self
     {
-        return $this->publishIn(EngineCatalog::find($engine)->imageRepository, $tag, $digest ?? self::digestFor($engine, $tag));
+        return $this->publishIn(EngineCatalog::find($engine)->imageRepository, $tag, $digest ?? self::digestFor($engine, $tag), $sdk);
     }
 
-    public function publishIn(string $repository, string $tag, string $digest): self
+    public function publishIn(string $repository, string $tag, string $digest, ?string $sdk = self::SDK): self
     {
         $this->digests[$repository][$tag] = $digest;
+        $this->sdks[$repository][$digest] = $sdk;
 
         return $this;
     }
@@ -69,6 +76,13 @@ final class FakeImageRegistry implements ImageRegistry
         $this->ensureUp($repository);
 
         return $this->digests[$repository][$tag] ?? throw ImageUnavailable::answered($repository, 404);
+    }
+
+    public function labelsOf(string $repository, string $digest): ImageLabels
+    {
+        $this->ensureUp($repository);
+
+        return new ImageLabels($this->sdks[$repository][$digest] ?? null);
     }
 
     private function ensureUp(string $repository): void

@@ -108,7 +108,7 @@ final readonly class CreateDatabase
         try {
             return $resolve();
         } catch (ImageUnavailable $unavailable) {
-            throw ValidationException::withMessages(['version_line' => "{$unavailable->getMessage()} Try again in a moment."]);
+            throw ValidationException::withMessages(['version_line' => $unavailable->refused ? $unavailable->getMessage() : "{$unavailable->getMessage()} Try again in a moment."]);
         }
     }
 }

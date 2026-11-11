@@ -78,3 +78,30 @@ it('retries a registry that fails with a server error and then answers', functio
 
     expect(resolve(OciRegistry::class)->tagsOf('ghcr.io/databasifylabs/databasify-postgres'))->toBe(['18.7']);
 });
+
+it('reads the sdk label from the linux/amd64 image config of an index', function () {
+    $index = 'sha256:'.str_repeat('a', 64);
+    $amd64 = 'sha256:'.str_repeat('b', 64);
+    $config = 'sha256:'.str_repeat('c', 64);
+    fakeGhcr([
+        "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$index}" => Http::response(['manifests' => [
+            ['digest' => 'sha256:'.str_repeat('d', 64), 'platform' => ['os' => 'linux', 'architecture' => 'arm64']],
+            ['digest' => $amd64, 'platform' => ['os' => 'linux', 'architecture' => 'amd64']],
+        ]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$amd64}" => Http::response(['config' => ['digest' => $config]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.engine' => 'postgres', 'io.databasify.sdk' => '0.1.2']]]),
+    ]);
+
+    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.1.2');
+});
+
+it('reads no sdk from an image config without the label', function () {
+    $manifest = 'sha256:'.str_repeat('b', 64);
+    $config = 'sha256:'.str_repeat('c', 64);
+    fakeGhcr([
+        "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$manifest}" => Http::response(['config' => ['digest' => $config]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => null]]),
+    ]);
+
+    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $manifest)->sdk)->toBeNull();
+});

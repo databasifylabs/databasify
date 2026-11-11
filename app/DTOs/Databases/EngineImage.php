@@ -10,6 +10,7 @@ final readonly class EngineImage
         public string $repository,
         public string $digest,
         public string $release,
+        public ?string $sdk,
     ) {}
 
     public function reference(): string
@@ -35,15 +36,15 @@ final readonly class EngineImage
     }
 
     /**
-     * @return array{image_repository: string, image_digest: string, image_release: string}
+     * @return array{image_repository: string, image_digest: string, image_release: string, image_sdk: string|null}
      */
     public function toRow(): array
     {
-        return ['image_repository' => $this->repository, 'image_digest' => $this->digest, 'image_release' => $this->release];
+        return ['image_repository' => $this->repository, 'image_digest' => $this->digest, 'image_release' => $this->release, 'image_sdk' => $this->sdk];
     }
 
     /**
-     * @return array{image_repository: string, image_digest: string, image_release: string, available_image_repository: null, available_image_digest: null, available_image_release: null}
+     * @return array{image_repository: string, image_digest: string, image_release: string, image_sdk: string|null, available_image_repository: null, available_image_digest: null, available_image_release: null, available_image_sdk: null}
      */
     public function toInstalledRow(): array
     {
@@ -51,18 +52,18 @@ final readonly class EngineImage
     }
 
     /**
-     * @return array{available_image_repository: string, available_image_digest: string, available_image_release: string}
+     * @return array{available_image_repository: string, available_image_digest: string, available_image_release: string, available_image_sdk: string|null}
      */
     public function toAvailableRow(): array
     {
-        return ['available_image_repository' => $this->repository, 'available_image_digest' => $this->digest, 'available_image_release' => $this->release];
+        return ['available_image_repository' => $this->repository, 'available_image_digest' => $this->digest, 'available_image_release' => $this->release, 'available_image_sdk' => $this->sdk];
     }
 
     /**
-     * @return array{available_image_repository: null, available_image_digest: null, available_image_release: null}
+     * @return array{available_image_repository: null, available_image_digest: null, available_image_release: null, available_image_sdk: null}
      */
     public static function noneAvailableRow(): array
     {
-        return ['available_image_repository' => null, 'available_image_digest' => null, 'available_image_release' => null];
+        return ['available_image_repository' => null, 'available_image_digest' => null, 'available_image_release' => null, 'available_image_sdk' => null];
     }
 }

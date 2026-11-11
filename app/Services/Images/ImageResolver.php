@@ -8,6 +8,7 @@ use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Databases\EngineImage;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
+use App\Support\Engines\SdkRange;
 
 final readonly class ImageResolver
 {
@@ -19,8 +20,14 @@ final readonly class ImageResolver
         $repository = $engine->imageRepository;
         $release = $this->newestReleaseIn($this->registry->tagsOf($repository), $line)
             ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $repository);
+        $digest = $this->registry->digestOf($repository, $release);
+        $sdk = $this->registry->labelsOf($repository, $digest)->sdk;
 
-        return new EngineImage($repository, $this->registry->digestOf($repository, $release), $release);
+        if (! SdkRange::allows($sdk)) {
+            throw ImageUnavailable::unsupportedSdk("{$engine->label} {$release}", $sdk);
+        }
+
+        return new EngineImage($repository, $digest, $release, $sdk);
     }
 
     /**

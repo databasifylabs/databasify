@@ -8,9 +8,12 @@ use App\Actions\Databases\Certificates\InstallNodeCertificate;
 use App\Actions\Databases\Certificates\IssueNodeCertificates;
 use App\Actions\Dns\EnsureZoneCertificate;
 use App\Engines\EngineClient;
+use App\Engines\Requests\EngineInfo;
 use App\Engines\Requests\HostDeploy;
+use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Models\DatabaseNode;
+use App\Support\Engines\SdkRange;
 
 final readonly class DeployNode
 {
@@ -29,6 +32,7 @@ final readonly class DeployNode
         $this->hostBinary->handle($node);
 
         $this->engine->send($node, $this->deploymentOf($database, $node), "{$node->server->name}: deploying the engine");
+        $this->ensureSupportedSdkOn($database, $node);
 
         $this->certificate->handle($database->refresh(), $node);
     }
@@ -42,6 +46,17 @@ final readonly class DeployNode
         }
 
         rescue(fn () => $this->zoneCertificate->handle($zone));
+    }
+
+    private function ensureSupportedSdkOn(Database $database, DatabaseNode $node): void
+    {
+        $sdk = $this->engine->send($node, new EngineInfo)->sdk;
+
+        if (SdkRange::allows($sdk)) {
+            return;
+        }
+
+        throw ImageUnavailable::unsupportedSdk("{$database->engine()->label} {$database->image_release}", $sdk);
     }
 
     private function deploymentOf(Database $database, DatabaseNode $node): HostDeploy

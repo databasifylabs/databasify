@@ -9,7 +9,7 @@ Nodes of one database must run byte-identical engine images, or replication and 
 
 ## Decision
 
-When a database is created, `ImageResolver::newest()` asks the registry (`ghcr.io/databasifylabs`, overridable with `DATABASIFY_IMAGE_REGISTRY`; an anonymous bearer token is fetched only after a 401) for the newest exact tag of `databasify-<engine>` in the version line. Tags must match `<line>.N[.N…]` and are ranked with `version_compare`. The repository, digest and release are stored on the `databases` row (`image_*` columns). Every node pulls `repo@digest`. A daily check stores a newer image in `available_image_*` until it is installed.
+When a database is created, `ImageResolver::newest()` asks the registry (`ghcr.io/databasifylabs`, overridable with `DATABASIFY_IMAGE_REGISTRY`; an anonymous bearer token is fetched only after a 401) for the newest exact tag of `databasify-<engine>` in the version line. Tags must match `<line>.N[.N…]` and are ranked with `version_compare`. An image built on an SDK outside the app's range is refused ([0040](0040-one-sdk-range-per-app-release.md)). The repository, digest, release and SDK are stored on the `databases` row (`image_*` columns). Every node pulls `repo@digest`. A daily check stores a newer image in `available_image_*` until it is installed.
 
 ## Consequences
 

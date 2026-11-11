@@ -156,8 +156,25 @@ it('stores the newest image of its line once, when it is created', function () {
     $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'version_line' => '8', 'primary_server_id' => $server->id])->assertRedirect(projectUrl('/databases/').Database::query()->sole()->id);
     withImage('valkey', '8.1.11');
 
-    expect(Database::query()->sole()->image())->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10'));
+    expect(Database::query()->sole()->image())->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10', '0.1.0'));
 });
+
+it('refuses to create a database from an image built on an SDK outside the range', function (?string $sdk, string $named) {
+    Queue::fake([AdvanceDatabaseFlow::class]);
+    $this->actingAs(User::factory()->create());
+    $server = Server::factory()->ready()->create();
+    withImage('valkey', '9.0.3', sdk: $sdk);
+
+    $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'version_line' => '9', 'primary_server_id' => $server->id])
+        ->assertSessionHasErrors(['version_line' => "Valkey 9.0.3 is built on SDK {$named}; this Databasify supports ^0.1."]);
+
+    expect(Database::query()->count())->toBe(0)
+        ->and(DatabaseNode::query()->count())->toBe(0);
+    Queue::assertNothingPushed();
+})->with([
+    'a newer minor' => ['0.2.0', '0.2.0'],
+    'an image without an SDK label' => [null, 'unknown'],
+]);
 
 it('creates nothing when the image registry cannot be reached', function () {
     Queue::fake([AdvanceDatabaseFlow::class]);

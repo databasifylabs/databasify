@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Actions\Databases\Upgrades\CheckDatabaseUpgrade;
 use App\DTOs\Databases\EngineImage;
 use App\Enums\Databases\DatabaseMode;
+use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 
 it('offers a newer release of the line without asking the servers', function () {
     withImage('postgres', '18.6');
@@ -17,7 +19,7 @@ it('offers a newer release of the line without asking the servers', function () 
 
     $offered = resolve(CheckDatabaseUpgrade::class)->handle($database);
 
-    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7'))
+    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.1.0'))
         ->and($database->fresh()->availableImage())->toEqual($offered)
         ->and($database->fresh()->availableUpdateRefreshesImage())->toBeFalse()
         ->and($ssh->runs)->toBeEmpty();
@@ -51,7 +53,7 @@ it('offers a refresh when the release was rebuilt under the same tag', function 
 it('offers nothing and clears an old offer while the database runs the newest image', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update((new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9'))->toAvailableRow());
+    $database->update((new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.0'))->toAvailableRow());
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull()
         ->and($database->fresh()->availableImage())->toBeNull();
@@ -60,7 +62,7 @@ it('offers nothing and clears an old offer while the database runs the newest im
 it('never offers an older release than the one the database runs', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update((new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9'))->toRow());
+    $database->update((new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.0'))->toRow());
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull();
 });
@@ -74,6 +76,20 @@ it('keeps the current offer when the registry cannot be reached', function () {
 
     expect(fn () => resolve(CheckDatabaseUpgrade::class)->handle($database))->toThrow(ImageUnavailable::class)
         ->and($database->fresh()->available_image_release)->toBe('18.7');
+});
+
+it('keeps the current image when the newest one is outside the range', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    withImage('valkey', '9.1.3');
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    withImage('valkey', '9.1.4', sdk: '0.2.0');
+
+    expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull()
+        ->and($database->fresh()->availableImage())->toBeNull()
+        ->and($database->fresh()->image_release)->toBe('9.1.3');
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->database->is($database)
+        && $alert->subject === 'main stays on Valkey 9.1.3'
+        && $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
 });
 
 it('checks for an upgrade over http', function () {

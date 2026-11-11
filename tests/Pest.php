@@ -337,9 +337,9 @@ function newDatabase(string $engine, int $servers, DatabaseMode $mode = Database
     return $database;
 }
 
-function withImage(string $engine, string $release, ?string $digest = null): void
+function withImage(string $engine, string $release, ?string $digest = null, ?string $sdk = '0.1.0'): void
 {
-    imageRegistry()->publish($engine, $release, $digest);
+    imageRegistry()->publish($engine, $release, $digest, $sdk);
 }
 
 function idleDatabase(string $engine, int $servers, DatabaseMode $mode = DatabaseMode::HighAvailability, string $name = 'main', ?string $versionLine = null): Database

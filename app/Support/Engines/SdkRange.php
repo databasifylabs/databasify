@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Engines;
+
+use App\Support\Plugins\VersionConstraint;
+use Illuminate\Support\Str;
+
+final readonly class SdkRange
+{
+    public static function allows(?string $sdk): bool
+    {
+        if ($sdk === null) {
+            return false;
+        }
+
+        return VersionConstraint::allows(self::constraint(), Str::of($sdk)->ltrim('v')->before('+')->value());
+    }
+
+    public static function refusalOf(string $image, ?string $sdk): string
+    {
+        $built = $sdk ?? 'unknown';
+
+        return "{$image} is built on SDK {$built}; this Databasify supports ".self::constraint().'.';
+    }
+
+    private static function constraint(): string
+    {
+        return config()->string('databasify.sdk.range');
+    }
+}

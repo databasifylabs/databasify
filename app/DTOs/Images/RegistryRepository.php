@@ -43,6 +43,11 @@ final readonly class RegistryRepository
         return "{$this->baseUrl()}/v2/{$this->name}/manifests/{$reference}";
     }
 
+    public function blobUrl(string $digest): string
+    {
+        return "{$this->baseUrl()}/v2/{$this->name}/blobs/{$digest}";
+    }
+
     public function nextPageIn(string $link): ?string
     {
         if (preg_match('/<([^>]+)>\s*;\s*rel="?next"?/', $link, $match) !== 1) {
