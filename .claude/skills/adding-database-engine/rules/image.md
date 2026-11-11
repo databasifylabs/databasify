@@ -1,6 +1,6 @@
-# Phase 2: the engine image (`../engines`)
+# Phase 2: the engine image (engines repository)
 
-The engines repo's own skill, `../engines/.claude/skills/adding-engine-image`, covers the same ground in more detail; follow it when you work in that repo.
+Paths here are from the root of your engines clone. Its own skill, `.claude/skills/adding-engine-image`, covers the same ground in more detail; follow it when you work in that repository.
 
 ## Files
 
@@ -66,6 +66,8 @@ No workflow change is needed: the CI matrix, tags and refresh all come from `ver
 
 ## Verify locally (Docker must be running)
 
+These local checks are the contributor's proof: CI on a fork cannot publish images, so the pull request shows the build, smoke, conformance and scan results you ran.
+
 ```bash
 images/images.sh build <key> --load --tag smoke:<key>
 images/images.sh smoke smoke:<key> <engine>
@@ -80,9 +82,9 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/repo:ro" 
 
 Lint: `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.10.0 -s bash -S warning images/<engine>/smoke/check.sh`.
 
-## After the user approves the push
+## After the pull request merges (maintainers)
 
-Watch the `images` workflow (`gh run watch <id> --exit-status`); a failing line does not publish. A new `databasify-<engine>` GHCR package is created **private**: the user must make it public and give `databasifylabs/engines` the Write role under Manage Actions access. Verify anonymous pulls and note the digest:
+A branch pushed to the engines repository itself builds test tags (`<release>-<sha7>`); the app never picks those, because it takes only exact `<line>.x` releases. A merge to `main` publishes the release tags. Watch the `images` workflow (`gh run watch <id> --exit-status`); a failing line does not publish. A new `databasify-<engine>` GHCR package is created **private**: a maintainer makes it public and gives `databasifylabs/engines` the Write role under Manage Actions access. Verify anonymous pulls and note the digest:
 
 ```bash
 tok=$(curl -s "https://ghcr.io/token?scope=repository:databasifylabs/databasify-<engine>:pull" | jq -r .token)
@@ -91,4 +93,4 @@ curl -sI -H "Authorization: Bearer $tok" -H "Accept: application/vnd.oci.image.i
 
 A rebuild of the same release (new digest) shows up in the app as "Refresh image", which is useful to test the image-swap rollout.
 
-The push also republishes `ghcr.io/databasifylabs/databasify-wrapper:<wrapper>` with the new code (`.github/workflows/wrapper.yml`); the app follows that tag's digest and installs it on every node with `host wrapper-update`, so the engine's code reaches existing databases too.
+The merge also republishes `ghcr.io/databasifylabs/databasify-wrapper:<wrapper>` with the new code (`.github/workflows/wrapper.yml`); the app follows that tag's digest and installs it on every node with `host wrapper-update`, so the engine's code reaches existing databases too.

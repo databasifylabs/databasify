@@ -1,6 +1,6 @@
 ---
 name: adding-database-engine
-description: 'Add a new database engine (or a new version line of one) to Databasify end to end: the engine package in the Go wrapper and its image in the sibling engines repository, then the app side (catalog registration, connection profile, migration source, icon, tests), and finally a live e2e run on three provider servers. Use when the user asks to add, support, port or integrate an engine such as ClickHouse, KeyDB or a new PostgreSQL/MySQL/MongoDB major, or to add a version line to an existing engine. Do not use for fixing one command of an existing engine or for routine image pin bumps (the weekly refresh workflow handles those).'
+description: 'Add a new database engine (or a new version line of one) to Databasify end to end: the engine package in the Go wrapper and its image in the separate engines repository (databasifylabs/engines), then the app side (catalog registration, connection profile, migration source, icon, tests), and finally a live e2e run on three provider servers. Use when the user asks to add, support, port or integrate an engine such as ClickHouse, KeyDB or a new PostgreSQL/MySQL/MongoDB major, or to add a version line to an existing engine. Do not use for fixing one command of an existing engine or for routine image pin bumps (the weekly refresh workflow handles those).'
 license: Apache-2.0
 metadata:
     author: databasify
@@ -10,19 +10,26 @@ metadata:
 
 A Databasify engine is two halves that ship separately:
 
-1. **The engine** in `../engines` (repo `databasifylabs/engines`): a Go package in the `databasify` wrapper that implements `contracts.Engine`, plus an image that is the official engine image with that wrapper as PID 1, published as `ghcr.io/databasifylabs/databasify-<engine>`. All engine logic lives there: config files, tuning, settings, processes, HA, accounts, backups, migrations. The engines repo has its own image skill, `.claude/skills/adding-engine-image`.
+1. **The engine** in the engines repository, [`databasifylabs/engines`](https://github.com/databasifylabs/engines): a Go package in the `databasify` wrapper that implements `contracts.Engine`, plus an image that is the official engine image with that wrapper as PID 1, published as `ghcr.io/databasifylabs/databasify-<engine>`. All engine logic lives there: config files, tuning, settings, processes, HA, accounts, backups, migrations. Clone it on its own, wherever you like (`git clone https://github.com/databasifylabs/engines.git`); the rules for phases 1 and 2 name paths from the root of that clone. It has its own image skill, `.claude/skills/adding-engine-image`.
 2. **The app** in this repo: one `RegisterEngine` entry in `app/Providers/EngineServiceProvider.php` (label, category, lines, connection profile, migration source, flags) and an icon. The app drives every engine with the same typed commands and flows (`docs/adr/0035-engine-commands-and-flows.md`); it has no per-engine driver, scripts or flows.
 
 What a database can do comes from the engine at runtime: `engine capabilities` (commands, password encryptions, reserved names, ports) and `config fields` are read from the seed after its first deploy and stored on the database. A command the engine doesn't offer answers `unsupported`, and the app hides that feature.
 
+## How a contribution lands
+
+- **Open an issue first.** New engines and version lines need an agreed approach before code (`CONTRIBUTING.md`).
+- **One pull request per repository.** Branch from `main` in the engines repository and from `0.x` here, commit per phase, and open each pull request against that branch. Never push to `main` or `0.x` yourself.
+- **The engines pull request lands first.** The app can only create databases from published images, and only a merge to the engines `main` publishes release tags (`<line>.x`) and moves the shared wrapper tag that every Databasify install pulls. Link the engines pull request from the app's.
+- **Say how you tested.** Name the engine, line and OS, which checks ran, and whether the live e2e ran.
+
 ## Order of work
 
-Do the phases in order, commit per phase in each repo, and never push either repo unless the user says so. Pushing `../engines` publishes image digests and moves the shared wrapper tag. Read the rule file for a phase before starting it, and [rules/lessons.md](rules/lessons.md) before the e2e.
+Do the phases in order. Read the rule file for a phase before starting it, and [rules/lessons.md](rules/lessons.md) before the e2e.
 
 | Phase | What                                                                       | Rules                                          |
 | ----- | -------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1     | Engine package in `../engines`: groups, settings, processes, Go tests      | [rules/engine.md](rules/engine.md)             |
-| 2     | Image in `../engines`, built, smoke-tested with conformance, scanned       | [rules/image.md](rules/image.md)               |
+| 1     | Engine package in the engines repository: groups, settings, processes, Go tests | [rules/engine.md](rules/engine.md)             |
+| 2     | Image in the engines repository, built, smoke-tested with conformance, scanned | [rules/image.md](rules/image.md)               |
 | 3     | App registration: catalog entry, connection profile, icon                  | [rules/registration.md](rules/registration.md) |
 | 4     | Pest tests, PHPStan, Pint, frontend checks, then a live e2e on three servers | [rules/testing.md](rules/testing.md)         |
 
@@ -32,7 +39,7 @@ A new **version line** of an existing engine is phase 2 (a `versions.json` entry
 
 Pick the engine package whose replication model matches and copy its shape, not its text:
 
-| New engine replicates like                                              | Template in `../engines/internal/engines/`                      |
+| New engine replicates like                                              | Template in the engines repository's `internal/engines/`        |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
 | Built-in elections, the engine picks the primary (replica sets, Galera) | `mongodb/` (non-SQL), `mariadb/` (SQL, on `mysqlfamily/`)       |
 | External HA manager plus a DCS (Patroni + etcd)                         | `postgres/`                                                     |
@@ -47,4 +54,4 @@ Pick the engine package whose replication model matches and copy its shape, not 
 - Every feature is its own typed command; there is no raw SQL or script endpoint. New request or reply fields go in `internal/requests` and `internal/responses` in the engines repo and are mirrored name for name in `app/Engines/Requests`, `app/Engines/Responses` and `app/Engines/Data`.
 - The user-editable settings mirror what DigitalOcean offers for that engine, no more and no fewer. Tuned values (memory, connections) stay automatic.
 - Follow `~/.claude/CLAUDE.md` and `AGENTS.md`: Action pattern, final readonly DTOs with named constructors, collections first, early returns, no comments except PHPStan types, PHPStan max with no ignores.
-- Drive e2e only through the app's actions; never repair a server by hand. Creating public DNS records, ordering or destroying servers and pushing images each need the user's go-ahead.
+- Drive e2e only through the app's actions; never repair a server by hand. Use your own provider account and domain for it, destroy test servers afterwards, and get the go-ahead of whoever runs the session before creating public DNS records or ordering or destroying servers.

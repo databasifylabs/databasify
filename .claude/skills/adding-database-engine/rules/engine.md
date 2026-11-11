@@ -1,6 +1,6 @@
-# Phase 1: the engine package (`../engines`)
+# Phase 1: the engine package (engines repository)
 
-The engine is Go code inside the `databasify` wrapper. Read `../engines/README.md` (the command reference and the flows the app follows) and the engines ADRs (`../engines/docs/adr/`) before writing any, especially 0001 (typed commands), 0002 (hand-written contract), 0006 (how the wrapper talks to each engine), 0008 (clusters manage their own writer) and 0011 (safe updates per line).
+The engine is Go code inside the `databasify` wrapper. Paths here are from the root of your engines clone. Read its `README.md` (the command reference and the flows the app follows) and its ADRs (`docs/adr/`) before writing any, especially 0001 (typed commands), 0002 (hand-written contract), 0006 (how the wrapper talks to each engine), 0008 (clusters manage their own writer) and 0011 (safe updates per line).
 
 ## Files
 
@@ -11,7 +11,7 @@ The engine is Go code inside the `databasify` wrapper. Read `../engines/README.m
 | `internal/requests`, `internal/responses`, `internal/dtos` | Only when the engine needs a field no engine had. Shared types never grow engine-specific fields: those go in the request's `options` object, which the engine validates. |
 | `README.md`                            | A column in the Engines table, any footnotes, and every engine-specific step in the Flows section. The app's flows follow this README.                                           |
 | `docs/adr/`                            | An ADR for each lasting choice the engine makes (its HA mechanism, backup and migration tools), like 0004, 0005 and 0007.                                                       |
-| `versions.json`                        | Raise `wrapper` only when the user wants a new release; otherwise the moving tag republishes the same version with the new code (ADR 0012).                                     |
+| `versions.json`                        | Leave `wrapper` alone: maintainers raise it for a release, and until then a merge republishes the same version with the new code (ADR 0012).                                   |
 
 ## Groups
 
@@ -39,7 +39,7 @@ The engine is Go code inside the `databasify` wrapper. Read `../engines/README.m
 ## Accounts, backups and migrations
 
 - **Accounts:** users, databases and grants (`read`, `write`) through the engine's own client. Refuse reserved names with `invalid_request`, and never echo a password back.
-- **Archive:** the backup tool's config, scheduled backups gated on the primary, `archive status` with the earliest and latest restorable time, and `restore start`. When a bundled tool doesn't support a line yet, ship the line and tell the user, so the app registers it with `'recovery' => false`.
+- **Archive:** the backup tool's config, scheduled backups gated on the primary, `archive status` with the earliest and latest restorable time, and `restore start`. When a bundled tool doesn't support a line yet, ship the line and say so in the pull request, so the app registers it with `'recovery' => false`.
 - **Migration:** `migration check` returns facts and blockers, `migration start` runs the copy in a transient unit, and `migration progress` reports lag as the unapplied backlog, so an idle source reads 0.
 - Read third-party tools' source for how they build connection strings before relying on query options, and check which engine versions each tool supports.
 
