@@ -19,7 +19,7 @@ it('offers a newer release of the line without asking the servers', function () 
 
     $offered = resolve(CheckDatabaseUpgrade::class)->handle($database);
 
-    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.1.0'))
+    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.1.1'))
         ->and($database->fresh()->availableImage())->toEqual($offered)
         ->and($database->fresh()->availableUpdateRefreshesImage())->toBeFalse()
         ->and($ssh->runs)->toBeEmpty();
@@ -53,7 +53,7 @@ it('offers a refresh when the release was rebuilt under the same tag', function 
 it('offers nothing and clears an old offer while the database runs the newest image', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update(['available_image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.0')]);
+    $database->update(['available_image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.1')]);
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull()
         ->and($database->fresh()->availableImage())->toBeNull();
@@ -62,7 +62,7 @@ it('offers nothing and clears an old offer while the database runs the newest im
 it('never offers an older release than the one the database runs', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update(['image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.0')]);
+    $database->update(['image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.1')]);
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull();
 });

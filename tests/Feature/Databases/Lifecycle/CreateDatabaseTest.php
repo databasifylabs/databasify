@@ -157,7 +157,7 @@ it('stores the newest image of its line once, when it is created', function () {
     withImage('valkey', '8.1.11');
 
     expect(Database::query()->sole())
-        ->image->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10', '0.1.0'))
+        ->image->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10', '0.1.1'))
         ->available_image->toBeNull();
 });
 

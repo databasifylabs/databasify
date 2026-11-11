@@ -108,7 +108,7 @@ it('restores a database on a dropped SDK onto the newest supported image of its 
 
     $restored = inProjectDuring(fn (): Database => resolve(RestoreToPointInTime::class)->handle($source, new PointInTimeRestore('orders-restored', Server::factory()->ready()->create()->id, $target)));
 
-    expect($restored->image->sdk)->toBe('0.1.0');
+    expect($restored->image->sdk)->toBe('0.1.1');
 });
 
 it('lets storage credentials rotate while a database on a dropped SDK archives there', function () {
@@ -170,7 +170,7 @@ it('lists the databases another SDK range would make read-only', function () {
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
     $this->artisan('databases:check-sdks', ['--range' => '^0.2'])
-        ->expectsOutputToContain('cache runs SDK 0.1.0')
+        ->expectsOutputToContain('cache runs SDK 0.1.1')
         ->assertExitCode(0);
 
     $this->artisan('databases:check-sdks', ['--range' => '^0.1'])

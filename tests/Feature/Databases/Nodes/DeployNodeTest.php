@@ -39,7 +39,7 @@ it('fails a deploy before touching the server when the host binary cannot be res
 it('deploys then installs the node certificate', function () {
     $ssh = fakeSsh()
         ->respondToEngine('host deploy', ['engine' => 'postgres', 'container' => 'databasify-postgres', 'created' => true, 'replaced' => false])
-        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.1.0'])
+        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.1.1'])
         ->respondToEngine('tls install', []);
     $node = engineNode();
     $database = $node->database;

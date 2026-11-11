@@ -13,7 +13,7 @@ use App\Exceptions\Images\ImageUnavailable;
 
 final class FakeImageRegistry implements ImageRegistry
 {
-    private const string SDK = '0.1.0';
+    private const string SDK = '0.1.1';
 
     private const string HOST_REPOSITORY = 'ghcr.io/databasifylabs/databasify-host';
 
