@@ -6,7 +6,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { useRepositoryStars } from '@/hooks/use-repository-stars';
 import { repositoryUrl } from '@/lib/repository';
 import { runAction } from '@/lib/run-action';
 import { destroy as dismissStarPrompt } from '@/routes/repository/star-prompt';
@@ -16,8 +15,6 @@ function dismiss(): void {
 }
 
 export default function StarPromptCard() {
-    const stars = useRepositoryStars();
-
     return (
         <Card>
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
@@ -36,9 +33,7 @@ export default function StarPromptCard() {
                             onClick={dismiss}
                         >
                             <Star className="fill-amber-400 text-amber-400" />
-                            {stars
-                                ? `Star on GitHub · ${stars}`
-                                : 'Star on GitHub'}
+                            Star on GitHub
                         </a>
                     </Button>
                     <Button

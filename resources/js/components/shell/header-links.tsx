@@ -6,7 +6,6 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useRepositoryStars } from '@/hooks/use-repository-stars';
 import { repositoryUrl } from '@/lib/repository';
 
 function HeaderLink({
@@ -40,12 +39,10 @@ function HeaderLink({
 }
 
 export function HeaderLinks() {
-    const stars = useRepositoryStars();
-
     return (
         <HeaderLink
             href={repositoryUrl}
-            label={stars ? `Star on GitHub (${stars})` : 'Star on GitHub'}
+            label="Star on GitHub"
             icon={Star}
             iconClassName="fill-amber-400 text-amber-400"
         />

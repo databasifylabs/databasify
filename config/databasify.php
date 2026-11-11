@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'repository' => env('DATABASIFY_REPOSITORY', 'databasifylabs/databasify'),
-
     'images' => [
         'registry' => env('DATABASIFY_IMAGE_REGISTRY', 'ghcr.io/databasifylabs'),
         'repository' => env('DATABASIFY_IMAGE_REPOSITORY', 'databasify-{engine}'),
