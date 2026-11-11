@@ -101,12 +101,12 @@ it('gives the restored database its own point-in-time recovery on the same stora
 it('refuses to restore when no image of the line is built on an SDK inside the range', function () {
     $source = staleWindowDatabase();
     $source->update(['image' => new EngineImage($source->image->repository, $source->image->digest, $source->image->release, '0.0.9')]);
-    withImage('mysql', '8.4.0', sdk: '0.2.0');
-    withImage('mysql', '8.4.99', sdk: '0.2.0');
+    withImage('mysql', '8.4.0', sdk: '0.3.0');
+    withImage('mysql', '8.4.99', sdk: '0.3.0');
     $ssh = fakeEngine();
 
     restoreTo($source, now()->subHour())
-        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.2.0; this Databasify supports ^0.1.']);
+        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.3.0; this Databasify supports ^0.2.']);
 
     expect(Database::query()->where('name', 'orders-restored')->exists())->toBeFalse()
         ->and($ssh->runs)->toBe([]);

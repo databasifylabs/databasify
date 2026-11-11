@@ -89,6 +89,6 @@ it('decodes the SDK version an engine reports', function () {
     $reply = resolve(EngineClient::class)->send(engineNode(), new EngineInfo);
 
     expect($reply)->toBeInstanceOf(EngineInfoReply::class)
-        ->sdk->toBe('0.1.1')
+        ->sdk->toBe('0.2.0')
         ->engine->toBe('postgres');
 });

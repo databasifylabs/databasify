@@ -31,9 +31,14 @@ final class ImageUnavailable extends RuntimeException
         return new self("No {$label} image is published in {$repository}.");
     }
 
-    public static function hostBinary(string $name, string $version, self $previous): self
+    public static function hostBinary(string $constraint, self $previous): self
     {
-        return new self("The host binary {$name}:{$version} could not be resolved: {$previous->getMessage()}", previous: $previous);
+        return new self("The host binary engine-sdk {$constraint} could not be resolved: {$previous->getMessage()}", previous: $previous);
+    }
+
+    public static function noHostRelease(string $constraint): self
+    {
+        return new self("No engine-sdk release satisfies {$constraint}.");
     }
 
     public static function unsupportedSdk(string $engine, EngineImage $image, ?string $sdk): self

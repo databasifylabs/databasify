@@ -89,10 +89,10 @@ it('reads the sdk label from the linux/amd64 image config of an index', function
             ['digest' => $amd64, 'platform' => ['os' => 'linux', 'architecture' => 'amd64']],
         ]]),
         "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$amd64}" => Http::response(['config' => ['digest' => $config]]),
-        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.engine' => 'postgres', 'io.databasify.sdk' => '0.1.2']]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.engine' => 'postgres', 'io.databasify.sdk' => '0.2.2']]]),
     ]);
 
-    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.1.2');
+    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.2.2');
 });
 
 it('reads no sdk from an image config without the label', function () {
@@ -116,9 +116,9 @@ it('skips attestation manifests when an index has no linux/amd64 image', functio
             ['digest' => $arm64, 'platform' => ['os' => 'linux', 'architecture' => 'arm64']],
         ]]),
         "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$arm64}" => Http::response(['config' => ['digest' => $config]]),
-        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.sdk' => '0.1.2']]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.sdk' => '0.2.2']]]),
         'ghcr.io/v2/databasifylabs/databasify-postgres/*' => Http::response(['config' => ['digest' => 'sha256:'.str_repeat('e', 64)]]),
     ]);
 
-    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.1.2');
+    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.2.2');
 });

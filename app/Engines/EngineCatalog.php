@@ -67,9 +67,7 @@ final readonly class EngineCatalog
 
     private static function defaultRepositoryOf(string $id): string
     {
-        $repository = str_replace('{engine}', $id, config()->string('databasify.images.repository'));
-
-        return config()->string('databasify.images.registry')."/{$repository}";
+        return config()->string('databasify.registry')."/databasify-{$id}";
     }
 
     /**

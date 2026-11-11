@@ -3,15 +3,10 @@
 declare(strict_types=1);
 
 return [
-    'images' => [
-        'registry' => env('DATABASIFY_IMAGE_REGISTRY', 'ghcr.io/databasifylabs'),
-        'repository' => env('DATABASIFY_IMAGE_REPOSITORY', 'databasify-{engine}'),
-    ],
+    'registry' => env('DATABASIFY_REGISTRY', 'ghcr.io/databasifylabs'),
 
-    'sdk' => [
-        'host' => '0.1.1',
-        'host_repository' => 'databasify-host',
-        'range' => '^0.1',
+    'require' => [
+        'engine-sdk' => '^0.2',
     ],
 
     'docker' => [

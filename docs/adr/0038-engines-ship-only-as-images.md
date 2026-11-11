@@ -12,7 +12,7 @@
 - The binary inside each engine image is the one that runs. The app no longer installs, resolves or records a wrapper: `host wrapper-update`, `WrapperResolver`, `SyncDatabaseWrapperJob` and the `databases.wrapper_version` and `databases.wrapper_digest` columns are gone.
 - Fixes to the binary ship as new images in the weekly refresh window, like any other engine change.
 - `Database::ensureNotBusy()` refuses a change while the database is busy or migrating. `Database::ensureIdle()` is the entry point for change actions; it calls it and, since 0041, refuses a database whose image is built on a dropped SDK.
-- The binary on the host itself is the pinned official `ghcr.io/databasifylabs/databasify-host:<version>` image (`databasify.sdk.host`), resolved to a digest by `HostBinaryResolver` and installed by `InstallHostBinary` before every deploy; it is replaced only when its bytes differ. After `host deploy`, `DeployNode` checks the SDK the engine reports in `engine info` ([0040](0040-one-sdk-range-per-app-release.md)).
+- The binary on the host itself is the official `{databasify.registry}/engine-sdk` image: `HostBinaryResolver` picks the newest exact `x.y.z` tag inside `databasify.require.engine-sdk` and pins it by digest (cached ten minutes), and it is installed by `InstallHostBinary` and installed by `InstallHostBinary` before every deploy; it is replaced only when its bytes differ. After `host deploy`, `DeployNode` checks the SDK the engine reports in `engine info` ([0040](0040-one-sdk-range-per-app-release.md)).
 
 ## Consequences
 

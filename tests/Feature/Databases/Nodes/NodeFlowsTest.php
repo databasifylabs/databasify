@@ -200,7 +200,7 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
     $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'));
-    $offered = new EngineImage($database->image->repository, 'sha256:'.str_repeat('b', 64), '8.4.9', '0.1.4');
+    $offered = new EngineImage($database->image->repository, 'sha256:'.str_repeat('b', 64), '8.4.9', '0.2.4');
     $database->update(['available_image' => $offered, 'config_fields' => []]);
 
     resolve(UpgradeDatabase::class)->handle($database->fresh());
@@ -222,11 +222,11 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
 it('refuses to install an offered image built on an SDK outside the range', function () {
     $database = idleDatabase('mysql', 1);
     $ssh = fakeEngine();
-    $database->update(['available_image' => new EngineImage($database->image->repository, 'sha256:'.str_repeat('b', 64), '8.4.9', '0.2.0')]);
+    $database->update(['available_image' => new EngineImage($database->image->repository, 'sha256:'.str_repeat('b', 64), '8.4.9', '0.3.0')]);
     $image = $database->image;
 
     expect(fn () => resolve(UpgradeDatabase::class)->handle($database->fresh()))
-        ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.2.0; this Databasify supports ^0.1.')
+        ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.3.0; this Databasify supports ^0.2.')
         ->and($database->fresh())->image->toEqual($image)->operation->toBeNull()
         ->and($ssh->runs)->toBe([]);
 });

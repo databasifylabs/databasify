@@ -7,44 +7,58 @@ namespace App\Services\Images;
 use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Images\HostBinaryImage;
 use App\Exceptions\Images\ImageUnavailable;
+use App\Support\Engines\SdkRange;
+use Closure;
 use Illuminate\Support\Facades\Cache;
 
 final readonly class HostBinaryResolver
 {
     private const int CACHE_SECONDS = 600;
 
+    private const string RELEASE = '/^\d+\.\d+\.\d+$/';
+
     public function __construct(private ImageRegistry $registry) {}
 
     public function pinned(): HostBinaryImage
     {
-        $repository = $this->repository();
-        $version = $this->version();
-        $digest = Cache::remember("host-binary-digest.{$version}", self::CACHE_SECONDS, fn (): string => $this->digestOf($repository, $version));
+        $constraint = SdkRange::constraint();
 
-        return new HostBinaryImage($repository, $version, $digest);
+        return Cache::remember("host-binary.{$constraint}", self::CACHE_SECONDS, fn (): HostBinaryImage => $this->newestIn($constraint));
     }
 
-    private function digestOf(string $repository, string $version): string
+    private function newestIn(string $constraint): HostBinaryImage
+    {
+        $repository = config()->string('databasify.registry').'/engine-sdk';
+        $version = $this->newestReleaseIn($this->fromRegistry(fn (): array => $this->registry->tagsOf($repository), $constraint), $constraint);
+
+        return new HostBinaryImage($repository, $version, $this->fromRegistry(fn (): string => $this->registry->digestOf($repository, $version), $constraint));
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $call
+     * @return TResult
+     */
+    private function fromRegistry(Closure $call, string $constraint): mixed
     {
         try {
-            return $this->registry->digestOf($repository, $version);
+            return $call();
         } catch (ImageUnavailable $unavailable) {
-            throw ImageUnavailable::hostBinary($this->name(), $version, $unavailable);
+            throw ImageUnavailable::hostBinary($constraint, $unavailable);
         }
     }
 
-    private function repository(): string
+    /**
+     * @param  list<string>  $tags
+     */
+    private function newestReleaseIn(array $tags, string $constraint): string
     {
-        return config()->string('databasify.images.registry').'/'.config()->string('databasify.sdk.host_repository');
-    }
+        $release = collect($tags)
+            ->filter(fn (string $tag): bool => preg_match(self::RELEASE, $tag) === 1 && SdkRange::allows($tag, $constraint))
+            ->sort(fn (string $left, string $right): int => version_compare($left, $right))
+            ->last();
 
-    private function version(): string
-    {
-        return config()->string('databasify.sdk.host');
-    }
-
-    private function name(): string
-    {
-        return config()->string('databasify.sdk.host_repository');
+        return is_string($release) ? $release : throw ImageUnavailable::noHostRelease($constraint);
     }
 }

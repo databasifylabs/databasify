@@ -38,6 +38,6 @@ final readonly class SdkRange
 
     public static function constraint(): string
     {
-        return config()->string('databasify.sdk.range');
+        return config()->string('databasify.require.engine-sdk');
     }
 }

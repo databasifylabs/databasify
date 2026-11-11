@@ -108,7 +108,7 @@ it('restores a database on a dropped SDK onto the newest supported image of its 
 
     $restored = inProjectDuring(fn (): Database => resolve(RestoreToPointInTime::class)->handle($source, new PointInTimeRestore('orders-restored', Server::factory()->ready()->create()->id, $target)));
 
-    expect($restored->image->sdk)->toBe('0.1.1');
+    expect($restored->image->sdk)->toBe('0.2.0');
 });
 
 it('lets storage credentials rotate while a database on a dropped SDK archives there', function () {
@@ -135,10 +135,10 @@ it('upgrades a database on a dropped SDK only to an image inside the range', fun
     $database = onSdk(idleDatabase('valkey', 1, DatabaseMode::Single), '0.0.9');
     $current = $database->image;
 
-    $database->update(['available_image' => new EngineImage($current->repository, 'sha256:'.str_repeat('d', 64), '9.9.9', '0.2.0')]);
-    expect(fn () => resolve(UpgradeDatabase::class)->handle($database->refresh()))->toThrow(ValidationException::class, 'is built on SDK 0.2.0');
+    $database->update(['available_image' => new EngineImage($current->repository, 'sha256:'.str_repeat('d', 64), '9.9.9', '0.3.0')]);
+    expect(fn () => resolve(UpgradeDatabase::class)->handle($database->refresh()))->toThrow(ValidationException::class, 'is built on SDK 0.3.0');
 
-    $database->update(['available_image' => new EngineImage($current->repository, 'sha256:'.str_repeat('e', 64), '9.9.9', '0.1.4')]);
+    $database->update(['available_image' => new EngineImage($current->repository, 'sha256:'.str_repeat('e', 64), '9.9.9', '0.2.4')]);
     resolve(UpgradeDatabase::class)->handle($database->refresh());
 
     expect($database->refresh()->runsSupportedSdk())->toBeTrue();
@@ -151,7 +151,7 @@ it('shows the read-only banner on the database page and lists the database on th
 
     $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/show')
-        ->where('sdkUnsupported', ['sdk' => '0.0.9', 'range' => '^0.1', 'author' => 'Databasify']));
+        ->where('sdkUnsupported', ['sdk' => '0.0.9', 'range' => '^0.2', 'author' => 'Databasify']));
 
     $this->get(projectUrl('/dashboard'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('dashboard')
@@ -169,11 +169,11 @@ it('shows no banner for a database on a supported SDK', function () {
 it('lists the databases another SDK range would make read-only', function () {
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
-    $this->artisan('databases:check-sdks', ['--range' => '^0.2'])
-        ->expectsOutputToContain('cache runs SDK 0.1.1')
+    $this->artisan('databases:check-sdks', ['--range' => '^0.3'])
+        ->expectsOutputToContain('cache runs SDK 0.2.0')
         ->assertExitCode(0);
 
-    $this->artisan('databases:check-sdks', ['--range' => '^0.1'])
+    $this->artisan('databases:check-sdks', ['--range' => '^0.2'])
         ->expectsOutputToContain('No database would become read-only.')
         ->assertExitCode(0);
 });

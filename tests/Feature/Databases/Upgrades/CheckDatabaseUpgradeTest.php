@@ -19,7 +19,7 @@ it('offers a newer release of the line without asking the servers', function () 
 
     $offered = resolve(CheckDatabaseUpgrade::class)->handle($database);
 
-    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.1.1'))
+    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.2.0'))
         ->and($database->fresh()->availableImage())->toEqual($offered)
         ->and($database->fresh()->availableUpdateRefreshesImage())->toBeFalse()
         ->and($ssh->runs)->toBeEmpty();
@@ -53,7 +53,7 @@ it('offers a refresh when the release was rebuilt under the same tag', function 
 it('offers nothing and clears an old offer while the database runs the newest image', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update(['available_image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.1')]);
+    $database->update(['available_image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.2.0')]);
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull()
         ->and($database->fresh()->availableImage())->toBeNull();
@@ -62,7 +62,7 @@ it('offers nothing and clears an old offer while the database runs the newest im
 it('never offers an older release than the one the database runs', function () {
     withImage('postgres', '18.6');
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $database->update(['image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.1.1')]);
+    $database->update(['image' => new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('9', 64), '18.9', '0.2.0')]);
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull();
 });
@@ -82,14 +82,14 @@ it('keeps the current image when the newest one is outside the range', function 
     Event::fake([DatabaseAlertRaised::class]);
     withImage('valkey', '9.1.3');
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    withImage('valkey', '9.1.4', sdk: '0.2.0');
+    withImage('valkey', '9.1.4', sdk: '0.3.0');
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database))->toBeNull()
         ->and($database->fresh()->availableImage())->toBeNull()
         ->and($database->fresh()->image->release)->toBe('9.1.3');
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->database->is($database)
         && $alert->subject === 'main stays on Valkey 9.1.3'
-        && $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
+        && $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.');
 });
 
 it('offers the newest supported release and warns about a newer refused one', function () {
@@ -97,24 +97,24 @@ it('offers the newest supported release and warns about a newer refused one', fu
     withImage('valkey', '9.1.2');
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     withImage('valkey', '9.1.3');
-    withImage('valkey', '9.1.4', sdk: '0.2.0');
+    withImage('valkey', '9.1.4', sdk: '0.3.0');
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database)?->release)->toBe('9.1.3')
         ->and($database->fresh()->availableImage()?->release)->toBe('9.1.3');
-    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.');
 });
 
 it('raises the refusal alert once per refused image', function () {
     Event::fake([DatabaseAlertRaised::class]);
     withImage('valkey', '9.1.3');
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    withImage('valkey', '9.1.4', sdk: '0.2.0');
+    withImage('valkey', '9.1.4', sdk: '0.3.0');
 
     resolve(CheckDatabaseUpgrade::class)->handle($database);
     resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
     Event::assertDispatchedTimes(DatabaseAlertRaised::class, 1);
 
-    withImage('valkey', '9.1.5', sdk: '0.2.0');
+    withImage('valkey', '9.1.5', sdk: '0.3.0');
     resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
     Event::assertDispatchedTimes(DatabaseAlertRaised::class, 2);
 });
@@ -123,13 +123,13 @@ it('alerts again for a refused image after a supported one was offered', functio
     Event::fake([DatabaseAlertRaised::class]);
     withImage('valkey', '9.1.3');
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.2.0');
+    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.3.0');
     resolve(CheckDatabaseUpgrade::class)->handle($database);
 
     withImage('valkey', '9.1.4', 'sha256:'.str_repeat('5', 64));
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database->fresh())?->release)->toBe('9.1.4');
 
-    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.2.0');
+    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.3.0');
     resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
     Event::assertDispatchedTimes(DatabaseAlertRaised::class, 2);
 });
