@@ -15,7 +15,7 @@ A Databasify engine is two halves that ship separately:
    - It holds a Go package implementing the public [engine SDK](https://github.com/databasifylabs/engine-sdk)'s `contract.Engine`, and `cmd/databasify/main.go` calling `sdk.Run(<engine>.New())`.
    - Its images are the official engine image with that binary as PID 1, published as `ghcr.io/databasifylabs/databasify-<engine>`.
    - All engine logic lives there: config files, tuning, settings, processes, HA, accounts, backups, migrations.
-   - Clone it on its own. The rules for phases 1 and 2 name paths from the root of that clone. The image tools (`tools/images.sh`) and the image skill (`.claude/skills/adding-engine-image`) live in a clone of [`databasifylabs/engine-sdk`](https://github.com/databasifylabs/engine-sdk) at the version the engine's `go.mod` requires.
+   - Clone it on its own. The rules for phases 1 and 2 name paths from the root of that clone. The image tools (`tools/images.sh`) live in a clone of [`databasifylabs/engine-sdk`](https://github.com/databasifylabs/engine-sdk) at the version the engine's `go.mod` requires, and the [engine-template README](https://github.com/databasifylabs/engine-template) is the public guide from the first commit to a published image.
    - A change to the command contract itself (a new command, request or reply field) is a pull request to `engine-sdk`.
 2. **The app** in this repo: one `RegisterEngine` entry in `app/Providers/EngineServiceProvider.php` (label, category, lines, connection profile, migration source, flags) and an icon. The app drives every engine with the same typed commands and flows (`docs/adr/0035-engine-commands-and-flows.md`); it has no per-engine driver, scripts or flows.
 

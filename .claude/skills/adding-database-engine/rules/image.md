@@ -1,6 +1,6 @@
 # Phase 2: the engine images (engine repository)
 
-Paths here are from the root of your engine clone. The SDK's skill, `.claude/skills/adding-engine-image` in [`databasifylabs/engine-sdk`](https://github.com/databasifylabs/engine-sdk), covers the same ground in more detail; follow it when you work there. `$IMAGES` below is `tools/images.sh` in a clone of `engine-sdk` at the version the engine's `go.mod` requires, run from the engine repository root.
+Paths here are from the root of your engine clone. The [engine-template README](https://github.com/databasifylabs/engine-template) is the public guide for building and publishing an engine's images; this file adds the team's own rules. `$IMAGES` below is `tools/images.sh` in a clone of `engine-sdk` at the version the engine's `go.mod` requires, run from the engine repository root.
 
 ## Files
 
