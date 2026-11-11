@@ -19,7 +19,7 @@ The Go source lives in the separate `databasifylabs/engines` repository.
 - Manifest `env` overrides the image's `ENV`, so drivers must not set environment the image already sets.
 - Server processes must guard on their data directory existing.
 - Engine and database scripts (`ssh/engines`, `ssh/databases`) must use `databasify ctl`, never `systemctl`, `systemd-run`, `journalctl`, `apt`, `apt-mark`, `dpkg`, `dnf` or `runuser`. `NativeToolsGateTest` enforces this, with three documented exceptions. Host provisioning scripts (`ssh/servers`) use the native tools by design.
-- Every image must carry the `io.databasify.wrapper` label, which the host binary uses to find the engine container. The binary in the image is the one that runs ([0038](0038-engines-ship-only-as-images.md)).
+- Every image must carry the `io.databasify.sdk` label, which the host binary uses to find the engine container. The binary in the image is the one that runs ([0038](0038-engines-ship-only-as-images.md)).
 
 ## Alternatives considered
 
