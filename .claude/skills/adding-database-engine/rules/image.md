@@ -86,7 +86,7 @@ Lint: `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:v0.10.0 -s bas
 
 ## After the pull request merges (maintainers)
 
-A branch pushed to the engine repository itself builds test tags (`<release>-<sha7>`); the app never picks those, because it takes only exact `<line>.x` releases. A merge to `main` publishes the release tags. Watch the `images` workflow (`gh run watch <id> --exit-status`); a failing line does not publish. A new `databasify-<engine>` GHCR package is created **private**: a maintainer makes it public and gives the engine repository the Write role under Manage Actions access. Verify anonymous pulls and note the digest:
+A branch pushed to the engine repository itself builds test tags (`<release>-<sha7>`); the app never picks those, because it takes only exact `<line>.x` releases. A merge to `main` publishes the release tags. Watch the `images` workflow (`gh run watch <id> --exit-status`); a failing line does not publish. A new `databasify-<engine>` GHCR package is created **private**: the engine repository creates it on its first publish, and a maintainer makes it public. Verify anonymous pulls and note the digest:
 
 ```bash
 tok=$(curl -s "https://ghcr.io/token?scope=repository:databasifylabs/databasify-<engine>:pull" | jq -r .token)
