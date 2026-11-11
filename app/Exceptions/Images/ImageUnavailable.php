@@ -22,4 +22,9 @@ final class ImageUnavailable extends RuntimeException
     {
         return new self("No {$label} image is published in {$repository}.");
     }
+
+    public static function hostBinary(string $name, string $version, self $previous): self
+    {
+        return new self("The host binary {$name}:{$version} could not be resolved: {$previous->getMessage()}", previous: $previous);
+    }
 }

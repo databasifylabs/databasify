@@ -10,6 +10,11 @@ return [
         'repository' => env('DATABASIFY_IMAGE_REPOSITORY', 'databasify-{engine}'),
     ],
 
+    'sdk' => [
+        'host' => '0.1.0',
+        'host_repository' => 'databasify-host',
+    ],
+
     'docker' => [
         'version' => '29.9.2',
         'containerd' => '2.4.2',

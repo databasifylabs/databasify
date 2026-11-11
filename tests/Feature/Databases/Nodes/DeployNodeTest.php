@@ -4,18 +4,33 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\InstallHostBinary;
+use App\Exceptions\Images\ImageUnavailable;
+use Illuminate\Support\Facades\Cache;
+use Tests\Support\FakeImageRegistry;
 
-it('installs the host binary only when missing', function () {
+it('installs the pinned host binary before every deploy', function () {
     $ssh = fakeSsh();
     $node = engineNode();
     $before = count($ssh->runs);
+    $digest = FakeImageRegistry::digestIn('ghcr.io/databasifylabs/databasify-host', '0.1.0');
 
     resolve(InstallHostBinary::class)->handle($node);
 
     expect($ssh->scriptAt($before))
-        ->toContain('command -v databasify >/dev/null 2>&1 && exit 0')
-        ->toContain("docker run --rm --entrypoint cat {$node->database->image()->reference()} /usr/local/bin/databasify > /usr/local/bin/databasify.new")
-        ->toContain('chmod 755 /usr/local/bin/databasify.new && mv /usr/local/bin/databasify.new /usr/local/bin/databasify');
+        ->toContain("docker run --rm --entrypoint cat ghcr.io/databasifylabs/databasify-host@{$digest} /databasify > /usr/local/bin/databasify.new")
+        ->toContain('chmod 755 /usr/local/bin/databasify.new && mv /usr/local/bin/databasify.new /usr/local/bin/databasify')
+        ->not->toContain('exit 0');
+});
+
+it('fails a deploy before touching the server when the host binary cannot be resolved', function () {
+    $ssh = fakeSsh();
+    $node = engineNode();
+    imageRegistry()->goDown();
+    Cache::flush();
+    $before = count($ssh->runs);
+
+    expect(fn () => resolve(DeployNode::class)->handle($node->database, $node))->toThrow(ImageUnavailable::class, 'databasify-host:0.1.0')
+        ->and(count($ssh->runs))->toBe($before);
 });
 
 it('deploys then installs the node certificate', function () {

@@ -12,7 +12,7 @@
 - The binary inside each engine image is the one that runs. The app no longer installs, resolves or records a wrapper: `host wrapper-update`, `WrapperResolver`, `SyncDatabaseWrapperJob` and the `databases.wrapper_version` and `databases.wrapper_digest` columns are gone.
 - Fixes to the binary ship as new images in the weekly refresh window, like any other engine change.
 - `Database::ensureNotBusy()` refuses a change while the database is busy or migrating. `Database::ensureIdle()` is the entry point for change actions and for now only calls it.
-- The binary on the host itself is pinned by the app and installed from the engine image (`InstallHostBinary`).
+- The binary on the host itself is the pinned official `ghcr.io/databasifylabs/databasify-host:<version>` image (`databasify.sdk.host`), resolved to a digest by `HostBinaryResolver` and installed by `InstallHostBinary` before every deploy; it is replaced only when its bytes differ.
 
 ## Consequences
 
@@ -29,5 +29,9 @@
 - `app/Actions/Databases/Lifecycle/CreateDatabase.php`
 - `app/Actions/Databases/Nodes/DeployNode.php`
 - `app/Actions/Databases/Nodes/InstallHostBinary.php`
+- `app/Services/Images/HostBinaryResolver.php`
+- `app/DTOs/Images/HostBinaryImage.php`
+- `resources/views/ssh/databases/nodes/install-host-binary.blade.php`
+- `config/databasify.php`
 - `app/Engines/Flows/UpgradeFlow.php`
 - `database/migrations/2026_10_22_000003_create_databases_table.php`

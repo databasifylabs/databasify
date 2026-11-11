@@ -12,6 +12,8 @@ use App\Exceptions\Images\ImageUnavailable;
 
 final class FakeImageRegistry implements ImageRegistry
 {
+    private const string HOST_REPOSITORY = 'ghcr.io/databasifylabs/databasify-host';
+
     /** @var array<string, array<string, string>> */
     private array $digests = [];
 
@@ -20,6 +22,7 @@ final class FakeImageRegistry implements ImageRegistry
     public static function withEveryLine(): self
     {
         $registry = new self;
+        $registry->publishIn(self::HOST_REPOSITORY, '0.1.0', self::digestIn(self::HOST_REPOSITORY, '0.1.0'));
         EngineCatalog::all()->each(fn (Engine $engine) => collect($engine->lines)->each(fn (VersionLine $line) => $registry->publish($engine->id, "{$line->value}.0")));
 
         return $registry;
@@ -27,7 +30,12 @@ final class FakeImageRegistry implements ImageRegistry
 
     public static function digestFor(string $engine, string $tag): string
     {
-        return 'sha256:'.hash('sha256', EngineCatalog::find($engine)->imageRepository.":{$tag}");
+        return self::digestIn(EngineCatalog::find($engine)->imageRepository, $tag);
+    }
+
+    public static function digestIn(string $repository, string $tag): string
+    {
+        return 'sha256:'.hash('sha256', "{$repository}:{$tag}");
     }
 
     public function publish(string $engine, string $tag, ?string $digest = null): self
