@@ -28,7 +28,7 @@ final class CheckEngineSdksCommand extends Command
         }
 
         $this->components->warn("These databases would become read-only under SDK {$constraint}:");
-        $databases->each(fn (Database $database) => $this->components->bulletList(["{$database->name} runs SDK {$database->imageSdk()}"]));
+        $this->components->bulletList($databases->map(fn (Database $database): string => "{$database->name} runs SDK {$database->imageSdk()}")->all());
 
         return self::SUCCESS;
     }
