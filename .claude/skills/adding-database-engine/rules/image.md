@@ -1,4 +1,6 @@
-# Phase 1 — the engine image (`../engines`)
+# Phase 2: the engine image (`../engines`)
+
+The engines repo's own skill, `../engines/.claude/skills/adding-engine-image`, covers the same ground in more detail; follow it when you work in that repo.
 
 ## Files
 
@@ -6,13 +8,14 @@
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `images/<engine>/Dockerfile`           | Extends the official image. Copy an existing one (`images/mongodb`, `images/valkey`) and keep the stage layout. One Dockerfile serves every line of the engine.                                                                        |
 | `images/<engine>/smoke/processes.json` | A minimal process manifest the smoke test runs through the wrapper.                                                                                                                                                                    |
+| `images/<engine>/conformance`          | An empty file. Its presence makes `images.sh smoke` run the engine conformance suite (`internal/conformance`) against the smoke container: every offered command, `unsupported` for the rest, exit codes, and passwords never echoed. Add it once the engine passes. |
 | `images/<engine>/smoke/check.sh`       | Waits for the engine, asserts `$DATABASIFY_RELEASE`, exercises the bundled tools, checks UID 64999. It runs against every line, so it must tolerate fields older releases lack (`serverStatus().tcmalloc.usingPerCPUCaches ?? false`). |
 | `images/<engine>/.trivyignore`         | Only for CVEs bundled upstream that we cannot fix; group them with a comment saying when to remove them (see `images/mongodb/.trivyignore`). Try `upgrades` first.                                                                     |
 | `images/<engine>/repositories.sh`      | Only when a package comes from a third-party repository the base image lacks (MySQL's Percona repo). Both the Dockerfile (bind mount) and `images/packages.sh` use it, and it is part of the content hash.                             |
 | `versions.json`                        | One entry per line under the top-level `images` object (`images["<engine>-<line>"]`); `registry`, `wrapper` and `go` are shared by every image.                                                                                        |
 | `README.md`                            | Add the engine to the intro and its license (and every bundled tool's license) to the Licenses section.                                                                                                                                |
 
-No workflow or Go change is needed: the CI matrix, tags and refresh all come from `versions.json`.
+No workflow change is needed: the CI matrix, tags and refresh all come from `versions.json`. The engine's Go package (phase 1) is built into the image by the shared `wrapper` stage.
 
 ## Dockerfile rules
 
@@ -86,4 +89,6 @@ tok=$(curl -s "https://ghcr.io/token?scope=repository:databasifylabs/databasify-
 curl -sI -H "Authorization: Bearer $tok" -H "Accept: application/vnd.oci.image.index.v1+json" https://ghcr.io/v2/databasifylabs/databasify-<engine>/manifests/<release> | grep -i docker-content-digest
 ```
 
-A rebuild of the same release (new digest) shows up in the app as "Refresh image" — useful to test the image-swap rollout.
+A rebuild of the same release (new digest) shows up in the app as "Refresh image", which is useful to test the image-swap rollout.
+
+The push also republishes `ghcr.io/databasifylabs/databasify-wrapper:<wrapper>` with the new code (`.github/workflows/wrapper.yml`); the app follows that tag's digest and installs it on every node with `host wrapper-update`, so the engine's code reaches existing databases too.

@@ -12,9 +12,9 @@ What broke the first time MongoDB ran on real servers. Check each for the new en
 ## Image and process
 
 - Host tuning must never lower a kernel value the OS already set higher (`vm.max_map_count`); keep the larger of the original and ours.
-- An engine process listed in `processes.json` is not started unless a script enables it.
+- An engine process listed in `processes.json` is not started unless the engine enables it.
 - Start the server only when its data directory exists, or erase/disk-loss leaves it in a restart loop.
-- Don't override image environment from the driver.
+- Don't override image environment from the process manifest.
 
 ## Clustering
 
@@ -38,4 +38,4 @@ What broke the first time MongoDB ran on real servers. Check each for the new en
 - Settings mirror DigitalOcean's list for the engine; tuned values stay automatic.
 - On a domain, MongoDB publishes `mongodb+srv` like DigitalOcean (all members in SRV, one A record each); without a domain clients connect to the IP with the CA certificate.
 - MongoDB lines: 7.0, 8.0 (default), 9.0 without point-in-time recovery until PBM supports it.
-- MySQL lines: 8.4 LTS (default), 9.7 LTS. MySQL 9.0 removed the `mysql_native_password` server option and plugin, so the 9.7 `files/server` is a full copy without it and 9.7 offers no Legacy password encryption.
+- MySQL lines: 8.4 LTS (default), 9.7 LTS. MySQL 9.0 removed the `mysql_native_password` server option and plugin, so the engine leaves it out of the 9.7 config and offers no `mysql_native_password` encryption on 9.7.
