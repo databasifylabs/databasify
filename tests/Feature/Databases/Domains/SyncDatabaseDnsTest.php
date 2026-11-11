@@ -208,6 +208,7 @@ it('logs a failing dns sync once until it recovers', function () {
 });
 
 it('leaves the records alone while the domain of the database changes', function () {
+    Sleep::fake(syncWithCarbon: true);
     fakeCloudflare([]);
     $database = withZone(idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db'));
     $database->dnsLock()->get();
@@ -215,4 +216,18 @@ it('leaves the records alone while the domain of the database changes', function
     resolve(SyncDatabaseDns::class)->handle($database);
 
     Http::assertNothingSent();
+});
+
+it('waits for a sync that already runs instead of dropping its own', function () {
+    Sleep::fake();
+    fakeCloudflare([]);
+    $database = withZone(idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db'));
+    markRoles($database, NodeRole::Primary);
+    $running = $database->dnsLock();
+    $running->get();
+    Sleep::whenFakingSleep(fn () => $running->release());
+
+    resolve(SyncDatabaseDns::class)->handle($database);
+
+    expect(Cache::get('dns:app-db.db.example.com'))->toBe([$database->nodes()->sole()->server->public_ip]);
 });

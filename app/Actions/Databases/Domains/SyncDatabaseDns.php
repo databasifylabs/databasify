@@ -11,12 +11,15 @@ use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\DnsZone;
 use App\Services\Dns\DnsRecordPublisher;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 final readonly class SyncDatabaseDns
 {
     private const int REMIND_SECONDS = 86400;
+
+    private const int WAIT_SECONDS = 10;
 
     public function __construct(
         private DnsRecordPublisher $dns,
@@ -25,7 +28,11 @@ final readonly class SyncDatabaseDns
 
     public function handle(Database $loaded): void
     {
-        $loaded->dnsLock()->get(fn () => $this->syncCurrent($loaded));
+        try {
+            $loaded->dnsLock()->block(self::WAIT_SECONDS, fn () => $this->syncCurrent($loaded));
+        } catch (LockTimeoutException) {
+            return;
+        }
     }
 
     private function syncCurrent(Database $loaded): void
