@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Engines\Data\Grant;
 use App\Engines\EngineClient;
+use App\Engines\Requests\EngineInfo;
 use App\Engines\Requests\NodeStatus;
 use App\Engines\Requests\UserCreate;
+use App\Engines\Responses\EngineInfo as EngineInfoReply;
 use App\Engines\Responses\NodeStatus as NodeStatusReply;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeRole;
@@ -79,4 +81,14 @@ it('refuses a reply that is not JSON', function () {
     $node = engineNode();
 
     expect(fn () => resolve(EngineClient::class)->send($node, new NodeStatus))->toThrow(EngineError::class);
+});
+
+it('decodes the SDK version an engine reports', function () {
+    fakeEngine();
+
+    $reply = resolve(EngineClient::class)->send(engineNode(), new EngineInfo);
+
+    expect($reply)->toBeInstanceOf(EngineInfoReply::class)
+        ->sdk->toBe('0.1.0')
+        ->engine->toBe('postgres');
 });

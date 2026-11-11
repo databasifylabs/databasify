@@ -186,6 +186,7 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
         ->respondToEngine('node metrics', ['connections' => 3, 'queries' => 120, 'dataMb' => 40, 'keys' => null, 'hits' => null, 'misses' => null, 'evicted' => null])
         ->respondToEngine('operation status', $operation('succeeded'))
         ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0'])
+        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.1.0'])
         ->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))
         ->respondToEngine('config fields', ['fields' => [engineFieldPayload()]]);
 }
