@@ -52,7 +52,7 @@ class EngineServiceProvider extends ServiceProvider
             ->connection(new ConnectionProfile('mysql', '?ssl-mode=REQUIRED', 'sslmode', 'REQUIRED', 'mariadb -u {username} -p{password} -h {host} -P {port} -D {database} --ssl', null, true, self::SQL_ENV_KEYS, self::MYSQL_ENV_NOTE, 'If the client cannot verify the server through your password, add --ssl-verify-server-cert=0. To verify the server with the CA certificate, download it and add --ssl-ca={ca}.'))
             ->environment('mariadb')
             ->failoverHint('Galera needs three members to keep a majority when one fails. Add one more standby.')
-            ->versions('11.8', [['value' => '10.11', 'label' => 'MariaDB 10.11 LTS'], ['value' => '11.4', 'label' => 'MariaDB 11.4 LTS'], ['value' => '11.8', 'label' => 'MariaDB 11.8 LTS'], ['value' => '12.3', 'label' => 'MariaDB 12.3 LTS']])
+            ->versions('12.3', [['value' => '10.11', 'label' => 'MariaDB 10.11 LTS'], ['value' => '11.4', 'label' => 'MariaDB 11.4 LTS'], ['value' => '11.8', 'label' => 'MariaDB 11.8 LTS'], ['value' => '12.3', 'label' => 'MariaDB 12.3 LTS']])
             ->register();
 
         $this->engine('mongodb', 'MongoDB', self::APPLICATION)

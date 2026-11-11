@@ -36,7 +36,7 @@ it('offers every supported line with its label and default', function () {
         'redis' => [$line('7.2', 'Redis 7.2'), $line('8', 'Redis 8', true)],
         'mysql' => [$line('8.4', 'MySQL 8.4 LTS', true), $line('9.7', 'MySQL 9.7 LTS')],
         'postgres' => [$line('15', 'PostgreSQL 15'), $line('16', 'PostgreSQL 16'), $line('17', 'PostgreSQL 17'), $line('18', 'PostgreSQL 18', true)],
-        'mariadb' => [$line('10.11', 'MariaDB 10.11 LTS'), $line('11.4', 'MariaDB 11.4 LTS'), $line('11.8', 'MariaDB 11.8 LTS', true), $line('12.3', 'MariaDB 12.3 LTS')],
+        'mariadb' => [$line('10.11', 'MariaDB 10.11 LTS'), $line('11.4', 'MariaDB 11.4 LTS'), $line('11.8', 'MariaDB 11.8 LTS'), $line('12.3', 'MariaDB 12.3 LTS', true)],
         'mongodb' => [$line('7.0', 'MongoDB 7.0'), $line('8.0', 'MongoDB 8.0', true), $line('9.0', 'MongoDB 9.0', false, false)],
     ]);
 });
