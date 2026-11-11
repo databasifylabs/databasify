@@ -11,13 +11,13 @@ use Illuminate\Support\Str;
 
 final readonly class SdkRange
 {
-    public static function allows(?string $sdk): bool
+    public static function allows(?string $sdk, ?string $constraint = null): bool
     {
         if ($sdk === null) {
             return false;
         }
 
-        return VersionConstraint::allows(self::constraint(), Str::of($sdk)->ltrim('v')->before('+')->value());
+        return VersionConstraint::allows($constraint ?? self::constraint(), Str::of($sdk)->ltrim('v')->before('+')->value());
     }
 
     public static function supported(string $engine, EngineImage $image): EngineImage
@@ -36,7 +36,7 @@ final readonly class SdkRange
         return "{$image} is built on SDK {$built}; this Databasify supports ".self::constraint().'.';
     }
 
-    private static function constraint(): string
+    public static function constraint(): string
     {
         return config()->string('databasify.sdk.range');
     }

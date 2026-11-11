@@ -14,6 +14,7 @@ final readonly class DeleteDatabaseUser
 
     public function handle(DatabaseUser $user): void
     {
+        $user->database->ensureRunsSupportedSdk();
         $user->ensureDeletable();
         $this->primary->handle($user->database, new UserDrop($user->name), "Delete user {$user->name}");
         $user->delete();

@@ -17,6 +17,7 @@ final readonly class CreateSchema
 
     public function handle(Database $database, string $name): Schema
     {
+        $database->ensureRunsSupportedSdk();
         $database->ensureManagesAccounts();
 
         if ($database->hasSchema($name)) {

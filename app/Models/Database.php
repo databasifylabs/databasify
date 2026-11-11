@@ -19,6 +19,7 @@ use App\DTOs\Databases\IssuedCertificate;
 use App\DTOs\Databases\MaintenanceWindow;
 use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Databases\ServiceRecords;
+use App\DTOs\Databases\UnsupportedSdk;
 use App\DTOs\Databases\VersionLine;
 use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
@@ -42,6 +43,7 @@ use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Observers\DatabaseObserver;
 use App\Support\Databases\ClientPorts;
+use App\Support\Engines\SdkRange;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
@@ -516,6 +518,40 @@ class Database extends Model implements Movable
     public function ensureIdle(): void
     {
         $this->ensureNotBusy();
+        $this->ensureRunsSupportedSdk();
+    }
+
+    public function runsSupportedSdk(?string $constraint = null): bool
+    {
+        return SdkRange::allows($this->image->sdk, $constraint);
+    }
+
+    public function ensureRunsSupportedSdk(): void
+    {
+        if ($this->runsSupportedSdk()) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['database' => "{$this->name} runs an engine image built on SDK {$this->imageSdk()}, which this Databasify no longer supports. Wait for {$this->engineAuthor()} to publish a new image."]);
+    }
+
+    public function unsupportedSdk(): ?UnsupportedSdk
+    {
+        if ($this->runsSupportedSdk()) {
+            return null;
+        }
+
+        return new UnsupportedSdk($this->imageSdk(), SdkRange::constraint(), $this->engineAuthor());
+    }
+
+    public function imageSdk(): string
+    {
+        return $this->image->sdk ?? 'unknown';
+    }
+
+    private function engineAuthor(): string
+    {
+        return $this->engine()->author ?? 'Databasify';
     }
 
     public function ensureNotBusy(): void

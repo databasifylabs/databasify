@@ -23,6 +23,8 @@ import {
 } from '@/components/databases/describe';
 import BrandIcon from '@/components/brand-icon';
 import StarPromptCard from '@/components/dashboard/star-prompt-card';
+import UnsupportedSdkCard from '@/components/dashboard/unsupported-sdk-card';
+import type { UnsupportedSdkDatabase } from '@/components/dashboard/unsupported-sdk-card';
 import NodeDots from '@/components/databases/nodes/node-dots';
 import ReadOnlyRows from '@/components/databases/nodes/read-only-rows';
 import ReadOnlyToggle from '@/components/databases/nodes/read-only-toggle';
@@ -69,6 +71,7 @@ type Props = {
     logs: { data: ServerLog[] };
     requirements: Requirements;
     showStarPrompt: boolean;
+    sdkUnsupported: UnsupportedSdkDatabase[];
 };
 
 type Requirements = {
@@ -502,6 +505,7 @@ export default function Dashboard({
     logs: { data: logs },
     requirements,
     showStarPrompt,
+    sdkUnsupported,
 }: Props) {
     usePoll(10000, { only: ['summary', 'databases', 'servers', 'logs'] });
 
@@ -535,6 +539,10 @@ export default function Dashboard({
                 </div>
 
                 {showStarPrompt && <StarPromptCard />}
+
+                {sdkUnsupported.length > 0 && (
+                    <UnsupportedSdkCard databases={sdkUnsupported} />
+                )}
 
                 {(summary.servers.total === 0 ||
                     summary.databases.total === 0) && (

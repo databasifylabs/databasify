@@ -14,6 +14,7 @@ final readonly class DeleteSchema
 
     public function handle(Schema $schema): void
     {
+        $schema->database->ensureRunsSupportedSdk();
         $schema->ensureDeletable();
         $this->primary->handle($schema->database, new DatabaseDrop($schema->name), "Delete database {$schema->name}");
         $schema->delete();

@@ -23,6 +23,8 @@ import CommunityBadge from '@/components/community-badge';
 import StatusDot from '@/components/status-dot';
 import OperationLabel from '@/components/databases/operation-label';
 import StopOperationButton from '@/components/databases/stop-operation-button';
+import UnsupportedSdkAlert from '@/components/databases/unsupported-sdk-alert';
+import type { UnsupportedSdk } from '@/components/databases/unsupported-sdk-alert';
 import StatusBadge from '@/components/status-badge';
 import TabNav from '@/components/tab-nav';
 import type { TabSpec } from '@/components/tab-nav';
@@ -60,6 +62,7 @@ type Props = {
     log: ServerLogWithOutput | null;
     latestLogId: string | null;
     clientIp: string | null;
+    sdkUnsupported: UnsupportedSdk | null;
 };
 
 function tabsFor(database: Database): TabSpec[] {
@@ -96,6 +99,7 @@ export default function ShowDatabase({
     log,
     latestLogId,
     clientIp,
+    sdkUnsupported,
 }: Props) {
     const tabs = tabsFor(database);
     const [tab, navigate] = useQueryTab(
@@ -163,6 +167,13 @@ export default function ShowDatabase({
                         variant="button"
                     />
                 </div>
+
+                {sdkUnsupported && (
+                    <UnsupportedSdkAlert
+                        name={database.name}
+                        unsupported={sdkUnsupported}
+                    />
+                )}
 
                 <Tabs value={tab} onValueChange={navigate} className="gap-6">
                     <TabNav tabs={tabs} />

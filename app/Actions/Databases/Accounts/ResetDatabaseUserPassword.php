@@ -14,6 +14,7 @@ final readonly class ResetDatabaseUserPassword
 
     public function handle(DatabaseUser $user): DatabaseUser
     {
+        $user->database->ensureRunsSupportedSdk();
         $password = new_password();
         $this->primary->handle($user->database, new UserSetPassword($user->name, $password, $user->password_encryption), "Reset password for {$user->name}");
         $user->update(['password' => $password]);

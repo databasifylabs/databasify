@@ -11,7 +11,7 @@ final readonly class BackUpNow
 {
     public function handle(Database $database): void
     {
-        $database->ensureIdle();
+        $database->ensureNotBusy();
         dispatch(new RefreshRecoveryStatusJob($database->recoveryOrFail(), backUpNow: true));
     }
 }

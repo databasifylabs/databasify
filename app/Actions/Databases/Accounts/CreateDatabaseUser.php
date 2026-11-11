@@ -16,6 +16,7 @@ final readonly class CreateDatabaseUser
 
     public function handle(Database $database, string $name, ?string $encryption = null): DatabaseUser
     {
+        $database->ensureRunsSupportedSdk();
         $database->ensureManagesAccounts();
 
         if ($database->hasUser($name)) {

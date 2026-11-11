@@ -60,6 +60,7 @@ class DatabaseController extends Controller
             'clientIp' => $request->ip(),
             'database' => new DatabaseResource($database->load(DatabaseResource::RELATIONS)),
             'appEnv' => $database->environment($database->endpoints()),
+            'sdkUnsupported' => $database->unsupportedSdk()?->toArray(),
             'availableServers' => $this->freeServers(),
             'dnsZones' => $this->dnsZones(),
             'storageProviders' => $this->storageProviders(),

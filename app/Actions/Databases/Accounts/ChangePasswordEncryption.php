@@ -15,6 +15,7 @@ final readonly class ChangePasswordEncryption
 
     public function handle(DatabaseUser $user, string $encryption): DatabaseUser
     {
+        $user->database->ensureRunsSupportedSdk();
         if (! $user->hasEncryptionChoice()) {
             throw ValidationException::withMessages(['password_encryption' => "{$user->database->engine()->label} has no password encryption to choose."]);
         }
