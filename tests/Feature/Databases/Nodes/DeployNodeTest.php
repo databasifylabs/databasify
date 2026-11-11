@@ -17,7 +17,10 @@ it('installs the pinned host binary before every deploy', function () {
     resolve(InstallHostBinary::class)->handle($node);
 
     expect($ssh->scriptAt($before))
-        ->toContain("docker run --rm --entrypoint cat ghcr.io/databasifylabs/databasify-host@{$digest} /databasify > /usr/local/bin/databasify.new")
+        ->toContain("container=\$(docker create ghcr.io/databasifylabs/databasify-host@{$digest})")
+        ->toContain('docker cp "$container:/databasify" /usr/local/bin/databasify.new || { docker rm "$container" > /dev/null; exit 1; }')
+        ->toContain('docker rm "$container" > /dev/null')
+        ->not->toContain('--entrypoint')
         ->toContain('chmod 755 /usr/local/bin/databasify.new && mv /usr/local/bin/databasify.new /usr/local/bin/databasify')
         ->not->toContain('exit 0');
 });
