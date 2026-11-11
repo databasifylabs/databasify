@@ -9,8 +9,8 @@ Plugins can register database engines ([0016](0016-app-architecture.md)). Databa
 
 ## Decision
 
-- An engine registered by app core (`EngineServiceProvider`, `RegisterEngine::make()`) is official. An engine registered through `PluginContext::database()` is community: its catalog entry records the plugin id and author, and `Engine::isCommunity()` is true. The author is the first `authors[].name` in the plugin's `composer.json`, else the vendor part of its package name.
-- A plugin declares the engines it registers in `composer.json` under `extra.databasify.engines`, a list of ids. Registering an engine that is not declared fails the plugin's boot.
+- An engine app core registers (`EngineServiceProvider` calling `RegisterEngine::make()`) is official. Any engine added to `engine.providers` while a plugin loads, however the plugin adds it (`PluginContext::database()`, `RegisterEngine::make()` or a raw `config()` write), is community: `PluginLoader::load()` stamps its catalog entry with the plugin id and author from the plugin row, overwriting anything the plugin set, and `Engine::isCommunity()` is true. The plugin has nothing to set. The author is the first `authors[].name` in the plugin's `composer.json`, else the vendor part of its package name.
+- A plugin declares the engines it registers in `composer.json` under `extra.databasify.engines`, a list of ids. `PluginLoader::load()` checks every engine the plugin added against that list; an undeclared one fails the plugin's boot and its config changes are rolled back.
 - Installing a plugin that declares engines is refused on `community_engines` until the admin accepts the warning, checked from the staged `composer.json` before any plugin code runs. An update that declares a new engine asks again.
 - An update that drops a declared engine any database still uses is refused.
 - The Plugins page, the create-page engine card and the database header show a "Community" badge.
@@ -27,8 +27,8 @@ Plugins can register database engines ([0016](0016-app-architecture.md)). Databa
 
 ## Evidence
 
+- `app/Services/Plugins/PluginLoader.php`
 - `app/Plugins/PluginContext.php`
-- `app/Plugins/RegisterEngine.php`
 - `app/Engines/Engine.php`
 - `app/DTOs/Plugins/PluginPackage.php`
 - `app/Actions/Plugins/ConfirmCommunityEngines.php`

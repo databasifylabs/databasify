@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Plugins;
 
+use App\Engines\EngineCatalog;
+use App\Exceptions\Plugins\UndeclaredEngine;
 use App\Models\Plugin;
 use App\Plugins\AbstractPlugin;
 use App\Plugins\PluginContext;
@@ -35,9 +37,11 @@ final readonly class PluginLoader
     public function load(Plugin $plugin): ?string
     {
         $before = config()->getMany(self::REGISTRIES);
+        $engines = config()->array(EngineCatalog::CONFIG, []);
 
         try {
             $this->start($this->providerOf($plugin));
+            $this->stampEnginesAddedBy($plugin, $engines);
         } catch (Throwable $exception) {
             config($before);
             report($exception);
@@ -71,6 +75,20 @@ final readonly class PluginLoader
         }
 
         $provider->callBootedCallbacks();
+    }
+
+    /**
+     * @param  array<mixed>  $before
+     */
+    private function stampEnginesAddedBy(Plugin $plugin, array $before): void
+    {
+        foreach (array_keys(array_diff_key(config()->array(EngineCatalog::CONFIG, []), $before)) as $id) {
+            if (! in_array($id, $plugin->engines, true)) {
+                throw UndeclaredEngine::named("{$id}");
+            }
+
+            config([EngineCatalog::CONFIG.".{$id}.plugin" => $plugin->id, EngineCatalog::CONFIG.".{$id}.author" => $plugin->author]);
+        }
     }
 
     /**

@@ -286,3 +286,40 @@ it('fails the boot of a plugin that registers an engine it did not declare', fun
     expect(Plugin::query()->count())->toBe(0)
         ->and(Database::engines())->not->toContain('clickhouse');
 });
+
+/**
+ * @param  list<string>  $engines
+ */
+function directEngineZip(array $engines): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent('direct.zip', pluginZip('Direct', 'direct', "\\App\\Plugins\\RegisterEngine::make('x')->label('X')->register();", engines: $engines, authors: [['name' => 'Acme Labs']]));
+}
+
+it('fails the boot of a plugin that registers an undeclared engine without its context', function () {
+    $this->post('/plugins', ['archive' => directEngineZip([])])->assertSessionHasErrors(['source' => 'The plugin failed to load: Declare the "x" engine in extra.databasify.engines before registering it.']);
+
+    expect(Database::engines())->not->toContain('x');
+});
+
+it('stamps a declared engine a plugin registers without its context as community', function () {
+    $this->post('/plugins', ['archive' => directEngineZip(['x']), 'accepts_community_engines' => true])->assertSessionHasNoErrors();
+
+    expect(EngineCatalog::find('x'))->isCommunity()->toBeTrue()->author->toBe('Acme Labs');
+});
+
+it('fails the boot of a plugin that writes an undeclared engine into the config', function () {
+    $zip = UploadedFile::fake()->createWithContent('raw.zip', pluginZip('Raw', 'raw', "config(['engine.providers.y' => ['label' => 'Y']]);", engines: []));
+
+    $this->post('/plugins', ['archive' => $zip])->assertSessionHasErrors(['source' => 'The plugin failed to load: Declare the "y" engine in extra.databasify.engines before registering it.']);
+
+    expect(Database::engines())->not->toContain('y');
+});
+
+it('shows the real author of a plugin that sets its own', function () {
+    $register = "\$this->databasify()->database('z')->label('Z')->register();\n        config(['engine.providers.z.author' => 'Databasify', 'engine.providers.z.plugin' => 'core']);";
+    $zip = UploadedFile::fake()->createWithContent('z.zip', pluginZip('Zed', 'zed', $register, engines: ['z'], authors: [['name' => 'Acme Labs']]));
+
+    $this->post('/plugins', ['archive' => $zip, 'accepts_community_engines' => true])->assertSessionHasNoErrors();
+
+    expect(EngineCatalog::find('z'))->author->toBe('Acme Labs')->plugin->toBe('zed');
+});
