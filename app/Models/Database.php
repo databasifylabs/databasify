@@ -142,9 +142,10 @@ class Database extends Model implements Movable
             return false;
         }
 
+        $current = $zone->certificateFingerprint();
         $installed = $this->nodes()->whereNotNull('certificate_fingerprint')->pluck('certificate_fingerprint');
 
-        return $installed->isNotEmpty() && $installed->every(fn (?string $fingerprint): bool => $fingerprint === $zone->certificateFingerprint());
+        return $installed->isNotEmpty() && $installed->every(fn (?string $fingerprint): bool => $fingerprint === $current);
     }
 
     public function publicCertificateZone(): ?DnsZone

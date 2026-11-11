@@ -36,7 +36,7 @@ final readonly class RefreshNodeStatuses
             NodeStatus::class,
         );
         $anotherAnswersAsPrimary = collect($statuses)->contains(fn (NodeStatus $status): bool => $status->role === NodeRole::Primary);
-        $nodes->values()->each(fn (DatabaseNode $node, int $index) => $this->record($node, $statuses[$index] ?? NodeStatus::unreachable(), $anotherAnswersAsPrimary));
+        $nodes->values()->each(fn (DatabaseNode $node, int $index) => $this->recordStatusOn($node, $statuses[$index] ?? NodeStatus::unreachable(), $anotherAnswersAsPrimary));
 
         $all = $database->nodesWithServers();
         $status = $all->healthStatus();
@@ -47,7 +47,7 @@ final readonly class RefreshNodeStatuses
         return $status;
     }
 
-    private function record(DatabaseNode $node, NodeStatus $status, bool $anotherAnswersAsPrimary): void
+    private function recordStatusOn(DatabaseNode $node, NodeStatus $status, bool $anotherAnswersAsPrimary): void
     {
         if ($status->isUnreachable() && $anotherAnswersAsPrimary && $node->isPrimary()) {
             $node->markUnreachable();
