@@ -96,3 +96,16 @@ it('gives the restored database its own point-in-time recovery on the same stora
         ->backup_hour->toBe($source->pointInTimeRecovery?->backup_hour)
         ->path->not->toBe($source->pointInTimeRecovery?->path);
 });
+
+it('refuses to restore onto an image built on an SDK outside the range', function () {
+    $source = staleWindowDatabase();
+    $source->update(['image_sdk' => '0.0.9']);
+    $ssh = fakeEngine();
+
+    restoreTo($source, now()->subHour())
+        ->assertSessionHasErrors(['version_line' => "MySQL {$source->image_release} is built on SDK 0.0.9; this Databasify supports ^0.1."]);
+
+    expect(Database::query()->where('name', 'orders-restored')->exists())->toBeFalse()
+        ->and($ssh->runs)->toBe([]);
+    Queue::assertNothingPushed();
+});

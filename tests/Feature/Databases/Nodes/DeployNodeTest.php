@@ -69,3 +69,12 @@ it('fails the deploy when the running engine reports an SDK outside the range', 
         ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image_release} is built on SDK 0.2.0; this Databasify supports ^0.1.")
         ->and(engineCommandsIn($ssh))->not->toContain("{$node->server->name}: tls install");
 });
+
+it('names the SDK unknown when the running engine reports none', function () {
+    fakeEngine(fakeSsh()->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '']));
+    $node = engineNode();
+    $database = $node->database;
+
+    expect(fn () => resolve(DeployNode::class)->handle($database, $node))
+        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image_release} is built on SDK unknown; this Databasify supports ^0.1.");
+});

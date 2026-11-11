@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Images;
 
+use App\DTOs\Databases\EngineImage;
 use App\Support\Engines\SdkRange;
 use RuntimeException;
 use Throwable;
 
 final class ImageUnavailable extends RuntimeException
 {
-    public function __construct(string $message, public readonly bool $refused = false, ?Throwable $previous = null)
+    public function __construct(string $message, public readonly ?EngineImage $refused = null, ?Throwable $previous = null)
     {
         parent::__construct($message, previous: $previous);
     }
@@ -35,8 +36,8 @@ final class ImageUnavailable extends RuntimeException
         return new self("The host binary {$name}:{$version} could not be resolved: {$previous->getMessage()}", previous: $previous);
     }
 
-    public static function unsupportedSdk(string $image, ?string $sdk): self
+    public static function unsupportedSdk(string $engine, EngineImage $image, ?string $sdk): self
     {
-        return new self(SdkRange::refusalOf($image, $sdk), refused: true);
+        return new self(SdkRange::refusalOf("{$engine} {$image->release}", $sdk), refused: $image);
     }
 }

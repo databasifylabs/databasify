@@ -21,13 +21,8 @@ final readonly class ImageResolver
         $release = $this->newestReleaseIn($this->registry->tagsOf($repository), $line)
             ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $repository);
         $digest = $this->registry->digestOf($repository, $release);
-        $sdk = $this->registry->labelsOf($repository, $digest)->sdk;
 
-        if (! SdkRange::allows($sdk)) {
-            throw ImageUnavailable::unsupportedSdk("{$engine->label} {$release}", $sdk);
-        }
-
-        return new EngineImage($repository, $digest, $release, $sdk);
+        return SdkRange::supported($engine->label, new EngineImage($repository, $digest, $release, $this->registry->labelsOf($repository, $digest)->sdk));
     }
 
     /**

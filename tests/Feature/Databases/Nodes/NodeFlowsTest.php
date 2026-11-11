@@ -199,7 +199,7 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
     $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'));
-    $database->update(['available_image_repository' => $database->image_repository, 'available_image_digest' => 'sha256:'.str_repeat('b', 64), 'available_image_release' => '8.4.9', 'config_fields' => []]);
+    $database->update(['available_image_repository' => $database->image_repository, 'available_image_digest' => 'sha256:'.str_repeat('b', 64), 'available_image_release' => '8.4.9', 'available_image_sdk' => '0.1.4', 'config_fields' => []]);
 
     resolve(UpgradeDatabase::class)->handle($database->fresh());
     advanceFlows(40);
@@ -213,8 +213,20 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and($at($standby->server, 'host deploy'))->toBeLessThan($at($standby->server, 'node configure'))
         ->and($at($standby->server, 'node configure'))->toBeLessThan($at($standby->server, 'node ready'))
         ->and(requestOf($ssh, $primary->server, 'host deploy')['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
-        ->and($database->fresh())->image_release->toBe('8.4.9')->operation->toBeNull()
+        ->and($database->fresh())->image_release->toBe('8.4.9')->image_sdk->toBe('0.1.4')->operation->toBeNull()
         ->and($database->fresh()->config_fields)->toHaveCount(1);
+});
+
+it('refuses to install an offered image built on an SDK outside the range', function () {
+    $database = idleDatabase('mysql', 1);
+    $ssh = fakeEngine();
+    $database->update(['available_image_repository' => $database->image_repository, 'available_image_digest' => 'sha256:'.str_repeat('b', 64), 'available_image_release' => '8.4.9', 'available_image_sdk' => '0.2.0']);
+    $release = $database->image_release;
+
+    expect(fn () => resolve(UpgradeDatabase::class)->handle($database->fresh()))
+        ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.2.0; this Databasify supports ^0.1.')
+        ->and($database->fresh())->image_release->toBe($release)->operation->toBeNull()
+        ->and($ssh->runs)->toBe([]);
 });
 
 it('refuses to reboot while a node has just stopped answering', function () {

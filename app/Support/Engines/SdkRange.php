@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Engines;
 
+use App\DTOs\Databases\EngineImage;
+use App\Exceptions\Images\ImageUnavailable;
 use App\Support\Plugins\VersionConstraint;
 use Illuminate\Support\Str;
 
@@ -16,6 +18,15 @@ final readonly class SdkRange
         }
 
         return VersionConstraint::allows(self::constraint(), Str::of($sdk)->ltrim('v')->before('+')->value());
+    }
+
+    public static function supported(string $engine, EngineImage $image): EngineImage
+    {
+        if (self::allows($image->sdk)) {
+            return $image;
+        }
+
+        throw ImageUnavailable::unsupportedSdk($engine, $image, $image->sdk);
     }
 
     public static function refusalOf(string $image, ?string $sdk): string

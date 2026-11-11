@@ -18,6 +18,7 @@ use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use App\Support\Databases\DefaultAccount;
+use App\Support\Engines\SdkRange;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -36,7 +37,7 @@ final readonly class CreateDatabase
         $draft = new Database(['engine' => $data->engine]);
         $engine = $draft->engine();
         $line = $data->versionLine ?? $engine->defaultLine;
-        $image = $data->image ?? $this->unlessUnavailable(fn (): EngineImage => $this->newestImage->newest($draft, $line));
+        $image = $this->unlessUnavailable(fn (): EngineImage => SdkRange::supported($engine->label, $data->image ?? $this->newestImage->newest($draft, $line)));
 
         $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
             $database = Database::query()->create(array_merge([
@@ -108,7 +109,7 @@ final readonly class CreateDatabase
         try {
             return $resolve();
         } catch (ImageUnavailable $unavailable) {
-            throw ValidationException::withMessages(['version_line' => $unavailable->refused ? $unavailable->getMessage() : "{$unavailable->getMessage()} Try again in a moment."]);
+            throw ValidationException::withMessages(['version_line' => $unavailable->refused !== null ? $unavailable->getMessage() : "{$unavailable->getMessage()} Try again in a moment."]);
         }
     }
 }

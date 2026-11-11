@@ -105,3 +105,20 @@ it('reads no sdk from an image config without the label', function () {
 
     expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $manifest)->sdk)->toBeNull();
 });
+
+it('skips attestation manifests when an index has no linux/amd64 image', function () {
+    $index = 'sha256:'.str_repeat('a', 64);
+    $arm64 = 'sha256:'.str_repeat('b', 64);
+    $config = 'sha256:'.str_repeat('c', 64);
+    fakeGhcr([
+        "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$index}" => Http::response(['manifests' => [
+            ['digest' => 'sha256:'.str_repeat('d', 64), 'platform' => ['os' => 'unknown', 'architecture' => 'unknown']],
+            ['digest' => $arm64, 'platform' => ['os' => 'linux', 'architecture' => 'arm64']],
+        ]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/manifests/{$arm64}" => Http::response(['config' => ['digest' => $config]]),
+        "ghcr.io/v2/databasifylabs/databasify-postgres/blobs/{$config}" => Http::response(['config' => ['Labels' => ['io.databasify.sdk' => '0.1.2']]]),
+        'ghcr.io/v2/databasifylabs/databasify-postgres/*' => Http::response(['config' => ['digest' => 'sha256:'.str_repeat('e', 64)]]),
+    ]);
+
+    expect(resolve(OciRegistry::class)->labelsOf('ghcr.io/databasifylabs/databasify-postgres', $index)->sdk)->toBe('0.1.2');
+});

@@ -56,7 +56,7 @@ final readonly class DeployNode
             return;
         }
 
-        throw ImageUnavailable::unsupportedSdk("{$database->engine()->label} {$database->image_release}", $sdk);
+        throw ImageUnavailable::unsupportedSdk($database->engine()->label, $database->image(), $sdk);
     }
 
     private function deploymentOf(Database $database, DatabaseNode $node): HostDeploy

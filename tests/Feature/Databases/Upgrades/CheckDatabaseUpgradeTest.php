@@ -92,6 +92,36 @@ it('keeps the current image when the newest one is outside the range', function 
         && $alert->message === 'Valkey 9.1.4 is built on SDK 0.2.0; this Databasify supports ^0.1.');
 });
 
+it('raises the refusal alert once per refused image', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    withImage('valkey', '9.1.3');
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    withImage('valkey', '9.1.4', sdk: '0.2.0');
+
+    resolve(CheckDatabaseUpgrade::class)->handle($database);
+    resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
+    Event::assertDispatchedTimes(DatabaseAlertRaised::class, 1);
+
+    withImage('valkey', '9.1.5', sdk: '0.2.0');
+    resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
+    Event::assertDispatchedTimes(DatabaseAlertRaised::class, 2);
+});
+
+it('alerts again for a refused image after a supported one was offered', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    withImage('valkey', '9.1.3');
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.2.0');
+    resolve(CheckDatabaseUpgrade::class)->handle($database);
+
+    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('5', 64));
+    expect(resolve(CheckDatabaseUpgrade::class)->handle($database->fresh())?->release)->toBe('9.1.4');
+
+    withImage('valkey', '9.1.4', 'sha256:'.str_repeat('4', 64), sdk: '0.2.0');
+    resolve(CheckDatabaseUpgrade::class)->handle($database->fresh());
+    Event::assertDispatchedTimes(DatabaseAlertRaised::class, 2);
+});
+
 it('checks for an upgrade over http', function () {
     $this->actingAs(User::factory()->create());
     withImage('valkey', '9.1.1');

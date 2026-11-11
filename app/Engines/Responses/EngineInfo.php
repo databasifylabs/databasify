@@ -13,7 +13,7 @@ final readonly class EngineInfo implements EngineReply
         public string $engine,
         public string $line,
         public string $version,
-        public string $sdk,
+        public ?string $sdk,
     ) {}
 
     public static function fromPayload(Payload $payload): static
@@ -22,7 +22,7 @@ final readonly class EngineInfo implements EngineReply
             engine: $payload->string('engine'),
             line: $payload->string('line'),
             version: $payload->string('version'),
-            sdk: $payload->string('sdk'),
+            sdk: $payload->nullableString('sdk') ?: null,
         );
     }
 }

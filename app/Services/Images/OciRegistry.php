@@ -29,6 +29,8 @@ final readonly class OciRegistry implements ImageRegistry
 
     private const string PLATFORM = 'linux/amd64';
 
+    private const string UNKNOWN = 'unknown';
+
     private const array MANIFEST_TYPES = [
         'application/vnd.oci.image.index.v1+json',
         'application/vnd.docker.distribution.manifest.list.v2+json',
@@ -65,7 +67,7 @@ final readonly class OciRegistry implements ImageRegistry
     private function manifestOf(PendingRequest $client, RegistryRepository $address, string $digest): Payload
     {
         $manifest = Payload::of($this->successful(fn (): Response => $client->get($address->manifestUrl($digest)), $address)->json());
-        $platforms = collect($manifest->items('manifests'));
+        $platforms = collect($manifest->items('manifests'))->reject(fn (Payload $entry): bool => in_array(self::UNKNOWN, [$entry->string('platform.os'), $entry->string('platform.architecture')], true));
         $platform = $platforms->first(fn (Payload $entry): bool => "{$entry->string('platform.os')}/{$entry->string('platform.architecture')}" === self::PLATFORM)
             ?? $platforms->first();
 
