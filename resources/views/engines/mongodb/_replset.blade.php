@@ -55,17 +55,27 @@ function runOn(admin, command) {
   }
   return reply;
 }
-function peer(host) {
+function connectTo(host, authenticated) {
   const connection = new Mongo('mongodb://' + host + '/?directConnection=true&tls=true&tlsAllowInvalidCertificates=true&serverSelectionTimeoutMS=5000');
   const admin = connection.getDB('admin');
-  admin.auth({ user: 'root', pwd: env.MONGO_SECRET });
-  return admin;
+  if (authenticated) admin.auth({ user: 'root', pwd: env.MONGO_SECRET });
+  return { connection: connection, admin: admin };
+}
+function peer(host) { return connectTo(host, true).admin; }
+function withLocal(authenticated, body) {
+  const local = connectTo('127.0.0.1:25060', authenticated);
+  try {
+    return body(local.admin);
+  } finally {
+    local.connection.close();
+  }
 }
 function primaryOf(hosts) {
   for (const host of hosts) {
     try {
-      const admin = peer(host);
-      if (runOn(admin, { hello: 1 }).isWritablePrimary) return { admin: admin, host: host };
+      const reached = connectTo(host, true);
+      if (runOn(reached.admin, { hello: 1 }).isWritablePrimary) return { admin: reached.admin, host: host };
+      reached.connection.close();
     } catch (error) {}
   }
   throw failure('unavailable', 'no member of the replica set is primary yet');

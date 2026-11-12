@@ -28,7 +28,9 @@ it('joins the replica set as a task with the saved members', function () {
 
     $this->scripts->assertRan('mongodb/cluster/enable', fn (string $script, array $env): bool => $env['HOSTS'] === '10.0.0.1:25060,10.0.0.2:25060' && $env['SELF'] === '10.0.0.2:25060' && $env['SEED'] === 'true'
         && str_contains($script, "phase 'syncing'") && str_contains($script, "phase 'voting'") && str_contains($script, 'withMember(configOf(primary.admin), env.SELF)')
-        && str_contains($script, 'this member is too stale to catch up and no primary is reachable to copy from; its data stays untouched'))
+        && str_contains($script, 'this member is too stale to catch up and no primary is reachable to copy from; its data stays untouched')
+        && ! str_contains(substr($script, (int) strpos($script, 'join_set()')), 'mongo_js root')
+        && str_contains($script, 'mongo_js peers'))
         ->assertRan('mongodb/cluster/rejoin', fn (string $script): bool => str_contains($script, "phase 'starting MongoDB'"));
 });
 

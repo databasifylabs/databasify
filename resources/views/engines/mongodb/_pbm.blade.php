@@ -2,20 +2,24 @@ json_eval() {
     JSON_INPUT=$1 mongosh --nodb --quiet --norc --eval "const input = JSON.parse(process.env.JSON_INPUT || 'null'); $2"
 }
 
+PBM_OUTPUT=''
+PBM_ERROR=''
+
 pbm_run() {
-    local output
-    output=$(pbm "$@" 2>&1) && {
-        printf '%s' "$output"
+    local status
+    PBM_OUTPUT=$(pbm "$@" 2>&1) && status=0 || status=$?
+    if [ "$status" -eq 0 ]; then
+        PBM_ERROR=''
         return 0
-    }
-    PBM_ERROR="pbm $*: $(tail -n 3 <<< "$output" | tr '\n' ' ')"
+    fi
+    PBM_ERROR="pbm $*: $(tail -n 3 <<< "$PBM_OUTPUT" | tr '\n' ' ' | sed 's/ $//')"
     return 1
 }
 
 pbm_locked() {
     local deadline=$(( $(date +%s) + 600 ))
     while true; do
-        if PBM_OUTPUT=$(pbm_run "$@"); then
+        if pbm_run "$@"; then
             return 0
         fi
         if [[ $PBM_ERROR != *'another operation in progress'* ]] || [ "$(date +%s)" -ge "$deadline" ]; then

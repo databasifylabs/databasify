@@ -17,7 +17,7 @@ JS
 }
 
 resync() {
-    MONGO_TIMEOUT=60 mongo_try root <<'JS'
+    MONGO_TIMEOUT=60 mongo_try peers <<'JS'
 @include('engines.mongodb._replset')
 main(() => { primaryOf(hosts()); result({}); });
 JS
@@ -27,17 +27,17 @@ JS
     unit_do stop mongod
     find "$ROOT/data" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     unit_do start mongod
-    MONGO_TIMEOUT=21660 mongo_js none > /dev/null <<'JS'
+    MONGO_TIMEOUT=21660 mongo_js peers > /dev/null <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
-  until(21600, '6h0m0s', () => { const state = run('admin', { hello: 1 }); return state.secondary || state.isWritablePrimary; });
+  until(21600, '6h0m0s', () => withLocal(false, (admin) => { const state = runOn(admin, { hello: 1 }); return state.secondary || state.isWritablePrimary; }));
   result({});
 });
 JS
 }
 
 join_set() {
-    MONGO_TIMEOUT=21660 mongo_js root > /dev/null <<'JS'
+    MONGO_TIMEOUT=21660 mongo_js peers > /dev/null <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
   retry(21600, '6h0m0s', () => {
@@ -49,14 +49,19 @@ main(() => {
 });
 JS
     phase 'syncing'
-    synced=$(MONGO_TIMEOUT=21660 mongo_js root <<'JS'
+    synced=$(MONGO_TIMEOUT=21660 mongo_js peers <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
   const outcome = until(21600, '6h0m0s', () => {
-    const state = run('admin', { hello: 1 });
+    let state = null;
+    try {
+      state = withLocal(false, (admin) => runOn(admin, { hello: 1 }));
+    } catch (error) {
+      return false;
+    }
     if (state.secondary || state.isWritablePrimary) return 'synced';
     try {
-      if (tooStale(run('admin', { replSetGetStatus: 1 }))) return 'stale';
+      if (withLocal(true, (admin) => tooStale(runOn(admin, { replSetGetStatus: 1 })))) return 'stale';
     } catch (error) {}
     return false;
   });
@@ -71,12 +76,12 @@ JS
         return 0
     fi
     phase 'voting'
-    MONGO_TIMEOUT=660 mongo_js root > /dev/null <<'JS'
+    MONGO_TIMEOUT=660 mongo_js peers > /dev/null <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
   retry(600, '10m0s', () => {
     const primary = primaryOf(hosts());
-    const state = run('admin', { hello: 1 });
+    const state = withLocal(false, (admin) => runOn(admin, { hello: 1 }));
     const [next, changed] = withVote(configOf(primary.admin), env.SELF, Boolean(state.secondary));
     if (changed) reconfig(primary.admin, next, false);
   });

@@ -10,7 +10,7 @@ function codeOf(error) {
   if (code === 11000 || code === 51003 || code === 51002) return 'already_exists';
   const name = String((error && error.name) || '');
   const message = String((error && error.message) || error);
-  if (name.includes('MongoNetworkError') || name.includes('ServerSelection') || message.includes('ECONNREFUSED') || message.includes('Server selection timed out')) return 'unavailable';
+  if (name.includes('MongoNetwork') || name.includes('ServerSelection') || message.includes('ECONNREFUSED') || message.includes('Server selection timed out')) return 'unavailable';
   return 'internal';
 }
 function hasCode(error, code) { return Boolean(error) && error.code === code; }

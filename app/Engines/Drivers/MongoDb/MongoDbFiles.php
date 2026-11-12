@@ -22,7 +22,7 @@ final readonly class MongoDbFiles
 
     private const string RAW_NUMBER = "\0number:";
 
-    private const string USERINFO_KEPT = "$&'()*+,;=!~";
+    private const string USERINFO_KEPT = '$&+,;=';
 
     /**
      * @param  array<string, string>  $effective

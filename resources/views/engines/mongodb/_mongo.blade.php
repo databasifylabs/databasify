@@ -3,10 +3,17 @@ ROOT=/srv/mongodb
 
 mongo_secret_of() {
     case "$1" in
-        root) tr -d '[:space:]' < "$ROOT/conf/admin.pw" 2> /dev/null || true ;;
-        member) tr -d '[:space:]' < "$ROOT/conf/keyfile" 2> /dev/null || true ;;
+        root | peers) trimmed_file "$ROOT/conf/admin.pw" ;;
+        member) trimmed_file "$ROOT/conf/keyfile" ;;
         *) printf '' ;;
     esac
+}
+
+trimmed_file() {
+    local content
+    content=$(cat "$1" 2> /dev/null || true)
+    content=${content#"${content%%[![:space:]]*}"}
+    printf '%s' "${content%"${content##*[![:space:]]}"}"
 }
 
 mongo_prelude() {
@@ -20,8 +27,12 @@ mongo_js() {
     script=$(mktemp)
     errors=$(mktemp)
     { mongo_prelude; cat; } > "$script"
-    secret=${MONGO_SECRET:-$(mongo_secret_of "$auth")}
-    output=$(MONGO_AUTH="$auth" MONGO_SECRET="$secret" timeout "${MONGO_TIMEOUT:-300}" mongosh --quiet --norc "mongodb://${MONGO_HOST:-127.0.0.1:25060}/admin?directConnection=true&tls=${MONGO_TLS:-true}&tlsAllowInvalidCertificates=true&serverSelectionTimeoutMS=5000" --file "$script" 2> "$errors") && status=0 || status=$?
+    secret=${MONGO_SECRET-$(mongo_secret_of "$auth")}
+    local target=("mongodb://${MONGO_HOST:-127.0.0.1:25060}/admin?directConnection=true&tls=${MONGO_TLS:-true}&tlsAllowInvalidCertificates=true&serverSelectionTimeoutMS=5000")
+    if [ "$auth" = peers ]; then
+        target=(--nodb)
+    fi
+    output=$(MONGO_AUTH="$auth" MONGO_SECRET="$secret" timeout "${MONGO_TIMEOUT:-100}" mongosh --quiet --norc "${target[@]}" --file "$script" 2> "$errors") && status=0 || status=$?
     rm -f "$script"
     if [ "$status" -eq 0 ]; then
         rm -f "$errors"
@@ -41,10 +52,10 @@ mongo_failed() {
     message=$(tr -s '[:space:]' ' ' < "$2")
     rm -f "$2"
     if [ "$1" -eq 124 ]; then
-        databasify_fail unavailable "mongosh timed out after ${MONGO_TIMEOUT:-300}s"
+        databasify_fail unavailable "mongosh timed out after ${MONGO_TIMEOUT:-100}s"
     fi
     case "$message" in
-        *MongoNetworkError* | *ECONNREFUSED* | *'Server selection timed out'* | *MongoServerSelectionError* | *'connect ENOENT'*)
+        *MongoNetworkError* | *MongoNetworkTimeoutError* | *ECONNREFUSED* | *'Server selection timed out'* | *MongoServerSelectionError* | *'connect ENOENT'*)
             databasify_fail unavailable "$message" ;;
     esac
     databasify_fail internal "mongosh exited $1: $message"

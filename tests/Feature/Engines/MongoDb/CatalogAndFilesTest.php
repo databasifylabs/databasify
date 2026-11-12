@@ -42,3 +42,7 @@ it('renders the PBM config and URI like the Go engine', function () {
         ->and(MongoDbFiles::pbmConfigOf($storage, false))->toBe($fixture['plain'])
         ->and(MongoDbFiles::pbmUriOf('ag$ent/x@y'))->toBe($fixture['uri']);
 });
+
+it('escapes the PBM password like Go url.UserPassword', function () {
+    expect(MongoDbFiles::pbmUriOf("a!b'c(d)e*f~g\$h&i+j,k;l=m"))->toStartWith('mongodb://databasify_pbm:a%21b%27c%28d%29e%2Af~g$h&i+j,k;l=m@');
+});

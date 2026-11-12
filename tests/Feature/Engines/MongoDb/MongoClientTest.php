@@ -62,3 +62,20 @@ it('maps server error codes in the prelude like the Go client', function () {
 
     expect(json_decode(trim($run->output()), true))->toBe(['not_primary', 'not_primary', 'already_exists', 'already_exists', 'already_exists', 'internal', 'internal', 'unavailable', 'not_found']);
 });
+
+it('retries PBM while another operation runs and reports its real error', function (string $replies, bool $passes, string $expected) {
+    $bin = sys_get_temp_dir().'/pbm-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/replies", $replies);
+    file_put_contents("{$bin}/pbm", "#!/bin/bash\nline=\$(head -n 1 \"\$STUB/replies\")\nsed -i.bak 1d \"\$STUB/replies\"\nif [[ \$line == ok* ]]; then echo \"\${line#ok }\"; exit 0; fi\necho \"\$line\" >&2\nexit 1\n");
+    chmod("{$bin}/pbm", 0755);
+    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'testing/pbm-locked');
+
+    $run = Process::timeout(30)->input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'STUB' => $bin])->run(['bash', '-euo', 'pipefail', '-s']);
+    Process::run(['rm', '-rf', $bin]);
+
+    expect($run->successful())->toBe($passes)->and($run->output())->toContain($expected);
+})->with([
+    'busy then done' => ["Error: another operation in progress\nok configured\n", true, '"output":"configured"'],
+    'real error' => ["Error: storage unreachable\n", false, 'pbm config --file x: Error: storage unreachable'],
+]);

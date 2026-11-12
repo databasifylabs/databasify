@@ -4,7 +4,8 @@
 if [ ! -e "$ROOT/state/restoring" ] && writable; then
     use_pbm_storage "$PBM_CONFIG" || databasify_fail internal "$PBM_ERROR"
 fi
-raw=$(pbm_run status --out=json) || databasify_fail internal "$PBM_ERROR"
+pbm_run status --out=json || databasify_fail internal "$PBM_ERROR"
+raw=$PBM_OUTPUT
 backup_result=$(databasify ctl show -p Result --value mongodb-backup 2> /dev/null || true)
 summary=$(json_eval "$raw" '
 const at = (seconds) => new Date(seconds * 1000).toISOString().replace(".000Z", "Z");

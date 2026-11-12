@@ -6,7 +6,8 @@ trap 'rm -f "$ROOT/state/restoring"' EXIT
 
 resynced() {
     local logs verdict
-    logs=$(pbm_run logs --event=resync --tail=20 --out=json) || return 1
+    pbm_run logs --event=resync --tail=20 --out=json || return 1
+    logs=$PBM_OUTPUT
     verdict=$(json_eval "$logs" "
 const recent = (input || []).filter((entry) => Number(entry.ts) >= Number(process.env.SINCE));
 const broken = recent.find((entry) => Number(entry.s) <= 1);
@@ -20,7 +21,8 @@ print(broken ? 'error ' + broken.msg : (recent.some((entry) => entry.msg === 'su
 
 idle() {
     local status
-    status=$(pbm_run status --out=json) || return 1
+    pbm_run status --out=json || return 1
+    status=$PBM_OUTPUT
     [ "$(json_eval "$status" 'print((input.running && input.running.type) || "")')" = '' ]
 }
 

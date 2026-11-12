@@ -21,14 +21,14 @@ main(() => {
 });
 JS
 if [ -n "$MONGO_ERROR" ]; then
-    MONGO_SECRET=$ADMIN_PASSWORD mongo_js root > /dev/null <<'JS'
+    mongo_js root > /dev/null <<'JS'
 main(() => {
   run('admin', { updateUser: 'root', pwd: env.ADMIN_PASSWORD });
   result({});
 });
 JS
 fi
-MONGO_SECRET=$ADMIN_PASSWORD mongo_js root > /dev/null <<'JS'
+mongo_js root > /dev/null <<'JS'
 main(() => {
   try {
     run('admin', { createRole: 'pbmAnyAction', privileges: [{ resource: { anyResource: true }, actions: ['anyAction'] }], roles: [] });
