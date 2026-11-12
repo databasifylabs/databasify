@@ -31,3 +31,15 @@ it('controls units with the in-container ctl, never the host-only service comman
 
     expect($offending)->toBe([]);
 });
+
+it('prints every jq result on one line, since the app reads only the result line', function () {
+    $offending = [];
+
+    foreach (Finder::create()->files()->in(resource_path('views/engines'))->name('*.blade.php') as $script) {
+        if (preg_match('/result "\$\(jq (?!-[a-zA-Z]*c)/', $script->getContents()) === 1) {
+            $offending[] = $script->getRelativePathname();
+        }
+    }
+
+    expect($offending)->toBe([]);
+});

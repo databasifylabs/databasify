@@ -127,6 +127,17 @@ it('lists restart settings whose live value differs from the wanted one', functi
     $this->scripts->assertRan('mysql-family/config/show', fn (string $script, array $env): bool => str_contains($env['NAMES'], "'time_zone'") && ! str_contains($env['NAMES'], "'default_time_zone'"));
 });
 
+it('reads the live settings through the real show script', function () {
+    $fixture = goFixture('configure-standalone-8.4.json', 'mysql');
+    $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
+    respondToFileGet($ssh, 'state/tuned.json', '{"back_log":"256"}');
+    localScripts()->reply('SHOW GLOBAL VARIABLES', "back_log\t151\nmax_connections\t151");
+
+    $show = resolve(EngineClient::class)->send(configuredNode('mysql', '8.4'), new ConfigShow);
+
+    expect($show->pendingRestart)->toBe(['back_log']);
+});
+
 it('offers tuned defaults once the node is configured', function () {
     $fixture = goFixture('configure-standalone-10.11.json', 'mariadb');
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
