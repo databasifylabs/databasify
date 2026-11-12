@@ -1,57 +1,51 @@
 {
-  "8.4": {
-    "PasswordEncryptions": [
-      "caching_sha2_password",
-      "mysql_native_password"
-    ],
-    "DefaultPasswordEncryption": "caching_sha2_password",
-    "ReservedUsers": [
-      "root",
-      "mysql.sys",
-      "mysql.session",
-      "mysql.infoschema",
-      "databasify_repl",
-      "databasify_agent"
-    ],
-    "ReservedDatabases": [
-      "mysql",
-      "sys",
-      "performance_schema",
-      "information_schema"
-    ],
-    "Ports": {
-      "client": 25060,
-      "pool": null,
-      "peers": [
-        33061
-      ]
+    "8.4": {
+        "PasswordEncryptions": [
+            "caching_sha2_password",
+            "mysql_native_password"
+        ],
+        "DefaultPasswordEncryption": "caching_sha2_password",
+        "ReservedUsers": [
+            "root",
+            "mysql.sys",
+            "mysql.session",
+            "mysql.infoschema",
+            "databasify_repl",
+            "databasify_agent"
+        ],
+        "ReservedDatabases": [
+            "mysql",
+            "sys",
+            "performance_schema",
+            "information_schema"
+        ],
+        "Ports": {
+            "client": 25060,
+            "pool": null,
+            "peers": [33061]
+        }
+    },
+    "9.7": {
+        "PasswordEncryptions": ["caching_sha2_password"],
+        "DefaultPasswordEncryption": "caching_sha2_password",
+        "ReservedUsers": [
+            "root",
+            "mysql.sys",
+            "mysql.session",
+            "mysql.infoschema",
+            "databasify_repl",
+            "databasify_agent"
+        ],
+        "ReservedDatabases": [
+            "mysql",
+            "sys",
+            "performance_schema",
+            "information_schema"
+        ],
+        "Ports": {
+            "client": 25060,
+            "pool": null,
+            "peers": [33061]
+        }
     }
-  },
-  "9.7": {
-    "PasswordEncryptions": [
-      "caching_sha2_password"
-    ],
-    "DefaultPasswordEncryption": "caching_sha2_password",
-    "ReservedUsers": [
-      "root",
-      "mysql.sys",
-      "mysql.session",
-      "mysql.infoschema",
-      "databasify_repl",
-      "databasify_agent"
-    ],
-    "ReservedDatabases": [
-      "mysql",
-      "sys",
-      "performance_schema",
-      "information_schema"
-    ],
-    "Ports": {
-      "client": 25060,
-      "pool": null,
-      "peers": [
-        33061
-      ]
-    }
-  }
 }
