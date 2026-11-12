@@ -77,19 +77,19 @@ horizon_workers() {
     stack_mb=${DATABASIFY_STACK_MB:-200}
     process_mb=${DATABASIFY_PHP_PROCESS_MB:-45}
     worker_mb=${DATABASIFY_WORKER_RSS_MB:-90}
-    groups="DEFAULT:10:1:8 MONITORING:25:2:32 PROVISIONING:15:2:16 DATABASES:35:3:64 MIGRATIONS:15:2:16 TERMINALS:10:2:16"
+    groups="DEFAULT:35:3:40:2 SSH:75:9:112:4"
 
-    horizon_mb=$(( (1 + 6) * process_mb ))
+    horizon_mb=$(( (1 + 2) * process_mb ))
     headroom_mb=$(( memory_mb * 15 / 100 ))
     available_mb=$(( memory_mb - reserve_mb - stack_mb - headroom_mb - horizon_mb ))
     [ "$available_mb" -lt 0 ] && available_mb=0
     worker_slots=$(( available_mb / worker_mb ))
 
     for spec in $groups; do
-        IFS=: read -r group share per_cpu maximum <<SPEC
+        IFS=: read -r group share per_cpu maximum queues <<SPEC
 $spec
 SPEC
-        eval "minimum=\${HORIZON_${group}_MIN_PROCESSES:-1}"
-        echo "HORIZON_${group}_MAX_PROCESSES=$(workers_for "$share" "$per_cpu" "$maximum" "$minimum")"
+        eval "per_queue=\${HORIZON_${group}_MIN_PROCESSES:-1}"
+        echo "HORIZON_${group}_MAX_PROCESSES=$(workers_for "$share" "$per_cpu" "$maximum" "$(( per_queue * queues ))")"
     done
 }

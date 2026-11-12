@@ -13,7 +13,7 @@ function updateDirectory(string $env, string $example): string
 
 function workersBelowWhatTheServerFits(): string
 {
-    return str_replace(['DEFAULT_MAX_PROCESSES=2', 'DATABASES_MAX_PROCESSES=6'], ['DEFAULT_MAX_PROCESSES=1', 'DATABASES_MAX_PROCESSES=3'], workersFor2CpusAnd4Gb());
+    return str_replace(['DEFAULT_MAX_PROCESSES=6', 'SSH_MAX_PROCESSES=18'], ['DEFAULT_MAX_PROCESSES=3', 'SSH_MAX_PROCESSES=9'], workersFor2CpusAnd4Gb());
 }
 
 it('reports the new settings it adds', function () {
@@ -103,7 +103,7 @@ it('keeps changed Horizon workers when it cannot ask', function () {
 
     $output = installerScript('has_terminal() { return 1; }; horizon_step', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(2, 4096), 'DATABASIFY_YES' => 'false'])->output();
 
-    expect($output)->toBe("    – Horizon workers kept (run again to apply: default 1 → 2, databases 3 → 6)\n")
+    expect($output)->toBe("    – Horizon workers kept (run again to apply: default 3 → 6, ssh 9 → 18)\n")
         ->and(file_get_contents("$dir/.env"))->toBe($env);
 });
 
@@ -127,7 +127,7 @@ it('sizes the Horizon workers with the overrides set in .env', function () {
     $output = installerScript('horizon_step', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(2, 4096), 'DATABASIFY_YES' => 'true'])->output();
 
     expect($output)->toBe("    ✓ Horizon workers updated for 4 CPUs and 4096 MB\n")
-        ->and(file_get_contents("$dir/.env"))->toContain('HORIZON_DEFAULT_MAX_PROCESSES=3', 'HORIZON_MONITORING_MAX_PROCESSES=7', 'HORIZON_DATABASES_MAX_PROCESSES=10');
+        ->and(file_get_contents("$dir/.env"))->toContain('HORIZON_DEFAULT_MAX_PROCESSES=11', 'HORIZON_SSH_MAX_PROCESSES=24');
 });
 
 it('keeps reading the piped script after asking Docker about the storage volume', function () {
@@ -183,4 +183,30 @@ it('keeps an external Redis host on update', function () {
 
     expect($output)->toBe('')
         ->and(file_get_contents("$dir/.env"))->toBe("REDIS_HOST=redis.example.com\nREVERB_HOST=127.0.0.1\n");
+});
+
+it('gives a 1 GB server one worker per queue', function () {
+    $dir = updateDirectory("HORIZON_DEFAULT_MAX_PROCESSES=\nHORIZON_SSH_MAX_PROCESSES=\n", '');
+
+    installerScript('horizon_step', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(1, 1024)]);
+
+    expect(file_get_contents("$dir/.env"))->toBe("HORIZON_DEFAULT_MAX_PROCESSES=2\nHORIZON_SSH_MAX_PROCESSES=4\n");
+});
+
+it('removes the worker settings of the retired queue groups', function () {
+    $retired = "HORIZON_MONITORING_MAX_PROCESSES=4\nHORIZON_PROVISIONING_MAX_PROCESSES=4\nHORIZON_DATABASES_MAX_PROCESSES=6\nHORIZON_MIGRATIONS_MAX_PROCESSES=4\nHORIZON_TERMINALS_MAX_PROCESSES=3\nHORIZON_DATABASES_MIN_PROCESSES=2\n";
+    $dir = updateDirectory("APP_NAME=Databasify\n{$retired}HORIZON_DEFAULT_MAX_PROCESSES=6\n", '');
+
+    $output = installerScript('. "$SOURCE/update.sh" --functions-only; LOG=/dev/null; retired_workers_step', ['DATABASIFY_DIR' => $dir])->output();
+
+    expect($output)->toContain('✓ Old Horizon worker settings removed')
+        ->and(file_get_contents("$dir/.env"))->toBe("APP_NAME=Databasify\nHORIZON_DEFAULT_MAX_PROCESSES=6\n");
+});
+
+it('prints nothing when no retired worker setting is left', function () {
+    $dir = updateDirectory("HORIZON_DEFAULT_MAX_PROCESSES=6\n", '');
+
+    $output = installerScript('. "$SOURCE/update.sh" --functions-only; LOG=/dev/null; retired_workers_step', ['DATABASIFY_DIR' => $dir])->output();
+
+    expect($output)->toBe('');
 });
