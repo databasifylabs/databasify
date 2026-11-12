@@ -25,7 +25,10 @@ final readonly class Cluster
     {
         $saved = $this->configuration->savedRequestOf($node);
 
-        return $this->scripts->start($node, $request->key, 'cluster/enable', ['SELF' => $saved->ip, 'REQUIRED' => (string) SentinelFiles::requiredReplicasFor(count($saved->members))]);
+        return $this->scripts->start($node, $request->key, 'cluster/enable', [
+            'SELF' => $saved->ip,
+            'REQUIRED' => (string) SentinelFiles::requiredReplicasFor(count($saved->members)),
+        ]);
     }
 
     public function disable(DatabaseNode $node): Done
@@ -37,15 +40,14 @@ final readonly class Cluster
 
     public function failover(DatabaseNode $node, ClusterFailover $request): Done
     {
-        $this->scripts->run($node, 'cluster/failover', ['TARGET' => $request->target, 'SELF' => $this->configuration->savedRequestOf($node)->ip], timeout: 900);
+        $this->scripts->run($node, 'cluster/failover', ['TARGET' => $request->target, 'SELF' => $this->selfIpOf($node)], timeout: 900);
 
         return new Done;
     }
 
     public function forceQuorum(DatabaseNode $node): Done
     {
-        $saved = $this->configuration->savedRequestOf($node);
-        $this->scripts->run($node, 'cluster/force-quorum', ['SELF' => $saved->ip], timeout: 900);
+        $this->scripts->run($node, 'cluster/force-quorum', ['SELF' => $this->selfIpOf($node)], timeout: 900);
 
         return new Done;
     }
@@ -53,7 +55,11 @@ final readonly class Cluster
     public function membership(DatabaseNode $node, ClusterMembership $request): Done
     {
         $size = count($request->members);
-        $this->scripts->run($node, 'cluster/membership', ['QUORUM' => (string) SentinelFiles::majorityOf($size), 'REQUIRED' => (string) SentinelFiles::requiredReplicasFor($size)]);
+
+        $this->scripts->run($node, 'cluster/membership', [
+            'QUORUM' => (string) SentinelFiles::majorityOf($size),
+            'REQUIRED' => (string) SentinelFiles::requiredReplicasFor($size),
+        ]);
 
         return new Done;
     }
@@ -77,5 +83,10 @@ final readonly class Cluster
             'READ_ONLY' => $request->readOnly ? 'true' : 'false',
             'PERSISTENT' => SentinelFiles::persistent($saved->settings) ? 'true' : 'false',
         ]);
+    }
+
+    private function selfIpOf(DatabaseNode $node): string
+    {
+        return $this->configuration->savedRequestOf($node)->ip;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Sentinel;
 
+use App\Engines\Data\EngineField;
 use App\Engines\Data\Member;
 use App\Engines\Settings\Setting;
 use App\Engines\Settings\SettingsCatalog;
@@ -61,9 +62,9 @@ final readonly class SentinelSettings
      */
     public static function restartOnlyKeys(SentinelFamilyEngine $engine, string $line): array
     {
-        $fields = array_filter(self::catalogFor($engine, $line)->fields, fn ($field): bool => $field->restart);
+        $fields = array_filter(self::catalogFor($engine, $line)->fields, fn (EngineField $field): bool => $field->restart);
 
-        return array_values(array_map(fn ($field): string => $field->key, $fields));
+        return array_values(array_map(fn (EngineField $field): string => $field->key, $fields));
     }
 
     /**

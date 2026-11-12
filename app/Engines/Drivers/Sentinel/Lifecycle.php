@@ -23,7 +23,11 @@ final readonly class Lifecycle
     public function start(DatabaseNode $node): Done
     {
         $request = $this->configuration->savedRequestOf($node);
-        $this->scripts->run($node, 'nodes/start', ['HOLDS' => $request->clustered && ! $request->readOnly ? 'true' : 'false', 'PERSISTENT' => SentinelFiles::persistent($request->settings) ? 'true' : 'false'], timeout: 300);
+
+        $this->scripts->run($node, 'nodes/start', [
+            'HOLDS' => $request->clustered && ! $request->readOnly ? 'true' : 'false',
+            'PERSISTENT' => SentinelFiles::persistent($request->settings) ? 'true' : 'false',
+        ], timeout: 300);
 
         return new Done;
     }
@@ -37,17 +41,7 @@ final readonly class Lifecycle
 
     public function restart(DatabaseNode $node): Done
     {
-        $directives = [];
-
-        try {
-            $request = $this->configuration->savedRequestOf($node);
-            $effective = $this->configuration->effectiveOf($node, $request);
-
-            foreach (SentinelSettings::restartOnlyKeys(SentinelScripts::engineOf($node), $node->database->version_line) as $key) {
-                $directives[] = ['name' => SentinelFiles::configKeyOf($key), 'line' => isset($effective[$key]) ? SentinelFiles::directiveOf($key, $effective[$key]) : null];
-            }
-        } catch (EngineBusy) {
-        }
+        $directives = $this->restartDirectivesOf($node);
 
         $this->scripts->run($node, 'nodes/restart', ['DIRECTIVES' => json_encode($directives, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)], timeout: 300);
 
@@ -73,6 +67,27 @@ final readonly class Lifecycle
     {
         $saved = $this->configuration->savedRequestOf($node);
 
-        return $this->scripts->start($node, $request->key, 'nodes/ready', ['CLUSTERED' => $saved->clustered ? 'true' : 'false', 'READ_ONLY' => $saved->readOnly ? 'true' : 'false', 'SELF' => $saved->ip]);
+        return $this->scripts->start($node, $request->key, 'nodes/ready', [
+            'CLUSTERED' => $saved->clustered ? 'true' : 'false',
+            'READ_ONLY' => $saved->readOnly ? 'true' : 'false',
+            'SELF' => $saved->ip,
+        ]);
+    }
+
+    /**
+     * @return list<array{name: string, line: string|null}>
+     */
+    private function restartDirectivesOf(DatabaseNode $node): array
+    {
+        try {
+            $effective = $this->configuration->effectiveOf($node, $this->configuration->savedRequestOf($node));
+        } catch (EngineBusy) {
+            return [];
+        }
+
+        return array_map(
+            fn (string $key): array => ['name' => SentinelFiles::configKeyOf($key), 'line' => isset($effective[$key]) ? SentinelFiles::directiveOf($key, $effective[$key]) : null],
+            SentinelSettings::restartOnlyKeys(SentinelScripts::engineOf($node), $node->database->version_line),
+        );
     }
 }

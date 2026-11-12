@@ -23,29 +23,14 @@ final readonly class ConfigCommands
 
     public function apply(DatabaseNode $node): Done
     {
-        $request = $this->configuration->savedRequestOf($node);
-        $catalog = $this->configuration->catalogOf($node);
-        $settings = array_diff_key($this->configuration->effectiveOf($node, $request), array_flip(SentinelSettings::restartOnlyKeys(SentinelScripts::engineOf($node), $node->database->version_line)));
-        $desired = SentinelFiles::persistent($settings) ? ['appendonly' => 'yes', 'save' => SentinelFiles::SNAPSHOT_SCHEDULE] : ['appendonly' => 'no', 'save' => ''];
-
-        foreach ($settings as $key => $value) {
-            [$name, $setting] = array_pad(explode(' ', SentinelFiles::directiveOf($key, $value), 2), 2, '');
-            $desired[$name] = trim($setting, '"');
-        }
-
-        $configKeys = [];
-
-        foreach ($catalog->fields as $field) {
-            $configKeys[$field->key] = SentinelFiles::configKeyOf($field->key);
-        }
-
+        $settings = $this->liveSettingsOf($node);
         $keys = array_keys($settings);
         sort($keys, SORT_STRING);
 
         $this->scripts->run($node, 'config/apply', [
-            'DESIRED' => json_encode((object) $desired, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'DESIRED' => json_encode((object) $this->desiredOf($settings), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'SETTING_KEYS' => json_encode($keys, JSON_THROW_ON_ERROR),
-            'CONFIG_KEYS' => json_encode($configKeys, JSON_THROW_ON_ERROR),
+            'CONFIG_KEYS' => json_encode($this->configKeysOf($node), JSON_THROW_ON_ERROR),
         ]);
 
         return new Done;
@@ -91,5 +76,46 @@ final readonly class ConfigCommands
         $this->apply($node);
 
         return new ConfigTune($catalog->restartChanged($previous, $tuned, $request->settings));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function liveSettingsOf(DatabaseNode $node): array
+    {
+        $effective = $this->configuration->effectiveOf($node, $this->configuration->savedRequestOf($node));
+        $restartOnly = SentinelSettings::restartOnlyKeys(SentinelScripts::engineOf($node), $node->database->version_line);
+
+        return array_diff_key($effective, array_flip($restartOnly));
+    }
+
+    /**
+     * @param  array<string, string>  $settings
+     * @return array<string, string>
+     */
+    private function desiredOf(array $settings): array
+    {
+        $desired = SentinelFiles::persistent($settings) ? ['appendonly' => 'yes', 'save' => SentinelFiles::SNAPSHOT_SCHEDULE] : ['appendonly' => 'no', 'save' => ''];
+
+        foreach ($settings as $key => $value) {
+            [$name, $setting] = array_pad(explode(' ', SentinelFiles::directiveOf($key, $value), 2), 2, '');
+            $desired[$name] = trim($setting, '"');
+        }
+
+        return $desired;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function configKeysOf(DatabaseNode $node): array
+    {
+        $configKeys = [];
+
+        foreach ($this->configuration->catalogOf($node)->fields as $field) {
+            $configKeys[$field->key] = SentinelFiles::configKeyOf($field->key);
+        }
+
+        return $configKeys;
     }
 }
