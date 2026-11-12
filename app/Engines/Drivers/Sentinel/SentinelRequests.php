@@ -74,11 +74,17 @@ final readonly class SentinelRequests
         private Migration $migration,
     ) {}
 
+    /**
+     * @param  EngineRequest<EngineReply>  $request
+     */
     public function answers(EngineRequest $request): bool
     {
         return in_array($request::class, [...self::ANSWERED, ...self::UNSUPPORTED], true);
     }
 
+    /**
+     * @param  EngineRequest<EngineReply>  $request
+     */
     public function answer(DatabaseNode $node, EngineRequest $request): ?EngineReply
     {
         if (in_array($request::class, self::UNSUPPORTED, true)) {
