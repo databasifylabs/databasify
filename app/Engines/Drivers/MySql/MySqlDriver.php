@@ -8,12 +8,22 @@ use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineReply;
 use App\Contracts\Engines\EngineRequest;
 use App\Engines\Drivers\MySqlFamily\Accounts;
+use App\Engines\Drivers\MySqlFamily\Cluster;
 use App\Engines\Drivers\TaskOperations;
 use App\Engines\Drivers\MySqlFamily\ConfigCommands;
 use App\Engines\Drivers\MySqlFamily\Configuration;
 use App\Engines\Drivers\MySqlFamily\Lifecycle;
 use App\Engines\Drivers\MySqlFamily\Readings;
 use App\Engines\Requests\AccountList;
+use App\Engines\Requests\ClusterDisable;
+use App\Engines\Requests\ClusterEnable;
+use App\Engines\Requests\ClusterFailover;
+use App\Engines\Requests\ClusterForceQuorum;
+use App\Engines\Requests\ClusterMembership;
+use App\Engines\Requests\ClusterPosition;
+use App\Engines\Requests\ClusterQuorum;
+use App\Engines\Requests\ClusterRejoin;
+use App\Engines\Requests\MemberForget;
 use App\Engines\Requests\ConfigApply;
 use App\Engines\Requests\ConfigFields;
 use App\Engines\Requests\ConfigShow;
@@ -51,6 +61,7 @@ final readonly class MySqlDriver implements EngineDriver
         private Configuration $configuration,
         private ConfigCommands $config,
         private Lifecycle $lifecycle,
+        private Cluster $cluster,
     ) {}
 
     public function answers(EngineRequest $request): bool
@@ -78,7 +89,16 @@ final readonly class MySqlDriver implements EngineDriver
             || $request instanceof NodeReset
             || $request instanceof NodeBootstrap
             || $request instanceof TlsInstall
-            || $request instanceof NodeReady;
+            || $request instanceof NodeReady
+            || $request instanceof ClusterEnable
+            || $request instanceof ClusterDisable
+            || $request instanceof ClusterFailover
+            || $request instanceof ClusterForceQuorum
+            || $request instanceof ClusterMembership
+            || $request instanceof ClusterPosition
+            || $request instanceof ClusterQuorum
+            || $request instanceof ClusterRejoin
+            || $request instanceof MemberForget;
     }
 
     public function answer(DatabaseNode $node, EngineRequest $request, ?ServerLog $log): EngineReply
@@ -108,6 +128,15 @@ final readonly class MySqlDriver implements EngineDriver
             $request instanceof NodeBootstrap => $this->lifecycle->bootstrap($node, $request),
             $request instanceof TlsInstall => $this->lifecycle->installTls($node, $request),
             $request instanceof NodeReady => $this->lifecycle->ready($node, $request),
+            $request instanceof ClusterEnable => $this->cluster->enable($node, $request),
+            $request instanceof ClusterDisable => $this->cluster->disable($node),
+            $request instanceof ClusterFailover => $this->cluster->failover($node, $request),
+            $request instanceof ClusterForceQuorum => $this->cluster->forceQuorum($node, $request),
+            $request instanceof ClusterMembership => $this->cluster->membership($node, $request),
+            $request instanceof ClusterPosition => $this->cluster->position($node),
+            $request instanceof ClusterQuorum => $this->cluster->quorum($node),
+            $request instanceof ClusterRejoin => $this->cluster->rejoin($node, $request),
+            $request instanceof MemberForget => $this->cluster->forget($node, $request),
             default => throw new LogicException("The MySQL driver does not answer {$request->command()}."),
         };
     }

@@ -35,3 +35,45 @@ online_and_joined() {
     boot_read_only
     : | write_file "$ROOT/state/grouped" 600 false || true
 }
+
+bootstrap_group() {
+    my '' > /dev/null <<< 'SET GLOBAL group_replication_bootstrap_group = ON'
+    local started=true
+    start_group "$1" || started=false
+    my '' > /dev/null <<< 'SET GLOBAL group_replication_bootstrap_group = OFF'
+    if [ "$started" = false ]; then
+        fail_task "$MY_ERROR_TEXT"
+    fi
+}
+
+gtid_executed() {
+    my '' <<'SQL'
+@verbatim
+SELECT @@gtid_executed
+@endverbatim
+SQL
+}
+
+join_group() {
+    local executed
+    executed=$(gtid_executed)
+    if [ -z "$executed" ]; then
+        my '' > /dev/null <<< 'SET GLOBAL group_replication_clone_threshold = 1'
+    fi
+    start_group "$1"
+}
+
+join_attempt() {
+    join_group "$REPLICATION_SECRET" && return 0
+    ATTEMPT_ERROR=$MY_ERROR_TEXT
+    return 1
+}
+
+channel_running() {
+    local running
+    running=$(my '' <<'SQL'
+SELECT COUNT(*) FROM performance_schema.replication_connection_status c JOIN performance_schema.replication_applier_status a USING (CHANNEL_NAME) WHERE CHANNEL_NAME = 'group' AND c.SERVICE_STATE = 'ON' AND a.SERVICE_STATE = 'ON'
+SQL
+) || return 1
+    [ "$running" = 1 ]
+}

@@ -42,3 +42,10 @@ wait_until() {
         sleep "$every"
     done
 }
+
+retry_or_fail() {
+    local seconds=$1 limit=$2
+    shift 2
+    ATTEMPT_ERROR=''
+    wait_until "$seconds" 2 "$@" || fail_task "the server was not ready within $limit; last attempt: $ATTEMPT_ERROR"
+}
