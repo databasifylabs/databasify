@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Databases\Nodes\LearnEngine;
 use App\Engines\Data\Grant;
 use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Engines\EngineClient;
+use App\Engines\Payload;
 use App\Engines\Requests\EngineInfo;
 use App\Engines\Requests\OperationStatus;
 use App\Engines\Requests\UserCreate;
+use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\OperationState;
 use Tests\Support\FakeEngineDriver;
@@ -42,6 +45,34 @@ it('lets the driver answer a listed engine once the switch is on', function () {
     expect($reply->created)->toBeTrue()
         ->and(FakeEngineDriver::$answered)->toBe(['user create'])
         ->and($ssh->scriptAt(0))->toContain('databasify engine info');
+});
+
+it('keeps a database on an image without the runtime on the binary', function () {
+    config(['databasify.php_engines' => ['postgres']]);
+    $ssh = fakeSsh()->respondToEngine('user create', ['created' => true]);
+    $node = engineNode();
+    $capabilities = engineCapabilitiesPayload('postgres');
+    $capabilities['commands'] = array_values(array_diff($capabilities['commands'], ['runtime run']));
+    $node->database->update(['engine_capabilities' => EngineCapabilities::fromPayload(new Payload($capabilities))]);
+
+    resolve(EngineClient::class)->send($node->fresh(), createUserRequest());
+
+    expect($ssh->scriptAt(0))->toContain('databasify user create')
+        ->and(FakeEngineDriver::$answered)->toBe([]);
+});
+
+it('moves a database to the driver once an upgrade reports the runtime', function () {
+    config(['databasify.php_engines' => ['postgres']]);
+    $node = engineNode();
+    $old = engineCapabilitiesPayload('postgres');
+    $old['commands'] = array_values(array_diff($old['commands'], ['runtime run']));
+    $node->database->update(['engine_capabilities' => EngineCapabilities::fromPayload(new Payload($old))]);
+    fakeSsh()->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))->respondToEngine('config fields', ['fields' => []]);
+
+    resolve(LearnEngine::class)->handle($node->database->fresh(), $node);
+    resolve(EngineClient::class)->send($node->fresh(), createUserRequest());
+
+    expect(FakeEngineDriver::$answered)->toBe(['user create']);
 });
 
 it('leaves engines that are not listed on the binary', function () {

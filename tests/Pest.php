@@ -170,7 +170,7 @@ function engineCapabilitiesPayload(string $engine): array
         default => [[], []],
     };
 
-    $commands = in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password'];
+    $commands = [...(in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password']), 'runtime run'];
     [$encryptions, $default] = match ($engine) {
         'mysql' => [['caching_sha2_password', 'mysql_native_password'], 'caching_sha2_password'],
         'mariadb' => [['mysql_native_password', 'ed25519', 'parsec'], 'mysql_native_password'],

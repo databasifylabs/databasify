@@ -100,9 +100,10 @@ final readonly class EngineClient
      */
     private function driverAnswering(DatabaseNode $node, EngineRequest $request): ?EngineDriver
     {
-        $engine = $node->database->engine();
+        $database = $node->database;
+        $engine = $database->engine();
 
-        if ($engine->driver === null || ! in_array($engine->id, config()->array('databasify.php_engines'), true)) {
+        if ($engine->driver === null || ! $database->runsEngineRuntime() || ! in_array($engine->id, config()->array('databasify.php_engines'), true)) {
             return null;
         }
 
