@@ -1,0 +1,18 @@
+{
+  "large": {
+    "cacheSizeGB": "31.50",
+    "maxIncomingConnections": "20000"
+  },
+  "medium": {
+    "cacheSizeGB": "1.50",
+    "maxIncomingConnections": "2048"
+  },
+  "odd": {
+    "cacheSizeGB": "3.25",
+    "maxIncomingConnections": "3840"
+  },
+  "small": {
+    "cacheSizeGB": "0.25",
+    "maxIncomingConnections": "256"
+  }
+}
