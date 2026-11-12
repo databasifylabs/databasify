@@ -64,11 +64,15 @@ function connectTo(host, authenticated) {
 function peer(host) { return connectTo(host, true).admin; }
 function withLocal(authenticated, body) {
   const local = connectTo('127.0.0.1:25060', authenticated);
+  let outcome;
   try {
-    return body(local.admin);
-  } finally {
+    outcome = body(local.admin);
+  } catch (error) {
     local.connection.close();
+    throw error;
   }
+  local.connection.close();
+  return outcome;
 }
 function primaryOf(hosts) {
   for (const host of hosts) {

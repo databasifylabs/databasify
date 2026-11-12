@@ -26,7 +26,9 @@ my_failed() {
     if [ "$1" -eq 124 ]; then
         databasify_fail unavailable "$MY_CLIENT timed out after ${MY_TIMEOUT:-300}s"
     fi
-    if [[ $message =~ ^ERROR\ ([0-9]+)\ \(([0-9A-Z]+)\)(\ at\ line\ [0-9]+)?:\ (.*)$ ]]; then
+    local reported
+    reported=$(grep -m 1 '^ERROR [0-9]' <<< "$message" || true)
+    if [[ $reported =~ ^ERROR\ ([0-9]+)\ \(([0-9A-Z]+)\)(\ at\ line\ [0-9]+)?:\ (.*)$ ]]; then
         my_server_failed "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
     fi
     databasify_fail internal "$MY_CLIENT exited $1: $message"

@@ -76,6 +76,7 @@ it('turns client errors into the codes Go reports', function (string $stderr, st
     'no socket' => ["ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/srv/mysql/run/mysqld.sock' (2)", EngineUnavailable::class, "Can't connect to local MySQL server through socket '/srv/mysql/run/mysqld.sock' (2)"],
     'other server error' => ['ERROR 1064 (42000) at line 1: You have an error in your SQL syntax', EngineError::class, 'Error 1064 (42000): You have an error in your SQL syntax'],
     'not a server error' => ['mysql: unknown option', EngineError::class, 'mysql exited 1: mysql: unknown option'],
+    'statement echoed first' => ["--------------\nREVOKE ALL PRIVILEGES ON `d`.* FROM 'u'@'%'\n--------------\n\nERROR 1141 (42000) at line 1: There is no such grant defined for user 'u' on host '%'", EngineError::class, "Error 1141 (42000): There is no such grant defined for user 'u' on host '%'"],
 ]);
 
 it('runs the MariaDB client for MariaDB', function () {
