@@ -187,3 +187,11 @@ it('collects the source facts by running the real check script', function () {
         ->and($check->problems)->toBe([])
         ->and($local->statements())->toContain("SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = 'shop'");
 });
+
+it('requires TLS to a MariaDB source when the source asks for it', function () {
+    $this->scripts->respond('mysql-family/migration/check', ['error' => 'unreachable']);
+
+    sendToArchive(idleDatabase('mariadb', 1)->nodes()->sole(), new MigrationCheck(new MigrationSource('10.0.0.9', 3306, 'm', 'pw', true), []));
+
+    $this->scripts->assertRan('mysql-family/migration/check', fn (string $script): bool => str_contains($script, "printf 'ssl\\nskip-ssl-verify-server-cert\\n'"));
+});

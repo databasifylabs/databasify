@@ -40,7 +40,9 @@ it('enables Group Replication as a task with the group name from the saved reque
         && str_contains($script, 'SET GLOBAL group_replication_clone_threshold = 1')
         && str_contains($script, 'a cluster needs a primary key on every table; add one to ')
         && str_contains($script, "SELECT asynchronous_connection_failover_add_managed('group', 'GroupReplication', ")
-        && str_contains($script, 'CLONE INSTANCE FROM'));
+        && str_contains($script, 'CLONE INSTANCE FROM')
+        && str_contains($script, 'MY_TIMEOUT=21600 my_try')
+        && str_contains($script, 'SELECT STATE, ERROR_MESSAGE FROM performance_schema.clone_status'));
 });
 
 it('disables, fails over and changes the seeds with the Go statements', function () {

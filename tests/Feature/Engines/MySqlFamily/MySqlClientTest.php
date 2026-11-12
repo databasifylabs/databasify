@@ -81,3 +81,33 @@ it('turns client errors into the codes Go reports', function (string $stderr, st
 it('runs the MariaDB client for MariaDB', function () {
     expect(runWithClient('mariadb', 'ERROR 1290 (HY000) at line 1: read only', 1))->toBeInstanceOf(NotPrimary::class);
 });
+
+it('turns off NO_BACKSLASH_ESCAPES for its own session so the quoting always holds', function (string $engine) {
+    $bin = sys_get_temp_dir().'/my-args-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/timeout", "#!/bin/bash\nprintf '%s\\n' \"\$1\" > \"\$ARGS_FILE.timeout\"\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$bin}/{$engine}", "#!/bin/bash\ncat > /dev/null\nprintf '%s\\n' \"\$@\" > \"\$ARGS_FILE\"\n");
+    chmod("{$bin}/timeout", 0755);
+    chmod("{$bin}/{$engine}", 0755);
+    $node = idleDatabase($engine, 1)->nodes()->sole();
+    $script = resolve(ScriptView::class)->render($node, 'testing/my-run', ['engine' => MySqlFamilyEngine::of($engine)]);
+
+    Process::input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'ARGS_FILE' => "{$bin}/args"])->run(['bash', '-euo', 'pipefail', '-s'])->throw();
+    $args = file_get_contents("{$bin}/args");
+    $timeout = trim((string) file_get_contents("{$bin}/args.timeout"));
+    Process::run(['rm', '-rf', $bin]);
+
+    expect($args)->toContain("--init-command=SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@SESSION.sql_mode, ','), ',NO_BACKSLASH_ESCAPES,', ','))")
+        ->and($timeout)->toBe('300');
+})->with(['mysql', 'mariadb']);
+
+it('stops the script when a piped file write fails', function () {
+    $node = idleDatabase('mysql', 1)->nodes()->sole();
+    $script = resolve(ScriptView::class)->render($node, 'testing/write-fails', ['engine' => MySqlFamilyEngine::of('mysql')]);
+
+    $run = Process::input($script)->env(['TEST_ROOT' => sys_get_temp_dir().'/no-such-root-'.uniqid()])->run(['bash', '-euo', 'pipefail', '-s']);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output())->toContain('DATABASIFY_ERROR internal')
+        ->and($run->output())->not->toContain('unnoticed');
+})->skip(fn (): bool => ! Process::run(['bash', '-c', 'shopt -s lastpipe'])->successful(), 'needs bash 4.2 or newer, as the engine images ship');

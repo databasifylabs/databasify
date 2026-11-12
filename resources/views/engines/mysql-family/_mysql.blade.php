@@ -1,6 +1,9 @@
 @include('engines._runtime')
 MY_CLIENT={!! $sh->arg($engine->client) !!}
 MY_CNF={!! $sh->arg($engine->adminCnf()) !!}
+@verbatim
+MY_SESSION="SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@SESSION.sql_mode, ','), ',NO_BACKSLASH_ESCAPES,', ','))"
+@endverbatim
 
 my() {
     local database=$1 errors output status names=-N
@@ -8,7 +11,7 @@ my() {
         names=--column-names
     fi
     errors=$(mktemp)
-    output=$(timeout 60 "$MY_CLIENT" --defaults-extra-file="${MY_DEFAULTS:-$MY_CNF}" "$names" -B -r ${database:+"--database=$database"} 2> "$errors") && status=0 || status=$?
+    output=$(timeout "${MY_TIMEOUT:-300}" "$MY_CLIENT" --defaults-extra-file="${MY_DEFAULTS:-$MY_CNF}" "--init-command=${MY_SESSION}${MY_SESSION_EXTRA:+, $MY_SESSION_EXTRA}" "$names" -B -r ${database:+"--database=$database"} 2> "$errors") && status=0 || status=$?
     if [ "$status" -ne 0 ]; then
         my_failed "$status" "$errors"
     fi
@@ -21,7 +24,7 @@ my_failed() {
     message=$(cat "$2")
     rm -f "$2"
     if [ "$1" -eq 124 ]; then
-        databasify_fail unavailable "$MY_CLIENT timed out after 60s"
+        databasify_fail unavailable "$MY_CLIENT timed out after ${MY_TIMEOUT:-300}s"
     fi
     if [[ $message =~ ^ERROR\ ([0-9]+)\ \(([0-9A-Z]+)\)(\ at\ line\ [0-9]+)?:\ (.*)$ ]]; then
         my_server_failed "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"

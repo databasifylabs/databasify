@@ -13,7 +13,7 @@ SQL
         ATTEMPT_ERROR=$MY_ERROR_TEXT
         return 1
     fi
-    my_try '' <<SQL
+    MY_TIMEOUT=21600 my_try '' <<SQL
 CLONE INSTANCE FROM 'databasify_repl'@$(my_string "$PRIMARY"):25060 IDENTIFIED BY $(my_string "$REPLICATION_SECRET") REQUIRE SSL
 SQL
     if [[ $MY_ERROR_TEXT == 'Error 3707 '* ]]; then
@@ -22,10 +22,22 @@ SQL
         ATTEMPT_ERROR=$MY_ERROR_TEXT
         return 1
     fi
-    wait_until 21600 2 serving || {
+    wait_until 21600 2 clone_finished || {
         ATTEMPT_ERROR='the server was not ready within 6h0m0s'
         return 1
     }
+    if [ "$CLONE_STATE" = Failed ]; then
+        ATTEMPT_ERROR=$CLONE_ERROR
+        return 1
+    fi
+}
+
+clone_finished() {
+    serving || return 1
+    my_try '' <<< 'SELECT STATE, ERROR_MESSAGE FROM performance_schema.clone_status'
+    [ -z "$MY_ERROR" ] || return 1
+    IFS=$'\t' read -r CLONE_STATE CLONE_ERROR <<< "$MY_OUTPUT"
+    [ "$CLONE_STATE" = Completed ] || [ "$CLONE_STATE" = Failed ]
 }
 
 follow_group() {

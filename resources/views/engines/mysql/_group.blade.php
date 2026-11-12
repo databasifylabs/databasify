@@ -55,10 +55,15 @@ SQL
 }
 
 join_group() {
-    local executed
-    executed=$(gtid_executed)
-    if [ -z "$executed" ]; then
-        my '' > /dev/null <<< 'SET GLOBAL group_replication_clone_threshold = 1'
+    my_try '' <<'SQL'
+@verbatim
+SELECT @@gtid_executed
+@endverbatim
+SQL
+    [ -z "$MY_ERROR" ] || return 1
+    if [ -z "$MY_OUTPUT" ]; then
+        my_try '' <<< 'SET GLOBAL group_replication_clone_threshold = 1'
+        [ -z "$MY_ERROR" ] || return 1
     fi
     start_group "$1"
 }

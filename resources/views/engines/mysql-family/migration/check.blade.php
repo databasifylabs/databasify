@@ -4,7 +4,11 @@ SOURCE_CNF=$(source_cnf)
 trap 'rm -f "$SOURCE_CNF"' EXIT
 
 on_source() {
+@if ($engine->id === 'mysql')
+    MY_DEFAULTS=$SOURCE_CNF MY_SESSION_EXTRA='SESSION information_schema_stats_expiry = 0' my_try ''
+@else
     MY_DEFAULTS=$SOURCE_CNF my_try ''
+@endif
 }
 
 on_source <<'SQL'

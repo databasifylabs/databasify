@@ -37,7 +37,7 @@ copy_from() {
         ATTEMPT_ERROR="mariadb: exit status ${statuses[2]}: $(tr -s '[:space:]' ' ' < "$loaded")"
     else
         ATTEMPT_ERROR=''
-        COPIED_GTID=$(tail -n 1 "$found" | sed -n "s/^gtid_slave_pos='\(.*\)'$/\1/p")
+        COPIED_GTID=$(head -n 1 "$found" | sed -n "s/^gtid_slave_pos='\(.*\)'$/\1/p")
     fi
     rm -f "$errors" "$loaded" "$found"
     [ -z "$ATTEMPT_ERROR" ]

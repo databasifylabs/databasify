@@ -131,7 +131,7 @@ final readonly class Accounts
     private function withoutReserved(array $names, array $reserved): array
     {
         $kept = array_values(array_diff($names, $reserved));
-        sort($kept);
+        sort($kept, SORT_STRING);
 
         return $kept;
     }

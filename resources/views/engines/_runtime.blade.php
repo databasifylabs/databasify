@@ -1,4 +1,5 @@
 exec 3>&1
+shopt -s lastpipe 2> /dev/null || true
 
 databasify_fail() {
     printf 'DATABASIFY_ERROR %s\n%s\n' "$1" "$2" >&3

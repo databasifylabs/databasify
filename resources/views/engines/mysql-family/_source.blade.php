@@ -14,9 +14,12 @@ source_cnf() {
         else
             printf 'ssl-mode=PREFERRED\n'
         fi
-        printf 'init-command="SET SESSION information_schema_stats_expiry = 0"\n'
 @else
-        printf 'skip-ssl-verify-server-cert\n'
+        if [ "$SOURCE_TLS" = true ]; then
+            printf 'ssl\nskip-ssl-verify-server-cert\n'
+        else
+            printf 'skip-ssl-verify-server-cert\n'
+        fi
 @endif
     } > "$cnf"
     printf '%s' "$cnf"

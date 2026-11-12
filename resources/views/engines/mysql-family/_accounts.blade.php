@@ -26,7 +26,7 @@ user_exists() {
     count=$(my '' <<SQL
 SELECT COUNT(*) FROM mysql.user WHERE User = $quoted_name AND Host = '%'
 SQL
-)
+) || exit 1
     [ "$count" != 0 ]
 }
 
@@ -56,10 +56,11 @@ SQL
 }
 
 apply_grants() {
-    local database access privileges
+    local database access privileges managed
+    managed=$(managed_databases)
     while IFS= read -r -d '' database; do
         revoke_on "$database" "$NAME"
-    done < <(each_of "$(managed_databases)")
+    done < <(each_of "$managed")
     while IFS= read -r -d '' database; do
         access=$(jq -r --arg name "$database" 'map(select(.database == $name))[0].access' <<< "$GRANTS")
         privileges='SELECT, SHOW VIEW'
