@@ -8,6 +8,8 @@ use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineReply;
 use App\Contracts\Engines\EngineRequest;
 use App\Engines\Drivers\MySqlFamily\Accounts;
+use App\Engines\Drivers\MySqlFamily\Archive;
+use App\Engines\Drivers\MySqlFamily\Migration;
 use App\Engines\Drivers\MySqlFamily\Cluster;
 use App\Engines\Drivers\TaskOperations;
 use App\Engines\Drivers\MySqlFamily\ConfigCommands;
@@ -15,6 +17,12 @@ use App\Engines\Drivers\MySqlFamily\Configuration;
 use App\Engines\Drivers\MySqlFamily\Lifecycle;
 use App\Engines\Drivers\MySqlFamily\Readings;
 use App\Engines\Requests\AccountList;
+use App\Engines\Requests\ArchiveStatus;
+use App\Engines\Requests\RestoreStart;
+use App\Engines\Requests\MigrationCheck;
+use App\Engines\Requests\MigrationStart;
+use App\Engines\Requests\MigrationProgress;
+use App\Engines\Requests\MigrationStop;
 use App\Engines\Requests\ClusterDisable;
 use App\Engines\Requests\ClusterEnable;
 use App\Engines\Requests\ClusterFailover;
@@ -62,6 +70,8 @@ final readonly class MySqlDriver implements EngineDriver
         private ConfigCommands $config,
         private Lifecycle $lifecycle,
         private Cluster $cluster,
+        private Archive $archive,
+        private Migration $migration,
     ) {}
 
     public function answers(EngineRequest $request): bool
@@ -98,7 +108,13 @@ final readonly class MySqlDriver implements EngineDriver
             || $request instanceof ClusterPosition
             || $request instanceof ClusterQuorum
             || $request instanceof ClusterRejoin
-            || $request instanceof MemberForget;
+            || $request instanceof MemberForget
+            || $request instanceof ArchiveStatus
+            || $request instanceof RestoreStart
+            || $request instanceof MigrationCheck
+            || $request instanceof MigrationStart
+            || $request instanceof MigrationProgress
+            || $request instanceof MigrationStop;
     }
 
     public function answer(DatabaseNode $node, EngineRequest $request, ?ServerLog $log): EngineReply
@@ -137,6 +153,12 @@ final readonly class MySqlDriver implements EngineDriver
             $request instanceof ClusterQuorum => $this->cluster->quorum($node),
             $request instanceof ClusterRejoin => $this->cluster->rejoin($node, $request),
             $request instanceof MemberForget => $this->cluster->forget($node, $request),
+            $request instanceof ArchiveStatus => $this->archive->status($node, $request),
+            $request instanceof RestoreStart => $this->archive->restore($node, $request),
+            $request instanceof MigrationCheck => $this->migration->check($node, $request),
+            $request instanceof MigrationStart => $this->migration->start($node, $request),
+            $request instanceof MigrationProgress => $this->migration->progress($node),
+            $request instanceof MigrationStop => $this->migration->stop($node),
             default => throw new LogicException("The MySQL driver does not answer {$request->command()}."),
         };
     }

@@ -62,6 +62,16 @@ final readonly class MySqlFamilyEngine
         };
     }
 
+    public function baseSuffix(): string
+    {
+        return $this->id === 'mysql' ? '.xbstream' : '.mbstream';
+    }
+
+    public function migrationUnit(): string
+    {
+        return "{$this->id}-migration";
+    }
+
     public function adminCnf(): string
     {
         return "{$this->home}/conf/admin.cnf";
