@@ -1,5 +1,5 @@
-node_state() {
-    my '' <<'SQL'
+read_state() {
+    my_try '' <<'SQL'
 @verbatim
 SELECT @@wsrep_on, @@read_only,
     COALESCE((SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'WSREP_CLUSTER_STATUS'), ''),
@@ -7,10 +7,10 @@ SELECT @@wsrep_on, @@read_only,
     COALESCE((SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'SLAVES_RUNNING'), '0')
 @endverbatim
 SQL
-}
-
-read_state() {
-    IFS=$'\t' read -r STATE_GALERA STATE_READ_ONLY STATE_CLUSTER STATE_LOCAL STATE_REPLICATING <<< "$(node_state)"
+    if [ -n "$MY_ERROR" ] || [ -z "$MY_OUTPUT" ]; then
+        return 1
+    fi
+    IFS=$'\t' read -r STATE_GALERA STATE_READ_ONLY STATE_CLUSTER STATE_LOCAL STATE_REPLICATING <<< "$MY_OUTPUT"
 }
 
 state_synced() {
@@ -19,6 +19,10 @@ state_synced() {
 
 state_read_only() {
     [ "$STATE_READ_ONLY" != 0 ] && [ "$(tr '[:lower:]' '[:upper:]' <<< "$STATE_READ_ONLY")" != OFF ]
+}
+
+synced_now() {
+    read_state && state_synced
 }
 
 role_of_state() {

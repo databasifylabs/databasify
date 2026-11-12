@@ -16,6 +16,7 @@ final readonly class MySqlFamilyEngine
      */
     private function __construct(
         public string $id,
+        public string $label,
         public string $home,
         public string $client,
         public string $daemon,
@@ -27,10 +28,10 @@ final readonly class MySqlFamilyEngine
     public static function of(string $engine): self
     {
         return match ($engine) {
-            'mysql' => new self('mysql', '/srv/mysql', 'mysql', 'mysqld', 'caching_sha2_password',
+            'mysql' => new self('mysql', 'MySQL', '/srv/mysql', 'mysql', 'mysqld', 'caching_sha2_password',
                 ['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'databasify_repl', 'databasify_agent'],
                 ['mysql', 'sys', 'performance_schema', 'information_schema']),
-            'mariadb' => new self('mariadb', '/srv/mariadb', 'mariadb', 'mariadbd', 'mysql_native_password',
+            'mariadb' => new self('mariadb', 'MariaDB', '/srv/mariadb', 'mariadb', 'mariadbd', 'mysql_native_password',
                 ['root', 'mysql', 'mariadb.sys', 'databasify_sst', 'databasify_repl', 'databasify_agent'],
                 ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify']),
             default => throw new InvalidArgumentException("{$engine} is not a MySQL family engine."),

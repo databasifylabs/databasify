@@ -142,6 +142,19 @@ function fakeScripts(): FakeScriptRunner
     return $fake;
 }
 
+/**
+ * @return array{string, string}
+ */
+function selfSignedPair(): array
+{
+    $key = openssl_pkey_new(['private_key_bits' => 2048]);
+    $certificate = openssl_csr_sign(openssl_csr_new(['commonName' => 'node'], $key), null, $key, 1);
+    openssl_x509_export($certificate, $pem);
+    openssl_pkey_export($key, $keyPem);
+
+    return [$pem, $keyPem];
+}
+
 function localScripts(): LocalScriptRunner
 {
     $local = resolve(LocalScriptRunner::class);

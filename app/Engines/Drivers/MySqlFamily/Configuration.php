@@ -21,7 +21,7 @@ final readonly class Configuration
 {
     public const string TUNED_STATE = 'state/tuned.json';
 
-    private const string REQUEST_STATE = 'state/node.json';
+    public const string REQUEST_STATE = 'state/node.json';
 
     private const int CONFIGURE_TIMEOUT = 600;
 
@@ -101,7 +101,7 @@ final readonly class Configuration
 
     private function refuseMissingSecrets(MySqlFamilyEngine $engine, NodeConfigure $request): void
     {
-        $label = $engine->id === 'mysql' ? 'MySQL' : 'MariaDB';
+        $label = $engine->label;
 
         $missing = match (true) {
             $request->secrets->admin === null => "{$label} needs the admin secret",
