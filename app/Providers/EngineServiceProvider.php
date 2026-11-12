@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 use App\Engines\Drivers\MariaDb\MariaDbDriver;
+use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Plugins\RegisterEngine;
@@ -62,6 +63,7 @@ class EngineServiceProvider extends ServiceProvider
             ->register();
 
         $this->engine('mongodb', 'MongoDB', self::APPLICATION)
+            ->driver(MongoDbDriver::class)
             ->migrationSource(27017)
             ->serviceRecord('_mongodb._tcp', 'replicaSet=databasify&authSource=admin')
             ->connection(
