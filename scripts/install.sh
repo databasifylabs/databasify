@@ -42,14 +42,15 @@ domain_from() {
 
 ask_domain() {
     local answer=
+    DOMAIN=
     if [ -n "${DATABASIFY_DOMAIN+set}" ]; then
-        domain_from "$DATABASIFY_DOMAIN"
+        DOMAIN=$(domain_from "$DATABASIFY_DOMAIN")
         return 0
     fi
     has_terminal || return 0
     printf '\n  %sDomain for Databasify%s (leave empty to use %s): ' "$BOLD" "$RESET" "$1" > /dev/tty
     read -r answer < /dev/tty || true
-    domain_from "$answer"
+    DOMAIN=$(domain_from "$answer")
 }
 
 write_env() {
@@ -135,7 +136,8 @@ check_server
 
 address=$(public_address || true)
 address=${address:-localhost}
-domain=$(ask_domain "$address")
+ask_domain "$address"
+domain=$DOMAIN
 [ -n "$domain" ] || printf '\n  %sUsing http://%s. Add a domain later in %s/.env%s\n' "$DIM" "$address" "$DIR" "$RESET"
 
 mkdir -p "$DIR"

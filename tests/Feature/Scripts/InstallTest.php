@@ -7,11 +7,18 @@ it('cleans up a typed domain', function (string $input) {
 })->with(['db.example.com', 'https://db.example.com/', ' http://db.example.com ', 'https://db.example.com/app/']);
 
 it('uses the domain from the environment without asking', function () {
-    expect(installerScript('. "$SOURCE/install.sh" --functions-only; ask_domain 203.0.113.10', ['DATABASIFY_DOMAIN' => 'db.example.com'])->output())->toBe('db.example.com');
+    expect(installerScript('. "$SOURCE/install.sh" --functions-only; ask_domain 203.0.113.10; printf "[%s]" "$DOMAIN"', ['DATABASIFY_DOMAIN' => ' https://db.example.com/ '])->output())->toBe('[db.example.com]');
 });
 
 it('uses the address when the environment sets an empty domain', function () {
-    expect(installerScript('. "$SOURCE/install.sh" --functions-only; ask_domain 203.0.113.10', ['DATABASIFY_DOMAIN' => ''])->output())->toBe('');
+    expect(installerScript('. "$SOURCE/install.sh" --functions-only; ask_domain 203.0.113.10; printf "[%s]" "$DOMAIN"', ['DATABASIFY_DOMAIN' => ''])->output())->toBe('[]');
+});
+
+it('reads the domain from the terminal in its own process, never inside a command substitution', function () {
+    $script = (string) file_get_contents(base_path('scripts/install.sh'));
+
+    expect($script)->not->toMatch('/\$\(\s*ask_domain/')
+        ->and($script)->toContain("\nask_domain \"\$address\"\n");
 });
 
 it('detects an install only when both .env and compose.yaml exist', function (array $files, int $status) {
