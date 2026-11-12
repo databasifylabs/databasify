@@ -96,3 +96,10 @@ it('rejoins as a task, following the group on a read-only node', function (bool 
         && str_contains($script, "phase 'starting replication'")
         && str_contains($script, "phase 'waiting until the member is online'"));
 })->with([true, false]);
+
+it('names the latest replication errors when the member left the group with an error', function () {
+    sendToGroup($this->node, new ClusterRejoin('rejoin.1', false));
+
+    $this->scripts->assertRan('mysql/cluster/rejoin', fn (string $script): bool => str_contains($script, "SELECT DATA FROM performance_schema.error_log WHERE SUBSYSTEM = 'Repl' AND PRIO = 'Error' ORDER BY LOGGED DESC LIMIT 3")
+        && str_contains($script, 'fail_task "this member left the group with an error: $(group_errors)"'));
+});

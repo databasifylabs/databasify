@@ -5,6 +5,17 @@ SQL
     [ -z "$MY_ERROR" ] || [[ $MY_ERROR_TEXT == 'Error 3093 '* ]]
 }
 
+group_errors() {
+    my_try '' <<'SQL'
+SELECT DATA FROM performance_schema.error_log WHERE SUBSYSTEM = 'Repl' AND PRIO = 'Error' ORDER BY LOGGED DESC LIMIT 3
+SQL
+    if [ -n "$MY_ERROR" ] || [ -z "$MY_OUTPUT" ]; then
+        printf 'see the MySQL log'
+        return
+    fi
+    printf '%s' "${MY_OUTPUT//$'\n'/; }"
+}
+
 online_check() {
     my_try '' <<'SQL'
 @verbatim
@@ -15,7 +26,7 @@ SQL
         return 1
     fi
     if [ "$MY_OUTPUT" = ERROR ]; then
-        fail_task 'this member left the group with an error, see the MySQL log'
+        fail_task "this member left the group with an error: $(group_errors)"
     fi
     if { [ -z "$MY_OUTPUT" ] || [ "$MY_OUTPUT" = OFFLINE ]; } && [ -n "$GROUP_PASSWORD" ]; then
         start_group "$GROUP_PASSWORD" || true
