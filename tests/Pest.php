@@ -52,6 +52,7 @@ use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeScriptRunner;
+use Tests\Support\LocalScriptRunner;
 use Tests\Support\FakeServerConnection;
 use Tests\TestCase;
 
@@ -139,6 +140,14 @@ function fakeScripts(): FakeScriptRunner
     app()->instance(EngineScripts::class, $fake);
 
     return $fake;
+}
+
+function localScripts(): LocalScriptRunner
+{
+    $local = resolve(LocalScriptRunner::class);
+    app()->instance(EngineScripts::class, $local);
+
+    return $local;
 }
 
 function fakeSsh(): FakeServerConnection
