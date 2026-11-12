@@ -1,0 +1,50 @@
+{
+    "keyfile": "kupOSg4rkuA/ZEeDMz/qiEasfyZkq8DAYd30E4Jt0uE=",
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"mongod\",\n      \"argv\": [\n        \"mongod\",\n        \"--config\",\n        \"/srv/mongodb/conf/mongod.conf\"\n      ],\n      \"user\": \"mongodb\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"15m0s\",\n      \"enabled\": true\n    },\n    {\n      \"name\": \"pbm-agent\",\n      \"argv\": [\n        \"pbm-agent\"\n      ],\n      \"user\": \"mongodb\",\n      \"env\": {\n        \"PBM_MONGODB_URI\": \"mongodb://databasify_pbm:ag$ent%2Fx%40y@127.0.0.1:25060/?authSource=admin\\u0026tls=true\\u0026tlsInsecure=true\"\n      },\n      \"after\": [\n        \"mongod\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"1m0s\",\n      \"enabled\": true\n    }\n  ],\n  \"schedules\": [\n    {\n      \"name\": \"mongodb-backup\",\n      \"onCalendar\": \"04:00\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"backup\"\n      ],\n      \"timeout\": \"24h0m0s\"\n    }\n  ]\n}",
+    "mongodConf": "{\n  \"net\": {\n    \"bindIpAll\": true,\n    \"maxIncomingConnections\": 2048,\n    \"port\": 25060,\n    \"tls\": {\n      \"CAFile\": \"/srv/mongodb/tls/ca.crt\",\n      \"allowConnectionsWithoutCertificates\": true,\n      \"certificateKeyFile\": \"/srv/mongodb/tls/server.pem\",\n      \"disabledProtocols\": \"TLS1_0,TLS1_1\",\n      \"mode\": \"requireTLS\"\n    }\n  },\n  \"operationProfiling\": {\n    \"mode\": \"slowOp\",\n    \"slowOpThresholdMs\": 100\n  },\n  \"replication\": {\n    \"replSetName\": \"databasify\"\n  },\n  \"security\": {\n    \"authorization\": \"enabled\",\n    \"keyFile\": \"/srv/mongodb/conf/keyfile\"\n  },\n  \"setParameter\": {\n    \"transactionLifetimeLimitSeconds\": 60\n  },\n  \"storage\": {\n    \"dbPath\": \"/srv/mongodb/data\",\n    \"wiredTiger\": {\n      \"engineConfig\": {\n        \"cacheSizeGB\": 1.50\n      }\n    }\n  },\n  \"systemLog\": {\n    \"verbosity\": 0\n  }\n}\n",
+    "request": {
+        "clustered": true,
+        "readOnly": false,
+        "ip": "10.0.0.2",
+        "databaseId": "db-1",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.2",
+                "position": 2,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            }
+        ],
+        "settings": {},
+        "secrets": {
+            "admin": "adm'in",
+            "replication": "rep\"l",
+            "agent": "ag$ent/x@y"
+        },
+        "archive": {
+            "storage": {
+                "endpoint": "https://s3.example.com",
+                "bucket": "bk",
+                "region": "us-east-1",
+                "accessKey": "AK",
+                "secretKey": "S'K",
+                "pathStyle": true,
+                "verifyTls": true,
+                "path": "/db/m/"
+            },
+            "retentionDays": 7,
+            "backupHour": 4
+        },
+        "primary": null
+    }
+}

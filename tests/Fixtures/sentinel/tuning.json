@@ -1,0 +1,22 @@
+{
+    "large": {
+        "io-threads": "16",
+        "maxclients": "65504",
+        "maxmemory": "45875mb"
+    },
+    "medium": {
+        "io-threads": "1",
+        "maxclients": "65504",
+        "maxmemory": "2867mb"
+    },
+    "odd": {
+        "io-threads": "1",
+        "maxclients": "65504",
+        "maxmemory": "5376mb"
+    },
+    "small": {
+        "io-threads": "1",
+        "maxclients": "65504",
+        "maxmemory": "716mb"
+    }
+}

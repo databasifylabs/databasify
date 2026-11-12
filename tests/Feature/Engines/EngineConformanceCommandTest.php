@@ -51,3 +51,22 @@ it('passes every step for the MySQL family through its PHP driver', function (st
         ->expectsOutputToContain('PASS operation status unknown key')
         ->assertSuccessful();
 })->with(['mysql', 'mariadb']);
+
+it('passes every step for MongoDB through its PHP driver', function () {
+    $database = idleDatabase('mongodb', 1, name: 'conformance-mongodb');
+    fakeScripts()
+        ->respond('mongodb/nodes/status', ['role' => 'primary', 'version' => '8.0.4'])
+        ->respond('mongodb/accounts/list', fn (array $env): array => ['users' => ['app', $this->createdUser ?? 'none'], 'databases' => ['app', $this->createdSchema ?? 'none']])
+        ->respond('mongodb/accounts/create-user', function (array $env): array {
+            $created = ! isset($this->createdUser);
+            $this->createdUser = $env['NAME'];
+            $this->createdSchema = json_decode($env['GRANTS'], true)[0]['database'];
+
+            return ['created' => $created];
+        });
+
+    $this->artisan('engines:conformance', ['database' => $database->name])
+        ->expectsOutputToContain('PASS user create again')
+        ->expectsOutputToContain('FAIL user set-password with a newline: a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab')
+        ->assertFailed();
+});

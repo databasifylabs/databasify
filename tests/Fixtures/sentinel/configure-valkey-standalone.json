@@ -1,0 +1,35 @@
+{
+    "flavor": "valkey",
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"valkey-server\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"umask 0027 \\u0026\\u0026 exec \\\"$@\\\"\",\n        \"private-umask\",\n        \"valkey-server\",\n        \"/srv/valkey/conf/valkey.conf\"\n      ],\n      \"user\": \"valkey\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"1m0s\",\n      \"enabled\": true\n    }\n  ],\n  \"schedules\": []\n}",
+    "primary": "",
+    "request": {
+        "clustered": false,
+        "readOnly": false,
+        "ip": "10.0.0.1",
+        "databaseId": "",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 0
+            }
+        ],
+        "settings": {
+            "maxmemory-policy": "allkeys-lru",
+            "notify-keyspace-events": "",
+            "pubsub-output-buffer-limit": "64"
+        },
+        "secrets": {
+            "admin": "pa\"ss\\word",
+            "replication": null,
+            "agent": null
+        },
+        "archive": null,
+        "primary": null
+    },
+    "sentinelConf": "port 26379\nbind 10.0.0.1 127.0.0.1\ndaemonize no\ndir /srv/valkey/sentinel\nrequirepass \"pa\\\"ss\\\\word\"\nsentinel announce-ip 10.0.0.1\nsentinel announce-port 26379\nsentinel sentinel-pass \"pa\\\"ss\\\\word\"\nsentinel monitor main 10.0.0.1 6379 1\nsentinel auth-pass main \"pa\\\"ss\\\\word\"\nsentinel down-after-milliseconds main 5000\nsentinel failover-timeout main 60000\nsentinel parallel-syncs main 1\n",
+    "serverConf": "port 6379\nbind * -::*\nprotected-mode yes\ntcp-backlog 511\ntcp-keepalive 300\ndaemonize no\nloglevel notice\nlogfile \"\"\ndir /srv/valkey/data\ntls-port 25061\ntls-cert-file /srv/valkey/tls/server.pem\ntls-key-file /srv/valkey/tls/server.pem\ntls-ca-cert-file /srv/valkey/tls/ca.crt\ntls-auth-clients no\ntls-protocols \"TLSv1.2 TLSv1.3\"\nrequirepass \"pa\\\"ss\\\\word\"\nmasterauth \"pa\\\"ss\\\\word\"\nmaxmemory-clients 10%\nlazyfree-lazy-expire yes\nlazyfree-lazy-server-del yes\nlazyfree-lazy-user-del yes\nlazyfree-lazy-user-flush yes\nactivedefrag yes\nlatency-monitor-threshold 100\nsave 3600 1\nstop-writes-on-bgsave-error yes\ndbfilename dump.rdb\nappendonly yes\nappendfilename \"appendonly.aof\"\nappenddirname \"appendonlydir\"\nappendfsync everysec\naof-use-rdb-preamble yes\nio-threads 1\nmaxclients 65504\nmaxmemory 2867mb\nmaxmemory-policy allkeys-lru\nnotify-keyspace-events \"\"\nclient-output-buffer-limit pubsub 64mb 16mb 60\n"
+}
