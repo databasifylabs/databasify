@@ -9,6 +9,8 @@ return [
         'engine-sdk' => '^0.2',
     ],
 
+    'php_engines' => array_values(array_filter(explode(',', (string) env('DATABASIFY_PHP_ENGINES', '')))),
+
     'docker' => [
         'version' => '29.9.2',
         'containerd' => '2.4.2',

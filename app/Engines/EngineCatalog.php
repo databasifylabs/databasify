@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
+use App\Contracts\Engines\EngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 use App\DTOs\Databases\VersionLine;
@@ -62,7 +63,16 @@ final readonly class EngineCatalog
             readOnlyNodesVote: $flag('read_only_nodes_vote'),
             plugin: $optional('plugin'),
             author: $optional('author'),
+            driver: self::driverOf($optional('driver')),
         );
+    }
+
+    /**
+     * @return class-string<EngineDriver>|null
+     */
+    private static function driverOf(?string $class): ?string
+    {
+        return $class !== null && is_a($class, EngineDriver::class, true) ? $class : null;
     }
 
     private static function defaultRepositoryOf(string $id): string

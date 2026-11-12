@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Engines\Drivers\Postgres;
+
+use App\Contracts\Engines\EngineScripts;
+use App\Engines\Responses\NodeMetrics;
+use App\Engines\Responses\NodeStatus;
+use App\Enums\Databases\NodeRole;
+use App\Models\DatabaseNode;
+
+final readonly class Readings
+{
+    public function __construct(
+        private EngineScripts $scripts,
+        private Accounts $accounts,
+    ) {}
+
+    public function status(DatabaseNode $node): NodeStatus
+    {
+        $reply = $this->scripts->run($node, 'postgres/nodes/status', $this->accounts->dataFor($node))->json();
+
+        return new NodeStatus(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
+    }
+
+    public function metrics(DatabaseNode $node): NodeMetrics
+    {
+        return NodeMetrics::fromPayload($this->scripts->run($node, 'postgres/nodes/metrics', $this->accounts->dataFor($node))->json());
+    }
+}

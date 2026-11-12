@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
+use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Plugins\RegisterEngine;
 use Illuminate\Support\ServiceProvider;
 
@@ -40,6 +41,7 @@ class EngineServiceProvider extends ServiceProvider
             ->register();
 
         $this->engine('postgres', 'PostgreSQL', self::APPLICATION)
+            ->driver(PostgresDriver::class)
             ->migrationSource(5432)
             ->connection(new ConnectionProfile('postgresql', '?sslmode=require', 'sslmode', 'require', 'PGSSLMODE=require PGPASSWORD={password} psql -U {username} -h {host} -p {port} -d {database}', null, true, self::SQL_ENV_KEYS, 'To verify the server, download the CA certificate and use sslmode=verify-full with sslrootcert=/path/to/{ca}.', 'To verify the server, download the CA certificate and use PGSSLMODE=verify-full PGSSLROOTCERT={ca}.'))
             ->environment('pgsql', ['DB_SSLMODE' => 'require'])

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
+use App\Contracts\Engines\EngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 use App\DTOs\Databases\VersionLine;
@@ -19,6 +20,7 @@ final readonly class Engine
     /**
      * @param  list<VersionLine>  $lines
      * @param  array<string, string>  $environmentExtra
+     * @param  class-string<EngineDriver>|null  $driver
      */
     public function __construct(
         public string $id,
@@ -41,6 +43,7 @@ final readonly class Engine
         public bool $readOnlyNodesVote,
         public ?string $plugin,
         public ?string $author,
+        public ?string $driver = null,
     ) {}
 
     public function isCommunity(): bool
