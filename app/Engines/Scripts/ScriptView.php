@@ -42,7 +42,7 @@ final readonly class ScriptView
         return match ($engine) {
             'postgres' => new PostgresSql,
             'mysql', 'mariadb' => new MySqlSql,
-            'mongodb' => new EnvOnlyQuoting,
+            'mongodb', 'valkey', 'redis' => new EnvOnlyQuoting,
             default => throw new InvalidArgumentException("No script quoting for the {$engine} engine."),
         };
     }
