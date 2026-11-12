@@ -1,0 +1,44 @@
+{
+    "large": {
+        "effective_cache_size": "49152MB",
+        "effective_io_concurrency": "200",
+        "maintenance_work_mem": "2048MB",
+        "max_connections": "2048",
+        "max_parallel_maintenance_workers": "8",
+        "max_parallel_workers": "32",
+        "max_parallel_workers_per_gather": "8",
+        "max_slot_wal_keep_size": "512000MB",
+        "max_worker_processes": "32",
+        "random_page_cost": "1.1",
+        "shared_buffers": "16384MB",
+        "work_mem": "8MB"
+    },
+    "medium": {
+        "effective_cache_size": "3072MB",
+        "effective_io_concurrency": "200",
+        "maintenance_work_mem": "256MB",
+        "max_connections": "128",
+        "max_parallel_maintenance_workers": "1",
+        "max_parallel_workers": "2",
+        "max_parallel_workers_per_gather": "1",
+        "max_slot_wal_keep_size": "20480MB",
+        "max_worker_processes": "8",
+        "random_page_cost": "1.1",
+        "shared_buffers": "1024MB",
+        "work_mem": "8MB"
+    },
+    "small": {
+        "effective_cache_size": "768MB",
+        "effective_io_concurrency": "200",
+        "maintenance_work_mem": "64MB",
+        "max_connections": "100",
+        "max_parallel_maintenance_workers": "1",
+        "max_parallel_workers": "2",
+        "max_parallel_workers_per_gather": "1",
+        "max_slot_wal_keep_size": "2560MB",
+        "max_worker_processes": "8",
+        "random_page_cost": "1.1",
+        "shared_buffers": "256MB",
+        "work_mem": "4MB"
+    }
+}

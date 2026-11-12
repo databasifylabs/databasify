@@ -1,0 +1,53 @@
+{
+    "files": [
+        {
+            "content": "local all postgres peer\nlocal all all scram-sha-256\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all ::1/128 scram-sha-256\nhost replication replicator 127.0.0.1/32 scram-sha-256\nhost replication replicator ::1/128 scram-sha-256\nhostssl replication replicator 0.0.0.0/0 scram-sha-256\nhostssl all all 0.0.0.0/0 scram-sha-256\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/pg_hba.conf"
+        },
+        {
+            "content": "\"pgbouncer\" \"d989e044e5f68938a0973fac39fa940d7903d1a5303fd5245e40d071cdc6c071\"\n",
+            "mode": 384,
+            "path": "/srv/postgres/conf/pgbouncer-users.txt"
+        },
+        {
+            "content": "[databases]\npostgres = host=127.0.0.1 port=25060 dbname=postgres pool_size=2\n%include /srv/postgres/conf/pgbouncer-pools.ini\n\n[pgbouncer]\nlisten_addr = *\nlisten_port = 25061\nunix_socket_dir =\nauth_type = scram-sha-256\nauth_file = /srv/postgres/conf/pgbouncer-users.txt\nauth_user = pgbouncer\nauth_dbname = postgres\nauth_query = SELECT username, password FROM pgbouncer.get_auth($1)\nclient_tls_sslmode = require\nclient_tls_cert_file = /srv/postgres/tls/server.crt\nclient_tls_key_file = /srv/postgres/tls/server.key\nserver_tls_sslmode = require\nmax_client_conn = 5000\ndefault_pool_size = 16\nignore_startup_parameters = extra_float_digits,options\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/pgbouncer.ini"
+        },
+        {
+            "content": "listen_addresses = '*'\nport = '25060'\nhba_file = '/srv/postgres/conf/pg_hba.conf'\ncompute_query_id = 'auto'\nhot_standby = 'on'\nmax_connections = '200'\nmax_replication_slots = '20'\nmax_wal_senders = '20'\npassword_encryption = 'scram-sha-256'\npg_stat_statements.track = 'top'\nshared_preload_libraries = 'pg_stat_statements'\nwal_keep_size = '1GB'\nwal_level = 'replica'\nwal_log_hints = 'on'\nlog_destination = 'stderr'\nlogging_collector = 'off'\nssl = 'on'\nssl_cert_file = '/srv/postgres/tls/server.crt'\nssl_key_file = '/srv/postgres/tls/server.key'\nssl_min_protocol_version = 'TLSv1.2'\ntimezone = 'Asia/Dhaka'\nunix_socket_directories = '/srv/postgres/run'\nwork_mem = '8MB'\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/postgresql.conf"
+        }
+    ],
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"databasify-postgres-locks\",\n      \"type\": \"oneshot\",\n      \"user\": \"postgres\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"pgrep -x postgres \\u003e /dev/null || rm -f /srv/postgres/run/.s.PGSQL.* /srv/postgres/data/postmaster.pid\"\n      ],\n      \"enabled\": true\n    },\n    {\n      \"name\": \"databasify-postgres\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres-locks\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"SIGINT\",\n      \"stopTimeout\": \"2m\",\n      \"argv\": [\n        \"/usr/lib/postgresql/18/bin/postgres\",\n        \"-D\",\n        \"/srv/postgres/data\",\n        \"-c\",\n        \"config_file=/srv/postgres/conf/postgresql.conf\"\n      ],\n      \"enabled\": false\n    },\n    {\n      \"name\": \"databasify-pgbouncer\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres\",\n        \"databasify-patroni\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"argv\": [\n        \"/usr/sbin/pgbouncer\",\n        \"/srv/postgres/conf/pgbouncer.ini\"\n      ],\n      \"enabled\": false\n    }\n  ]\n}",
+    "request": {
+        "clustered": false,
+        "readOnly": false,
+        "ip": "10.0.0.1",
+        "databaseId": "db-1",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            }
+        ],
+        "settings": {
+            "max_connections": "200",
+            "timezone": "Asia/Dhaka",
+            "work_mem": "8MB"
+        },
+        "secrets": {
+            "admin": "adm'in",
+            "replication": "rep\"l",
+            "agent": "ag$ent"
+        },
+        "archive": null,
+        "primary": null
+    }
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
+use App\Contracts\Engines\EngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 
@@ -70,6 +71,14 @@ final class RegisterEngine extends AbstractProviderRegistrar
     public function persistenceChoice(): static
     {
         return $this->set('persistence_choice', true);
+    }
+
+    /**
+     * @param  class-string<EngineDriver>  $driver
+     */
+    public function driver(string $driver): static
+    {
+        return $this->set('driver', $driver);
     }
 
     protected function config(): string

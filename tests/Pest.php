@@ -5,13 +5,19 @@ declare(strict_types=1);
 use App\Actions\Databases\Certificates\IssueNodeCertificates;
 use App\Actions\Databases\Lifecycle\CreateDatabase;
 use App\Contracts\Acme\CertificateAuthority;
+use App\Contracts\Engines\EngineScripts;
 use App\Contracts\Images\ImageRegistry;
 use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Databases\NewDatabase;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Updates\Release;
+use App\Engines\Data\ArchiveSettings;
 use App\Engines\Data\EngineField;
+use App\Engines\Data\Member;
+use App\Engines\Data\Secrets;
+use App\Engines\Data\Storage;
 use App\Engines\Payload;
+use App\Engines\Requests\NodeConfigure;
 use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\FlowState;
@@ -45,6 +51,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
+use Tests\Support\FakeScriptRunner;
 use Tests\Support\FakeServerConnection;
 use Tests\TestCase;
 
@@ -92,6 +99,48 @@ function inProjectDuring(Closure $callback): mixed
     }
 }
 
+function configureFromFixture(array $request): NodeConfigure
+{
+    $archive = $request['archive'] === null ? null : new ArchiveSettings(
+        new Storage(...array_intersect_key($request['archive']['storage'], array_flip(['endpoint', 'bucket', 'region', 'accessKey', 'secretKey', 'pathStyle', 'path']))),
+        $request['archive']['retentionDays'],
+        $request['archive']['backupHour'],
+    );
+
+    return new NodeConfigure(
+        $request['clustered'],
+        $request['readOnly'],
+        $request['ip'],
+        $request['databaseId'],
+        array_map(fn (array $member): Member => new Member(...$member), $request['members']),
+        $request['settings'] ?? [],
+        new Secrets(...$request['secrets']),
+        $archive,
+        $request['primary'],
+    );
+}
+
+function respondToFileGet(FakeServerConnection $ssh, string $path, ?string $content): FakeServerConnection
+{
+    return $ssh->respondWhen(
+        fn (string $server, string $script): bool => str_contains($script, '| databasify file get ') && json_decode((string) base64_decode((string) preg_replace("/.*printf '%s' '([^']+)'.*/s", '$1', $script)), true)['path'] === $path,
+        json_encode(['contentBase64' => base64_encode($content ?? ''), 'exists' => $content !== null], JSON_THROW_ON_ERROR),
+    );
+}
+
+function goFixture(string $name): mixed
+{
+    return json_decode((string) file_get_contents(base_path("tests/Fixtures/postgres/{$name}")), true);
+}
+
+function fakeScripts(): FakeScriptRunner
+{
+    $fake = resolve(FakeScriptRunner::class);
+    app()->instance(EngineScripts::class, $fake);
+
+    return $fake;
+}
+
 function fakeSsh(): FakeServerConnection
 {
     $fake = new FakeServerConnection;
@@ -121,7 +170,7 @@ function engineCapabilitiesPayload(string $engine): array
         default => [[], []],
     };
 
-    $commands = in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password'];
+    $commands = [...(in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password']), 'runtime run'];
     [$encryptions, $default] = match ($engine) {
         'mysql' => [['caching_sha2_password', 'mysql_native_password'], 'caching_sha2_password'],
         'mariadb' => [['mysql_native_password', 'ed25519', 'parsec'], 'mysql_native_password'],

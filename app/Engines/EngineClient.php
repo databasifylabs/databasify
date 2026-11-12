@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
+use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineReply;
 use App\Contracts\Engines\EngineRequest;
 use App\Contracts\Ssh\ServerConnection;
@@ -15,6 +16,8 @@ use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 use App\Models\Server;
 use App\Models\ServerLog;
+use Illuminate\Contracts\Container\Container;
+use LogicException;
 use Throwable;
 
 final readonly class EngineClient
@@ -27,7 +30,10 @@ final readonly class EngineClient
 
     private const int NOT_RUNNING = 69;
 
-    public function __construct(private ServerConnection $connection) {}
+    public function __construct(
+        private ServerConnection $connection,
+        private Container $container,
+    ) {}
 
     /**
      * @template TReply of EngineReply
@@ -56,6 +62,12 @@ final readonly class EngineClient
      */
     public function sendInto(DatabaseNode $node, EngineRequest $request, ?ServerLog $serverLog, ?int $timeout = null): EngineReply
     {
+        $driver = $this->driverAnswering($node, $request);
+
+        if ($driver !== null) {
+            return $this->replyOf($request, $driver->answer($node, $request, $serverLog));
+        }
+
         $server = $node->server;
         $output = '';
 
@@ -81,6 +93,40 @@ final readonly class EngineClient
 
             throw $unsupported;
         }
+    }
+
+    /**
+     * @param  EngineRequest<EngineReply>  $request
+     */
+    private function driverAnswering(DatabaseNode $node, EngineRequest $request): ?EngineDriver
+    {
+        $database = $node->database;
+        $engine = $database->engine();
+
+        if ($engine->driver === null || ! $database->runsEngineRuntime() || ! in_array($engine->id, config()->array('databasify.php_engines'), true)) {
+            return null;
+        }
+
+        $driver = $this->container->make($engine->driver);
+
+        return $driver instanceof EngineDriver && $driver->answers($request) ? $driver : null;
+    }
+
+    /**
+     * @template TReply of EngineReply
+     *
+     * @param  EngineRequest<TReply>  $request
+     * @return TReply
+     */
+    private function replyOf(EngineRequest $request, EngineReply $reply): EngineReply
+    {
+        $expected = $request->reply();
+
+        if (! $reply instanceof $expected) {
+            throw new LogicException("The engine driver answered {$request->command()} with ".$reply::class.", not {$expected}.");
+        }
+
+        return $reply;
     }
 
     /**

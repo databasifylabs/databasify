@@ -662,6 +662,11 @@ class Database extends Model implements Movable
         return $chosen ?? $default;
     }
 
+    public function runsEngineRuntime(): bool
+    {
+        return $this->engine_capabilities?->offers('runtime run') === true;
+    }
+
     public function managesAccounts(): bool
     {
         return $this->engine_capabilities?->offers('user create') === true;
