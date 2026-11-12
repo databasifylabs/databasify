@@ -7,7 +7,7 @@ namespace App\Engines\Drivers;
 final readonly class GoJson
 {
     /**
-     * @param  array<string, mixed>  $value
+     * @param  array<array-key, mixed>  $value
      */
     public static function indented(array $value): string
     {

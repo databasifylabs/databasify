@@ -110,8 +110,8 @@ final readonly class MongoDbFiles
     }
 
     /**
-     * @param  array<string, mixed>  $map
-     * @return array<string, mixed>
+     * @param  array<array-key, mixed>  $map
+     * @return array<array-key, mixed>
      */
     private static function sorted(array $map): array
     {
