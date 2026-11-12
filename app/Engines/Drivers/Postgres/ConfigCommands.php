@@ -66,7 +66,7 @@ final readonly class ConfigCommands
         $catalog = $this->configuration->catalogOf($node);
         $previous = $this->tunedOf($node, $request);
         $tuned = $catalog->tuned(NodeState::selfOf($request));
-        $this->saveTuned($node, $tuned);
+        $this->state->saveTuned($node, Configuration::TUNED_STATE, $tuned);
         $this->configuration->configure($node, $request);
         $this->sync($node);
         $this->apply($node);
@@ -79,23 +79,6 @@ final readonly class ConfigCommands
      */
     private function tunedOf(DatabaseNode $node, NodeConfigure $request): array
     {
-        $saved = $this->configuration->savedTunedOf($node);
-
-        if ($saved !== null) {
-            return $saved;
-        }
-
-        $tuned = $this->configuration->catalogOf($node)->tuned(NodeState::selfOf($request));
-        $this->saveTuned($node, $tuned);
-
-        return $tuned;
-    }
-
-    /**
-     * @param  array<string, string>  $tuned
-     */
-    private function saveTuned(DatabaseNode $node, array $tuned): void
-    {
-        $this->state->saveTuned($node, Configuration::TUNED_STATE, $tuned);
+        return $this->state->tunedOrNewOf($node, Configuration::TUNED_STATE, $this->configuration->catalogOf($node), $request);
     }
 }

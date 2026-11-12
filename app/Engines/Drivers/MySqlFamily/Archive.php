@@ -39,16 +39,17 @@ final readonly class Archive
         ], timeout: 900)->json();
 
         $bases = $this->basesIn($reply->objects('base'), $engine->baseSuffix());
-        $latest = $bases === [] ? null : end($bases);
         $shipped = $this->latestOf($reply->strings('shipped'));
+        $failure = in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.";
 
-        return new ArchiveStatusReply(
-            count($bases),
-            $bases === [] ? null : $this->timeOf($bases[0]),
-            $latest === null ? null : $this->timeOf($shipped !== null && $shipped->greaterThan($latest) ? $shipped : $latest),
-            $latest === null ? null : $this->timeOf($latest),
-            in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.",
-        );
+        if ($bases === []) {
+            return new ArchiveStatusReply(0, null, null, null, $failure);
+        }
+
+        $latest = end($bases);
+        $recoverableUntil = $shipped !== null && $shipped->greaterThan($latest) ? $shipped : $latest;
+
+        return new ArchiveStatusReply(count($bases), $this->timeOf($bases[0]), $this->timeOf($recoverableUntil), $this->timeOf($latest), $failure);
     }
 
     public function restore(DatabaseNode $node, RestoreStart $request): Operation
@@ -88,10 +89,9 @@ final readonly class Archive
         $bases = [];
 
         foreach ($paths as $path) {
-            $name = str_ends_with($path, $suffix) ? substr($path, 0, -strlen($suffix)) : null;
-            $stamp = $name === null || ! in_array($name.self::INFO_SUFFIX, $paths, true) ? false : CarbonImmutable::createFromFormat(self::STAMP_FORMAT, $name, 'UTC');
+            $stamp = $this->baseStampOf($path, $suffix, $paths);
 
-            if ($stamp instanceof CarbonImmutable) {
+            if ($stamp !== null) {
                 $bases[] = $stamp;
             }
         }
@@ -99,6 +99,26 @@ final readonly class Archive
         usort($bases, fn (CarbonImmutable $a, CarbonImmutable $b): int => $a <=> $b);
 
         return $bases;
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function baseStampOf(string $path, string $suffix, array $paths): ?CarbonImmutable
+    {
+        if (! str_ends_with($path, $suffix)) {
+            return null;
+        }
+
+        $name = substr($path, 0, -strlen($suffix));
+
+        if (! in_array($name.self::INFO_SUFFIX, $paths, true)) {
+            return null;
+        }
+
+        $stamp = CarbonImmutable::createFromFormat(self::STAMP_FORMAT, $name, 'UTC');
+
+        return $stamp instanceof CarbonImmutable ? $stamp : null;
     }
 
     /**
@@ -110,7 +130,10 @@ final readonly class Archive
 
         foreach ($times as $time) {
             $parsed = CarbonImmutable::parse($time)->utc();
-            $latest = $latest === null || $parsed->greaterThan($latest) ? $parsed : $latest;
+
+            if ($latest === null || $parsed->greaterThan($latest)) {
+                $latest = $parsed;
+            }
         }
 
         return $latest;

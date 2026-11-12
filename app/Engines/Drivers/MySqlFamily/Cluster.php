@@ -142,7 +142,7 @@ final readonly class Cluster
         foreach (explode(',', $compact) as $set) {
             foreach (array_slice(explode(':', $set), 1) as $interval) {
                 [$first, $last] = array_pad(explode('-', $interval, 2), 2, null);
-                $total += ($last === null ? (int) $first : (int) $last) - (int) $first + 1;
+                $total += (int) ($last ?? $first) - (int) $first + 1;
             }
         }
 

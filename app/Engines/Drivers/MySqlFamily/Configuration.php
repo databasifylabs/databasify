@@ -42,7 +42,7 @@ final readonly class Configuration
         $reply = $this->scripts->run($node, 'mysql-family/nodes/configure', [
             ...$this->filesEnvOf($node, $request, $tuned),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'INIT_SQL' => $engine->id === 'mysql' ? "ALTER USER 'root'@'localhost' IDENTIFIED BY ".FamilyFiles::sqlString((string) $request->secrets->admin).";\n" : MariaDbFiles::initStatementsOf($request),
+            'INIT_SQL' => $this->initSqlOf($engine, $request),
             'INIT_COMMAND' => $this->initCommandOf($engine),
             'SEED' => $this->startsNewCluster($engine, $request) ? 'true' : 'false',
             'GROUPED_BOOT' => $engine->id === 'mysql' && $request->clustered && ! $request->readOnly ? 'true' : 'false',
@@ -86,16 +86,7 @@ final readonly class Configuration
      */
     public function tunedOf(DatabaseNode $node, NodeConfigure $request): array
     {
-        $saved = $this->state->tunedOf($node, self::TUNED_STATE);
-
-        if ($saved !== null) {
-            return $saved;
-        }
-
-        $tuned = $this->catalogOf($node)->tuned(NodeState::selfOf($request));
-        $this->state->saveTuned($node, self::TUNED_STATE, $tuned);
-
-        return $tuned;
+        return $this->state->tunedOrNewOf($node, self::TUNED_STATE, $this->catalogOf($node), $request);
     }
 
     /**
@@ -131,6 +122,15 @@ final readonly class Configuration
     private function filesOf(MySqlFamilyEngine $engine, NodeConfigure $effective, string $line, bool $newCluster): ConfigFiles
     {
         return $engine->id === 'mysql' ? MySqlFiles::of($effective, $line) : MariaDbFiles::of($effective, $line, $newCluster);
+    }
+
+    private function initSqlOf(MySqlFamilyEngine $engine, NodeConfigure $request): string
+    {
+        if ($engine->id !== 'mysql') {
+            return MariaDbFiles::initStatementsOf($request);
+        }
+
+        return "ALTER USER 'root'@'localhost' IDENTIFIED BY ".FamilyFiles::sqlString((string) $request->secrets->admin).";\n";
     }
 
     private function initCommandOf(MySqlFamilyEngine $engine): string

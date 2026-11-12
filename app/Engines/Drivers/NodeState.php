@@ -14,6 +14,7 @@ use App\Engines\Payload;
 use App\Engines\Requests\FileGet;
 use App\Engines\Requests\FilePut;
 use App\Engines\Requests\NodeConfigure;
+use App\Engines\Settings\SettingsCatalog;
 use App\Models\DatabaseNode;
 
 final readonly class NodeState
@@ -39,6 +40,23 @@ final readonly class NodeState
                 $tuned[$key] = $value;
             }
         }
+
+        return $tuned;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function tunedOrNewOf(DatabaseNode $node, string $path, SettingsCatalog $catalog, NodeConfigure $request): array
+    {
+        $saved = $this->tunedOf($node, $path);
+
+        if ($saved !== null) {
+            return $saved;
+        }
+
+        $tuned = $catalog->tuned(self::selfOf($request));
+        $this->saveTuned($node, $path, $tuned);
 
         return $tuned;
     }

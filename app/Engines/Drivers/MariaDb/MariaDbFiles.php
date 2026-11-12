@@ -9,6 +9,7 @@ use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\Member;
 use App\Engines\Drivers\MySqlFamily\FamilyFiles;
 use App\Engines\Drivers\MySqlFamily\MySqlFamilyEngine;
+use App\Engines\Drivers\NodeState;
 use App\Engines\Requests\NodeConfigure;
 
 final readonly class MariaDbFiles
@@ -149,13 +150,7 @@ final readonly class MariaDbFiles
 
     private static function gtidDomainOf(NodeConfigure $request): int
     {
-        foreach ($request->members as $member) {
-            if ($member->ip === $request->ip) {
-                return $member->position + self::DOMAIN_OFFSET;
-            }
-        }
-
-        return self::DOMAIN_OFFSET;
+        return NodeState::selfOf($request)->position + self::DOMAIN_OFFSET;
     }
 
     /**

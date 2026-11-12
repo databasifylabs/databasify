@@ -141,9 +141,8 @@ final readonly class ConfigCommands
         }
 
         $left = $this->numberOf($field, $live);
-        $right = $this->numberOf($field, $wanted);
 
-        return $left !== null && $right !== null && $left === $right;
+        return $left !== null && $left === $this->numberOf($field, $wanted);
     }
 
     private function numberOf(EngineField $field, string $value): ?float
