@@ -1,0 +1,128 @@
+{
+  "10.11": {
+    "PasswordEncryptions": [
+      "mysql_native_password",
+      "ed25519"
+    ],
+    "DefaultPasswordEncryption": "mysql_native_password",
+    "ReservedUsers": [
+      "root",
+      "mysql",
+      "mariadb.sys",
+      "databasify_sst",
+      "databasify_repl",
+      "databasify_agent"
+    ],
+    "ReservedDatabases": [
+      "mysql",
+      "sys",
+      "performance_schema",
+      "information_schema",
+      "databasify"
+    ],
+    "Ports": {
+      "client": 25060,
+      "pool": null,
+      "peers": [
+        4444,
+        4567,
+        4568
+      ]
+    }
+  },
+  "11.4": {
+    "PasswordEncryptions": [
+      "mysql_native_password",
+      "ed25519"
+    ],
+    "DefaultPasswordEncryption": "mysql_native_password",
+    "ReservedUsers": [
+      "root",
+      "mysql",
+      "mariadb.sys",
+      "databasify_sst",
+      "databasify_repl",
+      "databasify_agent"
+    ],
+    "ReservedDatabases": [
+      "mysql",
+      "sys",
+      "performance_schema",
+      "information_schema",
+      "databasify"
+    ],
+    "Ports": {
+      "client": 25060,
+      "pool": null,
+      "peers": [
+        4444,
+        4567,
+        4568
+      ]
+    }
+  },
+  "11.8": {
+    "PasswordEncryptions": [
+      "mysql_native_password",
+      "ed25519",
+      "parsec"
+    ],
+    "DefaultPasswordEncryption": "mysql_native_password",
+    "ReservedUsers": [
+      "root",
+      "mysql",
+      "mariadb.sys",
+      "databasify_sst",
+      "databasify_repl",
+      "databasify_agent"
+    ],
+    "ReservedDatabases": [
+      "mysql",
+      "sys",
+      "performance_schema",
+      "information_schema",
+      "databasify"
+    ],
+    "Ports": {
+      "client": 25060,
+      "pool": null,
+      "peers": [
+        4444,
+        4567,
+        4568
+      ]
+    }
+  },
+  "12.3": {
+    "PasswordEncryptions": [
+      "mysql_native_password",
+      "ed25519",
+      "parsec"
+    ],
+    "DefaultPasswordEncryption": "mysql_native_password",
+    "ReservedUsers": [
+      "root",
+      "mysql",
+      "mariadb.sys",
+      "databasify_sst",
+      "databasify_repl",
+      "databasify_agent"
+    ],
+    "ReservedDatabases": [
+      "mysql",
+      "sys",
+      "performance_schema",
+      "information_schema",
+      "databasify"
+    ],
+    "Ports": {
+      "client": 25060,
+      "pool": null,
+      "peers": [
+        4444,
+        4567,
+        4568
+      ]
+    }
+  }
+}
