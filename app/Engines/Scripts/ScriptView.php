@@ -41,6 +41,7 @@ final readonly class ScriptView
     {
         return match ($engine) {
             'postgres' => new PostgresSql,
+            'mysql', 'mariadb' => new MySqlSql,
             default => throw new InvalidArgumentException("No script quoting for the {$engine} engine."),
         };
     }
