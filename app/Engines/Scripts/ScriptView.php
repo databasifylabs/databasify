@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Engines\Scripts;
 
 use App\Contracts\Engines\SqlQuoting;
+use App\Models\DatabaseNode;
 use Illuminate\Contracts\View\Factory;
 use InvalidArgumentException;
 
@@ -15,9 +16,11 @@ final readonly class ScriptView
     /**
      * @param  array<string, mixed>  $data
      */
-    public function render(string $engine, string $script, array $data = []): string
+    public function render(DatabaseNode $node, string $script, array $data = []): string
     {
-        return $this->views->make($this->viewOf($script), [...$data, 'sql' => $this->quotingFor($engine), 'sh' => new Shell])->render();
+        $database = $node->database;
+
+        return $this->views->make($this->viewOf($script), [...$data, 'line' => $database->version_line, 'sql' => $this->quotingFor($database->engine), 'sh' => new Shell])->render();
     }
 
     /**

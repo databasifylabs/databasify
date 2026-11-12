@@ -46,7 +46,7 @@ final readonly class Migration
             'MIGRATION_OWNER' => $request->owner,
             'MIGRATION_CONTINUOUS' => 'false',
             'MIGRATION_PUBLICATION' => '',
-            'COPY_SCRIPT' => base64_encode($this->views->render('postgres', 'postgres/migration/copy', $this->accounts->dataFor($node))),
+            'COPY_SCRIPT' => base64_encode($this->views->render($node, 'postgres/migration/copy', $this->accounts->dataFor($node))),
         ]);
 
         return new Done;

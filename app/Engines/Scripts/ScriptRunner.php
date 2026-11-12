@@ -29,7 +29,7 @@ final readonly class ScriptRunner implements EngineScripts
     public function run(DatabaseNode $node, string $script, array $data = [], ?string $user = null, int $timeout = 120, ?string $log = null, array $env = []): ScriptResult
     {
         $serverLog = $log === null ? null : $this->engine->openLog($node, $log);
-        $request = new RuntimeRun($this->views->render($node->database->engine, $script, $data), $env, $user, $timeout);
+        $request = new RuntimeRun($this->views->render($node, $script, $data), $env, $user, $timeout);
         $reply = $this->engine->sendInto($node, $request, null, $timeout + self::TRANSPORT_GRACE);
 
         if ($reply->exit !== 0) {
@@ -46,7 +46,7 @@ final readonly class ScriptRunner implements EngineScripts
 
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
     {
-        return $this->engine->send($node, new TaskStart($key, $this->views->render($node->database->engine, $script, $data), $env, $user));
+        return $this->engine->send($node, new TaskStart($key, $this->views->render($node, $script, $data), $env, $user));
     }
 
     public function phaseOf(DatabaseNode $node, string $key): ?string

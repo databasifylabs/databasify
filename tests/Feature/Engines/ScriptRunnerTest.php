@@ -53,10 +53,12 @@ it('reads the latest phase from a task log', function () {
 it('renders the real view in the fake', function () {
     $scripts = fakeScripts()->respond('testing/echo', ['said' => 'yes']);
 
-    $result = resolve(EngineScripts::class)->run(engineNode(), 'testing/echo', ['word' => "it's"]);
+    $node = engineNode();
+
+    $result = resolve(EngineScripts::class)->run($node, 'testing/echo', ['word' => "it's"]);
 
     expect($result->json()->string('said'))->toBe('yes');
-    $scripts->assertRan('testing/echo', fn (string $script): bool => $script === resolve(ScriptView::class)->render('postgres', 'testing/echo', ['word' => "it's"]));
+    $scripts->assertRan('testing/echo', fn (string $script): bool => $script === resolve(ScriptView::class)->render($node, 'testing/echo', ['word' => "it's"]));
 });
 
 it('passes values in the env, not in the script', function () {
@@ -80,3 +82,16 @@ it('reduces a psql statement failure to the server message', function () {
     expect(fn () => resolve(ScriptRunner::class)->run(engineNode(), 'testing/echo', ['word' => 'x']))
         ->toThrow(EngineError::class, 'ERROR:  role "x" already exists');
 });
+
+it('gives every script the version line so it can branch on it', function (string $line, string $expected) {
+    $node = engineNode();
+    $node->database->update(['version_line' => $line]);
+    $scripts = fakeScripts();
+
+    resolve(EngineScripts::class)->run($node->fresh(), 'testing/version');
+
+    $scripts->assertRan('testing/version', fn (string $script): bool => trim($script) === $expected);
+})->with([
+    'older line' => ['8.4', 'echo old'],
+    'newer line' => ['9.7', 'echo new'],
+]);

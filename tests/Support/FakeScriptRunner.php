@@ -100,6 +100,6 @@ final class FakeScriptRunner implements EngineScripts
      */
     private function record(DatabaseNode $node, string $script, array $data, array $env): void
     {
-        $this->runs[] = ['script' => $script, 'text' => $this->views->render($node->database->engine, $script, $data), 'data' => $data, 'env' => $env];
+        $this->runs[] = ['script' => $script, 'text' => $this->views->render($node, $script, $data), 'data' => $data, 'env' => $env];
     }
 }
