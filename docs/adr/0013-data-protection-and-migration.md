@@ -21,7 +21,7 @@ Point-in-time recovery and importing data from existing databases are core featu
       The restore runs as `postgres`, so untrusted extensions install, and then hands the restored schemas, tables (partitions included; owned sequences follow their table), views, sequences, routines, domains, enum and range types, collations, operators, text-search configurations and dictionaries, and large objects to the default user, one autocommitted `ALTER … OWNER` each (psql `\gexec`), so thousands of tables never hold all their locks at once. Extension members stay with `postgres`. Operator classes and families, conversions, foreign-data wrappers and foreign servers are out of scope and stay owned by `postgres`.
     - MySQL: mysqlsh copy plus a replication channel.
     - MariaDB: `mariadb-dump` plus a `CHANGE MASTER 'migration'` channel.
-    - MongoDB: MongoShake. Valkey and Redis: redis-shake.
+    - MongoDB: Percona ClusterSync for MongoDB (PCSM). Valkey and Redis: redis-shake.
 - **Migration sources:**
     - TLS: every engine encrypts the connection to the source and does not verify its certificate, like DigitalOcean's migration, which has no CA input. A source with a private or self-signed certificate therefore works.
     - PostgreSQL uses `sslmode=require`, MySQL `ssl-mode REQUIRED`, and Valkey and Redis `--tls --insecure` in the check. redis-shake (`tls = true`) never verifies the server certificate.
