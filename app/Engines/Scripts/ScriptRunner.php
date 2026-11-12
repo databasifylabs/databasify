@@ -29,7 +29,7 @@ final readonly class ScriptRunner implements EngineScripts
     public function run(DatabaseNode $node, string $script, array $data = [], ?string $user = null, int $timeout = 120, ?string $log = null, array $env = []): ScriptResult
     {
         $serverLog = $log === null ? null : $this->engine->openLog($node, $log);
-        $request = new RuntimeRun($this->views->render($node, $script, $data), $env, $user, $timeout);
+        $request = new RuntimeRun($this->views->render($node, $script, $data), $this->environmentOf($node, $env), $user, $timeout);
         $reply = $this->engine->sendInto($node, $request, null, $timeout + self::TRANSPORT_GRACE);
 
         if ($reply->exit !== 0) {
@@ -46,7 +46,7 @@ final readonly class ScriptRunner implements EngineScripts
 
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
     {
-        return $this->engine->send($node, new TaskStart($key, $this->views->render($node, $script, $data), $env, $user));
+        return $this->engine->send($node, new TaskStart($key, $this->views->render($node, $script, $data), $this->environmentOf($node, $env), $user));
     }
 
     public function phaseOf(DatabaseNode $node, string $key): ?string
@@ -54,6 +54,17 @@ final readonly class ScriptRunner implements EngineScripts
         $phases = array_filter(explode("\n", $this->engine->send($node, new TaskLog($key))->lines), fn (string $line): bool => str_starts_with($line, self::PHASE));
 
         return $phases === [] ? null : substr((string) end($phases), strlen(self::PHASE));
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     * @return array<string, string>
+     */
+    private function environmentOf(DatabaseNode $node, array $env): array
+    {
+        $container = ['DATABASIFY_ENGINE' => $node->database->engine, 'DATABASIFY_LINE' => $node->database->version_line, 'HOME' => '/root'];
+
+        return [...$container, ...array_diff_key($env, $container)];
     }
 
     private function failLog(?ServerLog $serverLog, string $stderr): void
