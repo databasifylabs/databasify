@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
+use App\Engines\Drivers\MariaDb\MariaDbDriver;
+use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Plugins\RegisterEngine;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +35,7 @@ class EngineServiceProvider extends ServiceProvider
             ->register();
 
         $this->engine('mysql', 'MySQL', self::APPLICATION)
+            ->driver(MySqlDriver::class)
             ->migrationSource(3306)
             ->connection(new ConnectionProfile('mysql', '?ssl-mode=REQUIRED', 'sslmode', 'REQUIRED', 'mysql -u {username} -p{password} -h {host} -P {port} -D {database} --ssl-mode=REQUIRED', null, true, self::SQL_ENV_KEYS, self::MYSQL_ENV_NOTE, 'With the MariaDB client, use --ssl --ssl-verify-server-cert=0 instead of --ssl-mode=REQUIRED. To verify the server, download the CA certificate and use --ssl-mode=VERIFY_IDENTITY --ssl-ca={ca}.'))
             ->environment('mysql')
@@ -50,6 +53,7 @@ class EngineServiceProvider extends ServiceProvider
             ->register();
 
         $this->engine('mariadb', 'MariaDB', self::APPLICATION)
+            ->driver(MariaDbDriver::class)
             ->migrationSource(3306)
             ->connection(new ConnectionProfile('mysql', '?ssl-mode=REQUIRED', 'sslmode', 'REQUIRED', 'mariadb -u {username} -p{password} -h {host} -P {port} -D {database} --ssl', null, true, self::SQL_ENV_KEYS, self::MYSQL_ENV_NOTE, 'If the client cannot verify the server through your password, add --ssl-verify-server-cert=0. To verify the server with the CA certificate, download it and add --ssl-ca={ca}.'))
             ->environment('mariadb')
