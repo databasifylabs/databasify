@@ -52,8 +52,8 @@ use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeScriptRunner;
-use Tests\Support\LocalScriptRunner;
 use Tests\Support\FakeServerConnection;
+use Tests\Support\LocalScriptRunner;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)

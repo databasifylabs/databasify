@@ -100,7 +100,7 @@ it('forces quorum only once the other nodes are confirmed down', function () {
 
     sendToGalera($this->node, new ClusterForceQuorum(true));
 
-    $this->scripts->assertRan('mariadb/cluster/force-quorum', fn (string $script): bool => str_contains($script, "pc.bootstrap=YES")
+    $this->scripts->assertRan('mariadb/cluster/force-quorum', fn (string $script): bool => str_contains($script, 'pc.bootstrap=YES')
         && str_contains($script, 'this node is already in a primary component')
         && str_contains($script, 'safe_to_bootstrap: 1'));
 });

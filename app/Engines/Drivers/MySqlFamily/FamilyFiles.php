@@ -46,11 +46,12 @@ final readonly class FamilyFiles
     }
 
     /**
+     * @param  list<string>  $argv
      * @param  list<array<string, mixed>>  $extra
      */
-    public static function manifestOf(MySqlFamilyEngine $engine, NodeConfigure $request, array $server, array $extra = []): string
+    public static function manifestOf(MySqlFamilyEngine $engine, NodeConfigure $request, array $argv, array $extra = []): string
     {
-        $server = ['name' => $engine->serverUnit(), 'argv' => $server, 'user' => 'mysql', 'restart' => 'always', 'restartSec' => '3s', 'stopSignal' => 'TERM', 'stopTimeout' => '10m0s', 'enabled' => true];
+        $server = ['name' => $engine->serverUnit(), 'argv' => $argv, 'user' => 'mysql', 'restart' => 'always', 'restartSec' => '3s', 'stopSignal' => 'TERM', 'stopTimeout' => '10m0s', 'enabled' => true];
 
         if ($request->archive === null) {
             return GoJson::indented(['processes' => [$server, ...$extra], 'schedules' => []]);

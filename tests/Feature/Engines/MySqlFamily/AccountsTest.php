@@ -132,7 +132,7 @@ it('grants replication on top of database access', function () {
 });
 
 it('drops a database after revoking it from every user, ignoring a missing grant', function () {
-    $this->local->reply("SELECT COALESCE(JSON_ARRAYAGG(User), JSON_ARRAY()) FROM mysql.db", '["a","b"]')
+    $this->local->reply('SELECT COALESCE(JSON_ARRAYAGG(User), JSON_ARRAY()) FROM mysql.db', '["a","b"]')
         ->reply("FROM 'a'@'%'", 'ERROR 1141 (42000) at line 1: There is no such grant defined for user \'a\' on host \'%\'');
 
     sendToFamily(familyNode('mysql', '8.4'), new DatabaseDrop('shop'));

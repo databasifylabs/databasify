@@ -94,7 +94,7 @@ it('checks a MySQL source with the Go readiness rules', function () {
         'localTables' => ['app' => 0, 'shop' => 4],
         'missingKeys' => ['app' => 2, 'shop' => 0],
         'gtidMode' => 'OFF',
-        'grants' => ["GRANT REPLICATION SLAVE ON *.* TO `m`@`%`"],
+        'grants' => ['GRANT REPLICATION SLAVE ON *.* TO `m`@`%`'],
         'localVersion' => '8.4.13',
         'roleEdgesReadable' => false,
     ]);
