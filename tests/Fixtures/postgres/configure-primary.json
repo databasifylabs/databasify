@@ -1,99 +1,99 @@
 {
-  "files": [
-    {
-      "content": "ttl: 30\nloop_wait: 10\nretry_timeout: 10\nmaximum_lag_on_failover: 1048576\nfailsafe_mode: true\npostgresql:\n  use_pg_rewind: true\n  use_slots: true\n  parameters:\n    compute_query_id: 'auto'\n    hot_standby: 'on'\n    max_replication_slots: '20'\n    max_wal_senders: '20'\n    password_encryption: 'scram-sha-256'\n    pg_stat_statements.track: 'top'\n    shared_preload_libraries: 'pg_stat_statements'\n    wal_keep_size: '1GB'\n    wal_level: 'logical'\n    wal_log_hints: 'on'\n",
-      "mode": 416,
-      "path": "/srv/postgres/conf/dcs.yml"
-    },
-    {
-      "content": "ETCD_NAME=10.0.0.2\nETCD_DATA_DIR=/srv/postgres/etcd\nETCD_LISTEN_CLIENT_URLS=http://10.0.0.2:2379,http://127.0.0.1:2379\nETCD_ADVERTISE_CLIENT_URLS=http://10.0.0.2:2379\nETCD_LISTEN_PEER_URLS=http://10.0.0.2:2380\nETCD_INITIAL_ADVERTISE_PEER_URLS=http://10.0.0.2:2380\nETCD_INITIAL_CLUSTER=10.0.0.1=http://10.0.0.1:2380,10.0.0.2=http://10.0.0.2:2380\nETCD_INITIAL_CLUSTER_STATE=existing\nETCD_INITIAL_CLUSTER_TOKEN=databasify-db-1\nETCD_MAX_LEARNERS=7\nETCD_AUTO_COMPACTION_MODE=periodic\nETCD_AUTO_COMPACTION_RETENTION=1h\nETCD_QUOTA_BACKEND_BYTES=2147483648\n",
-      "mode": 416,
-      "path": "/srv/postgres/conf/etcd.env"
-    },
-    {
-      "content": "scope: 'main'\nname: '10.0.0.2'\nrestapi:\n  listen: '0.0.0.0:8008'\n  connect_address: '10.0.0.2:8008'\n  authentication:\n    username: patroni\n    password: 'ag$ent'\netcd3:\n  hosts: '10.0.0.1:2379,10.0.0.2:2379,10.0.0.3:2379,10.0.0.4:2379'\nbootstrap:\n  dcs:\n    ttl: 30\n    loop_wait: 10\n    retry_timeout: 10\n    maximum_lag_on_failover: 1048576\n    failsafe_mode: true\n    postgresql:\n      use_pg_rewind: true\n      use_slots: true\n      parameters:\n        compute_query_id: 'auto'\n        hot_standby: 'on'\n        max_replication_slots: '20'\n        max_wal_senders: '20'\n        password_encryption: 'scram-sha-256'\n        pg_stat_statements.track: 'top'\n        shared_preload_libraries: 'pg_stat_statements'\n        wal_keep_size: '1GB'\n        wal_level: 'logical'\n        wal_log_hints: 'on'\n  initdb:\n    - encoding: UTF8\n    - data-checksums\npostgresql:\n  listen: '*:25060'\n  connect_address: '10.0.0.2:25060'\n  data_dir: '/srv/postgres/data'\n  bin_dir: '/usr/lib/postgresql/18/bin'\n  pgpass: '/srv/postgres/conf/pgpass'\n  use_unix_socket: true\n  use_unix_socket_repl: false\n  remove_data_directory_on_rewind_failure: true\n  remove_data_directory_on_diverged_timelines: true\n  authentication:\n    superuser:\n      username: postgres\n      password: 'adm''in'\n    replication:\n      username: replicator\n      password: 'rep\"l'\n    rewind:\n      username: postgres\n      password: 'adm''in'\n  parameters:\n    archive_command: 'pgbackrest --config=/srv/postgres/conf/pgbackrest.conf --stanza=main archive-push %p'\n    archive_mode: 'on'\n    archive_timeout: '60'\n    log_destination: 'stderr'\n    logging_collector: 'off'\n    ssl: 'on'\n    ssl_cert_file: '/srv/postgres/tls/server.crt'\n    ssl_key_file: '/srv/postgres/tls/server.key'\n    ssl_min_protocol_version: 'TLSv1.2'\n    statement_timeout: '5000'\n    unix_socket_directories: '/srv/postgres/run'\n  pg_hba:\n    - 'local all postgres peer'\n    - 'local all all scram-sha-256'\n    - 'host all all 127.0.0.1/32 scram-sha-256'\n    - 'host all all ::1/128 scram-sha-256'\n    - 'host replication replicator 127.0.0.1/32 scram-sha-256'\n    - 'host replication replicator ::1/128 scram-sha-256'\n    - 'hostssl replication replicator 0.0.0.0/0 scram-sha-256'\n    - 'hostssl all all 0.0.0.0/0 scram-sha-256'\ntags:\n  nofailover: false\n  noloadbalance: false\n  nosync: false\n  clonefrom: false\n",
-      "mode": 384,
-      "path": "/srv/postgres/conf/patroni.yml"
-    },
-    {
-      "content": "[global]\nrepo1-type=s3\nrepo1-storage-port=9000\nrepo1-s3-endpoint=s3.example.com\nrepo1-s3-bucket=bk\nrepo1-s3-region=us-east-1\nrepo1-s3-key=AK\nrepo1-s3-key-secret=S'K\nrepo1-s3-uri-style=path\nrepo1-path=/db/x\nrepo1-retention-full-type=time\nrepo1-retention-full=7\nrepo1-bundle=y\ncompress-type=zst\nprocess-max=2\nstart-fast=y\narchive-async=y\narchive-push-queue-max=4GiB\nspool-path=/srv/postgres/archive/spool\nlock-path=/srv/postgres/archive/lock\nlog-path=/srv/postgres/archive/log\nlog-level-console=warn\nlog-level-file=info\n\n[main]\npg1-path=/srv/postgres/data\npg1-port=25060\npg1-socket-path=/srv/postgres/run\n",
-      "mode": 384,
-      "path": "/srv/postgres/conf/pgbackrest.conf"
-    },
-    {
-      "content": "\"pgbouncer\" \"d989e044e5f68938a0973fac39fa940d7903d1a5303fd5245e40d071cdc6c071\"\n",
-      "mode": 384,
-      "path": "/srv/postgres/conf/pgbouncer-users.txt"
-    },
-    {
-      "content": "[databases]\npostgres = host=127.0.0.1 port=25060 dbname=postgres pool_size=2\n%include /srv/postgres/conf/pgbouncer-pools.ini\n\n[pgbouncer]\nlisten_addr = *\nlisten_port = 25061\nunix_socket_dir =\nauth_type = scram-sha-256\nauth_file = /srv/postgres/conf/pgbouncer-users.txt\nauth_user = pgbouncer\nauth_dbname = postgres\nauth_query = SELECT username, password FROM pgbouncer.get_auth($1)\nclient_tls_sslmode = require\nclient_tls_cert_file = /srv/postgres/tls/server.crt\nclient_tls_key_file = /srv/postgres/tls/server.key\nserver_tls_sslmode = require\nmax_client_conn = 5000\ndefault_pool_size = 16\nignore_startup_parameters = extra_float_digits,options\n",
-      "mode": 416,
-      "path": "/srv/postgres/conf/pgbouncer.ini"
-    }
-  ],
-  "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"databasify-postgres-locks\",\n      \"type\": \"oneshot\",\n      \"user\": \"postgres\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"pgrep -x postgres \\u003e /dev/null || rm -f /srv/postgres/run/.s.PGSQL.* /srv/postgres/data/postmaster.pid\"\n      ],\n      \"enabled\": true\n    },\n    {\n      \"name\": \"databasify-etcd\",\n      \"user\": \"postgres\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"set -a; . /srv/postgres/conf/etcd.env; for extra in /srv/postgres/conf/etcd-initial.env /srv/postgres/conf/etcd-force.env; do [ ! -f \\\"$extra\\\" ] || . \\\"$extra\\\"; done; set +a\\npeers() { awk -F \\\"'\\\" '/^  hosts: / { print $2 }' /srv/postgres/conf/patroni.yml 2\\u003e/dev/null | tr ',' '\\\\n' | grep -v \\\"^$ETCD_NAME:\\\"; }\\nif [ \\\"$ETCD_INITIAL_CLUSTER_STATE\\\" = new ] \\u0026\\u0026 [ ! -d \\\"$ETCD_DATA_DIR/member\\\" ]; then\\n    for endpoint in $(peers); do\\n        if timeout 10 etcdctl --endpoints=\\\"http://$endpoint\\\" member list 2\\u003e/dev/null | awk -F ', ' -v peer=\\\"$ETCD_INITIAL_ADVERTISE_PEER_URLS\\\" '$4 == peer { listed = 1 } END { exit !listed }'; then\\n            echo \\\"etcd on $ETCD_NAME lost its data while http://$endpoint still lists it, waiting until it is registered again\\\"\\n            exit 1\\n        fi\\n    done\\nfi\\nif [ \\\"$ETCD_INITIAL_CLUSTER_STATE\\\" = existing ] \\u0026\\u0026 [ ! -d \\\"$ETCD_DATA_DIR/member\\\" ]; then\\n    for endpoint in $(peers); do\\n        cluster=$(timeout 10 etcdctl --endpoints=\\\"http://$endpoint\\\" member list 2\\u003e/dev/null | awk -F ', ' -v peer=\\\"$ETCD_INITIAL_ADVERTISE_PEER_URLS\\\" -v self=\\\"$ETCD_NAME\\\" '{ name = ($4 == peer) ? self : $3; printf \\\"%s%s=%s\\\", separator, name, $4; separator = \\\",\\\" }')\\n        if [ -n \\\"$cluster\\\" ]; then\\n            export ETCD_INITIAL_CLUSTER=\\\"$cluster\\\"\\n            break\\n        fi\\n    done\\nfi\\nexec /usr/local/bin/etcd\"\n      ],\n      \"enabled\": false\n    },\n    {\n      \"name\": \"databasify-patroni\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres-locks\",\n        \"databasify-etcd\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"SIGTERM\",\n      \"stopTimeout\": \"2m\",\n      \"argv\": [\n        \"/usr/bin/patroni\",\n        \"/srv/postgres/conf/patroni.yml\"\n      ],\n      \"enabled\": false\n    },\n    {\n      \"name\": \"databasify-pgbouncer\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres\",\n        \"databasify-patroni\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"argv\": [\n        \"/usr/sbin/pgbouncer\",\n        \"/srv/postgres/conf/pgbouncer.ini\"\n      ],\n      \"enabled\": false\n    }\n  ],\n  \"schedules\": [\n    {\n      \"name\": \"databasify-postgres-backup\",\n      \"onCalendar\": \"03:00\",\n      \"timeout\": \"24h\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"backup\"\n      ]\n    }\n  ]\n}",
-  "request": {
-    "clustered": true,
-    "readOnly": false,
-    "ip": "10.0.0.2",
-    "databaseId": "db-1",
-    "members": [
-      {
-        "ip": "10.0.0.1",
-        "position": 1,
-        "voting": true,
-        "cpus": 2,
-        "memoryMb": 4096,
-        "diskGb": 80
-      },
-      {
-        "ip": "10.0.0.2",
-        "position": 2,
-        "voting": true,
-        "cpus": 2,
-        "memoryMb": 4096,
-        "diskGb": 80
-      },
-      {
-        "ip": "10.0.0.3",
-        "position": 3,
-        "voting": true,
-        "cpus": 2,
-        "memoryMb": 4096,
-        "diskGb": 80
-      },
-      {
-        "ip": "10.0.0.4",
-        "position": 4,
-        "voting": false,
-        "cpus": 2,
-        "memoryMb": 4096,
-        "diskGb": 80
-      }
+    "files": [
+        {
+            "content": "ttl: 30\nloop_wait: 10\nretry_timeout: 10\nmaximum_lag_on_failover: 1048576\nfailsafe_mode: true\npostgresql:\n  use_pg_rewind: true\n  use_slots: true\n  parameters:\n    compute_query_id: 'auto'\n    hot_standby: 'on'\n    max_replication_slots: '20'\n    max_wal_senders: '20'\n    password_encryption: 'scram-sha-256'\n    pg_stat_statements.track: 'top'\n    shared_preload_libraries: 'pg_stat_statements'\n    wal_keep_size: '1GB'\n    wal_level: 'logical'\n    wal_log_hints: 'on'\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/dcs.yml"
+        },
+        {
+            "content": "ETCD_NAME=10.0.0.2\nETCD_DATA_DIR=/srv/postgres/etcd\nETCD_LISTEN_CLIENT_URLS=http://10.0.0.2:2379,http://127.0.0.1:2379\nETCD_ADVERTISE_CLIENT_URLS=http://10.0.0.2:2379\nETCD_LISTEN_PEER_URLS=http://10.0.0.2:2380\nETCD_INITIAL_ADVERTISE_PEER_URLS=http://10.0.0.2:2380\nETCD_INITIAL_CLUSTER=10.0.0.1=http://10.0.0.1:2380,10.0.0.2=http://10.0.0.2:2380\nETCD_INITIAL_CLUSTER_STATE=existing\nETCD_INITIAL_CLUSTER_TOKEN=databasify-db-1\nETCD_MAX_LEARNERS=7\nETCD_AUTO_COMPACTION_MODE=periodic\nETCD_AUTO_COMPACTION_RETENTION=1h\nETCD_QUOTA_BACKEND_BYTES=2147483648\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/etcd.env"
+        },
+        {
+            "content": "scope: 'main'\nname: '10.0.0.2'\nrestapi:\n  listen: '0.0.0.0:8008'\n  connect_address: '10.0.0.2:8008'\n  authentication:\n    username: patroni\n    password: 'ag$ent'\netcd3:\n  hosts: '10.0.0.1:2379,10.0.0.2:2379,10.0.0.3:2379,10.0.0.4:2379'\nbootstrap:\n  dcs:\n    ttl: 30\n    loop_wait: 10\n    retry_timeout: 10\n    maximum_lag_on_failover: 1048576\n    failsafe_mode: true\n    postgresql:\n      use_pg_rewind: true\n      use_slots: true\n      parameters:\n        compute_query_id: 'auto'\n        hot_standby: 'on'\n        max_replication_slots: '20'\n        max_wal_senders: '20'\n        password_encryption: 'scram-sha-256'\n        pg_stat_statements.track: 'top'\n        shared_preload_libraries: 'pg_stat_statements'\n        wal_keep_size: '1GB'\n        wal_level: 'logical'\n        wal_log_hints: 'on'\n  initdb:\n    - encoding: UTF8\n    - data-checksums\npostgresql:\n  listen: '*:25060'\n  connect_address: '10.0.0.2:25060'\n  data_dir: '/srv/postgres/data'\n  bin_dir: '/usr/lib/postgresql/18/bin'\n  pgpass: '/srv/postgres/conf/pgpass'\n  use_unix_socket: true\n  use_unix_socket_repl: false\n  remove_data_directory_on_rewind_failure: true\n  remove_data_directory_on_diverged_timelines: true\n  authentication:\n    superuser:\n      username: postgres\n      password: 'adm''in'\n    replication:\n      username: replicator\n      password: 'rep\"l'\n    rewind:\n      username: postgres\n      password: 'adm''in'\n  parameters:\n    archive_command: 'pgbackrest --config=/srv/postgres/conf/pgbackrest.conf --stanza=main archive-push %p'\n    archive_mode: 'on'\n    archive_timeout: '60'\n    log_destination: 'stderr'\n    logging_collector: 'off'\n    ssl: 'on'\n    ssl_cert_file: '/srv/postgres/tls/server.crt'\n    ssl_key_file: '/srv/postgres/tls/server.key'\n    ssl_min_protocol_version: 'TLSv1.2'\n    statement_timeout: '5000'\n    unix_socket_directories: '/srv/postgres/run'\n  pg_hba:\n    - 'local all postgres peer'\n    - 'local all all scram-sha-256'\n    - 'host all all 127.0.0.1/32 scram-sha-256'\n    - 'host all all ::1/128 scram-sha-256'\n    - 'host replication replicator 127.0.0.1/32 scram-sha-256'\n    - 'host replication replicator ::1/128 scram-sha-256'\n    - 'hostssl replication replicator 0.0.0.0/0 scram-sha-256'\n    - 'hostssl all all 0.0.0.0/0 scram-sha-256'\ntags:\n  nofailover: false\n  noloadbalance: false\n  nosync: false\n  clonefrom: false\n",
+            "mode": 384,
+            "path": "/srv/postgres/conf/patroni.yml"
+        },
+        {
+            "content": "[global]\nrepo1-type=s3\nrepo1-storage-port=9000\nrepo1-s3-endpoint=s3.example.com\nrepo1-s3-bucket=bk\nrepo1-s3-region=us-east-1\nrepo1-s3-key=AK\nrepo1-s3-key-secret=S'K\nrepo1-s3-uri-style=path\nrepo1-path=/db/x\nrepo1-retention-full-type=time\nrepo1-retention-full=7\nrepo1-bundle=y\ncompress-type=zst\nprocess-max=2\nstart-fast=y\narchive-async=y\narchive-push-queue-max=4GiB\nspool-path=/srv/postgres/archive/spool\nlock-path=/srv/postgres/archive/lock\nlog-path=/srv/postgres/archive/log\nlog-level-console=warn\nlog-level-file=info\n\n[main]\npg1-path=/srv/postgres/data\npg1-port=25060\npg1-socket-path=/srv/postgres/run\n",
+            "mode": 384,
+            "path": "/srv/postgres/conf/pgbackrest.conf"
+        },
+        {
+            "content": "\"pgbouncer\" \"d989e044e5f68938a0973fac39fa940d7903d1a5303fd5245e40d071cdc6c071\"\n",
+            "mode": 384,
+            "path": "/srv/postgres/conf/pgbouncer-users.txt"
+        },
+        {
+            "content": "[databases]\npostgres = host=127.0.0.1 port=25060 dbname=postgres pool_size=2\n%include /srv/postgres/conf/pgbouncer-pools.ini\n\n[pgbouncer]\nlisten_addr = *\nlisten_port = 25061\nunix_socket_dir =\nauth_type = scram-sha-256\nauth_file = /srv/postgres/conf/pgbouncer-users.txt\nauth_user = pgbouncer\nauth_dbname = postgres\nauth_query = SELECT username, password FROM pgbouncer.get_auth($1)\nclient_tls_sslmode = require\nclient_tls_cert_file = /srv/postgres/tls/server.crt\nclient_tls_key_file = /srv/postgres/tls/server.key\nserver_tls_sslmode = require\nmax_client_conn = 5000\ndefault_pool_size = 16\nignore_startup_parameters = extra_float_digits,options\n",
+            "mode": 416,
+            "path": "/srv/postgres/conf/pgbouncer.ini"
+        }
     ],
-    "settings": {
-      "statement_timeout": "5000",
-      "wal_level": "logical"
-    },
-    "secrets": {
-      "admin": "adm'in",
-      "replication": "rep\"l",
-      "agent": "ag$ent"
-    },
-    "archive": {
-      "storage": {
-        "endpoint": "https://s3.example.com:9000",
-        "bucket": "bk",
-        "region": "us-east-1",
-        "accessKey": "AK",
-        "secretKey": "S'K",
-        "pathStyle": true,
-        "verifyTls": true,
-        "path": "/db/x/"
-      },
-      "retentionDays": 7,
-      "backupHour": 3
-    },
-    "primary": null
-  }
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"databasify-postgres-locks\",\n      \"type\": \"oneshot\",\n      \"user\": \"postgres\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"pgrep -x postgres \\u003e /dev/null || rm -f /srv/postgres/run/.s.PGSQL.* /srv/postgres/data/postmaster.pid\"\n      ],\n      \"enabled\": true\n    },\n    {\n      \"name\": \"databasify-etcd\",\n      \"user\": \"postgres\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"argv\": [\n        \"sh\",\n        \"-c\",\n        \"set -a; . /srv/postgres/conf/etcd.env; for extra in /srv/postgres/conf/etcd-initial.env /srv/postgres/conf/etcd-force.env; do [ ! -f \\\"$extra\\\" ] || . \\\"$extra\\\"; done; set +a\\npeers() { awk -F \\\"'\\\" '/^  hosts: / { print $2 }' /srv/postgres/conf/patroni.yml 2\\u003e/dev/null | tr ',' '\\\\n' | grep -v \\\"^$ETCD_NAME:\\\"; }\\nif [ \\\"$ETCD_INITIAL_CLUSTER_STATE\\\" = new ] \\u0026\\u0026 [ ! -d \\\"$ETCD_DATA_DIR/member\\\" ]; then\\n    for endpoint in $(peers); do\\n        if timeout 10 etcdctl --endpoints=\\\"http://$endpoint\\\" member list 2\\u003e/dev/null | awk -F ', ' -v peer=\\\"$ETCD_INITIAL_ADVERTISE_PEER_URLS\\\" '$4 == peer { listed = 1 } END { exit !listed }'; then\\n            echo \\\"etcd on $ETCD_NAME lost its data while http://$endpoint still lists it, waiting until it is registered again\\\"\\n            exit 1\\n        fi\\n    done\\nfi\\nif [ \\\"$ETCD_INITIAL_CLUSTER_STATE\\\" = existing ] \\u0026\\u0026 [ ! -d \\\"$ETCD_DATA_DIR/member\\\" ]; then\\n    for endpoint in $(peers); do\\n        cluster=$(timeout 10 etcdctl --endpoints=\\\"http://$endpoint\\\" member list 2\\u003e/dev/null | awk -F ', ' -v peer=\\\"$ETCD_INITIAL_ADVERTISE_PEER_URLS\\\" -v self=\\\"$ETCD_NAME\\\" '{ name = ($4 == peer) ? self : $3; printf \\\"%s%s=%s\\\", separator, name, $4; separator = \\\",\\\" }')\\n        if [ -n \\\"$cluster\\\" ]; then\\n            export ETCD_INITIAL_CLUSTER=\\\"$cluster\\\"\\n            break\\n        fi\\n    done\\nfi\\nexec /usr/local/bin/etcd\"\n      ],\n      \"enabled\": false\n    },\n    {\n      \"name\": \"databasify-patroni\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres-locks\",\n        \"databasify-etcd\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"SIGTERM\",\n      \"stopTimeout\": \"2m\",\n      \"argv\": [\n        \"/usr/bin/patroni\",\n        \"/srv/postgres/conf/patroni.yml\"\n      ],\n      \"enabled\": false\n    },\n    {\n      \"name\": \"databasify-pgbouncer\",\n      \"user\": \"postgres\",\n      \"after\": [\n        \"databasify-postgres\",\n        \"databasify-patroni\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"argv\": [\n        \"/usr/sbin/pgbouncer\",\n        \"/srv/postgres/conf/pgbouncer.ini\"\n      ],\n      \"enabled\": false\n    }\n  ],\n  \"schedules\": [\n    {\n      \"name\": \"databasify-postgres-backup\",\n      \"onCalendar\": \"03:00\",\n      \"timeout\": \"24h\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"backup\"\n      ]\n    }\n  ]\n}",
+    "request": {
+        "clustered": true,
+        "readOnly": false,
+        "ip": "10.0.0.2",
+        "databaseId": "db-1",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.2",
+                "position": 2,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.3",
+                "position": 3,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.4",
+                "position": 4,
+                "voting": false,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            }
+        ],
+        "settings": {
+            "statement_timeout": "5000",
+            "wal_level": "logical"
+        },
+        "secrets": {
+            "admin": "adm'in",
+            "replication": "rep\"l",
+            "agent": "ag$ent"
+        },
+        "archive": {
+            "storage": {
+                "endpoint": "https://s3.example.com:9000",
+                "bucket": "bk",
+                "region": "us-east-1",
+                "accessKey": "AK",
+                "secretKey": "S'K",
+                "pathStyle": true,
+                "verifyTls": true,
+                "path": "/db/x/"
+            },
+            "retentionDays": 7,
+            "backupHour": 3
+        },
+        "primary": null
+    }
 }
