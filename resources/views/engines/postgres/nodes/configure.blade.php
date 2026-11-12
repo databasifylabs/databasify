@@ -14,7 +14,7 @@ changed=false
 pool_size=$(default_pool_size)
 while IFS=$'\t' read -r path mode content; do
     [ -z "$path" ] && continue
-    if printf '%s' "$content" | base64 -d | sed "s/@@DEFAULT_POOL_SIZE@@/$pool_size/" | write_file "$path" "$mode"; then
+    if printf '%s' "$content" | base64 -d | sed "s/__DEFAULT_POOL_SIZE__/$pool_size/" | write_file "$path" "$mode"; then
         changed=true
     fi
 done < <(jq -r '.[] | [.path, .mode, .content] | @tsv' <<< "$FILES")

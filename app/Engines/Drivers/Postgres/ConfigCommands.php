@@ -6,8 +6,7 @@ namespace App\Engines\Drivers\Postgres;
 
 use App\Contracts\Engines\EngineScripts;
 use App\Engines\Data\EngineField;
-use App\Engines\EngineClient;
-use App\Engines\Requests\FilePut;
+use App\Engines\Drivers\NodeState;
 use App\Engines\Requests\NodeConfigure;
 use App\Engines\Responses\ConfigFields;
 use App\Engines\Responses\ConfigShow;
@@ -22,7 +21,7 @@ final readonly class ConfigCommands
 
     public function __construct(
         private EngineScripts $scripts,
-        private EngineClient $engine,
+        private NodeState $state,
         private Accounts $accounts,
         private Configuration $configuration,
     ) {}
@@ -66,8 +65,8 @@ final readonly class ConfigCommands
         $request = $this->configuration->savedRequestOf($node) ?? throw new EngineBusy('busy', 'run node configure first');
         $catalog = $this->configuration->catalogOf($node);
         $previous = $this->tunedOf($node, $request);
-        $tuned = $catalog->tuned($this->configuration->selfOf($request));
-        $this->saveTuned($node, $tuned);
+        $tuned = $catalog->tuned(NodeState::selfOf($request));
+        $this->state->saveTuned($node, Configuration::TUNED_STATE, $tuned);
         $this->configuration->configure($node, $request);
         $this->sync($node);
         $this->apply($node);
@@ -80,23 +79,6 @@ final readonly class ConfigCommands
      */
     private function tunedOf(DatabaseNode $node, NodeConfigure $request): array
     {
-        $saved = $this->configuration->savedTunedOf($node);
-
-        if ($saved !== null) {
-            return $saved;
-        }
-
-        $tuned = $this->configuration->catalogOf($node)->tuned($this->configuration->selfOf($request));
-        $this->saveTuned($node, $tuned);
-
-        return $tuned;
-    }
-
-    /**
-     * @param  array<string, string>  $tuned
-     */
-    private function saveTuned(DatabaseNode $node, array $tuned): void
-    {
-        $this->engine->send($node, new FilePut(Configuration::TUNED_STATE, $this->configuration->tunedJsonOf($tuned), 0o600, null));
+        return $this->state->tunedOrNewOf($node, Configuration::TUNED_STATE, $this->configuration->catalogOf($node), $request);
     }
 }

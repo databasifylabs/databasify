@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\Engines\Drivers\GoJson;
 use App\Engines\Requests\NodeConfigure;
 
 final readonly class PostgresManifest
@@ -64,7 +65,7 @@ SH;
             ]];
         }
 
-        return self::goJson($manifest);
+        return GoJson::indented($manifest);
     }
 
     /**
@@ -116,16 +117,5 @@ SH;
         unset($process['argv'], $process['enabled']);
 
         return [...$process, 'stopSignal' => $signal, 'stopTimeout' => self::STOP_TIMEOUT, 'argv' => $argv, 'enabled' => $enabled];
-    }
-
-    /**
-     * @param  array<string, mixed>  $value
-     */
-    private static function goJson(array $value): string
-    {
-        $json = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $twoSpaces = (string) preg_replace_callback('/^( +)/m', fn (array $match): string => str_repeat(' ', intdiv(strlen($match[1]), 2)), $json);
-
-        return strtr($twoSpaces, ['<' => '\u003c', '>' => '\u003e', '&' => '\u0026']);
     }
 }

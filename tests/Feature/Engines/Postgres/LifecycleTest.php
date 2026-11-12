@@ -22,16 +22,6 @@ beforeEach(function () {
     $this->node = engineNode();
 });
 
-function selfSignedPair(): array
-{
-    $key = openssl_pkey_new(['private_key_bits' => 2048]);
-    $certificate = openssl_csr_sign(openssl_csr_new(['commonName' => 'node'], $key), null, $key, 1);
-    openssl_x509_export($certificate, $pem);
-    openssl_pkey_export($key, $keyPem);
-
-    return [$pem, $keyPem];
-}
-
 it('starts, wakes and restarts the node through its units', function () {
     $client = resolve(EngineClient::class);
     $client->send($this->node, new NodeStart);

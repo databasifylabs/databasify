@@ -53,6 +53,7 @@ use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeScriptRunner;
 use Tests\Support\FakeServerConnection;
+use Tests\Support\LocalScriptRunner;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -128,9 +129,9 @@ function respondToFileGet(FakeServerConnection $ssh, string $path, ?string $cont
     );
 }
 
-function goFixture(string $name): mixed
+function goFixture(string $name, string $engine = 'postgres'): mixed
 {
-    return json_decode((string) file_get_contents(base_path("tests/Fixtures/postgres/{$name}")), true);
+    return json_decode((string) file_get_contents(base_path("tests/Fixtures/{$engine}/{$name}")), true);
 }
 
 function fakeScripts(): FakeScriptRunner
@@ -139,6 +140,27 @@ function fakeScripts(): FakeScriptRunner
     app()->instance(EngineScripts::class, $fake);
 
     return $fake;
+}
+
+/**
+ * @return array{string, string}
+ */
+function selfSignedPair(): array
+{
+    $key = openssl_pkey_new(['private_key_bits' => 2048]);
+    $certificate = openssl_csr_sign(openssl_csr_new(['commonName' => 'node'], $key), null, $key, 1);
+    openssl_x509_export($certificate, $pem);
+    openssl_pkey_export($key, $keyPem);
+
+    return [$pem, $keyPem];
+}
+
+function localScripts(): LocalScriptRunner
+{
+    $local = resolve(LocalScriptRunner::class);
+    app()->instance(EngineScripts::class, $local);
+
+    return $local;
 }
 
 function fakeSsh(): FakeServerConnection

@@ -1,0 +1,69 @@
+{
+    "files": [
+        {
+            "content": "[mysqld]\ndatadir=/srv/mysql/data\nsocket=/srv/mysql/run/mysqld.sock\npid-file=/srv/mysql/run/mysqld.pid\nport=25060\nbind-address=*\nreport_host=10.0.0.4\nserver_id=167772165\ngtid_mode=ON\nenforce_gtid_consistency=ON\nlog_bin=binlog\nbinlog_expire_logs_seconds=604800\nssl_ca=/srv/mysql/tls/ca.crt\nssl_cert=/srv/mysql/tls/server.crt\nssl_key=/srv/mysql/tls/server.key\ntls_version=TLSv1.2,TLSv1.3\nplugin-load-add=mysql_clone.so\nperformance_schema=ON\nperformance-schema-consumer-statements-digest=ON\nmysql_native_password=ON\nsuper_read_only=ON\nreplica_parallel_workers=4\nback_log=256\ninnodb_buffer_pool_size=2560M\ninnodb_io_capacity=2000\ninnodb_io_capacity_max=4000\ninnodb_log_buffer_size=16M\ninnodb_open_files=4000\ninnodb_page_cleaners=1\ninnodb_parallel_read_threads=1\ninnodb_purge_threads=1\ninnodb_read_io_threads=4\ninnodb_redo_log_capacity=640M\ninnodb_write_io_threads=4\nmax_connections=256\nopen_files_limit=65536\ntable_open_cache=4000\ntable_open_cache_instances=2\ntemptable_max_ram=122M\nthread_cache_size=10\n!includedir /srv/mysql/conf/conf.d\n",
+            "mode": 384,
+            "path": "/srv/mysql/conf/my.cnf"
+        },
+        {
+            "content": "[client]\nuser=root\npassword=adm'in\\x\nsocket=/srv/mysql/run/mysqld.sock\n",
+            "mode": 384,
+            "path": "/srv/mysql/conf/admin.cnf"
+        },
+        {
+            "content": "[client]\nuser=databasify_agent\npassword=ag$ent\nsocket=/srv/mysql/run/mysqld.sock\n\n[xtrabackup]\ndatadir=/srv/mysql/data\n",
+            "mode": 384,
+            "path": "/srv/mysql/conf/agent.cnf"
+        }
+    ],
+    "line": "8.4",
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"mysql-server\",\n      \"argv\": [\n        \"/usr/sbin/mysqld\",\n        \"--defaults-file=/srv/mysql/conf/my.cnf\"\n      ],\n      \"user\": \"mysql\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"10m0s\",\n      \"enabled\": true\n    }\n  ],\n  \"schedules\": []\n}",
+    "request": {
+        "clustered": true,
+        "readOnly": true,
+        "ip": "10.0.0.4",
+        "databaseId": "db-1",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.2",
+                "position": 2,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.3",
+                "position": 3,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.4",
+                "position": 4,
+                "voting": false,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            }
+        ],
+        "settings": {},
+        "secrets": {
+            "admin": "adm'in\\x",
+            "replication": "rep\"l",
+            "agent": "ag$ent"
+        },
+        "archive": null,
+        "primary": "10.0.0.1"
+    }
+}

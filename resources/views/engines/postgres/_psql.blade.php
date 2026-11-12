@@ -1,20 +1,5 @@
-exec 3>&1
+@include('engines._runtime')
 PG_PORT={!! $sh->arg((string) $port) !!}
-
-databasify_fail() {
-    printf 'DATABASIFY_ERROR %s\n%s\n' "$1" "$2" >&3
-    printf '%s\n' "$2" >&2
-    exit 1
-}
-
-phase() {
-    printf 'DATABASIFY_PHASE %s\n' "$1"
-}
-
-fail_task() {
-    printf '%s\n' "$1" >&2
-    exit 1
-}
 
 pg() {
     local database=$1 script name errors output status getenv=''
@@ -48,10 +33,6 @@ pg_failed() {
     esac
 }
 
-result() {
-    printf 'DATABASIFY_RESULT %s\n' "$1"
-}
-
 pg_try() {
     local database=$1 errors
     errors=$(mktemp)
@@ -64,32 +45,8 @@ pg_try() {
     rm -f "$errors"
 }
 
-unit_active() {
-    databasify ctl is-active --quiet "$1" 2> /dev/null
-}
-
-unit_do() {
-    local output
-    output=$(databasify ctl "$@" 2>&1) || databasify_fail internal "$1 ${*:2}: $output"
-}
-
 clustered() {
     [ -e /srv/postgres/conf/patroni.yml ] && [ ! -e /srv/postgres/conf/postgresql.conf ]
-}
-
-wait_until() {
-    local seconds=$1 every=$2 deadline
-    shift 2
-    deadline=$(( $(date +%s) + seconds ))
-    while true; do
-        if "$@"; then
-            return 0
-        fi
-        if [ "$(date +%s)" -ge "$deadline" ]; then
-            return 1
-        fi
-        sleep "$every"
-    done
 }
 
 patroni_state() {

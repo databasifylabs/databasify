@@ -1,0 +1,86 @@
+{
+    "files": [
+        {
+            "content": "[mysqld]\ndatadir=/srv/mariadb/data\nsocket=/srv/mariadb/run/mariadbd.sock\npid-file=/srv/mariadb/run/mariadbd.pid\nport=25060\nbind-address=*\nserver_id=1674929645\ngtid_domain_id=12\nlog_bin=binlog\nlog_slave_updates=ON\nbinlog_format=ROW\nbinlog_expire_logs_seconds=604800\nssl_ca=/srv/mariadb/tls/ca.crt\nssl_cert=/srv/mariadb/tls/server.crt\nssl_key=/srv/mariadb/tls/server.key\ntls_version=TLSv1.2,TLSv1.3\nplugin_load_add=auth_ed25519\nperformance_schema=ON\nperformance_schema_digests_size=10000\nplugin_load_add=auth_parsec\nwsrep_on=ON\nwsrep_provider=/usr/lib/galera/libgalera_smm.so\nwsrep_cluster_name=3f1c2b9e0000400080001234567890ab\nwsrep_cluster_address=gcomm://10.0.0.1,10.0.0.2,10.0.0.3\nwsrep_node_address=10.0.0.2\nwsrep_node_name=10.0.0.2\nwsrep_node_incoming_address=10.0.0.2:25060\nwsrep_sst_method=mariabackup\nwsrep_sst_auth=databasify_sst:rep\"l\nwsrep_gtid_mode=ON\nwsrep_gtid_domain_id=1\nwsrep_provider_options=\"socket.ssl_key=/srv/mariadb/tls/server.key;socket.ssl_cert=/srv/mariadb/tls/server.crt;socket.ssl_ca=/srv/mariadb/tls/ca.crt;gcache.size=1G\"\ninnodb_autoinc_lock_mode=2\ninnodb_force_primary_key=ON\nread_only=ON\nback_log=256\ninnodb_buffer_pool_size=2560M\ninnodb_io_capacity=2000\ninnodb_io_capacity_max=4000\ninnodb_log_buffer_size=16M\ninnodb_log_file_size=640M\ninnodb_open_files=4000\ninnodb_purge_threads=1\ninnodb_read_io_threads=4\ninnodb_write_io_threads=4\nmax_connections=256\nopen_files_limit=65536\ntable_open_cache=4000\ntable_open_cache_instances=2\nthread_cache_size=10\nwait_timeout=600\n\n[sst]\nssl-mode=VERIFY_CA\n",
+            "mode": 384,
+            "path": "/srv/mariadb/conf/my.cnf"
+        },
+        {
+            "content": "[client]\nuser=root\npassword=adm'in\\x\nsocket=/srv/mariadb/run/mariadbd.sock\n",
+            "mode": 384,
+            "path": "/srv/mariadb/conf/admin.cnf"
+        },
+        {
+            "content": "[client]\nuser=databasify_agent\npassword=ag$ent\nsocket=/srv/mariadb/run/mariadbd.sock\n\n[mariadb-backup]\ndatadir=/srv/mariadb/data\n",
+            "mode": 384,
+            "path": "/srv/mariadb/conf/agent.cnf"
+        }
+    ],
+    "init": "FLUSH PRIVILEGES;\nALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('adm''in\\\\x') OR unix_socket;\nCREATE USER 'databasify_sst'@'localhost' IDENTIFIED BY 'rep\"l';\nGRANT RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR ON *.* TO 'databasify_sst'@'localhost';\n",
+    "line": "11.8",
+    "manifest": "{\n  \"processes\": [\n    {\n      \"name\": \"mariadb-server\",\n      \"argv\": [\n        \"/usr/sbin/mariadbd\",\n        \"--defaults-file=/srv/mariadb/conf/my.cnf\"\n      ],\n      \"user\": \"mysql\",\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"10m0s\",\n      \"enabled\": true\n    },\n    {\n      \"name\": \"mariadb-binlog-stream\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"archive-stream\"\n      ],\n      \"after\": [\n        \"mariadb-server\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"10s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"10s\",\n      \"enabled\": true\n    },\n    {\n      \"name\": \"mariadb-cluster-watch\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"cluster-watch\"\n      ],\n      \"after\": [\n        \"mariadb-server\"\n      ],\n      \"restart\": \"always\",\n      \"restartSec\": \"3s\",\n      \"stopSignal\": \"TERM\",\n      \"stopTimeout\": \"10s\",\n      \"enabled\": true\n    }\n  ],\n  \"schedules\": [\n    {\n      \"name\": \"mariadb-binlog-ship\",\n      \"every\": \"1m0s\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"archive-ship\"\n      ],\n      \"timeout\": \"1h0m0s\"\n    },\n    {\n      \"name\": \"mariadb-backup\",\n      \"onCalendar\": \"03:00\",\n      \"argv\": [\n        \"/usr/local/bin/databasify\",\n        \"engine-task\",\n        \"backup\"\n      ],\n      \"timeout\": \"24h0m0s\"\n    }\n  ]\n}",
+    "newCluster": false,
+    "request": {
+        "clustered": true,
+        "readOnly": false,
+        "ip": "10.0.0.2",
+        "databaseId": "3f1c2b9e-0000-4000-8000-1234567890ab",
+        "members": [
+            {
+                "ip": "10.0.0.1",
+                "position": 1,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.2",
+                "position": 2,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.3",
+                "position": 3,
+                "voting": true,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            },
+            {
+                "ip": "10.0.0.4",
+                "position": 4,
+                "voting": false,
+                "cpus": 2,
+                "memoryMb": 4096,
+                "diskGb": 80
+            }
+        ],
+        "settings": {
+            "wait_timeout": "600"
+        },
+        "secrets": {
+            "admin": "adm'in\\x",
+            "replication": "rep\"l",
+            "agent": "ag$ent"
+        },
+        "archive": {
+            "storage": {
+                "endpoint": "https://s3.example.com:9000",
+                "bucket": "bk",
+                "region": "us-east-1",
+                "accessKey": "AK",
+                "secretKey": "S'K",
+                "pathStyle": true,
+                "verifyTls": true,
+                "path": "/db/x/"
+            },
+            "retentionDays": 7,
+            "backupHour": 3
+        },
+        "primary": "10.0.0.1"
+    }
+}

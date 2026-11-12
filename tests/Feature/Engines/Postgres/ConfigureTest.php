@@ -28,10 +28,11 @@ it('configures with the saved tuning and the Go-identical files', function () {
             && str_contains($serverConf, "work_mem = '8MB'\n")
             && str_contains($serverConf, "shared_buffers = '1024MB'\n")
             && str_contains($serverConf, "max_connections = '200'\n")
-            && str_contains(base64_decode($files['/srv/postgres/conf/pgbouncer.ini']['content']), 'default_pool_size = @@DEFAULT_POOL_SIZE@@')
+            && str_contains(base64_decode($files['/srv/postgres/conf/pgbouncer.ini']['content']), 'default_pool_size = __DEFAULT_POOL_SIZE__')
             && $env['CLUSTERED'] === 'false' && $env['LINE'] === '18'
             && json_decode($env['REQUEST_JSON'], true)['settings'] === ['max_connections' => '200', 'timezone' => 'Asia/Dhaka', 'work_mem' => '8MB']
             && str_contains($script, '/bin/initdb')
+            && str_contains($script, 'sed "s/__DEFAULT_POOL_SIZE__/$pool_size/"')
             && str_contains($script, 'databasify service reload');
     });
 });
