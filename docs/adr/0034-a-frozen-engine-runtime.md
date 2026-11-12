@@ -17,7 +17,7 @@ Most contributors are Laravel developers. The owner decided that engine behaviou
 
 ## Decision
 
-- **Engine-neutral commands.** Every engine image answers them through the SDK (`databasifylabs/engine-sdk` `v0.2.1`), next to `engine info`:
+- **Engine-neutral commands.** Every engine image answers them through the SDK (`databasifylabs/engine-sdk` `v0.2.2`), next to `engine info`:
     - `runtime info`, which reports protocol `1`;
     - `runtime run`;
     - `task start`, `task status`, `task log` and `task stop`;
