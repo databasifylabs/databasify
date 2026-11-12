@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineRequest;
 use App\Engines\Drivers\MariaDb\MariaDbDriver;
+use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
 use Symfony\Component\Finder\Finder;
@@ -31,4 +32,5 @@ it('answers every request the app sends except the binary, host and runtime ones
     'postgres' => [PostgresDriver::class, []],
     'mysql' => [MySqlDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
     'mariadb' => [MariaDbDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
+    'mongodb' => [MongoDbDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
 ]);

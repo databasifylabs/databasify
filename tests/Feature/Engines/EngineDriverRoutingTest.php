@@ -17,7 +17,7 @@ use Tests\Support\FakeEngineDriver;
 
 beforeEach(function () {
     FakeEngineDriver::$answered = [];
-    config(['engine.providers.postgres.driver' => FakeEngineDriver::class, 'engine.providers.mysql.driver' => FakeEngineDriver::class, 'engine.providers.mariadb.driver' => FakeEngineDriver::class]);
+    config(['engine.providers.postgres.driver' => FakeEngineDriver::class, 'engine.providers.mysql.driver' => FakeEngineDriver::class, 'engine.providers.mariadb.driver' => FakeEngineDriver::class, 'engine.providers.mongodb.driver' => FakeEngineDriver::class]);
 });
 
 function createUserRequest(): UserCreate
@@ -32,7 +32,7 @@ it('keeps sending requests to the engine binary while the switch is off', functi
 
     expect($ssh->scriptAt(0))->toContain('databasify user create')
         ->and(FakeEngineDriver::$answered)->toBe([]);
-})->with(['postgres', 'mysql', 'mariadb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
 
 it('lets the driver answer a listed engine once the switch is on', function (string $engine) {
     config(['databasify.php_engines' => [$engine]]);
@@ -45,7 +45,7 @@ it('lets the driver answer a listed engine once the switch is on', function (str
     expect($reply->created)->toBeTrue()
         ->and(FakeEngineDriver::$answered)->toBe(['user create'])
         ->and($ssh->scriptAt(0))->toContain('databasify engine info');
-})->with(['postgres', 'mysql', 'mariadb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
 
 it('keeps a database on an image without the runtime on the binary', function (string $engine) {
     config(['databasify.php_engines' => [$engine]]);
@@ -59,7 +59,7 @@ it('keeps a database on an image without the runtime on the binary', function (s
 
     expect($ssh->scriptAt(0))->toContain('databasify user create')
         ->and(FakeEngineDriver::$answered)->toBe([]);
-})->with(['postgres', 'mysql', 'mariadb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
 
 it('moves a database to the driver once an upgrade reports the runtime', function () {
     config(['databasify.php_engines' => ['postgres']]);
@@ -78,7 +78,7 @@ it('moves a database to the driver once an upgrade reports the runtime', functio
 it('leaves engines that are not listed on the binary', function () {
     config(['databasify.php_engines' => ['postgres']]);
     $ssh = fakeSsh()->respondToEngine('user create', ['created' => true]);
-    $node = idleDatabase('mongodb', 1)->nodes()->sole();
+    $node = idleDatabase('valkey', 1)->nodes()->sole();
 
     resolve(EngineClient::class)->send($node, createUserRequest());
 
