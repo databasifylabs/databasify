@@ -41,7 +41,7 @@ it('configures a MySQL node with the Go-identical files and its first-start SQL'
         && $env['INIT_SQL'] === "ALTER USER 'root'@'localhost' IDENTIFIED BY '".str_replace(['\\', "'"], ['\\\\', "''"], $fixture['request']['secrets']['admin'])."';\n"
         && $env['INIT_COMMAND'] === '/usr/sbin/mysqld --no-defaults --initialize-insecure --user=mysql --datadir=/srv/mysql/data --init-file=/srv/mysql/conf/init.sql'
         && str_contains($script, 'grouped.cnf')
-        && str_contains($script, 'databasify service reload'));
+        && str_contains($script, 'unit_do daemon-reload'));
 })->with(['standalone-8.4', 'primary-9.7']);
 
 it('configures a MariaDB node with both manifests so a seed starts a new cluster', function () {

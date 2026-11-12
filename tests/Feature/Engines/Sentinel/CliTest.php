@@ -67,3 +67,18 @@ it('reads an empty CONFIG GET value as empty, not as a missing setting', functio
     expect($run->successful())->toBeTrue($run->output().$run->errorOutput())
         ->and($run->output())->toContain('DATABASIFY_RESULT {"values":{"maxclients":"7","notify-keyspace-events":""}}');
 });
+
+it('finds no primary, without failing, on a first configure whose peers are not up yet', function () {
+    $bin = sys_get_temp_dir().'/primary-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$bin}/valkey-cli", "#!/bin/bash\necho 'Could not connect to Valkey at 10.0.0.2:26379: Connection refused'\nexit 1\n");
+    chmod("{$bin}/timeout", 0755);
+    chmod("{$bin}/valkey-cli", 0755);
+    $script = resolve(ScriptView::class)->render(idleDatabase('valkey', 1)->nodes()->sole(), 'sentinel/nodes/primary', ['engine' => SentinelFamilyEngine::of('valkey')]);
+
+    $run = Process::input($script)->env(['PATH' => "{$bin}:".getenv('PATH'), 'CLI_SECRET' => 'pw', 'PEERS' => '10.0.0.2 10.0.0.3'])->run(['bash', '-euo', 'pipefail', '-s']);
+    Process::run(['rm', '-rf', $bin]);
+
+    expect($run->successful())->toBeTrue($run->errorOutput())->and($run->output())->toContain('DATABASIFY_RESULT {"primary":""}');
+});

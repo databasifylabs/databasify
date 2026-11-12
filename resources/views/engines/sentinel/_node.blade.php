@@ -16,7 +16,7 @@ write_conf() {
 }
 
 replica_of() {
-    sed -n 's/^replicaof \([^ ]*\) [0-9]*$/\1/p' "$CONF" 2> /dev/null | head -n 1
+    sed -n 's/^replicaof \([^ ]*\) [0-9]*$/\1/p' "$CONF" 2> /dev/null | head -n 1 || true
 }
 
 set_replica_of() {
@@ -104,7 +104,7 @@ pair_value() {
 
 sentinel_hosts() {
     printf '127.0.0.1\n'
-    sed -n 's/^sentinel known-sentinel main \([^ ]*\) .*/\1/p' "$ROOT/sentinel/sentinel.conf" 2> /dev/null | awk '!seen[$0]++'
+    sed -n 's/^sentinel known-sentinel main \([^ ]*\) .*/\1/p' "$ROOT/sentinel/sentinel.conf" 2> /dev/null | awk '!seen[$0]++' || true
 }
 
 newest_primary() {
@@ -136,5 +136,5 @@ require_replicas() {
 }
 
 daemon_reload() {
-    printf '{}' | databasify service reload > /dev/null
+    unit_do daemon-reload
 }

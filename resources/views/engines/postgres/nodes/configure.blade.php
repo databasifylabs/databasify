@@ -30,7 +30,7 @@ if [ "$ARCHIVE" != true ]; then
 fi
 if printf '%s' "$MANIFEST" | base64 -d | write_file "$CONF/processes.json" 640; then
     changed=true
-    printf '{}' | databasify service reload > /dev/null
+    unit_do daemon-reload
 fi
 
 directories() {
@@ -75,7 +75,7 @@ repair_etcd_membership() {
         removed=$(etcd_ctl "$endpoint" member remove "$listed" 2>&1) || databasify_fail internal "etcdctl member: $removed"
         register_again "$endpoint"
     elif [ -z "$listed" ] && [ "$has_data" = true ]; then
-        printf '{"units":["databasify-etcd"]}' | databasify service stop > /dev/null
+        unit_do stop databasify-etcd
         rm -rf "$ROOT/etcd/member"
         register_again "$endpoint"
     elif [ -z "$listed" ]; then

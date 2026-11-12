@@ -33,7 +33,7 @@ it('configures with the saved tuning and the Go-identical files', function () {
             && json_decode($env['REQUEST_JSON'], true)['settings'] === ['max_connections' => '200', 'timezone' => 'Asia/Dhaka', 'work_mem' => '8MB']
             && str_contains($script, '/bin/initdb')
             && str_contains($script, 'sed "s/__DEFAULT_POOL_SIZE__/$pool_size/"')
-            && str_contains($script, 'databasify service reload');
+            && str_contains($script, 'unit_do daemon-reload');
     });
 });
 

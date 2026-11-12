@@ -35,7 +35,7 @@ if [ -z "$(ls -A "$ROOT/data")" ]; then
     changed=true
 fi
 
-printf '{}' | databasify service reload > /dev/null
+unit_do daemon-reload
 if [ -n "$HELPERS" ]; then
     read -r -a helpers <<< "$HELPERS"
     unit_do start "${helpers[@]}"

@@ -9,6 +9,6 @@ for peer in $PEERS; do
     fi
 done
 if [ -z "$primary" ]; then
-    primary=$(sed -n 's/^sentinel monitor main \([^ ]*\) .*/\1/p' "$ROOT/sentinel/sentinel.conf" 2> /dev/null | head -n 1)
+    primary=$(sed -n 's/^sentinel monitor main \([^ ]*\) .*/\1/p' "$ROOT/sentinel/sentinel.conf" 2> /dev/null | head -n 1 || true)
 fi
 result "$(jq -cn --arg primary "$primary" '{primary: $primary}')"
