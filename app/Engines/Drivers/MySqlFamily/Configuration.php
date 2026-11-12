@@ -33,21 +33,15 @@ final readonly class Configuration
     public function configure(DatabaseNode $node, NodeConfigure $request): NodeConfigureReply
     {
         $engine = FamilyScripts::engineOf($node);
-        $line = $node->database->version_line;
         $this->refuseMissingSecrets($engine, $request);
         $catalog = $this->catalogOf($node);
         $catalog->check($request->settings);
         $saved = $this->state->tunedOf($node, self::TUNED_STATE);
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
-        $effective = NodeState::withSettings($request, $catalog->effective($tuned, $request->settings));
-        $files = $this->filesOf($engine, $effective, $line, false);
 
         $reply = $this->scripts->run($node, 'mysql-family/nodes/configure', [
-            'REQUEST_JSON' => NodeState::requestJsonOf($request),
+            ...$this->filesEnvOf($node, $request, $tuned),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'FILES' => NodeState::filesJsonOf($files->files),
-            'MANIFEST' => base64_encode($files->manifest),
-            'MANIFEST_NEW_CLUSTER' => $engine->id === 'mariadb' ? base64_encode($this->filesOf($engine, $effective, $line, true)->manifest) : '',
             'INIT_SQL' => $engine->id === 'mysql' ? "ALTER USER 'root'@'localhost' IDENTIFIED BY ".FamilyFiles::sqlString((string) $request->secrets->admin).";\n" : MariaDbFiles::initStatementsOf($request),
             'INIT_COMMAND' => $this->initCommandOf($engine),
             'SEED' => $this->startsNewCluster($engine, $request) ? 'true' : 'false',
@@ -56,6 +50,25 @@ final readonly class Configuration
         ], timeout: self::CONFIGURE_TIMEOUT);
 
         return new NodeConfigureReply($reply->json()->bool('changed'));
+    }
+
+    /**
+     * @param  array<string, string>  $tuned
+     * @return array{REQUEST_JSON: string, FILES: string, MANIFEST: string, MANIFEST_NEW_CLUSTER: string}
+     */
+    public function filesEnvOf(DatabaseNode $node, NodeConfigure $request, array $tuned): array
+    {
+        $engine = FamilyScripts::engineOf($node);
+        $line = $node->database->version_line;
+        $effective = NodeState::withSettings($request, $this->catalogOf($node)->effective($tuned, $request->settings));
+        $files = $this->filesOf($engine, $effective, $line, false);
+
+        return [
+            'REQUEST_JSON' => NodeState::requestJsonOf($request),
+            'FILES' => NodeState::filesJsonOf($files->files),
+            'MANIFEST' => base64_encode($files->manifest),
+            'MANIFEST_NEW_CLUSTER' => $engine->id === 'mariadb' ? base64_encode($this->filesOf($engine, $effective, $line, true)->manifest) : '',
+        ];
     }
 
     public function catalogOf(DatabaseNode $node): SettingsCatalog

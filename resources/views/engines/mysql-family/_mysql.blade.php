@@ -5,7 +5,7 @@ MY_CNF={!! $sh->arg($engine->adminCnf()) !!}
 my() {
     local database=$1 errors output status
     errors=$(mktemp)
-    output=$(timeout 60 "$MY_CLIENT" --defaults-extra-file="$MY_CNF" -N -B -r ${database:+"--database=$database"} 2> "$errors") && status=0 || status=$?
+    output=$(timeout 60 "$MY_CLIENT" --defaults-extra-file="${MY_DEFAULTS:-$MY_CNF}" -N -B -r ${database:+"--database=$database"} 2> "$errors") && status=0 || status=$?
     if [ "$status" -ne 0 ]; then
         my_failed "$status" "$errors"
     fi

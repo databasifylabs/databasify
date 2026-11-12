@@ -87,7 +87,17 @@ clear_new_cluster() {
     fi
     rm -f "$ROOT/state/new-cluster"
     if [ -n "$MANIFEST" ]; then
-        printf '%s' "$MANIFEST" | base64 -d | write_file "$ROOT/conf/processes.json" 600 false || true
+        write_manifest || true
     fi
     printf '{}' | databasify service reload > /dev/null
+}
+
+mark_new_cluster() {
+    : | write_file "$ROOT/state/new-cluster" 600 false || true
+    write_manifest || true
+}
+
+restart_server() {
+    printf '{}' | databasify service reload > /dev/null
+    unit_do restart mariadb-server
 }

@@ -15,10 +15,10 @@ write_file() {
             return 1
         fi
     fi
-    printf '%s' "$content" > "$path.tmp"
-    chmod "$mode" "$path.tmp"
+    printf '%s' "$content" > "$path.tmp" || databasify_fail internal "could not write $path"
+    chmod "$mode" "$path.tmp" || databasify_fail internal "could not set the mode of $path"
     if [ "$owned" = true ]; then
-        chown 64999:64999 "$path.tmp"
+        chown 64999:64999 "$path.tmp" || databasify_fail internal "could not own $path"
     fi
-    mv "$path.tmp" "$path"
+    mv "$path.tmp" "$path" || databasify_fail internal "could not replace $path"
 }

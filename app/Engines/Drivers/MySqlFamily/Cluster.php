@@ -11,6 +11,7 @@ use App\Engines\Requests\ClusterForceQuorum;
 use App\Engines\Requests\ClusterMembership;
 use App\Engines\Requests\ClusterRejoin;
 use App\Engines\Requests\MemberForget;
+use App\Engines\Requests\NodeConfigure;
 use App\Engines\Responses\ClusterPosition;
 use App\Engines\Responses\ClusterQuorum;
 use App\Engines\Responses\Done;
@@ -31,16 +32,22 @@ final readonly class Cluster
     {
         $engine = FamilyScripts::engineOf($node);
         $saved = $this->configuration->savedRequestOf($node);
+        $reserved = ['RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR)];
+        $env = $engine->id === 'mysql' ? ['GROUP_NAME' => MySqlFiles::groupNameOf($saved->databaseId)] : $this->filesEnvOf($node, $saved);
 
-        return $this->scripts->start($node, $request->key, '{engine}/cluster/enable', [
-            'RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR),
-            'GROUP_NAME' => MySqlFiles::groupNameOf($saved->databaseId),
-        ]);
+        return $this->scripts->start($node, $request->key, '{engine}/cluster/enable', [...$reserved, ...$env]);
     }
 
     public function disable(DatabaseNode $node): Done
     {
-        $this->scripts->run($node, '{engine}/cluster/disable', timeout: self::WAITING_TIMEOUT);
+        $env = [];
+
+        if (FamilyScripts::engineOf($node)->id === 'mariadb') {
+            $saved = $this->configuration->savedRequestOf($node);
+            $env = $this->filesEnvOf($node, new NodeConfigure(false, $saved->readOnly, $saved->ip, $saved->databaseId, $saved->members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary));
+        }
+
+        $this->scripts->run($node, '{engine}/cluster/disable', $env, timeout: self::WAITING_TIMEOUT);
 
         return new Done;
     }
@@ -54,24 +61,40 @@ final readonly class Cluster
 
     public function forceQuorum(DatabaseNode $node, ClusterForceQuorum $request): Done
     {
+        $mysql = FamilyScripts::engineOf($node)->id === 'mysql';
+
         if (! $request->othersDown) {
-            throw new EngineBusy('busy', 'forcing the group while other members may be alive would split it; confirm the others are down');
+            throw new EngineBusy('busy', $mysql
+                ? 'forcing the group while other members may be alive would split it; confirm the others are down'
+                : 'forcing the cluster while other nodes may be alive would split it; confirm the others are down');
         }
 
-        $this->scripts->run($node, '{engine}/cluster/force-quorum', timeout: self::WAITING_TIMEOUT);
+        $env = $mysql ? [] : $this->filesEnvOf($node, $this->configuration->savedRequestOf($node));
+        $this->scripts->run($node, '{engine}/cluster/force-quorum', $env, timeout: self::WAITING_TIMEOUT);
 
         return new Done;
     }
 
     public function membership(DatabaseNode $node, ClusterMembership $request): Done
     {
-        $this->scripts->run($node, 'mysql/cluster/membership', ['SEEDS' => MySqlFiles::seedsOf($request->members)]);
+        if (FamilyScripts::engineOf($node)->id === 'mysql') {
+            $this->scripts->run($node, 'mysql/cluster/membership', ['SEEDS' => MySqlFiles::seedsOf($request->members)]);
+
+            return new Done;
+        }
+
+        $saved = $this->configuration->savedRequestOf($node);
+        $this->scripts->run($node, 'mariadb/cluster/membership', $this->filesEnvOf($node, new NodeConfigure($saved->clustered, $saved->readOnly, $saved->ip, $saved->databaseId, $request->members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary)));
 
         return new Done;
     }
 
     public function position(DatabaseNode $node): ClusterPosition
     {
+        if (FamilyScripts::engineOf($node)->id === 'mariadb') {
+            return ClusterPosition::fromPayload($this->scripts->run($node, 'mariadb/cluster/position', timeout: 300)->json());
+        }
+
         $executed = $this->scripts->run($node, 'mysql/cluster/position')->json()->nullableString('executed');
 
         return new ClusterPosition($executed === null ? -1 : $this->transactionsIn($executed));
@@ -89,9 +112,21 @@ final readonly class Cluster
 
     public function forget(DatabaseNode $node, MemberForget $request): Done
     {
+        if (FamilyScripts::engineOf($node)->id === 'mariadb') {
+            return new Done;
+        }
+
         $this->scripts->run($node, 'mysql/members/forget', ['SEED' => "{$request->ip}:".MySqlFiles::GROUP_PORT]);
 
         return new Done;
+    }
+
+    /**
+     * @return array{REQUEST_JSON: string, FILES: string, MANIFEST: string, MANIFEST_NEW_CLUSTER: string}
+     */
+    private function filesEnvOf(DatabaseNode $node, NodeConfigure $request): array
+    {
+        return $this->configuration->filesEnvOf($node, $request, $this->configuration->tunedOf($node, $request));
     }
 
     private function transactionsIn(string $gtidSet): int
