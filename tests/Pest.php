@@ -128,9 +128,9 @@ function respondToFileGet(FakeServerConnection $ssh, string $path, ?string $cont
     );
 }
 
-function goFixture(string $name): mixed
+function goFixture(string $name, string $engine = 'postgres'): mixed
 {
-    return json_decode((string) file_get_contents(base_path("tests/Fixtures/postgres/{$name}")), true);
+    return json_decode((string) file_get_contents(base_path("tests/Fixtures/{$engine}/{$name}")), true);
 }
 
 function fakeScripts(): FakeScriptRunner
