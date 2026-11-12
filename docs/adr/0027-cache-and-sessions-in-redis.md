@@ -1,11 +1,11 @@
-# 0034. Cache, sessions and locks in Redis
+# 0027. Cache, sessions and locks in Redis
 
 - Status: Accepted
 - Date: 2026-11-08
 
 ## Context
 
-[0021](0021-app-state-sqlite-and-redis.md) kept the cache, sessions and locks in SQLite. Every Horizon worker then writes cache entries and locks into the one SQLite file the app depends on, which adds to its write contention. The installed app already runs Redis for the queues.
+[0019](0019-app-state-sqlite-and-redis.md) kept the cache, sessions and locks in SQLite. Every Horizon worker then writes cache entries and locks into the one SQLite file the app depends on, which adds to its write contention. The installed app already runs Redis for the queues.
 
 ## Decision
 

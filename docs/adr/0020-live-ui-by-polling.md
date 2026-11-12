@@ -1,4 +1,4 @@
-# 0023. Live UI by polling, Reverb only for streams
+# 0020. Live UI by polling, Reverb only for streams
 
 - Status: Accepted
 - Date: 2026-11-04

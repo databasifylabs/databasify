@@ -1,4 +1,4 @@
-# 0018. Supported host operating systems and provisioning baseline
+# 0016. Supported host operating systems and provisioning baseline
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -18,7 +18,7 @@ Databasify runs on servers the user brings or orders. Every host script has to w
 
 ## Consequences
 
-- Adding an operating system means a new enum case, family scripts if it is a new family, and an image entry in every server provider's registration ([0019](0019-providers-order-vm-only.md)).
+- Adding an operating system means a new enum case, family scripts if it is a new family, and an image entry in every server provider's registration ([0017](0017-providers-order-vm-only.md)).
 - Every host script must work with SELinux enforcing.
 - RHEL-family provisioning is noticeably slower than Debian-family.
 
@@ -30,7 +30,7 @@ Databasify runs on servers the user brings or orders. Every host script has to w
 
 - `app/Enums/Servers/OperatingSystem.php`
 - `app/DTOs/Servers/ServerFacts.php`
-- `resources/views/ssh/servers/provision/provision.blade.php`
+- `app/Actions/Servers/ProvisionServer.php`
 - `resources/views/ssh/servers/os/swap.blade.php`
 - `app/Models/Database.php`
 - `scripts/lib.sh`

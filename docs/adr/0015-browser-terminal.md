@@ -1,4 +1,4 @@
-# 0017. Browser terminal as a queued SSH shell
+# 0015. Browser terminal as a queued SSH shell
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -17,8 +17,8 @@ Users need a shell on their servers without leaving the app or setting up their 
 ## Consequences
 
 - Every open terminal holds one Horizon worker for up to 2 hours. The `terminals` supervisor is small (2 workers by default), so concurrent terminals are limited.
-- Keystrokes pass through the default cache store ([0021](0021-app-state-sqlite-and-redis.md)).
-- Any signed-in user gets a root shell on every server, which is acceptable only because there is a single owner ([0016](0016-app-architecture.md)).
+- Keystrokes pass through the default cache store ([0019](0019-app-state-sqlite-and-redis.md)).
+- Any signed-in user gets a root shell on every server, which is acceptable only because there is a single owner ([0014](0014-app-architecture.md)).
 
 ## Alternatives considered
 

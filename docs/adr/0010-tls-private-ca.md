@@ -1,4 +1,4 @@
-# 0012. Private CA per database; public wildcard for key-value engines
+# 0010. Private CA per database; public wildcard for key-value engines
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -10,7 +10,7 @@ Every engine should serve TLS. Public certificates need a domain and a DNS provi
 ## Decision
 
 - Each database gets its own private CA (EC P-256, valid 10 years) and a certificate per node (EC P-256, valid 825 days, `serverAuth` and `clientAuth`), issued by the app with PHP's openssl extension (`OwnCertificateAuthority`, `IssueNodeCertificates`). A node's certificate names the database hostnames, its SRV member host and its own addresses and hostnames. Each node gets its certificate, key and the CA with `databasify tls install`, which writes the files the engine needs and reloads it.
-- CA and certificates are stored in the encrypted database settings ([0013](0013-secrets-and-ssh-keys.md)).
+- CA and certificates are stored in the encrypted database settings ([0011](0011-secrets-and-ssh-keys.md)).
 - Engines serve TLS themselves on fixed ports (`ClientPorts`): 25060 for SQL engines and MongoDB, 25061 for PgBouncer pools and for Valkey and Redis.
 - Engines registered with `publicCertificate()` (Valkey and Redis) use a Let's Encrypt wildcard `*.db.<zone>`, issued over ACME DNS-01 and stored on the DNS zone, whenever the database has a DNS zone. Each node deploy issues the wildcard first when the zone has none, and each node records the fingerprint of the certificate it was given. The connection details switch to the public profile only while the wildcard is current and every node that has been given a certificate serves it (a node still joining is not counted); issuing a new wildcard queues a certificate renewal for every other database on the zone; if issuing fails, the nodes keep the private CA until the daily check succeeds.
 - A daily check at 02:00 renews certificates that expire within 30 days, no longer cover every hostname or still name a hostname the database left, or that a node does not serve yet, on ready and degraded databases; an offline database is renewed by the first check after it serves again.

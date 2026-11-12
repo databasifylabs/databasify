@@ -1,4 +1,4 @@
-# 0019. Cloud providers only order the server
+# 0017. Cloud providers only order the server
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -10,7 +10,7 @@ Users can order servers on DigitalOcean, Hetzner, Vultr and Linode, or bring the
 ## Decision
 
 - The `ServerDriver` contract covers only regions, plans, private networks (VPCs), SSH keys, and creating, finding and deleting a server.
-- Each provider registration maps every supported operating system to the provider's image ([0018](0018-host-os-and-provisioning.md)). Ordered servers log in as `root` with the app's SSH key, registered with the provider, and always have password login turned off.
+- Each provider registration maps every supported operating system to the provider's image ([0016](0016-host-os-and-provisioning.md)). Ordered servers log in as `root` with the app's SSH key, registered with the provider, and always have password login turned off.
 - After ordering, the app waits up to 10 minutes for the server to boot, then up to 10 more for SSH. From there the server goes through the same provisioning as one the user added by hand.
 - The region and plan catalog is cached for 10 minutes, and networks for 60 seconds.
 

@@ -1,11 +1,11 @@
-# 0041. Databases on a dropped SDK run read-only
+# 0032. Databases on a dropped SDK run read-only
 
 - Status: Accepted
 - Date: 2026-11-11
 
 ## Context
 
-When an app release moves `databasify.require.engine-sdk` past an SDK (0040), databases already running an image built on it keep running that image. Most often it is a community engine whose author has not rebuilt yet. The app can't promise its commands still speak that image's contract, but stopping or refusing to watch the database would put data at risk.
+When an app release moves `databasify.require.engine-sdk` past an SDK (0031), databases already running an image built on it keep running that image. Most often it is a community engine whose author has not rebuilt yet. The app can't promise its commands still speak that image's contract, but stopping or refusing to watch the database would put data at risk.
 
 ## Decision
 

@@ -1,6 +1,6 @@
 # Phase 3: the app registration
 
-The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 0035). Everything else comes from the engine at runtime.
+The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 0028). Everything else comes from the engine at runtime.
 
 ## Files
 
@@ -9,7 +9,7 @@ The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 00
 | `app/Providers/EngineServiceProvider.php`             | One `RegisterEngine` chain in `boot()`, built from the `engine()` or `sentinel()` helper. The id is the image's engine name. |
 | `public/assets/icons/database-providers/<engine>.svg` | The logo, square SVG, named after the engine id (the registration's default icon path).                                     |
 | `README.md`                                           | The engine and its lines in the supported list.                                                                             |
-| ADRs in `docs/adr/`                                   | Update any ADR that lists the engines (0009 HA per engine, 0012 TLS, 0014 DNS hostnames) in the same change.                |
+| ADRs in `docs/adr/`                                   | Update any ADR that lists the engines (0007 HA per engine, 0010 TLS, 0012 DNS hostnames) in the same change.                |
 
 ## The registration
 
@@ -23,7 +23,7 @@ The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 00
 | `migrationSource(defaultPort, credentialsRequired, selectsDatabases)`  | Every built-in engine offers migrations; this sets the source form.                                                                                                                    |
 | `failoverHint()`                                                       | What the Nodes tab says when the database can't fail over on its own.                                                                                                                  |
 | `serviceRecord(prefix, options)`                                       | Only for engines whose drivers discover the cluster through DNS (MongoDB `_mongodb._tcp`). With a domain, the app publishes one A record per member, an SRV and a TXT record.          |
-| `publicCertificate()`                                                  | The engine serves the zone's public Let's Encrypt wildcard on a domain instead of the database's CA (Valkey and Redis, ADR 0012).                                                     |
+| `publicCertificate()`                                                  | The engine serves the zone's public Let's Encrypt wildcard on a domain instead of the database's CA (Valkey and Redis, ADR 0010).                                                     |
 | `persistenceChoice()`, `readOnlyNodesVote()`                           | Snapshot or append-only persistence, and read-only nodes counting as failover voters (Sentinel).                                                                                       |
 
 Derived automatically, with no change:

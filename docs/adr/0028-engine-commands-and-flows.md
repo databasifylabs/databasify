@@ -1,11 +1,11 @@
-# 0035. The app drives engines through typed commands and flows
+# 0028. The app drives engines through typed commands and flows
 
 - Status: Accepted
 - Date: 2026-11-10
 
 ## Context
 
-All database logic now lives in the engine images: the `databasify` wrapper answers the same typed JSON commands for every engine and runs long work (`node ready`, `cluster enable`, `cluster rejoin`, `restore start`) as operations inside the container. The app still carried its own copy of that logic: per-engine drivers, about 800 Blade scripts with folders per version line, and jobs that held a queue worker for up to six hours, so a crashed worker left a database locked until the eight-hour sweep.
+All database logic now lives in the engine images: the `databasify` binary answers the same typed JSON commands for every engine and runs long work (`node ready`, `cluster enable`, `cluster rejoin`, `restore start`) as operations inside the container. The app still carried its own copy of that logic: per-engine drivers, about 800 Blade scripts with folders per version line, and jobs that held a queue worker for up to six hours, so a crashed worker left a database locked until the eight-hour sweep.
 
 ## Decision
 
@@ -19,8 +19,8 @@ All database logic now lives in the engine images: the `databasify` wrapper answ
     - A failed flow's cleanup runs in its own `CleanUpDatabaseFlow` job (one hour), which releases the operation when it ends.
     - Recovery sends `cluster force-quorum` with `othersDown` only when the owner confirmed the other nodes are down, refuses when no member's quorum can be read, and refuses to pick a survivor when a member's position is unknown.
 - **The flows follow the engine README.** Create (and restore), add, remove, redeploy, reboot, settings change, rolling restart, re-tune, upgrade, point-in-time recovery changes and recovery after an outage each follow the order the engine documents. Rolling changes (reboot, restart, upgrade) go read-only nodes, standbys, `cluster failover`, former primary.
-- **A small catalog.** `EngineCatalog` holds only what the app needs per engine: label, icon, category, image repository, version lines, failover hint, SRV record, connection profile, Laravel environment, migration source form, persistence choice, whether read-only nodes vote and, for a community engine, its plugin and author ([0039](0039-community-engines.md)). Plugins register engines with `RegisterEngine` as data. What a database can do comes from the engine: `engine capabilities` (commands, password encryptions, reserved names, ports) and `config fields` are read from the seed after its first deploy and stored on the database.
-- **The app's CA.** Certificates are issued in PHP ([0012](0012-tls-private-ca.md)) and installed with `tls install`.
+- **A small catalog.** `EngineCatalog` holds only what the app needs per engine: label, icon, category, image repository, version lines, failover hint, SRV record, connection profile, Laravel environment, migration source form, persistence choice, whether read-only nodes vote and, for a community engine, its plugin and author ([0030](0030-community-engines.md)). Plugins register engines with `RegisterEngine` as data. What a database can do comes from the engine: `engine capabilities` (commands, password encryptions, reserved names, ports) and `config fields` are read from the seed after its first deploy and stored on the database.
+- **The app's CA.** Certificates are issued in PHP ([0010](0010-tls-private-ca.md)) and installed with `tls install`.
 - **Only `databasify` runs on a database server**, apart from the install of the pinned host binary (`install-host-binary.blade.php`), the host facts read for metrics, the firewall and the OS reboot.
 
 ## Consequences

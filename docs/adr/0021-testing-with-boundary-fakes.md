@@ -1,4 +1,4 @@
-# 0024. Tests fake the boundaries; real servers are tested by hand
+# 0021. Tests fake the boundaries; real servers are tested by hand
 
 - Status: Accepted
 - Date: 2026-11-04

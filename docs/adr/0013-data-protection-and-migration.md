@@ -1,4 +1,4 @@
-# 0015. Engine-native PITR and migrations over plain S3
+# 0013. Engine-native PITR and migrations over plain S3
 
 - Status: Accepted
 - Date: 2026-11-04

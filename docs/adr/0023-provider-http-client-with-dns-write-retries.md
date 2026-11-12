@@ -1,4 +1,4 @@
-# 0030. One provider HTTP client; DNS record writes retry too
+# 0023. One provider HTTP client; DNS record writes retry too
 
 - Status: Accepted
 - Date: 2026-11-05

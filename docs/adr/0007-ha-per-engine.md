@@ -1,4 +1,4 @@
-# 0009. Each engine keeps its own HA mechanism
+# 0007. Each engine keeps its own HA mechanism
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -19,7 +19,7 @@ Each engine uses its native HA stack:
 | MongoDB        | Replica set `databasify`, at most 7 voters     | —                |
 | Valkey / Redis | Sentinel                                       | 6379, 26379      |
 
-Clients reach the primary through a DNS name that follows it ([0014](0014-dns-hostnames.md)). The app adds manual failover, quorum detection (`DetectQuorum`: online × 2 > total) and recovery after a total outage (`PromoteSurvivor`).
+Clients reach the primary through a DNS name that follows it ([0012](0012-dns-hostnames.md)). The app adds manual failover, quorum detection (`DetectQuorum`: online × 2 > total) and recovery after a total outage (`PromoteSurvivor`).
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-# 0013. Encrypted secrets, one app SSH key, pinned host keys
+# 0011. Encrypted secrets, one app SSH key, pinned host keys
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -22,7 +22,7 @@ Databasify holds root-level access to every server it manages, plus database pas
 
 - Losing `APP_KEY` makes every stored secret unreadable. Backups of the app must include it.
 - A legitimately reinstalled server must be re-added, because its host key changed; there is no way to reset a pinned fingerprint.
-- The default user of PostgreSQL, MySQL, MariaDB and MongoDB databases holds replication rights, so it can be a migration source ([0015](0015-data-protection-and-migration.md)). Its password is therefore as sensitive as the data of the whole server. Per engine it is granted:
+- The default user of PostgreSQL, MySQL, MariaDB and MongoDB databases holds replication rights, so it can be a migration source ([0013](0013-data-protection-and-migration.md)). Its password is therefore as sensitive as the data of the whole server. Per engine it is granted:
     - MySQL: `REPLICATION SLAVE` and `REPLICATION CLIENT`, so it can read the binary log, which carries changes to every database on the server; `BACKUP_ADMIN`, whose `LOCK INSTANCE FOR BACKUP` blocks DDL server-wide while held; and `SELECT` on `mysql.default_roles` and `mysql.role_edges`, so it can see every account's roles.
     - MariaDB: `REPLICATION SLAVE` and `BINLOG MONITOR`, so it can read the binary log of every database; and `RELOAD`, so it can flush tables and logs and take the global read lock (`FLUSH TABLES WITH READ LOCK`), which blocks every write on the server while held.
     - PostgreSQL: the `REPLICATION` attribute, so it can open logical replication connections and create replication slots, which hold WAL on the server until they are dropped; `pg_hba.conf` keeps physical replication to `replicator`.

@@ -1,11 +1,11 @@
-# 0039. Plugin engines are community engines
+# 0030. Plugin engines are community engines
 
 - Status: Accepted
 - Date: 2026-11-11
 
 ## Context
 
-Plugins can register database engines ([0016](0016-app-architecture.md)). Databasify builds, tests and supports only the engines app core registers. An admin installing a plugin engine needs to know who stands behind it before any of its code runs, and a plugin update must not strand databases on an engine it no longer ships.
+Plugins can register database engines ([0014](0014-app-architecture.md)). Databasify builds, tests and supports only the engines app core registers. An admin installing a plugin engine needs to know who stands behind it before any of its code runs, and a plugin update must not strand databases on an engine it no longer ships.
 
 ## Decision
 

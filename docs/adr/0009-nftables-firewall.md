@@ -1,4 +1,4 @@
-# 0011. One nftables table per database
+# 0009. One nftables table per database
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -15,7 +15,7 @@ Each database gets its own nftables table, `databasify_database_<id without dash
 - Client ports accept the `@peers` and `@trusted` sets plus the server's private network range (VPC, custom or WireGuard). Trusted sources are IPv4 CIDRs; their labels live only in the app.
 - With no trusted sources, client ports are open to everyone.
 
-If ufw or firewalld is active, Databasify also opens the matching ports in it. Changes run as a queued operation and are refused while the database runs another one ([0007](0007-operations-and-server-logs.md)).
+If ufw or firewalld is active, Databasify also opens the matching ports in it. Changes run as a queued operation and are refused while the database runs another one ([0006](0006-operations-and-server-logs.md)).
 
 ## Consequences
 

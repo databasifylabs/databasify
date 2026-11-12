@@ -1,4 +1,4 @@
-# 0032. Delete guards in actions, cascades in model observers
+# 0025. Delete guards in actions, cascades in model observers
 
 - Status: Accepted
 - Date: 2026-11-07
@@ -11,7 +11,7 @@ The create migrations declared foreign keys with `constrained()` and `cascadeOnD
 
 - Migrations declare relationship columns as plain `foreignUuid('x_id')`, `->nullable()` when the relation is optional, with `->index()` unless the column is already `->unique()` or leads a composite unique or index of its table. Relationship columns come directly after `id`. No migration uses `constrained()`.
 - **Dependants refuse, owned parts cascade:** a resource managed on its own page (project, server provider, network, DNS provider or zone, storage provider, server) is never deleted while another resource depends on it; the delete is refused. Only parts owned by a resource with no page of their own (server users and logs, a database's nodes, accounts and pools, a node's samples and alerts, imported DNS zones) are deleted with it.
-- **Restrict lives in the delete action:** the action calls the model's `ensureDeletable()` first, which throws a `ValidationException` (`DeleteProject`, `DeleteServerProvider`, `DeleteNetwork`, `DeleteDnsProvider`, `DeleteStorageProvider`, `DeleteServer`). The guards count dependants in every project ([0031](0031-projects-as-a-global-scope.md)), through the unscoped dependency relations. Observers never refuse.
+- **Restrict lives in the delete action:** the action calls the model's `ensureDeletable()` first, which throws a `ValidationException` (`DeleteProject`, `DeleteServerProvider`, `DeleteNetwork`, `DeleteDnsProvider`, `DeleteStorageProvider`, `DeleteServer`). The guards count dependants in every project ([0024](0024-projects-as-a-global-scope.md)), through the unscoped dependency relations. Observers never refuse.
 - **Cascade and null-out live in one observer per parent model** (`app/Observers/<Model>Observer.php`, `#[ObservedBy]`), in `deleted`:
     - **Cascade:** deletes the children one model at a time through `DeleteChildren` (`->reorder()->lazyById()->each(...)`), so the children's own observers run and memory stays flat.
     - **Null out:** sets the column to `null` with one update query through the relation.
