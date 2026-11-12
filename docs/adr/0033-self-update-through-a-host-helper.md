@@ -14,7 +14,8 @@ Owners updated Databasify only over SSH with `curl -fsSL https://get.databasify.
 - The app only asks for an update. `/opt/databasify/updater/` is bind-mounted at `/app/updater`. The app can write only `request/` (owned by uid 33, the container's `www-data`, mode `0700`); the systemd unit `databasify-update.path` watches it and starts the oneshot `databasify-update.service`, which runs the latest `update.sh` from `get.databasify.io` as root (with `pipefail`, so a failed download fails the unit). `update.sh` clears `request/` right after it writes the running status, so the app always sees either the request or the status; `ExecStopPost` clears anything left so the path unit never loops. The request's content is never read.
 - `update.sh` writes `updater/status.json` (state, from, to, times, rollback and the fixed step list with each step's state) after every step and keeps only the latest log in `updater/update.log`, whether it runs from the app or over SSH. `install.sh` and `update.sh` install or refresh the units and the `installed` marker; `uninstall.sh --purge` removes the units.
 - Before pulling, `update.sh` records the running app image ID. When restarting fails or the new version is not healthy, it tags that image back, restarts and reports `rolled_back` in the status; a rollback that cannot restore the image says so. An `EXIT` trap marks a run that stops unexpectedly as failed, so the status is never left running. Without a running container it updates without rollback and says so.
-- Any signed-in user can update. The app refuses when `DATABASIFY_VERSION` pins a version, when the helper is not installed, while a request or an update is pending, or when no newer release is stored.
+- Updates exist only on Docker installs: the helper's `installed` marker in the updater folder turns them on. Without it the Updates sidebar item is hidden, the `/updates` routes return 404 (`EnsureUpdaterIsInstalled`) and `updates:check` does nothing. For development, `composer run setup` creates a stand-in marker in `storage/updater` (git-ignored) and points `DATABASIFY_UPDATER_PATH` at it, so the page shows while nothing acts on its requests.
+- Any signed-in user can update. The app refuses when `DATABASIFY_VERSION` pins a version, while a request or an update is pending, or when no newer release is stored.
 
 ## Consequences
 
@@ -24,7 +25,7 @@ Owners updated Databasify only over SSH with `curl -fsSL https://get.databasify.
 - A tag pushed without a GitHub Release fails the `bump` job, so `config/app.php` is not bumped either.
 - A tag pushed without a GitHub Release fails the `bump` job, so `config/app.php` is not bumped either.
 - The units hardcode `/opt/databasify`; a different install folder would need edited units.
-- Installs from before this decision get the helper the first time `update.sh` runs over SSH; until then the page shows that command.
+- Installs from before this decision get the helper, and with it the Updates page, the first time `update.sh` runs over SSH.
 
 ## Alternatives considered
 
@@ -49,4 +50,7 @@ Owners updated Databasify only over SSH with `curl -fsSL https://get.databasify.
 - `app/Services/Updates/HostUpdater.php`
 - `app/Queries/Updates/UpdatesPageQuery.php`
 - `app/Http/Controllers/Updates/UpdateController.php`
+- `app/Http/Middleware/EnsureUpdaterIsInstalled.php`
+- `composer.json`
+- `CONTRIBUTING.md`
 - `resources/js/pages/updates/index.tsx`

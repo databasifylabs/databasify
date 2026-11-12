@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Queries\Projects\CurrentProjectQuery;
 use App\Queries\Projects\ProjectQuery;
 use App\Queries\Updates\LatestReleaseQuery;
+use App\Services\Updates\HostUpdater;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
@@ -18,7 +19,7 @@ class HandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
 
-    public function __construct(private readonly CurrentProjectQuery $currentProject, private readonly LatestReleaseQuery $latestRelease) {}
+    public function __construct(private readonly CurrentProjectQuery $currentProject, private readonly LatestReleaseQuery $latestRelease, private readonly HostUpdater $updater) {}
 
     /**
      * @return array<string, mixed>
@@ -35,8 +36,14 @@ class HandleInertiaRequests extends Middleware
             'horizonUrl' => $request->user() !== null && Gate::allows('viewHorizon') ? route('horizon.index') : null,
             'currentProject' => fn (): ?array => $this->currentProjectFor($request->user()),
             'projects' => fn (): array => $this->projectsFor($request->user()),
-            'updateAvailable' => fn (): bool => $request->user() !== null && $this->latestRelease->hasNewerRelease(),
+            'updatesEnabled' => fn (): bool => $this->updatesEnabledFor($request->user()),
+            'updateAvailable' => fn (): bool => $this->updatesEnabledFor($request->user()) && $this->latestRelease->hasNewerRelease(),
         ]);
+    }
+
+    private function updatesEnabledFor(?User $user): bool
+    {
+        return $user !== null && $this->updater->isInstalled();
     }
 
     /**

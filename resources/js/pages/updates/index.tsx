@@ -68,7 +68,6 @@ function UpdatesBody(props: UpdatesPageProps) {
                 release={release}
                 checkedAt={props.checkedAt}
                 pinnedVersion={props.pinnedVersion}
-                updaterInstalled={props.updaterInstalled}
             />
         );
     }

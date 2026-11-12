@@ -49,19 +49,32 @@ function projectNavItems(): NavItem[] {
     ];
 }
 
-function globalNavItems(
-    horizonUrl: string | null,
+function updatesNavItems(
+    updatesEnabled: boolean,
     updateAvailable: boolean,
 ): NavItem[] {
+    if (!updatesEnabled) {
+        return [];
+    }
+
     return [
-        { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
-        { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
         {
             title: 'Updates',
             href: updatesIndex(),
             icon: RefreshCw,
             badge: updateAvailable ? 1 : undefined,
         },
+    ];
+}
+
+function globalNavItems(
+    horizonUrl: string | null,
+    updates: NavItem[],
+): NavItem[] {
+    return [
+        { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
+        { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
+        ...updates,
         ...(horizonUrl
             ? [
                   {
@@ -76,7 +89,8 @@ function globalNavItems(
 }
 
 export function AppSidebar() {
-    const { horizonUrl, currentProject, updateAvailable } = usePage().props;
+    const { horizonUrl, currentProject, updatesEnabled, updateAvailable } =
+        usePage().props;
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -99,7 +113,10 @@ export function AppSidebar() {
                 )}
                 <NavMain
                     label="Global"
-                    items={globalNavItems(horizonUrl, updateAvailable)}
+                    items={globalNavItems(
+                        horizonUrl,
+                        updatesNavItems(updatesEnabled, updateAvailable),
+                    )}
                 />
             </SidebarContent>
 

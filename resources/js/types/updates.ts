@@ -35,7 +35,6 @@ export type UpdatesPageProps = {
     nextCheckAt: string;
     updateAvailable: boolean;
     pinnedVersion: string | null;
-    updaterInstalled: boolean;
     updateRequested: boolean;
     status: UpdateStatus | null;
     logTail: string[];

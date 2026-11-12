@@ -32,14 +32,13 @@ it('allows an update on an install that tracks latest', function () {
 it('refuses without writing a request', function (string $reason) {
     match ($reason) {
         'pinned' => config()->set('databasify.updates.pinned', '0.1.0'),
-        'no helper' => unlink($this->updater.'/installed'),
         'already running' => file_put_contents($this->updater.'/status.json', runningStatusJson()),
         'up to date' => config()->set('app.version', '0.2.0'),
     };
 
     expect(fn () => resolve(StartUpdate::class)->handle())->toThrow(ValidationException::class)
         ->and(file_exists($this->updater.'/request/update'))->toBeFalse();
-})->with(['pinned', 'no helper', 'already running', 'up to date']);
+})->with(['pinned', 'already running', 'up to date']);
 
 it('refuses while an earlier request waits for the host', function () {
     file_put_contents($this->updater.'/request/update', 'earlier');

@@ -26,6 +26,7 @@ it('offers no Horizon link before signing in', function () {
 });
 
 it('shares whether a newer release is available', function (?string $release, bool $available) {
+    installedUpdater();
     config(['app.version' => '0.1.0']);
     if ($release !== null) {
         storeRelease($release, '');
@@ -42,3 +43,13 @@ it('shares no update for guests', function () {
 
     $this->get('/login')->assertInertia(fn (AssertableInertia $page) => $page->where('updateAvailable', false));
 });
+
+it('shows updates only on an install with the updater', function (bool $installed) {
+    config()->set('databasify.updates.path', $installed ? installedUpdater() : temporaryDirectory());
+    config(['app.version' => '0.1.0']);
+    storeRelease('0.2.0', '');
+
+    $this->actingAs(User::factory()->create())
+        ->get(projectUrl('/dashboard'))
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('updatesEnabled', $installed)->where('updateAvailable', $installed));
+})->with(['docker install' => true, 'local install' => false]);

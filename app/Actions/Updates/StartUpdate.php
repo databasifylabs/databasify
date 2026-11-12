@@ -29,7 +29,6 @@ final readonly class StartUpdate
 
         return match (true) {
             $pinned !== null => "This install is pinned to {$pinned} in /opt/databasify/.env.",
-            ! $this->updater->isInstalled() => 'The updater is not installed on this server yet. Run the update command over SSH once.',
             $this->updater->isRequested(), $this->updater->status()?->isRunning() === true => 'An update is already running.',
             ! $this->latestRelease->hasNewerRelease() => 'Databasify is already up to date.',
             default => null,

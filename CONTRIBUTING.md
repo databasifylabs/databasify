@@ -15,10 +15,19 @@ Requirements: PHP 8.5, Composer, Node.js and SQLite.
 ```bash
 git clone https://github.com/databasifylabs/databasify.git
 cd databasify
-composer install && npm install
-cp .env.example .env && php artisan key:generate && php artisan migrate
+composer run setup
 composer run dev
 ```
+
+`composer run setup` installs the dependencies, writes `.env`, generates the app key, migrates the database and builds the frontend.
+
+### The Updates page in development
+
+The Updates page only exists on Docker installs, where the host updater is installed. `composer run setup` also prepares a local stand-in for it: an `installed` marker in `storage/updater` (git-ignored) and `DATABASIFY_UPDATER_PATH` in `.env` pointing at that folder, so **Updates** shows in the sidebar.
+
+- Nothing on your machine runs the update. Clicking **Update** only creates `storage/updater/request/update`; delete it to reset the page.
+- To see the other states, write `storage/updater/status.json` by hand in the format `scripts/update.sh` writes. The page polls it every 2 seconds while its `state` is `running`.
+- To hide the page, remove the `DATABASIFY_UPDATER_PATH` line from `.env` and run `php artisan config:clear`.
 
 Branch from `0.x` and open your pull request against `0.x`.
 

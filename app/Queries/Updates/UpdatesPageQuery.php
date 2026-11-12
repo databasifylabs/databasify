@@ -24,7 +24,6 @@ final readonly class UpdatesPageQuery
             CarbonImmutable::tomorrow(),
             $this->latestRelease->hasNewerRelease(),
             $this->updater->pinnedVersion(),
-            $this->updater->isInstalled(),
             $this->updater->isRequested(),
             $status,
             $status?->isFailed() === true ? $this->logTail() : [],

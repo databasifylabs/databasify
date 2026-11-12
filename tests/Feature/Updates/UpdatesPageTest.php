@@ -23,7 +23,6 @@ it('shows the pending release with its notes', function () {
         ->where('release.url', 'https://github.com/databasifylabs/databasify/releases/tag/0.2.0')
         ->where('release.notesHtml', fn (string $html) => str_contains($html, '<li>Update from the app</li>'))
         ->where('updateAvailable', true)
-        ->where('updaterInstalled', true)
         ->where('pinnedVersion', null)
         ->where('status', null)
         ->where('updateRequested', false)
@@ -77,6 +76,16 @@ it('sends the latest log as a download', function () {
     file_put_contents($this->updater.'/update.log', "line one\n");
 
     $this->get('/updates/log')->assertDownload('databasify-update.log');
+});
+
+it('hides updates on an install without the updater', function () {
+    unlink($this->updater.'/installed');
+
+    $this->get('/updates')->assertNotFound();
+    $this->post('/updates')->assertNotFound();
+    $this->post('/updates/check')->assertNotFound();
+    $this->get('/updates/log')->assertNotFound();
+    expect(file_exists($this->updater.'/request/update'))->toBeFalse();
 });
 
 it('keeps guests out', function () {

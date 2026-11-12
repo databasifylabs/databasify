@@ -7,31 +7,19 @@ import { runAction } from '@/lib/run-action';
 import type { UpdateRelease } from '@/types';
 
 const RELEASES_URL = 'https://github.com/databasifylabs/databasify/releases';
-const UPDATE_COMMAND =
-    'curl -fsSL https://get.databasify.io/update.sh | sudo bash';
 
 function UpdateAction({
     release,
     pinnedVersion,
-    updaterInstalled,
 }: {
     release: UpdateRelease;
     pinnedVersion: string | null;
-    updaterInstalled: boolean;
 }) {
     if (pinnedVersion) {
         return (
             <p className="text-sm text-muted-foreground">
                 Pinned to {pinnedVersion} in /opt/databasify/.env
             </p>
-        );
-    }
-
-    if (!updaterInstalled) {
-        return (
-            <code className="rounded-md bg-muted px-2 py-1 font-mono text-xs">
-                {UPDATE_COMMAND}
-            </code>
         );
     }
 
@@ -51,13 +39,11 @@ export default function UpdateAvailable({
     release,
     checkedAt,
     pinnedVersion,
-    updaterInstalled,
 }: {
     currentVersion: string;
     release: UpdateRelease;
     checkedAt: string | null;
     pinnedVersion: string | null;
-    updaterInstalled: boolean;
 }) {
     return (
         <div className="rounded-xl border bg-card p-4">
@@ -76,11 +62,7 @@ export default function UpdateAvailable({
                         </div>
                     </div>
                 </div>
-                <UpdateAction
-                    release={release}
-                    pinnedVersion={pinnedVersion}
-                    updaterInstalled={updaterInstalled}
-                />
+                <UpdateAction release={release} pinnedVersion={pinnedVersion} />
             </div>
             <div className="mt-4 border-t pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">

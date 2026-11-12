@@ -62,6 +62,7 @@ it('stores nothing when the first check fails', function () {
 });
 
 it('fails the scheduled command without crashing when the source fails', function () {
+    installedUpdater();
     Http::fake(['get.databasify.io/*' => Http::response('', 404)]);
 
     $this->artisan('updates:check')->assertFailed();
@@ -79,9 +80,19 @@ it('compares versions', function (string $running, bool $newer) {
 })->with([['0.1.0', true], ['0.2.0', false], ['0.10.0', false]]);
 
 it('checks from the scheduled command', function () {
+    installedUpdater();
     Http::fake(['get.databasify.io/*' => Http::response(releaseFeed('0.3.0'))]);
 
     $this->artisan('updates:check')->assertSuccessful();
 
     expect(resolve(LatestReleaseQuery::class)->get()?->release->version)->toBe('0.3.0');
+});
+
+it('skips the scheduled check on an install without the updater', function () {
+    Http::fake();
+    config()->set('databasify.updates.path', temporaryDirectory());
+
+    $this->artisan('updates:check')->assertSuccessful();
+
+    Http::assertNothingSent();
 });

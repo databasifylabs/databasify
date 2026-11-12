@@ -69,6 +69,8 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"is_dir('storage/updater/request') || mkdir('storage/updater/request', 0755, true); touch('storage/updater/installed');\"",
+            "@php -r \"str_contains(file_get_contents('.env'), 'DATABASIFY_UPDATER_PATH=') || file_put_contents('.env', PHP_EOL.'DATABASIFY_UPDATER_PATH='.getcwd().'/storage/updater'.PHP_EOL, FILE_APPEND);\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
             "npm install",
