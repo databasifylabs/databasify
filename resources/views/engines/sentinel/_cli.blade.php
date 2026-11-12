@@ -2,6 +2,10 @@
 ROOT={!! $sh->arg($engine->home()) !!}
 CLI={!! $sh->arg($engine->cli) !!}
 FLAVOR={!! $sh->arg($engine->id) !!}
+CLI_CONNECT_TIMEOUT=
+if "$CLI" -t 5 --version > /dev/null 2>&1; then
+    CLI_CONNECT_TIMEOUT=5
+fi
 
 admin_password() {
     local content
@@ -17,7 +21,7 @@ cli() {
         databasify_fail unavailable 'no password file yet'
     fi
     secret=${CLI_SECRET-$(admin_password)}
-    output=$(REDISCLI_AUTH="$secret" timeout "${CLI_TIMEOUT:-30}" "$CLI" --no-auth-warning --raw -e -t 5 ${CLI_TLS:+--tls --insecure} ${CLI_USER:+--user "$CLI_USER"} -h "$host" -p "$port" "$@" 2>&1) && status=0 || status=$?
+    output=$(REDISCLI_AUTH="$secret" timeout "${CLI_TIMEOUT:-30}" "$CLI" --no-auth-warning --raw -e ${CLI_CONNECT_TIMEOUT:+-t "$CLI_CONNECT_TIMEOUT"} ${CLI_TLS:+--tls --insecure} ${CLI_USER:+--user "$CLI_USER"} -h "$host" -p "$port" "$@" 2>&1) && status=0 || status=$?
     output=${output//$'\r'/}
     if [ "$status" -eq 0 ]; then
         printf '%s' "$output"

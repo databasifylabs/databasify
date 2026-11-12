@@ -41,6 +41,22 @@ it('sends the trimmed password in REDISCLI_AUTH, never on argv', function (strin
         ->and($args)->toContain("--no-auth-warning\n--raw\n-e\n-t\n5\n-h\n127.0.0.1\n-p\n6379\nPING");
 })->with(['valkey', 'redis']);
 
+it('leaves out the connect timeout on a 7.2 CLI that rejects -t', function (string $engine) {
+    $bin = sys_get_temp_dir().'/old-cli-'.uniqid();
+    mkdir($bin);
+    $cli = SentinelFamilyEngine::of($engine)->cli;
+    file_put_contents("{$bin}/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$bin}/{$cli}", "#!/bin/bash\nfor arg in \"\$@\"; do if [ \"\$arg\" = -t ]; then echo \"Unrecognized option or bad number of args for: '-t'\"; exit 1; fi; done\nprintf 'PONG\\n'\n");
+    chmod("{$bin}/timeout", 0755);
+    chmod("{$bin}/{$cli}", 0755);
+    $script = resolve(ScriptView::class)->render(idleDatabase($engine, 1)->nodes()->sole(), 'testing/cli-run', ['engine' => SentinelFamilyEngine::of($engine)]);
+
+    $run = Process::input($script)->env(['PATH' => "{$bin}:".getenv('PATH'), 'CLI_SECRET' => 'pw', 'TEST_ROOT' => $bin])->run(['bash', '-euo', 'pipefail', '-s']);
+    Process::run(['rm', '-rf', $bin]);
+
+    expect($run->successful())->toBeTrue($run->output().$run->errorOutput())->and($run->output())->toContain('DATABASIFY_RESULT PONG');
+})->with(['valkey', 'redis']);
+
 it('maps CLI failures like the Go client', function (string $output, bool $withPassword, string $class, string $message) {
     [$run] = runCli('valkey', $output, 1, $withPassword);
     $error = ScriptFailure::of('testing/cli-run', (int) $run->exitCode(), $run->output(), $run->errorOutput());
