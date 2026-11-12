@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Engines\Drivers\Postgres;
 
 use App\Contracts\Engines\EngineScripts;
+use App\Engines\Drivers\TlsPair;
 use App\Engines\Requests\ClusterEnable;
 use App\Engines\Requests\NodeBootstrap;
 use App\Engines\Requests\NodeReady;
@@ -12,7 +13,6 @@ use App\Engines\Requests\NodeWake;
 use App\Engines\Requests\TlsInstall;
 use App\Engines\Responses\Done;
 use App\Engines\Responses\Operation;
-use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 
 final readonly class Lifecycle
@@ -62,7 +62,7 @@ final readonly class Lifecycle
 
     public function installTls(DatabaseNode $node, TlsInstall $request): Done
     {
-        $this->checkPair($request);
+        TlsPair::check($request);
         $this->scripts->run($node, 'postgres/nodes/tls-install', $this->accounts->dataFor($node), env: ['CERTIFICATE' => $request->certificate, 'KEY' => $request->key, 'CA' => $request->ca]);
 
         return new Done;
@@ -76,18 +76,5 @@ final readonly class Lifecycle
     public function enableCluster(DatabaseNode $node, ClusterEnable $request): Operation
     {
         return $this->scripts->start($node, $request->key, 'postgres/cluster/enable', $this->accounts->dataFor($node));
-    }
-
-    private function checkPair(TlsInstall $request): void
-    {
-        $certificate = openssl_x509_read($request->certificate);
-
-        if ($certificate === false || ! openssl_x509_check_private_key($certificate, $request->key)) {
-            throw new InvalidEngineRequest('invalid_request', 'the certificate and key are not a matching PEM pair: '.(openssl_error_string() ?: 'tls: private key does not match public key'));
-        }
-
-        if (preg_match('/-----BEGIN [A-Z ]+-----/', $request->ca) !== 1) {
-            throw new InvalidEngineRequest('invalid_request', 'the CA is not PEM');
-        }
     }
 }
