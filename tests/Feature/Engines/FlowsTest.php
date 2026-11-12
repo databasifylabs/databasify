@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Databases\Flows\StartFlow;
-use App\Actions\Servers\ReleaseAbandonedWork;
 use App\Engines\EngineClient;
 use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\StartedOperation;
@@ -180,16 +179,6 @@ it('copies the operation phase and progress onto the flow and the operation titl
     expect($record->fresh())->phase->toBe('copying data')
         ->and($record->fresh()->progress)->done->toBe(41)->total->toBe(120)->unit->toBe('GB')
         ->and($this->database->fresh()->operation)->toBe('Scripted flow: copying data, 41 of 120 GB');
-});
-
-it('keeps the lock of a database whose flow still runs past the abandoned-work cutoff', function () {
-    $keys = [];
-    startScripted($this->database, ScriptedFlow::bind([longStep($keys)]));
-
-    $this->travel(9)->hours();
-    resolve(ReleaseAbandonedWork::class)->handle();
-
-    expect($this->database->fresh()->operation)->toBe('Scripted flow');
 });
 
 it('cancels the operation and fails the flow when the owner stops it', function () {

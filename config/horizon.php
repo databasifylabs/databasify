@@ -255,7 +255,7 @@ return [
             'maxJobs' => 0,
             'memory' => (int) env('HORIZON_DATABASES_MEMORY', 128),
             'tries' => 1,
-            'timeout' => (int) env('HORIZON_DATABASES_TIMEOUT', 22000),
+            'timeout' => (int) env('HORIZON_DATABASES_TIMEOUT', 3660),
             'nice' => 0,
         ],
 

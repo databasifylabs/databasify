@@ -11,7 +11,6 @@ use App\Console\Commands\Databases\RefreshMigrationsCommand;
 use App\Console\Commands\Databases\RefreshRecoveryStatusCommand;
 use App\Console\Commands\Databases\RenewCertificatesCommand;
 use App\Console\Commands\Networks\ReconcileNetworksCommand;
-use App\Console\Commands\Servers\ReleaseAbandonedWorkCommand;
 use App\Console\Commands\Updates\CheckForReleaseCommand;
 use App\Models\NodeMetricSample;
 use App\Models\ServerLog;
@@ -24,7 +23,6 @@ Schedule::onOneServer()->group(function () {
     Schedule::command(RefreshMigrationsCommand::class)->everyMinute()->withoutOverlapping(5);
     Schedule::command(RefreshRecoveryStatusCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ReconcileNetworksCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
-    Schedule::command(ReleaseAbandonedWorkCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ApplyMaintenanceCommand::class)->hourly();
     Schedule::command(CheckDatabaseUpgradesCommand::class)->daily();
     Schedule::command(CheckForReleaseCommand::class)->daily();

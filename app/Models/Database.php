@@ -416,24 +416,6 @@ class Database extends Model implements Movable
      * @param  Builder<self>  $query
      */
     #[Scope]
-    protected function withoutRunningFlow(Builder $query): void
-    {
-        $query->whereDoesntHave('flows', fn (Builder $flows) => $flows->running());
-    }
-
-    /**
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
-    protected function operationStartedBefore(Builder $query, CarbonInterface $moment): void
-    {
-        $query->whereNotNull('operation')->where('operation_started_at', '<', $moment);
-    }
-
-    /**
-     * @param  Builder<self>  $query
-     */
-    #[Scope]
     protected function inMaintenanceWindowAt(Builder $query, CarbonInterface $moment): void
     {
         $utc = $moment->copy()->utc();
