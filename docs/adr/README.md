@@ -77,5 +77,6 @@ Options that were tried or rejected, and why.
 | [0031](0031-one-sdk-range-per-app-release.md)               | Each app release runs one engine SDK range               | Accepted |
 | [0032](0032-databases-on-a-dropped-sdk-run-read-only.md)    | Databases on a dropped SDK run read-only                 | Accepted |
 | [0033](0033-self-update-through-a-host-helper.md)           | Self-update through a host helper                        | Accepted |
+| [0034](0034-a-frozen-engine-runtime.md)                     | A frozen engine runtime                                  | Accepted |
 
 The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.
