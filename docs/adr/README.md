@@ -4,20 +4,20 @@ An ADR records one decision that shapes Databasify beyond a single change: what 
 
 ## Rules
 
--   One decision per file, named `NNNN-kebab-slug.md`, numbered in order.
--   Status is one of `Proposed`, `Accepted`, `Superseded by NNNN` or `Deprecated`.
--   An accepted decision is not rewritten. To change a decision, write a new ADR and mark the old one `Superseded by NNNN`.
--   Facts in an ADR (names, numbers, paths, behaviour) are kept in sync with the code in the same change that alters them.
--   Write an ADR only for a decision that outlives the change that introduced it. Details of a single change belong in its pull request or GitHub issue.
--   Evidence cites repository paths only. Git history before 2026-11-04 was squashed, so older commit hashes no longer resolve.
+- One decision per file, named `NNNN-kebab-slug.md`, numbered in order.
+- Status is one of `Proposed`, `Accepted`, `Superseded by NNNN` or `Deprecated`.
+- An accepted decision is not rewritten. To change a decision, write a new ADR and mark the old one `Superseded by NNNN`.
+- Facts in an ADR (names, numbers, paths, behaviour) are kept in sync with the code in the same change that alters them.
+- Write an ADR only for a decision that outlives the change that introduced it. Details of a single change belong in its pull request or GitHub issue.
+- Evidence cites repository paths only. Git history before 2026-11-04 was squashed, so older commit hashes no longer resolve.
 
 ## Template
 
 ```markdown
 # NNNN. Title
 
--   Status: Proposed
--   Date: YYYY-MM-DD
+- Status: Proposed
+- Date: YYYY-MM-DD
 
 ## Context
 
@@ -37,7 +37,7 @@ Options that were tried or rejected, and why.
 
 ## Evidence
 
--   `path/to/file`
+- `path/to/file`
 ```
 
 ## Index
