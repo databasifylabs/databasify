@@ -173,6 +173,7 @@ it('refuses a zip that is not a Databasify plugin', function () {
 });
 
 it('refuses a plugin built for another Databasify version and skips one that stopped matching', function () {
+    config(['app.version' => '0.1.0']);
     fakeGithub(pluginZip('Future', 'future', "\$this->databasify()->database('future')->label('Future')->register();", requires: '^9.0'));
     $this->post('/plugins', ['source' => 'acme/plugin', 'accepts_community_engines' => true])->assertSessionHasErrors(['source' => 'Needs Databasify ^9.0; this is 0.1.0.']);
     expect(Plugin::query()->count())->toBe(0);
