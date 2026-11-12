@@ -12,4 +12,5 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     external?: boolean;
+    badge?: number;
 };

@@ -17,6 +17,7 @@ declare module '@inertiajs/core' {
             horizonUrl: string | null;
             currentProject: Project | null;
             projects: Project[];
+            updateAvailable: boolean;
             [key: string]: unknown;
         };
     }

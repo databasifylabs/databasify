@@ -1,0 +1,9 @@
+[Unit]
+Description=Update Databasify to the latest release
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'set -o pipefail; curl -fsSL https://get.databasify.io/update.sh | bash'
+ExecStopPost=/bin/sh -c 'rm -rf /opt/databasify/updater/request/*'

@@ -9,6 +9,7 @@ use App\Contracts\Images\ImageRegistry;
 use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Databases\NewDatabase;
 use App\DTOs\Migrations\MigrationSource;
+use App\DTOs\Updates\Release;
 use App\Engines\Data\EngineField;
 use App\Engines\Payload;
 use App\Engines\Responses\EngineCapabilities;
@@ -28,8 +29,10 @@ use App\Models\NodeMetricSample;
 use App\Models\PointInTimeRecovery;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Setting;
 use App\Models\StorageProvider;
 use App\Support\Projects\ProjectContext;
+use Carbon\CarbonImmutable;
 use Database\Factories\ProjectFactory;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -474,4 +477,35 @@ function withCurrentCertificates(Database $database): Database
     resolve(IssueNodeCertificates::class)->handle($database);
 
     return $database->fresh() ?? $database;
+}
+
+function storeRelease(string $version, string $notes): void
+{
+    $release = new Release($version, CarbonImmutable::parse('2026-11-20T08:00:00Z'), "https://github.com/databasifylabs/databasify/releases/tag/{$version}", $notes);
+
+    Setting::query()->updateOrCreate(['name' => 'latest_release'], ['value' => $release->toJson()]);
+}
+
+function installedUpdater(): string
+{
+    $path = temporaryDirectory();
+    mkdir("{$path}/request");
+    touch("{$path}/installed");
+    config()->set('databasify.updates.path', $path);
+
+    return $path;
+}
+
+function updateStatusJson(string $state, bool $rolledBack = false, string $failedStep = ''): string
+{
+    $steps = collect(['Refreshing release files', 'Pulling images', 'Waiting until healthy'])
+        ->map(fn (string $title): array => ['title' => $title, 'state' => $title === $failedStep ? 'failed' : 'done'])
+        ->all();
+
+    return (string) json_encode(['state' => $state, 'from' => '0.1.0', 'to' => '0.2.0', 'started_at' => '2026-11-20T03:14:02Z', 'finished_at' => $state === 'running' ? null : '2026-11-20T03:16:06Z', 'rolled_back' => $rolledBack, 'message' => $rolledBack ? 'Rolled back to 0.1.0' : '', 'steps' => $steps]);
+}
+
+function runningStatusJson(): string
+{
+    return updateStatusJson('running');
 }

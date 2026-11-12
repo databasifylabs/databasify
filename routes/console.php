@@ -12,6 +12,7 @@ use App\Console\Commands\Databases\RefreshRecoveryStatusCommand;
 use App\Console\Commands\Databases\RenewCertificatesCommand;
 use App\Console\Commands\Networks\ReconcileNetworksCommand;
 use App\Console\Commands\Servers\ReleaseAbandonedWorkCommand;
+use App\Console\Commands\Updates\CheckForReleaseCommand;
 use App\Models\NodeMetricSample;
 use App\Models\ServerLog;
 use Illuminate\Support\Facades\Schedule;
@@ -26,6 +27,7 @@ Schedule::onOneServer()->group(function () {
     Schedule::command(ReleaseAbandonedWorkCommand::class)->everyFiveMinutes()->withoutOverlapping(10);
     Schedule::command(ApplyMaintenanceCommand::class)->hourly();
     Schedule::command(CheckDatabaseUpgradesCommand::class)->daily();
+    Schedule::command(CheckForReleaseCommand::class)->daily();
     Schedule::command(RenewCertificatesCommand::class)->dailyAt('02:00')->withoutOverlapping(240);
     Schedule::command('horizon:snapshot')->everyFiveMinutes();
     Schedule::command('model:prune', ['--model' => [NodeMetricSample::class, ServerLog::class]])->daily();

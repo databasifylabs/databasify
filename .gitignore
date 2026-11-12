@@ -49,3 +49,4 @@ yarn-error.log
 /docker/.env
 /scratchpad
 /docs/superpowers
+/scripts/version.json

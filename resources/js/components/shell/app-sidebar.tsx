@@ -9,6 +9,7 @@ import {
     LayoutGrid,
     ListEnd,
     Puzzle,
+    RefreshCw,
     Server,
 } from 'lucide-react';
 import AppLogo from '@/components/shell/app-logo';
@@ -34,6 +35,7 @@ import { index as projectsIndex } from '@/routes/projects';
 import { index as providersIndex } from '@/routes/providers';
 import { index as serversIndex } from '@/routes/servers';
 import { index as storageIndex } from '@/routes/storage-providers';
+import { index as updatesIndex } from '@/routes/updates';
 import type { NavItem } from '@/types';
 
 function projectNavItems(): NavItem[] {
@@ -47,10 +49,19 @@ function projectNavItems(): NavItem[] {
     ];
 }
 
-function globalNavItems(horizonUrl: string | null): NavItem[] {
+function globalNavItems(
+    horizonUrl: string | null,
+    updateAvailable: boolean,
+): NavItem[] {
     return [
         { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
         { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
+        {
+            title: 'Updates',
+            href: updatesIndex(),
+            icon: RefreshCw,
+            badge: updateAvailable ? 1 : undefined,
+        },
         ...(horizonUrl
             ? [
                   {
@@ -65,7 +76,7 @@ function globalNavItems(horizonUrl: string | null): NavItem[] {
 }
 
 export function AppSidebar() {
-    const { horizonUrl, currentProject } = usePage().props;
+    const { horizonUrl, currentProject, updateAvailable } = usePage().props;
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -86,7 +97,10 @@ export function AppSidebar() {
                 {currentProject && (
                     <NavMain label="Project" items={projectNavItems()} />
                 )}
-                <NavMain label="Global" items={globalNavItems(horizonUrl)} />
+                <NavMain
+                    label="Global"
+                    items={globalNavItems(horizonUrl, updateAvailable)}
+                />
             </SidebarContent>
 
             <SidebarFooter>

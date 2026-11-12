@@ -84,32 +84,73 @@ valkey_volume_step() {
     run_step 'Removing the old Valkey volume' '' remove_valkey_volume
 }
 
+NO_ROLLBACK='No running version found, rollback not available'
+
+record_previous_image() {
+    PREVIOUS_IMAGE=$(running_image)
+    PREVIOUS_VERSION=$(running_version)
+    [ -z "$PREVIOUS_IMAGE" ] || return 0
+    status_note false "$NO_ROLLBACK"
+    printf '%s\n' "$NO_ROLLBACK" >> "${LOG:-/dev/null}"
+    skipped_line "$NO_ROLLBACK" ''
+}
+
+lock_update() {
+    mkdir -p "$UPDATER_DIR"
+    exec 9> "$UPDATER_DIR/.lock"
+    flock -n 9 || refuse 'Another update is already running' 'Wait for it to finish, then run the update command again.'
+}
+
+clear_update_request() {
+    rm -rf "$UPDATER_DIR/request/"*
+}
+
+finish_unfinished_status() {
+    [ "${STATUS_STATE:-}" != running ] || status_finish failed
+}
+
+roll_back_to_previous() {
+    [ -n "$PREVIOUS_IMAGE" ] || return 0
+    roll_back "$PREVIOUS_IMAGE" "$PREVIOUS_VERSION"
+}
+
 if [ "${1:-}" = --functions-only ]; then
     return 0
 fi
 
-LOG=$DIR/update.log
+LOG=$UPDATER_DIR/update.log
+UPDATE_STATUS=$UPDATER_DIR/status.json
 RETRY_COMMAND='curl -fsSL https://get.databasify.io/update.sh | sudo bash'
 started=$(date +%s)
 
 require_root
 require_installed
-touch "$LOG"
+lock_update
+: > "$LOG"
+from=$(running_version)
+to=$(release_version)
+status_start "$from" "$to" 'Refreshing release files' 'Installing the updater' 'Adding new settings' 'Saving the app key and Reverb credentials' 'Pulling images' 'Restarting containers' 'Waiting until healthy' 'Removing old images'
+trap finish_unfinished_status EXIT
+clear_update_request
 
-banner 'Welcome to the Databasify updater' "This pulls the latest release and restarts Databasify. Your data and settings stay.\n${DIM}Full log: $LOG${RESET}" "$(version_chip "$(running_version)" "$(release_version)")"
+banner 'Welcome to the Databasify updater' "This pulls the latest release and restarts Databasify. Your data and settings stay.\n${DIM}Full log: $LOG${RESET}" "$(version_chip "$from" "$to")"
 
 heading Databasify
 run_step 'Refreshing release files' '' release_files_step
+run_step 'Installing the updater' '' install_updater
 settings_step
 bundled_services_step
 secrets_step
 horizon_step
+record_previous_image
 pull_step
 
 heading Start
-run_step 'Restarting containers' '' restart_containers
-STEP_LOG_LINES=50 STEP_FIX='See the app container log above' run_step 'Waiting until healthy' '' wait_for_health
+STEP_ON_FAILURE=roll_back_to_previous run_step 'Restarting containers' '' restart_containers
+STEP_LOG_LINES=50 STEP_FIX='See the app container log above' STEP_ON_FAILURE=roll_back_to_previous run_step 'Waiting until healthy' '' wait_for_health
 run_step 'Removing old images' '' remove_old_images
 valkey_volume_step
+
+status_finish succeeded
 
 summary_box "Databasify is up to date  in $(elapsed_since "$started")" "Open|$(app_url)"

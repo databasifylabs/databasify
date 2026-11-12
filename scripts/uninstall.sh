@@ -59,6 +59,7 @@ purge() {
     heading Databasify
     run_step 'Stopping containers' '' stop_containers
     run_step 'Deleting data volumes' '' delete_volumes
+    run_step 'Removing the updater' '' remove_updater
     run_step "Removing $DIR" '' remove_directory
     printf '\n  %s✓ Databasify is removed.%s %sDocker stays installed.%s\n' "$GREEN" "$RESET" "$DIM" "$RESET"
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 DIR=${DATABASIFY_DIR:-/opt/databasify}
+UPDATER_DIR=${DATABASIFY_UPDATER_DIR:-$DIR/updater}
 PULL=${DATABASIFY_PULL:-true}
 SECRET_NAMES='APP_KEY REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET'
 
@@ -103,8 +104,8 @@ pinned_version() {
 published_version() {
     local file
     file=$(mktemp)
-    fetch version "$file" 2> /dev/null || true
-    tr -d '[:space:]' < "$file"
+    fetch version.json "$file" 2> /dev/null || true
+    sed -n 's/^[[:space:]]*"version": "\([^"]*\)",$/\1/p' "$file" | head -n 1 | tr -d '[:space:]'
     rm -f "$file"
 }
 
@@ -123,6 +124,13 @@ running_version() {
     container=$(compose ps -q app 2> /dev/null) || return 0
     [ -n "$container" ] || return 0
     docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$container" < /dev/null 2> /dev/null || true
+}
+
+running_image() {
+    local container
+    container=$(compose ps -q app 2> /dev/null) || return 0
+    [ -n "$container" ] || return 0
+    docker inspect -f '{{.Image}}' "$container" < /dev/null 2> /dev/null || true
 }
 
 version_chip() {
@@ -145,6 +153,34 @@ download_release_files() {
     fetch env.example "$DIR/.env.example"
 }
 
+SYSTEMD_DIR=${SYSTEMD_DIR:-/etc/systemd/system}
+UPDATER_UNITS='databasify-update.path databasify-update.service'
+APP_USER_ID=33
+
+install_updater() {
+    local unit
+    for unit in $UPDATER_UNITS; do
+        fetch "$unit" "$SYSTEMD_DIR/$unit"
+    done
+    mkdir -p "$UPDATER_DIR/request"
+    chmod 755 "$UPDATER_DIR"
+    chmod 700 "$UPDATER_DIR/request"
+    chown "$APP_USER_ID:$APP_USER_ID" "$UPDATER_DIR/request"
+    touch "$UPDATER_DIR/installed"
+    systemctl daemon-reload
+    systemctl enable --now databasify-update.path
+    step_result 'Updater installed'
+}
+
+remove_updater() {
+    local unit
+    systemctl disable --now databasify-update.path 2> /dev/null || true
+    for unit in $UPDATER_UNITS; do
+        rm -f "$SYSTEMD_DIR/$unit"
+    done
+    systemctl daemon-reload 2> /dev/null || true
+}
+
 wait_until_healthy() {
     local container
     for _ in $(seq 1 60); do
@@ -155,6 +191,25 @@ wait_until_healthy() {
         sleep 5
     done
     compose logs --tail 50 app >> "${LOG:-/dev/null}" 2>&1
+    return 1
+}
+
+roll_back() {
+    local image=$1 version=$2 step="Rolling back to $2"
+    status_step "$step" running
+    if ! docker tag "$image" "$(compose config --images app)" < /dev/null; then
+        status_step "$step" failed
+        status_note false "Rollback to $version failed: the previous image could not be restored"
+        return 1
+    fi
+    compose up -d --remove-orphans
+    if wait_until_healthy; then
+        status_step "$step" done
+        status_note true "Rolled back to $version"
+        return 0
+    fi
+    status_step "$step" failed
+    status_note true "Rolled back to $version, but it did not become healthy"
     return 1
 }
 
@@ -407,7 +462,86 @@ log_file_readable() {
     [ -n "${LOG:-}" ] && [ "$LOG" != /dev/null ] && [ -f "$LOG" ]
 }
 
+STATUS_TITLES=()
+STATUS_STATES=()
+
+utc_now() {
+    date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
+json_string() {
+    printf '%s' "$1" \
+        | sed 's/\\/\\\\/g; s/"/\\"/g; s/'"$(printf '\t')"'/\\t/g; s/'"$(printf '\r')"'/\\r/g' \
+        | awk 'BEGIN { ORS = ""; printf "%s", "\"" } { if (NR > 1) { printf "%s", "\\n" } printf "%s", $0 } END { printf "%s", "\"" }'
+}
+
+status_steps_json() {
+    local index separator=''
+    for ((index = 0; index < ${#STATUS_TITLES[@]}; index++)); do
+        printf '%s{"title": %s, "state": "%s"}' "$separator" "$(json_string "${STATUS_TITLES[$index]}")" "${STATUS_STATES[$index]}"
+        separator=', '
+    done
+}
+
+write_status() {
+    [ -n "${UPDATE_STATUS:-}" ] || return 0
+    local file finished=null
+    [ -z "$STATUS_FINISHED_AT" ] || finished=$(json_string "$STATUS_FINISHED_AT")
+    mkdir -p "$(dirname "$UPDATE_STATUS")"
+    file=$(mktemp "$UPDATE_STATUS.XXXXXX")
+    printf '{"state": "%s", "from": %s, "to": %s, "started_at": "%s", "finished_at": %s, "rolled_back": %s, "message": %s, "steps": [%s]}\n' \
+        "$STATUS_STATE" "$(json_string "$STATUS_FROM")" "$(json_string "$STATUS_TO")" "$STATUS_STARTED_AT" "$finished" \
+        "$STATUS_ROLLED_BACK" "$(json_string "$STATUS_MESSAGE")" "$(status_steps_json)" > "$file"
+    chmod 644 "$file"
+    mv "$file" "$UPDATE_STATUS"
+}
+
+status_start() {
+    STATUS_FROM=$1 STATUS_TO=$2 STATUS_STATE=running STATUS_STARTED_AT=$(utc_now) STATUS_FINISHED_AT=''
+    STATUS_ROLLED_BACK=false STATUS_MESSAGE=''
+    shift 2
+    STATUS_TITLES=() STATUS_STATES=()
+    local title
+    for title in "$@"; do
+        STATUS_TITLES+=("$title")
+        STATUS_STATES+=(pending)
+    done
+    write_status
+}
+
+status_step() {
+    [ -n "${STATUS_STATE:-}" ] || return 0
+    local index
+    for ((index = 0; index < ${#STATUS_TITLES[@]}; index++)); do
+        if [ "${STATUS_TITLES[$index]}" = "$1" ]; then
+            STATUS_STATES[index]=$2
+            write_status
+            return 0
+        fi
+    done
+    STATUS_TITLES+=("$1")
+    STATUS_STATES+=("$2")
+    write_status
+}
+
+status_note() {
+    [ -n "${STATUS_STATE:-}" ] || return 0
+    STATUS_ROLLED_BACK=$1 STATUS_MESSAGE=$2
+    write_status
+}
+
+status_finish() {
+    [ -n "${STATUS_STATE:-}" ] || return 0
+    local index
+    for ((index = 0; index < ${#STATUS_STATES[@]}; index++)); do
+        [ "${STATUS_STATES[$index]}" != pending ] || STATUS_STATES[index]=skipped
+    done
+    STATUS_STATE=$1 STATUS_FINISHED_AT=$(utc_now)
+    write_status
+}
+
 step_failed() {
+    status_finish failed
     printf '    %s✗%s %s\n' "$RED" "$RESET" "$1"
     printf '\n'
     if log_file_readable; then
@@ -461,6 +595,7 @@ run_step() {
     [ -z "$hint" ] || label="$running_label ${DIM}($hint)${RESET}"
 
     STEP_RESULT_FILE=$(mktemp)
+    status_step "$running_label" running
     "$@" >> "${LOG:-/dev/null}" 2>&1 &
     pid=$!
     trap 'abort_step "$pid"' INT TERM
@@ -472,7 +607,12 @@ run_step() {
     done_label=$(tail -n 1 "$STEP_RESULT_FILE")
     rm -f "$STEP_RESULT_FILE"
 
-    [ "$status" -eq 0 ] || step_failed "$running_label failed" "${STEP_FIX:-}"
+    if [ "$status" -ne 0 ]; then
+        status_step "$running_label" failed
+        [ -z "${STEP_ON_FAILURE:-}" ] || "$STEP_ON_FAILURE" >> "${LOG:-/dev/null}" 2>&1 || true
+        step_failed "$running_label failed" "${STEP_FIX:-}"
+    fi
+    status_step "$running_label" done
     done_line "${done_label:-$running_label}"
 }
 

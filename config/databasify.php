@@ -18,6 +18,12 @@ return [
         'path' => env('DATABASIFY_PLUGINS_PATH', storage_path('plugins')),
     ],
 
+    'updates' => [
+        'source' => env('DATABASIFY_UPDATE_SOURCE', 'https://get.databasify.io/version.json'),
+        'path' => env('DATABASIFY_UPDATER_PATH', '/app/updater'),
+        'pinned' => env('DATABASIFY_VERSION'),
+    ],
+
     'acme' => [
         'mode' => env('ACME_MODE', 'live'),
         'propagation_seconds' => (int) env('ACME_PROPAGATION_SECONDS', 30),

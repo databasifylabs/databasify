@@ -19,3 +19,9 @@ it('sets no container environment in compose and keeps every former default in t
     expect($compose['services']['app'])->not->toHaveKey('environment')
         ->and($templateKeys->all())->toContain('LOG_CHANNEL', 'QUEUE_CONNECTION', 'BROADCAST_CONNECTION', 'REDIS_HOST', 'REVERB_HOST', 'REVERB_PORT', 'REVERB_SCHEME', 'DATABASIFY_VERSION', 'HTTP_PORT');
 });
+
+it('shares the updater folder with the app', function () {
+    $compose = Yaml::parseFile(base_path('scripts/compose.yaml'));
+
+    expect($compose['services']['app']['volumes'])->toContain('./updater:/app/updater');
+});

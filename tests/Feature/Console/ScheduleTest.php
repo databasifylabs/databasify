@@ -19,6 +19,7 @@ it('runs every command on its own schedule on one server only', function () {
         'servers:release-abandoned-work' => ['*/5 * * * *', true, true],
         'databases:apply-maintenance' => ['0 * * * *', false, true],
         'databases:check-upgrades' => ['0 0 * * *', false, true],
+        'updates:check' => ['0 0 * * *', false, true],
         'databases:renew-certificates' => ['0 2 * * *', true, true],
         'horizon:snapshot' => ['*/5 * * * *', false, true],
         "model:prune --model='App\\Models\\NodeMetricSample' --model='App\\Models\\ServerLog'" => ['0 0 * * *', false, true],

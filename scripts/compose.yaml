@@ -9,6 +9,7 @@ services:
         volumes:
             - storage:/app/storage
             - redis:/var/lib/redis
+            - ./updater:/app/updater
         stop_grace_period: 30m
         restart: unless-stopped
 

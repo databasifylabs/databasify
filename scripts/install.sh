@@ -149,6 +149,7 @@ heading Databasify
 run_step 'Downloading release files' '' release_files_step
 settings_step "$domain" "$address"
 pull_step
+run_step 'Installing the updater' '' install_updater
 
 heading Start
 STEP_FIX="Free the port, or set HTTP_PORT in $DIR/.env" run_step 'Starting containers' '' start_containers

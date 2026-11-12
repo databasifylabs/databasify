@@ -11,3 +11,4 @@ export type * from './server-logs';
 export type * from './servers';
 export type * from './storage';
 export type * from './ui';
+export type * from './updates';
