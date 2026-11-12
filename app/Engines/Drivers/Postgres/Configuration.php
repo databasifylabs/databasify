@@ -24,7 +24,7 @@ final readonly class Configuration
 
     private const string REQUEST_STATE = 'conf/request.json';
 
-    private const string POOL_SIZE_PLACEHOLDER = '@@DEFAULT_POOL_SIZE@@';
+    private const string POOL_SIZE_PLACEHOLDER = '__DEFAULT_POOL_SIZE__';
 
     private const int CONFIGURE_TIMEOUT = 300;
 
