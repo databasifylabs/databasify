@@ -37,3 +37,15 @@ it('renders every MongoDB script to valid bash and valid JavaScript', function (
     expect(iterator_count($scripts))->toBeGreaterThan(0)
         ->and($invalid)->toBe([]);
 });
+
+it('never closes a mongosh connection in a finally block, which the async rewriter runs before the awaited command', function () {
+    $offending = [];
+
+    foreach (Finder::create()->files()->in(resource_path('views/engines/mongodb'))->name('*.blade.php') as $script) {
+        if (preg_match('/\bfinally\b/', $script->getContents()) === 1) {
+            $offending[] = $script->getRelativePathname();
+        }
+    }
+
+    expect($offending)->toBe([]);
+});

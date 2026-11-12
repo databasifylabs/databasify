@@ -40,7 +40,7 @@ it('configures with the Go-identical files', function (string $case) {
             && $files['/srv/mongodb/conf/admin.pw'] === ['mode' => '600', 'content' => $fixture['request']['secrets']['admin']]
             && base64_decode($env['MANIFEST']) === $fixture['manifest']
             && $env['TUNED_JSON'] !== ''
-            && str_contains($script, 'databasify service reload')
+            && str_contains($script, 'unit_do daemon-reload')
             && str_contains($script, 'unit_do start pbm-agent');
     });
 })->with(['standalone', 'archived', 'readonly']);

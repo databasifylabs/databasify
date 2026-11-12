@@ -21,7 +21,7 @@ if printf '%s' "$MANIFEST" | base64 -d | write_file "$ROOT/conf/processes.json" 
     changed=true
 fi
 printf '%s' "$REQUEST_JSON" | write_file "$ROOT/state/node.json" 600 false || true
-printf '{}' | databasify service reload > /dev/null
+unit_do daemon-reload
 if [ "$START_AGENT" = true ] && unit_active mongod; then
     unit_do start pbm-agent
 fi

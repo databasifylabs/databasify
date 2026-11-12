@@ -16,7 +16,7 @@ else
     printf '%s' "${grastate/safe_to_bootstrap: 0/safe_to_bootstrap: 1}" > "$ROOT/data/grastate.dat"
     chmod 660 "$ROOT/data/grastate.dat"
     mark_new_cluster
-    printf '{}' | databasify service reload > /dev/null
+    unit_do daemon-reload
     unit_do start mariadb-server
 fi
 wait_until 21600 2 synced_now || databasify_fail internal 'the server was not ready within 6h0m0s'

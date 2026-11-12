@@ -38,6 +38,7 @@ it('creates a user with its name and password only in the env', function () {
         && json_decode($env['GRANTS'], true) === [['database' => 'shop', 'access' => 'write']]
         && json_decode($env['RESERVED_DATABASES'], true) === ['postgres', 'template0', 'template1']
         && ! str_contains($script, $password)
+        && str_contains($script, 'setpriv --reuid=64999 --regid=64999 --clear-groups psql')
         && str_contains($script, 'CREATE ROLE :"name" LOGIN;')
         && str_contains($script, 'pg_failed'));
 });

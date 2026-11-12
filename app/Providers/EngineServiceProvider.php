@@ -10,6 +10,8 @@ use App\Engines\Drivers\MariaDb\MariaDbDriver;
 use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
+use App\Engines\Drivers\Sentinel\RedisDriver;
+use App\Engines\Drivers\Sentinel\ValkeyDriver;
 use App\Plugins\RegisterEngine;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,10 +30,12 @@ class EngineServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->sentinel('valkey', 'Valkey', 'valkey-cli')
+            ->driver(ValkeyDriver::class)
             ->versions('9', [['value' => '7', 'label' => 'Valkey 7'], ['value' => '8', 'label' => 'Valkey 8'], ['value' => '9', 'label' => 'Valkey 9']])
             ->register();
 
         $this->sentinel('redis', 'Redis', 'redis-cli')
+            ->driver(RedisDriver::class)
             ->versions('8', [['value' => '7.2', 'label' => 'Redis 7.2'], ['value' => '8', 'label' => 'Redis 8']])
             ->register();
 

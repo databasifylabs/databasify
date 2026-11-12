@@ -8,6 +8,7 @@ use App\Contracts\Engines\EngineScripts;
 use App\Engines\EngineClient;
 use App\Engines\Requests\TaskStatus;
 use App\Engines\Requests\TaskStop;
+use App\Engines\Responses\Done;
 use App\Engines\Responses\Operation;
 use App\Models\DatabaseNode;
 
@@ -30,8 +31,10 @@ final readonly class TaskOperations
         return new Operation($operation->key, $operation->kind, $operation->state, $phase, $operation->progress, $operation->error);
     }
 
-    public function cancel(DatabaseNode $node, string $key): Operation
+    public function cancel(DatabaseNode $node, string $key): Done
     {
-        return $this->engine->send($node, new TaskStop($key));
+        $this->engine->send($node, new TaskStop($key));
+
+        return new Done;
     }
 }

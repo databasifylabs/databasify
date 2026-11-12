@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\LearnEngine;
 use App\Engines\Data\Grant;
+use App\Engines\Drivers\MongoDb\MongoDbDriver;
+use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
+use App\Engines\Drivers\Sentinel\ValkeyDriver;
 use App\Engines\EngineClient;
 use App\Engines\Payload;
 use App\Engines\Requests\EngineInfo;
+use App\Engines\Requests\OperationCancel;
 use App\Engines\Requests\OperationStatus;
 use App\Engines\Requests\UserCreate;
+use App\Engines\Responses\Done;
 use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\OperationState;
@@ -17,7 +22,7 @@ use Tests\Support\FakeEngineDriver;
 
 beforeEach(function () {
     FakeEngineDriver::$answered = [];
-    config(['engine.providers.postgres.driver' => FakeEngineDriver::class, 'engine.providers.mysql.driver' => FakeEngineDriver::class, 'engine.providers.mariadb.driver' => FakeEngineDriver::class, 'engine.providers.mongodb.driver' => FakeEngineDriver::class]);
+    config(['engine.providers.postgres.driver' => FakeEngineDriver::class, 'engine.providers.mysql.driver' => FakeEngineDriver::class, 'engine.providers.mariadb.driver' => FakeEngineDriver::class, 'engine.providers.mongodb.driver' => FakeEngineDriver::class, 'engine.providers.valkey.driver' => FakeEngineDriver::class, 'engine.providers.redis.driver' => FakeEngineDriver::class]);
 });
 
 function createUserRequest(): UserCreate
@@ -32,7 +37,7 @@ it('keeps sending requests to the engine binary while the switch is off', functi
 
     expect($ssh->scriptAt(0))->toContain('databasify user create')
         ->and(FakeEngineDriver::$answered)->toBe([]);
-})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb', 'valkey', 'redis']);
 
 it('lets the driver answer a listed engine once the switch is on', function (string $engine) {
     config(['databasify.php_engines' => [$engine]]);
@@ -45,7 +50,7 @@ it('lets the driver answer a listed engine once the switch is on', function (str
     expect($reply->created)->toBeTrue()
         ->and(FakeEngineDriver::$answered)->toBe(['user create'])
         ->and($ssh->scriptAt(0))->toContain('databasify engine info');
-})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb', 'valkey', 'redis']);
 
 it('keeps a database on an image without the runtime on the binary', function (string $engine) {
     config(['databasify.php_engines' => [$engine]]);
@@ -59,7 +64,7 @@ it('keeps a database on an image without the runtime on the binary', function (s
 
     expect($ssh->scriptAt(0))->toContain('databasify user create')
         ->and(FakeEngineDriver::$answered)->toBe([]);
-})->with(['postgres', 'mysql', 'mariadb', 'mongodb']);
+})->with(['postgres', 'mysql', 'mariadb', 'mongodb', 'valkey', 'redis']);
 
 it('moves a database to the driver once an upgrade reports the runtime', function () {
     config(['databasify.php_engines' => ['postgres']]);
@@ -76,7 +81,7 @@ it('moves a database to the driver once an upgrade reports the runtime', functio
 });
 
 it('leaves engines that are not listed on the binary', function () {
-    config(['databasify.php_engines' => ['postgres']]);
+    config(['databasify.php_engines' => ['postgres'], 'engine.providers.valkey.driver' => null]);
     $ssh = fakeSsh()->respondToEngine('user create', ['created' => true]);
     $node = idleDatabase('valkey', 1)->nodes()->sole();
 
@@ -97,3 +102,18 @@ it('reports a task-backed operation with the phase from its log', function () {
     expect($operation->state)->toBe(OperationState::Interrupted)
         ->and($operation->phase)->toBe('copying');
 });
+
+it('cancels a task-backed operation and answers done', function (string $engine, string $driver) {
+    config(['databasify.php_engines' => [$engine], "engine.providers.{$engine}.driver" => $driver]);
+    $ssh = fakeSsh()->respondToEngine('task stop', ['key' => 'k.1', 'kind' => 'task', 'state' => 'interrupted', 'phase' => 'stopping', 'progress' => null, 'startedAt' => '2026-11-13T00:00:00Z', 'finishedAt' => null, 'error' => null]);
+
+    $reply = resolve(EngineClient::class)->send(idleDatabase($engine, 1)->nodes()->sole(), new OperationCancel('k.1'));
+
+    expect($reply)->toBeInstanceOf(Done::class)
+        ->and($ssh->scriptAt(0))->toContain('databasify task stop');
+})->with([
+    'postgres' => ['postgres', PostgresDriver::class],
+    'mysql' => ['mysql', MySqlDriver::class],
+    'mongodb' => ['mongodb', MongoDbDriver::class],
+    'valkey' => ['valkey', ValkeyDriver::class],
+]);

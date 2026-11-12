@@ -1,6 +1,6 @@
 @include('engines.postgres._psql')
 @include('engines.postgres._cluster')
-printf '{}' | databasify service reload > /dev/null
+unit_do daemon-reload
 if [ -e /srv/postgres/conf/etcd.env ]; then
     phase 'starting etcd'
     unit_do enable databasify-etcd

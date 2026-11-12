@@ -7,7 +7,7 @@ if unit_active mariadb-server; then
         position=$MY_OUTPUT
     fi
 else
-    saved_seqno=$(sed -n 's/^seqno:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p' "$ROOT/data/grastate.dat" 2> /dev/null | head -n 1)
+    saved_seqno=$(sed -n 's/^seqno:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p' "$ROOT/data/grastate.dat" 2> /dev/null | head -n 1 || true)
     if [ -n "$saved_seqno" ] && [ "$saved_seqno" != -1 ]; then
         position=$saved_seqno
     else

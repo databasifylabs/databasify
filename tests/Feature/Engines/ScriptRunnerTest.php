@@ -66,7 +66,7 @@ it('passes values in the env, not in the script', function () {
 
     resolve(ScriptRunner::class)->run(engineNode(), 'testing/echo', ['word' => 'x'], env: ['PASSWORD' => "p'w"]);
 
-    expect(json_decode($ssh->engineRequestAt(0), true)['env'])->toBe(['PASSWORD' => "p'w"]);
+    expect(json_decode($ssh->engineRequestAt(0), true)['env'])->toBe(['DATABASIFY_ENGINE' => 'postgres', 'DATABASIFY_LINE' => '18', 'HOME' => '/root', 'PASSWORD' => "p'w"]);
 });
 
 it('turns a typed error line into the matching engine error', function () {
@@ -95,3 +95,12 @@ it('gives every script the version line so it can branch on it', function (strin
     'older line' => ['8.4', 'echo old'],
     'newer line' => ['9.7', 'echo new'],
 ]);
+
+it('tells the in-container tools which engine they serve, because the runtime starts scripts with an empty environment', function () {
+    $ssh = fakeSsh()->respondToEngine('task start', ['key' => 'k.1', 'kind' => 'task', 'state' => 'running', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-13T00:00:00Z', 'finishedAt' => null, 'error' => null]);
+    $node = idleDatabase('valkey', 1, versionLine: '9')->nodes()->sole();
+
+    resolve(ScriptRunner::class)->start($node, 'k.1', 'testing/echo', ['word' => 'x'], env: ['DATABASIFY_ENGINE' => 'spoofed']);
+
+    expect(json_decode($ssh->engineRequestAt(0), true)['env'])->toMatchArray(['DATABASIFY_ENGINE' => 'valkey', 'DATABASIFY_LINE' => '9', 'HOME' => '/root']);
+});

@@ -8,7 +8,7 @@ pg() {
         getenv+="\\getenv ${name} DATABASIFY_VAR_${name}"$'\n'
     done
     errors=$(mktemp)
-    output=$(printf '%s%s\n' "$getenv" "$script" | HOME=/var/lib/postgresql USER=postgres PGDATABASE="$database" PGOPTIONS='-c statement_timeout=55s' timeout 60 psql -X -A -t -q -v ON_ERROR_STOP=1 -h /srv/postgres/run -p "$PG_PORT" -f - 2>"$errors") && status=0 || status=$?
+    output=$(printf '%s%s\n' "$getenv" "$script" | HOME=/var/lib/postgresql USER=postgres PGDATABASE="$database" PGOPTIONS='-c statement_timeout=55s' timeout 60 setpriv --reuid=64999 --regid=64999 --clear-groups psql -X -A -t -q -v ON_ERROR_STOP=1 -h /srv/postgres/run -p "$PG_PORT" -f - 2>"$errors") && status=0 || status=$?
     if [ "$status" -ne 0 ]; then
         pg_failed "$status" "$errors"
     fi

@@ -89,7 +89,7 @@ clear_new_cluster() {
     if [ -n "$MANIFEST" ]; then
         write_manifest || true
     fi
-    printf '{}' | databasify service reload > /dev/null
+    unit_do daemon-reload
 }
 
 mark_new_cluster() {
@@ -98,6 +98,6 @@ mark_new_cluster() {
 }
 
 restart_server() {
-    printf '{}' | databasify service reload > /dev/null
+    unit_do daemon-reload
     unit_do restart mariadb-server
 }
