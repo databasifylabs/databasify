@@ -29,6 +29,7 @@ if [ "$previous" = "$SELF" ]; then
 fi
 settled() { { [ "$(current_role)" = master ] || replica_synced; } && aof_written; }
 wait_until 300 2 settled || true
-info=$(replication_info || true)
-set_replica_of "$(info_field "$info" master_host)"
+if info=$(replication_info); then
+    set_replica_of "$(info_field "$info" master_host)"
+fi
 result '{}'

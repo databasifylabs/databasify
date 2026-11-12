@@ -7,11 +7,8 @@ while IFS= read -r name; do
     if jq -e --arg name "$name" 'has($name)' <<< "$originals" > /dev/null; then
         continue
     fi
-    value=$(local_cli CONFIG GET "$name")
-    if [ "$(wc -l <<< "$value")" -lt 2 ]; then
-        databasify_fail internal "$FLAVOR has no setting named $name"
-    fi
-    originals=$(jq -c --arg name "$name" --arg value "$(sed -n 2p <<< "$value")" '. + {($name): $value}' <<< "$originals")
+    value=$(config_value "$name")
+    originals=$(jq -c --arg name "$name" --arg value "$value" '. + {($name): $value}' <<< "$originals")
 done < <(jq -r --argjson keys "$CONFIG_KEYS" '.[] | $keys[.] // .' <<< "$SETTING_KEYS")
 applied=$(cat "$ROOT/state/applied.json" 2> /dev/null || echo '[]')
 desired=$(jq -c --argjson applied "${applied:-[]}" --argjson kept "$SETTING_KEYS" --argjson keys "$CONFIG_KEYS" --argjson originals "$originals" \

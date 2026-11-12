@@ -93,7 +93,7 @@ final readonly class Configuration
             return '';
         }
 
-        $reported = $this->scripts->run($node, 'nodes/primary', ['PEERS' => $this->peersOf($request)])->json()->string('primary');
+        $reported = $this->scripts->run($node, 'nodes/primary', ['PEERS' => $this->peersOf($request), 'CLI_SECRET' => (string) $request->secrets->admin])->json()->string('primary');
 
         return $reported !== '' ? $reported : ($request->primary ?? '');
     }

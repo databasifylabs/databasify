@@ -77,7 +77,7 @@ it('configures with the primary found by the peers and the Go files', function (
     $reply = sendToSentinel(sentinelNode('redis'), configureFromFixture($fixture['request']));
 
     expect($reply->changed)->toBeTrue();
-    $this->scripts->assertRan('sentinel/nodes/primary', fn (string $script, array $env): bool => $env['PEERS'] === '10.0.0.2' && str_contains($script, 'get-master-addr-by-name main'))
+    $this->scripts->assertRan('sentinel/nodes/primary', fn (string $script, array $env): bool => $env['PEERS'] === '10.0.0.2' && $env['CLI_SECRET'] === 'pw' && str_contains($script, 'get-master-addr-by-name main'))
         ->assertRan('sentinel/nodes/configure', fn (string $script, array $env): bool => base64_decode($env['SERVER_CONF']) === $fixture['serverConf']
             && base64_decode($env['SENTINEL_CONF']) === $fixture['sentinelConf']
             && base64_decode($env['MANIFEST']) === $fixture['manifest']
@@ -145,7 +145,7 @@ it('runs the cluster commands', function () {
     expect(sendToSentinel($node, new ClusterQuorum)->online)->toBe(3);
 
     $this->scripts->assertRan('sentinel/cluster/enable', fn (string $script, array $env): bool => $env['REQUIRED'] === '1')
-        ->assertRan('sentinel/cluster/failover', fn (string $script, array $env): bool => str_contains($script, 'is a read-only replica and cannot become the primary') && str_contains($script, 'SENTINEL FAILOVER main'))
+        ->assertRan('sentinel/cluster/failover', fn (string $script, array $env): bool => str_contains($script, 'is a read-only replica and cannot become the primary') && str_contains($script, 'SENTINEL FAILOVER main') && str_contains($script, 'if info=$(replication_info); then'))
         ->assertRan('sentinel/cluster/force-quorum', fn (string $script): bool => str_contains($script, 'sentinel config-epoch main %d'))
         ->assertRan('sentinel/cluster/membership', fn (string $script, array $env): bool => $env['QUORUM'] === '2' && $env['REQUIRED'] === '0')
         ->assertRan('sentinel/cluster/rejoin', fn (string $script): bool => str_contains($script, "phase 'finding the primary'"));

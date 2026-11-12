@@ -13,11 +13,11 @@ admin_password() {
 cli() {
     local host=$1 port=$2 output status secret
     shift 2
-    if [ ! -f "$ROOT/conf/password" ]; then
+    if [ -z "${CLI_SECRET+set}" ] && [ ! -f "$ROOT/conf/password" ]; then
         databasify_fail unavailable 'no password file yet'
     fi
     secret=${CLI_SECRET-$(admin_password)}
-    output=$(REDISCLI_AUTH="$secret" timeout "${CLI_TIMEOUT:-30}" "$CLI" --no-auth-warning --raw -e ${CLI_TLS:+--tls --insecure} ${CLI_USER:+--user "$CLI_USER"} -h "$host" -p "$port" "$@" 2>&1) && status=0 || status=$?
+    output=$(REDISCLI_AUTH="$secret" timeout "${CLI_TIMEOUT:-30}" "$CLI" --no-auth-warning --raw -e -t 5 ${CLI_TLS:+--tls --insecure} ${CLI_USER:+--user "$CLI_USER"} -h "$host" -p "$port" "$@" 2>&1) && status=0 || status=$?
     output=${output//$'\r'/}
     if [ "$status" -eq 0 ]; then
         printf '%s' "$output"
@@ -51,6 +51,20 @@ cli_try() {
         CLI_ERROR_TEXT=$(tail -n +2 "$errors")
     }
     rm -f "$errors"
+}
+
+config_value() {
+    local reply
+    reply=$(local_cli CONFIG GET "$1"; printf x)
+    reply=${reply%x}
+    if [ "$(head -n 1 <<< "$reply")" != "$1" ]; then
+        databasify_fail internal "$FLAVOR has no setting named $1"
+    fi
+    if [[ $reply != *$'\n'* ]]; then
+        return 0
+    fi
+    reply=${reply#*$'\n'}
+    printf '%s' "${reply%$'\n'}"
 }
 
 info_field() {

@@ -38,7 +38,7 @@ it('sends the trimmed password in REDISCLI_AUTH, never on argv', function (strin
     expect($run->output())->toContain('DATABASIFY_RESULT PONG')
         ->and($auth)->toBe('pa"ss')
         ->and($args)->not->toContain('pa"ss')
-        ->and($args)->toContain("--no-auth-warning\n--raw\n-e\n-h\n127.0.0.1\n-p\n6379\nPING");
+        ->and($args)->toContain("--no-auth-warning\n--raw\n-e\n-t\n5\n-h\n127.0.0.1\n-p\n6379\nPING");
 })->with(['valkey', 'redis']);
 
 it('maps CLI failures like the Go client', function (string $output, bool $withPassword, string $class, string $message) {
@@ -51,3 +51,19 @@ it('maps CLI failures like the Go client', function (string $output, bool $withP
     'no password yet' => ['', false, EngineUnavailable::class, 'no password file yet'],
     'server error' => ['ERR unknown command', true, EngineError::class, 'ERR unknown command'],
 ]);
+
+it('reads an empty CONFIG GET value as empty, not as a missing setting', function () {
+    $bin = sys_get_temp_dir().'/cfg-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$bin}/valkey-cli", "#!/bin/bash\nname=\"\${@: -1}\"\nif [ \"\$name\" = notify-keyspace-events ]; then printf 'notify-keyspace-events\\n\\n'; else printf '%s\\n7\\n' \"\$name\"; fi\n");
+    chmod("{$bin}/timeout", 0755);
+    chmod("{$bin}/valkey-cli", 0755);
+    $script = resolve(ScriptView::class)->render(idleDatabase('valkey', 1)->nodes()->sole(), 'sentinel/config/show', ['engine' => SentinelFamilyEngine::of('valkey')]);
+
+    $run = Process::input($script)->env(['PATH' => "{$bin}:".getenv('PATH'), 'CLI_SECRET' => 'pw', 'NAMES' => 'maxclients notify-keyspace-events'])->run(['bash', '-euo', 'pipefail', '-s']);
+    Process::run(['rm', '-rf', $bin]);
+
+    expect($run->successful())->toBeTrue($run->output().$run->errorOutput())
+        ->and($run->output())->toContain('DATABASIFY_RESULT {"values":{"maxclients":"7","notify-keyspace-events":""}}');
+});
