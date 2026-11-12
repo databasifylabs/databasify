@@ -8,8 +8,14 @@ use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineReply;
 use App\Contracts\Engines\EngineRequest;
 use App\Engines\Requests\AccountList;
+use App\Engines\Requests\ConfigApply;
+use App\Engines\Requests\ConfigFields;
+use App\Engines\Requests\ConfigShow;
+use App\Engines\Requests\ConfigSync;
+use App\Engines\Requests\ConfigTune;
 use App\Engines\Requests\DatabaseCreate;
 use App\Engines\Requests\DatabaseDrop;
+use App\Engines\Requests\NodeConfigure;
 use App\Engines\Requests\NodeMetrics;
 use App\Engines\Requests\NodeStatus;
 use App\Engines\Requests\UserCreate;
@@ -25,6 +31,8 @@ final readonly class MongoDbDriver implements EngineDriver
     public function __construct(
         private Accounts $accounts,
         private Readings $readings,
+        private Configuration $configuration,
+        private ConfigCommands $config,
     ) {}
 
     public function answers(EngineRequest $request): bool
@@ -37,7 +45,13 @@ final readonly class MongoDbDriver implements EngineDriver
             || $request instanceof UserGrant
             || $request instanceof UserDrop
             || $request instanceof NodeStatus
-            || $request instanceof NodeMetrics;
+            || $request instanceof NodeMetrics
+            || $request instanceof NodeConfigure
+            || $request instanceof ConfigApply
+            || $request instanceof ConfigSync
+            || $request instanceof ConfigShow
+            || $request instanceof ConfigFields
+            || $request instanceof ConfigTune;
     }
 
     public function answer(DatabaseNode $node, EngineRequest $request, ?ServerLog $log): EngineReply
@@ -52,6 +66,12 @@ final readonly class MongoDbDriver implements EngineDriver
             $request instanceof UserDrop => $this->accounts->dropUser($node, $request),
             $request instanceof NodeStatus => $this->readings->status($node),
             $request instanceof NodeMetrics => $this->readings->metrics($node),
+            $request instanceof NodeConfigure => $this->configuration->configure($node, $request),
+            $request instanceof ConfigApply => $this->config->apply($node),
+            $request instanceof ConfigSync => $this->config->sync(),
+            $request instanceof ConfigShow => $this->config->show($node),
+            $request instanceof ConfigFields => $this->config->fields($node),
+            $request instanceof ConfigTune => $this->config->tune($node),
             default => throw new LogicException("The MongoDB driver does not answer {$request->command()}."),
         };
     }
