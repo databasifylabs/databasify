@@ -45,15 +45,18 @@ On a Linux server with at least 1 GB of memory (2 GB recommended):
 curl -fsSL https://get.databasify.io/install.sh | sudo bash
 ```
 
-Update or uninstall the same way with `https://get.databasify.io/update.sh` and `https://get.databasify.io/uninstall.sh`.
+Update from **Updates** in the app, or over SSH with `https://get.databasify.io/update.sh`. Uninstall with `https://get.databasify.io/uninstall.sh`. See [Updating and uninstalling](https://docs.databasify.io/getting-started/updating-and-uninstalling/).
 
 ## Development
 
+Requirements: PHP 8.5, Composer, Node.js and SQLite.
+
 ```bash
-composer install && npm install
-cp .env.example .env && php artisan key:generate && php artisan migrate
+composer run setup
 composer run dev
 ```
+
+`composer run setup` installs the dependencies, writes `.env`, migrates the database, builds the frontend and prepares a local stand-in for the host updater, so the **Updates** page shows in development. [CONTRIBUTING.md](CONTRIBUTING.md#the-updates-page-in-development) explains how to try its states.
 
 Run the checks with `php artisan test`, `vendor/bin/phpstan analyse`, `vendor/bin/pint` and `npm run check`.
 
