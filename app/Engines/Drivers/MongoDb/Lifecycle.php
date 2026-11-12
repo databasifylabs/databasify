@@ -29,23 +29,17 @@ final readonly class Lifecycle
 
     public function start(DatabaseNode $node): Done
     {
-        $this->scripts->run($node, 'mongodb/nodes/start', timeout: 300);
-
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/nodes/start');
     }
 
     public function wake(DatabaseNode $node): Done
     {
-        $this->scripts->run($node, 'mongodb/nodes/wake', timeout: 300);
-
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/nodes/wake');
     }
 
     public function restart(DatabaseNode $node): Done
     {
-        $this->scripts->run($node, 'mongodb/nodes/restart', timeout: 300);
-
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/nodes/restart');
     }
 
     public function bootstrap(DatabaseNode $node, NodeBootstrap $request): Done
@@ -61,7 +55,7 @@ final readonly class Lifecycle
         }
 
         $this->scripts->run($node, 'mongodb/nodes/bootstrap', timeout: 300, env: [
-            'HOST' => $saved->ip.':'.MongoDbFiles::CLIENT_PORT,
+            'HOST' => MongoDbFiles::hostOf($saved->ip),
             'ADMIN_PASSWORD' => $request->secrets->admin,
             'AGENT_PASSWORD' => $request->secrets->agent,
         ]);
@@ -90,5 +84,12 @@ final readonly class Lifecycle
     public function isSeed(NodeConfigure $request): bool
     {
         return ! $request->clustered || (! $request->readOnly && ($request->primary === null || $request->primary === $request->ip));
+    }
+
+    private function doneAfter(DatabaseNode $node, string $script): Done
+    {
+        $this->scripts->run($node, $script, timeout: 300);
+
+        return new Done;
     }
 }

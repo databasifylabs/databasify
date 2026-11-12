@@ -43,7 +43,7 @@ final readonly class Cluster
 
     public function failover(DatabaseNode $node, ClusterFailover $request): Done
     {
-        $this->scripts->run($node, 'mongodb/cluster/failover', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf($node), 'TARGET' => $request->target, 'TARGET_HOST' => $this->hostOf($request->target)]);
+        $this->scripts->run($node, 'mongodb/cluster/failover', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf($node), 'TARGET' => $request->target, 'TARGET_HOST' => MongoDbFiles::hostOf($request->target)]);
 
         return new Done;
     }
@@ -61,11 +61,11 @@ final readonly class Cluster
 
     public function membership(DatabaseNode $node, ClusterMembership $request): Done
     {
-        $voting = array_filter($request->members, fn (Member $member): bool => $member->voting);
+        $nonVoting = array_filter($request->members, fn (Member $member): bool => ! $member->voting);
         $this->scripts->run($node, 'mongodb/cluster/membership', timeout: self::WAITING_TIMEOUT, env: [
             ...$this->setEnvOf($node),
-            'WANTED' => implode(',', array_map(fn (Member $member): string => $this->hostOf($member->ip), $request->members)),
-            'NON_VOTING' => implode(',', array_map(fn (Member $member): string => $this->hostOf($member->ip), array_diff_key($request->members, $voting))),
+            'WANTED' => $this->hostsOf($request->members),
+            'NON_VOTING' => $this->hostsOf($nonVoting),
         ]);
 
         return new Done;
@@ -88,7 +88,7 @@ final readonly class Cluster
 
     public function forget(DatabaseNode $node, MemberForget $request): Done
     {
-        $this->scripts->run($node, 'mongodb/members/forget', env: [...$this->setEnvOf($node), 'GONE' => $this->hostOf($request->ip)]);
+        $this->scripts->run($node, 'mongodb/members/forget', env: [...$this->setEnvOf($node), 'GONE' => MongoDbFiles::hostOf($request->ip)]);
 
         return new Done;
     }
@@ -101,15 +101,18 @@ final readonly class Cluster
         $saved = $this->configuration->savedRequestOf($node);
 
         return [
-            'HOSTS' => implode(',', array_map(fn (Member $member): string => $this->hostOf($member->ip), $saved->members)),
-            'SELF' => $this->hostOf($saved->ip),
+            'HOSTS' => $this->hostsOf($saved->members),
+            'SELF' => MongoDbFiles::hostOf($saved->ip),
             'SEED' => $this->lifecycle->isSeed($saved) ? 'true' : 'false',
             'READ_ONLY' => $saved->readOnly ? 'true' : 'false',
         ];
     }
 
-    private function hostOf(string $ip): string
+    /**
+     * @param  array<array-key, Member>  $members
+     */
+    private function hostsOf(array $members): string
     {
-        return $ip.':'.MongoDbFiles::CLIENT_PORT;
+        return implode(',', array_map(fn (Member $member): string => MongoDbFiles::hostOf($member->ip), $members));
     }
 }

@@ -34,24 +34,24 @@ final readonly class Accounts
     public function list(DatabaseNode $node): AccountList
     {
         $reply = $this->scripts->run($node, 'mongodb/accounts/list')->json();
+        $users = $this->withoutReserved($reply->strings('users'), self::RESERVED_USERS);
+        $databases = $this->withoutReserved($reply->strings('databases'), self::RESERVED_DATABASES);
 
-        return new AccountList($this->withoutReserved($reply->strings('users'), self::RESERVED_USERS), $this->withoutReserved($reply->strings('databases'), self::RESERVED_DATABASES));
+        return new AccountList($users, $databases);
     }
 
     public function createDatabase(DatabaseNode $node, DatabaseCreate $request): Done
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $request->name);
-        $this->scripts->run($node, 'mongodb/accounts/create-database', env: ['NAME' => Shell::withoutNul($request->name)]);
 
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/accounts/create-database', ['NAME' => Shell::withoutNul($request->name)]);
     }
 
     public function dropDatabase(DatabaseNode $node, DatabaseDrop $request): Done
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $request->name);
-        $this->scripts->run($node, 'mongodb/accounts/drop-database', env: ['NAME' => Shell::withoutNul($request->name)]);
 
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/accounts/drop-database', ['NAME' => Shell::withoutNul($request->name)]);
     }
 
     public function createUser(DatabaseNode $node, UserCreate $request): UserCreateReply
@@ -65,23 +65,30 @@ final readonly class Accounts
     public function setPassword(DatabaseNode $node, UserSetPassword $request): Done
     {
         $this->refuseReserved(self::RESERVED_USERS, $request->name);
-        $this->scripts->run($node, 'mongodb/accounts/set-password', env: [...$this->passwordEnv($request->password, $request->encryption), 'NAME' => Shell::withoutNul($request->name)]);
 
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/accounts/set-password', [...$this->passwordEnv($request->password, $request->encryption), 'NAME' => Shell::withoutNul($request->name)]);
     }
 
     public function grant(DatabaseNode $node, UserGrant $request): Done
     {
         $this->refuseReserved(self::RESERVED_USERS, $request->name);
-        $this->scripts->run($node, 'mongodb/accounts/grant', env: [...$this->grantEnv($request->name, $request->grants), 'REPLICATION' => $request->replication ? 'true' : 'false']);
 
-        return new Done;
+        return $this->doneAfter($node, 'mongodb/accounts/grant', [...$this->grantEnv($request->name, $request->grants), 'REPLICATION' => $request->replication ? 'true' : 'false']);
     }
 
     public function dropUser(DatabaseNode $node, UserDrop $request): Done
     {
         $this->refuseReserved(self::RESERVED_USERS, $request->name);
-        $this->scripts->run($node, 'mongodb/accounts/drop-user', env: ['NAME' => Shell::withoutNul($request->name)]);
+
+        return $this->doneAfter($node, 'mongodb/accounts/drop-user', ['NAME' => Shell::withoutNul($request->name)]);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function doneAfter(DatabaseNode $node, string $script, array $env): Done
+    {
+        $this->scripts->run($node, $script, env: $env);
 
         return new Done;
     }

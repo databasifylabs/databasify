@@ -50,6 +50,20 @@ final readonly class MongoDbSettings
     /**
      * @return array<string, string>
      */
+    public static function defaults(): array
+    {
+        $defaults = [];
+
+        foreach (self::catalog()->fields as $field) {
+            $defaults[$field->key] = $field->default;
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * @return array<string, string>
+     */
     private static function tunedFor(Member $resources): array
     {
         $memory = max($resources->memoryMb, 1);

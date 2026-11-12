@@ -29,12 +29,7 @@ final readonly class MongoDbFiles
      */
     public static function mongodConfOf(array $effective): string
     {
-        $defaults = [];
-
-        foreach (MongoDbSettings::catalog()->fields as $field) {
-            $defaults[$field->key] = $field->default;
-        }
-
+        $defaults = MongoDbSettings::defaults();
         $value = fn (string $key): string => self::RAW_NUMBER.(is_numeric($effective[$key] ?? null) ? $effective[$key] : $defaults[$key]);
 
         $conf = [
@@ -78,6 +73,11 @@ final readonly class MongoDbFiles
         }
 
         return GoJson::indented(['processes' => $processes, 'schedules' => $schedules]);
+    }
+
+    public static function hostOf(string $ip): string
+    {
+        return $ip.':'.self::CLIENT_PORT;
     }
 
     public static function pbmUriOf(string $password): string

@@ -82,11 +82,7 @@ final readonly class ConfigCommands
     private function valuesOf(DatabaseNode $node): callable
     {
         $effective = $this->configuration->effectiveOf($node, $this->configuration->savedRequestOf($node));
-        $defaults = [];
-
-        foreach (MongoDbSettings::catalog()->fields as $field) {
-            $defaults[$field->key] = $field->default;
-        }
+        $defaults = MongoDbSettings::defaults();
 
         return fn (string $key): string => $effective[$key] ?? $defaults[$key] ?? '';
     }

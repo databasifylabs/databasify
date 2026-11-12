@@ -57,14 +57,6 @@ final readonly class Configuration
         return new NodeConfigureReply($reply->json()->bool('changed'));
     }
 
-    /**
-     * @param  list<ConfigFile>  $files
-     */
-    private function filesTsvOf(array $files): string
-    {
-        return implode("\n", array_map(fn (ConfigFile $file): string => $file->path."\t".decoct($file->mode)."\t".base64_encode($file->content), $files));
-    }
-
     public function savedRequestOf(DatabaseNode $node): NodeConfigure
     {
         return $this->state->requestOf($node, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
@@ -84,5 +76,13 @@ final readonly class Configuration
     public function effectiveOf(DatabaseNode $node, NodeConfigure $request): array
     {
         return MongoDbSettings::catalog()->effective($this->tunedOf($node, $request), $request->settings);
+    }
+
+    /**
+     * @param  list<ConfigFile>  $files
+     */
+    private function filesTsvOf(array $files): string
+    {
+        return implode("\n", array_map(fn (ConfigFile $file): string => $file->path."\t".decoct($file->mode)."\t".base64_encode($file->content), $files));
     }
 }
