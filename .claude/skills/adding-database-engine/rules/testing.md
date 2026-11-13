@@ -2,18 +2,18 @@
 
 ## Pest
 
-The app has no per-engine code, so most tests run for any engine. Registering one more engine breaks the tests that pin the engine list:
+Flows and actions run for any engine against a recording driver; the driver and its scripts get their own tests (rules/engine.md). Registering one more engine breaks the tests that pin the engine list:
 
 | Test                                                    | Change                                                                       |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `tests/Feature/Engines/EngineCatalogTest.php`           | The engine ids and labels, plus a line asserting the new entry's settings.   |
 | `tests/Feature/Plugins/PluginLoaderTest.php`            | `Database::engines()`.                                                       |
 | `tests/Feature/Databases/Lifecycle/CreateDatabaseTest.php` | `->has('engines', N)`.                                                    |
-| `tests/Pest.php`                                        | `engineCapabilitiesPayload()`: the engine's ports, reserved names, commands and password encryptions, as its `engine capabilities` reply has them. |
+| `tests/Pest.php`                                        | `useRecordingDrivers()`: add the driver class to the list it binds.          |
 
 Then add tests for what the registration changes: the connection details the engine shows (URI, CLI command, `.env` keys, the public-certificate and service variants), the migration source form, and a version line with `'recovery' => false` hiding backups. Use `createThroughFlow('<engine>', 3)` in `CreateDatabaseFlowTest` to run the create flow against `fakeEngine()`.
 
-Helpers in `tests/Pest.php`: `fakeSsh()`, `fakeEngine()` (answers every command; pass `fakeSsh()->respondToEngine(...)` first to override one), `engineCommandsIn()`, `answerNodeStatus()`, `idleDatabase()`, `advanceFlows()`, `inProjectDuring()`.
+Helpers in `tests/Pest.php`: `fakeSsh()`, `fakeEngine()` (binds the recording driver and answers the runtime's host commands), `recordedCalls()`, `recordedArgs()`, `answerRead()`, `engineCommandsIn()` (runtime commands and driver calls in order), `answerNodeStatus()`, `fakeScripts()`, `localScripts()`, `idleDatabase()`, `advanceFlows()`, `inProjectDuring()`.
 
 Checks before committing:
 

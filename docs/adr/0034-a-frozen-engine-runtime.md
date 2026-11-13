@@ -37,7 +37,7 @@ Most contributors are Laravel developers. The owner decided that engine behaviou
 - After the cutover, engine behaviour changes ship as app releases, and images change only when a database or tool version moves.
 - Every need the runtime cannot cover means an image change again, so new runtime commands must stay rare and engine-neutral.
 - Task records keep their env at mode `0600` under the engine's `state/operations`.
-- The cutover ADR will supersede 0028, 0029 and 0030 once the app drives every engine through the runtime.
+- [0035](0035-engine-api.md) records the cutover: the app drives every engine through the runtime and PHP drivers.
 
 ## Alternatives considered
 

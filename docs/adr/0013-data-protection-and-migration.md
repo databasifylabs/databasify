@@ -61,7 +61,7 @@ Point-in-time recovery and importing data from existing databases are core featu
 - `app/Support/Databases/SchemaName.php`
 - `app/DTOs/Databases/ServerAccounts.php`
 - `app/Models/DatabaseMigration.php`
-- `app/Actions/Databases/RunOnPrimary.php`
+- `app/Models/Database.php`
 - `app/Engines/Flows/UpgradeFlow.php`
 - `app/Actions/Databases/Migrations/CheckMigrationSource.php`
 - `app/Actions/Databases/Upgrades/`
