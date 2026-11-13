@@ -13,4 +13,4 @@ SELECT :'created'
 SQL
 )
 apply_grants
-result "$(jq -cn --arg created "$created" '{created: ($created == "t")}')"
+[ "$created" = t ] && echo "Created user $NAME." || echo "Updated the password of $NAME."

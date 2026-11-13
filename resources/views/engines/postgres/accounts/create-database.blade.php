@@ -8,4 +8,4 @@ CREATE DATABASE :"name";
 SELECT :'created'
 SQL
 )
-result "$(jq -cn --arg created "$created" '{created: ($created == "t")}')"
+[ "$created" = t ] && echo "Created database $NAME." || echo "Database $NAME already exists."

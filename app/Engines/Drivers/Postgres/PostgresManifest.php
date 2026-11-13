@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\NodeConfigure;
 
 final readonly class PostgresManifest
 {
@@ -52,7 +52,7 @@ fi
 exec /usr/local/bin/etcd
 SH;
 
-    public static function of(NodeConfigure $request, string $line): string
+    public static function of(NodeConfig $request, string $line): string
     {
         $manifest = ['processes' => self::processesOf($request, $line)];
 
@@ -71,7 +71,7 @@ SH;
     /**
      * @return list<array<string, mixed>>
      */
-    private static function processesOf(NodeConfigure $request, string $line): array
+    private static function processesOf(NodeConfig $request, string $line): array
     {
         $locks = ['name' => self::LOCKS_UNIT, 'type' => 'oneshot', 'user' => 'postgres', 'argv' => ['sh', '-c', self::LOCKS_SCRIPT], 'enabled' => true];
         $pooler = self::daemon(self::POOLER_UNIT, ['/usr/sbin/pgbouncer', PostgresFiles::CONF.'/pgbouncer.ini'], self::SERVER_UNIT, self::PATRONI_UNIT);

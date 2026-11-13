@@ -11,4 +11,4 @@ SELECT pg_reload_conf()
 SQL
     unit_do reload databasify-pgbouncer
 fi
-result '{}'
+echo "Installed the TLS certificate."

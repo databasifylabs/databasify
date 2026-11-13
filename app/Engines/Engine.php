@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
-use App\Contracts\Engines\EngineDriver;
+use App\Contracts\Engines\EngineDriver as LegacyEngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 use App\DTOs\Databases\VersionLine;
 use App\DTOs\Migrations\SourceForm;
+use App\Engines\Contracts\EngineDriver;
 use App\Engines\Data\ServiceRecord;
 
 final readonly class Engine
@@ -20,7 +21,7 @@ final readonly class Engine
     /**
      * @param  list<VersionLine>  $lines
      * @param  array<string, string>  $environmentExtra
-     * @param  class-string<EngineDriver>|null  $driver
+     * @param  class-string<EngineDriver>|class-string<LegacyEngineDriver>|null  $driver
      */
     public function __construct(
         public string $id,

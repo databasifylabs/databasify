@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Engines;
 
-use App\Contracts\Engines\EngineDriver;
+use App\Contracts\Engines\EngineDriver as LegacyEngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
 use App\DTOs\Databases\VersionLine;
 use App\DTOs\Migrations\SourceForm;
+use App\Engines\Contracts\EngineDriver;
 use App\Engines\Data\ServiceRecord;
 use App\Exceptions\Databases\UnknownEngine;
 use Illuminate\Support\Collection;
@@ -68,11 +69,11 @@ final readonly class EngineCatalog
     }
 
     /**
-     * @return class-string<EngineDriver>|null
+     * @return class-string<EngineDriver>|class-string<LegacyEngineDriver>|null
      */
     private static function driverOf(?string $class): ?string
     {
-        return $class !== null && is_a($class, EngineDriver::class, true) ? $class : null;
+        return $class !== null && (is_a($class, EngineDriver::class, true) || is_a($class, LegacyEngineDriver::class, true)) ? $class : null;
     }
 
     private static function defaultRepositoryOf(string $id): string

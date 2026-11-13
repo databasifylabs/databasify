@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\Contracts\Engines\EngineDriver;
+use App\Contracts\Engines\EngineDriver as LegacyEngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
+use App\Engines\Contracts\EngineDriver;
 
 final class RegisterEngine extends AbstractProviderRegistrar
 {
@@ -74,7 +75,7 @@ final class RegisterEngine extends AbstractProviderRegistrar
     }
 
     /**
-     * @param  class-string<EngineDriver>  $driver
+     * @param  class-string<EngineDriver>|class-string<LegacyEngineDriver>  $driver
      */
     public function driver(string $driver): static
     {

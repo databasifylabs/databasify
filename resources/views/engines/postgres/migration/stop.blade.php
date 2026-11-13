@@ -25,4 +25,4 @@ SQL
     on_conninfo "$conninfo" "DROP PUBLICATION IF EXISTS \"$publication\"" > /dev/null || true
 done <<< "$PG_OUTPUT"
 rm -rf /srv/postgres/migration/state
-result '{}'
+echo "Stopped the migration."

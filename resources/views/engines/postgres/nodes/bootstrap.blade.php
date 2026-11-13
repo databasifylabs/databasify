@@ -5,7 +5,7 @@ SELECT pg_is_in_recovery()
 SQL
 )
 if [ "$recovery" = t ]; then
-    result '{}'
+    echo "The restored data already has its users."
     exit 0
 fi
 DATABASIFY_VAR_postgres_password="$ADMIN_PASSWORD" DATABASIFY_VAR_replication_password="$REPLICATION_PASSWORD" DATABASIFY_VAR_pgbouncer_password="$POOLER_PASSWORD" pg postgres > /dev/null <<'SQL'
@@ -43,4 +43,4 @@ ALTER ROLE :"name" LOGIN PASSWORD :'password';
 SQL
     apply_grants
 fi
-result '{}'
+echo "Created the service roles and the default account."

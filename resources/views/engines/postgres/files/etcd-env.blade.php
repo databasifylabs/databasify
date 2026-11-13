@@ -1,0 +1,13 @@
+ETCD_NAME={!! $config->ip !!}
+ETCD_DATA_DIR=/srv/postgres/etcd
+ETCD_LISTEN_CLIENT_URLS=http://{!! $config->ip !!}:2379,http://127.0.0.1:2379
+ETCD_ADVERTISE_CLIENT_URLS=http://{!! $config->ip !!}:2379
+ETCD_LISTEN_PEER_URLS=http://{!! $config->ip !!}:2380
+ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{!! $config->ip !!}:2380
+ETCD_INITIAL_CLUSTER={!! $initialCluster !!}
+ETCD_INITIAL_CLUSTER_STATE={!! $clusterState !!}
+ETCD_INITIAL_CLUSTER_TOKEN=databasify-{!! $config->databaseId !!}
+ETCD_MAX_LEARNERS=7
+ETCD_AUTO_COMPACTION_MODE=periodic
+ETCD_AUTO_COMPACTION_RETENTION=1h
+ETCD_QUOTA_BACKEND_BYTES=2147483648

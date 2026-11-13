@@ -103,7 +103,7 @@ final readonly class EngineClient
         $database = $node->database;
         $engine = $database->engine();
 
-        if ($engine->driver === null || ! $database->runsEngineRuntime() || ! in_array($engine->id, config()->array('databasify.php_engines'), true)) {
+        if ($engine->driver === null || ! is_a($engine->driver, EngineDriver::class, true) || ! $database->runsEngineRuntime() || ! in_array($engine->id, config()->array('databasify.php_engines'), true)) {
             return null;
         }
 

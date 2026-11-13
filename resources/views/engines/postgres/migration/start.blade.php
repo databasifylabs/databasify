@@ -14,4 +14,4 @@ umask 077
 printf '%s' "$COPY_SCRIPT" | base64 -d > "$STATE/copy.sh"
 databasify ctl run -u databasify-postgres-migration -r bash "$STATE/copy.sh" > /dev/null 2>&1 \
     || databasify_fail internal 'could not start databasify-postgres-migration'
-result '{}'
+echo "Started the migration copy."

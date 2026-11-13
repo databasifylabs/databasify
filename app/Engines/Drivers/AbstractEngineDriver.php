@@ -14,8 +14,6 @@ use App\Engines\Contracts\Pools;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Engines\Runtime\Runtime;
-use App\Engines\Scripts\ScriptEnvironment;
-use App\Engines\Scripts\ScriptView;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\NotPrimary;
 use App\Models\DatabaseNode;
@@ -54,7 +52,9 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function task(string $key, string $script, array $data = [], array $env = [], ?string $user = null): Operation
     {
-        return $this->runtime()->startTask($this->node, $key, $this->views()->render($this->node, $script, $data), ScriptEnvironment::of($this->node, $env), $user);
+        $started = $this->scripts()->start($this->node, $key, $script, $data, $user, $env);
+
+        return new Operation($started->key, $started->kind, $started->state, $started->phase, $started->progress, $started->error);
     }
 
     public function taskStatus(string $key): Operation
@@ -74,12 +74,9 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
         return $this->runtime()->stopTask($this->node, $key);
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public function writeFile(string $view, array $data, string $path, int $mode, ?string $owner = null): void
+    public function putFile(string $path, string $content, int $mode, ?string $owner = null): void
     {
-        $this->runtime()->putFile($this->node, $path, $this->views()->render($this->node, $view, $data), $mode, $owner);
+        $this->runtime()->putFile($this->node, $path, $content, $mode, $owner);
     }
 
     public function getFile(string $path): ?string
@@ -138,10 +135,5 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     private function runtime(): Runtime
     {
         return resolve(Runtime::class);
-    }
-
-    private function views(): ScriptView
-    {
-        return resolve(ScriptView::class);
     }
 }

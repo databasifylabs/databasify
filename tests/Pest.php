@@ -14,6 +14,7 @@ use App\DTOs\Updates\Release;
 use App\Engines\Data\ArchiveSettings;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Member;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Secrets;
 use App\Engines\Data\Storage;
 use App\Engines\Payload;
@@ -109,6 +110,27 @@ function configureFromFixture(array $request): NodeConfigure
     );
 
     return new NodeConfigure(
+        $request['clustered'],
+        $request['readOnly'],
+        $request['ip'],
+        $request['databaseId'],
+        array_map(fn (array $member): Member => new Member(...$member), $request['members']),
+        $request['settings'] ?? [],
+        new Secrets(...$request['secrets']),
+        $archive,
+        $request['primary'],
+    );
+}
+
+function nodeConfigFromFixture(array $request): NodeConfig
+{
+    $archive = $request['archive'] === null ? null : new ArchiveSettings(
+        new Storage(...array_intersect_key($request['archive']['storage'], array_flip(['endpoint', 'bucket', 'region', 'accessKey', 'secretKey', 'pathStyle', 'path']))),
+        $request['archive']['retentionDays'],
+        $request['archive']['backupHour'],
+    );
+
+    return new NodeConfig(
         $request['clustered'],
         $request['readOnly'],
         $request['ip'],

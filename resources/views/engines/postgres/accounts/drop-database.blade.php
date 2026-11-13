@@ -6,4 +6,4 @@ DROP DATABASE IF EXISTS :"name" WITH (FORCE);
 SELECT :'dropped'
 SQL
 )
-result "$(jq -cn --arg dropped "$dropped" '{dropped: ($dropped == "t")}')"
+[ "$dropped" = t ] && echo "Dropped database $NAME." || echo "Database $NAME was already gone."

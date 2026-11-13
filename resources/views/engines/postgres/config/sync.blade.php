@@ -1,6 +1,6 @@
 @include('engines.postgres._psql')
 if ! clustered; then
-    result '{}'
+    echo "Synced the settings."
     exit 0
 fi
 
@@ -32,9 +32,9 @@ leading() {
     [ "$(patroni_state | jq -r '(.role // "") + " " + (.state // "")')" = "primary running" ] || [ "$(patroni_state | jq -r '(.role // "") + " " + (.state // "")')" = "master running" ]
 }
 if [ "$lowers" != true ] || ! wait_until 60 2 pending_restart; then
-    result '{}'
+    echo "The settings need no restart."
     exit 0
 fi
 patronictl_run restart main --role primary --force > /dev/null
 wait_until 300 2 leading || true
-result '{"restartedPrimary":true}'
+echo "Synced the settings and restarted the primary."
