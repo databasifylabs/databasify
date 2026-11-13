@@ -28,7 +28,7 @@ function savedMongo(string $case): void
 
 it('reports the archive and starts a backup when there is none', function () {
     savedMongo('archived');
-    $this->scripts->respond('mongodb/archive/status', ['backups' => 0, 'earliest' => null, 'latest' => null, 'lastBackup' => null, 'problem' => null, 'backupResult' => 'success']);
+    $this->scripts->respond('mongodb/archive/status', ['snapshots' => [], 'chunks' => [], 'problem' => null, 'backupResult' => 'success']);
 
     $status = resolve(EngineClient::class)->send($this->node, new ArchiveStatus(false));
 
@@ -41,13 +41,31 @@ it('reports the archive and starts a backup when there is none', function () {
 
 it('reports a failed backup unit and does not start another', function () {
     savedMongo('archived');
-    $this->scripts->respond('mongodb/archive/status', ['backups' => 2, 'earliest' => '2026-11-10T04:00:00Z', 'latest' => '2026-11-12T08:00:00Z', 'lastBackup' => '2026-11-11T04:00:00Z', 'problem' => null, 'backupResult' => 'exit-code']);
+    $this->scripts->respond('mongodb/archive/status', ['snapshots' => [1794283200, 1794369600], 'chunks' => [['start' => 1794283201, 'end' => 1794470400]], 'problem' => null, 'backupResult' => 'exit-code']);
 
     $status = resolve(EngineClient::class)->send($this->node, new ArchiveStatus(false));
 
     expect($status->problem)->toBe('The last backup failed, see the mongodb-backup log.')->and($status->latest)->toBe('2026-11-12T08:00:00Z');
     $this->scripts->assertNotRan('mongodb/archive/back-up');
 });
+
+it('offers only the times PBM can restore, from a base backup through its unbroken oplog', function (array $snapshots, array $chunks, ?string $earliest, ?string $latest) {
+    savedMongo('archived');
+    $this->scripts->respond('mongodb/archive/status', ['snapshots' => $snapshots, 'chunks' => $chunks, 'problem' => null, 'backupResult' => 'success']);
+
+    $status = resolve(EngineClient::class)->send($this->node, new ArchiveStatus(false));
+
+    expect($status->backups)->toBe(count($snapshots))
+        ->and($status->earliest)->toBe($earliest)
+        ->and($status->latest)->toBe($latest)
+        ->and($status->lastBackup)->toBe($snapshots === [] ? null : gmdate('Y-m-d\TH:i:s\Z', max($snapshots)));
+})->with([
+    'no backup yet' => [[], [], null, null],
+    'backups without oplog yet' => [[1794526554, 1794526571], [], '2026-11-12T23:36:11Z', '2026-11-12T23:36:11Z'],
+    'oplog starting after the second of two back-to-back backups' => [[1794526554, 1794526571], [['start' => 1794526572, 'end' => 1794527199]], '2026-11-12T23:36:11Z', '2026-11-12T23:46:39Z'],
+    'daily backups along one unbroken oplog' => [[1794283200, 1794369600], [['start' => 1794283201, 'end' => 1794400000], ['start' => 1794400000, 'end' => 1794470400]], '2026-11-10T04:00:00Z', '2026-11-12T08:00:00Z'],
+    'oplog with no base backup before it' => [[1794283200], [['start' => 1794300000, 'end' => 1794470400]], '2026-11-10T04:00:00Z', '2026-11-10T04:00:00Z'],
+]);
 
 it('needs an archive for status and restore, with the Go wording', function () {
     savedMongo('standalone');

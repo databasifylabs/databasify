@@ -33,11 +33,13 @@ final readonly class Archive
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
         ])->json();
         $failed = ! in_array($reply->string('backupResult'), ['', 'success'], true);
+        $snapshots = $reply->ints('snapshots');
+        $window = RestorableWindow::of($snapshots, array_map(OplogRange::fromPayload(...), $reply->objects('chunks')));
         $status = new ArchiveStatusReply(
-            $reply->int('backups'),
-            $reply->nullableString('earliest'),
-            $reply->nullableString('latest'),
-            $reply->nullableString('lastBackup'),
+            count($snapshots),
+            $this->momentOf($window->earliest),
+            $this->momentOf($window->latest),
+            $this->momentOf($snapshots === [] ? null : max($snapshots)),
             $failed ? 'The last backup failed, see the '.MongoDbFiles::BACKUP_UNIT.' log.' : $reply->nullableString('problem'),
         );
 
@@ -64,5 +66,10 @@ final readonly class Archive
             'ADMIN_PASSWORD' => (string) $saved->secrets->admin,
             'AGENT_PASSWORD' => $saved->secrets->agent,
         ]);
+    }
+
+    private function momentOf(?int $seconds): ?string
+    {
+        return $seconds === null ? null : gmdate('Y-m-d\TH:i:s\Z', $seconds);
     }
 }
