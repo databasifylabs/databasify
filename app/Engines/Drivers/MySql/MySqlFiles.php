@@ -10,6 +10,7 @@ use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\MySqlFamily\FamilyFiles;
 use App\Engines\Drivers\MySqlFamily\MySqlFamilyEngine;
+use App\Engines\Drivers\Support\ConfigView;
 
 final readonly class MySqlFiles
 {
@@ -60,7 +61,7 @@ final readonly class MySqlFiles
 
     private static function myCnfOf(NodeConfig $request, string $line): string
     {
-        return FamilyFiles::render('engines.mysql.files.my-cnf', [
+        return ConfigView::render('engines.mysql.files.my-cnf', [
             'config' => $request,
             'home' => self::HOME,
             'port' => FamilyFiles::CLIENT_PORT,
@@ -76,6 +77,6 @@ final readonly class MySqlFiles
 
     private static function agentCnfOf(string $password): string
     {
-        return FamilyFiles::render('engines.mysql.files.agent-cnf', ['password' => $password, 'home' => self::HOME]);
+        return ConfigView::render('engines.mysql.files.agent-cnf', ['password' => $password, 'home' => self::HOME]);
     }
 }

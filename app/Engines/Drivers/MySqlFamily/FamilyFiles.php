@@ -6,8 +6,7 @@ namespace App\Engines\Drivers\MySqlFamily;
 
 use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\GoJson;
-use Illuminate\Contracts\View\Factory;
-use LogicException;
+use App\Engines\Drivers\Support\ConfigView;
 
 final readonly class FamilyFiles
 {
@@ -19,21 +18,7 @@ final readonly class FamilyFiles
 
     public static function adminCnfOf(string $socket, string $password): string
     {
-        return self::render('engines.mysql-family.files.admin-cnf', ['socket' => $socket, 'password' => $password]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public static function render(string $view, array $data): string
-    {
-        $views = resolve(Factory::class);
-
-        if (! $views->exists($view)) {
-            throw new LogicException("There is no config file view {$view}.");
-        }
-
-        return $views->make($view, $data)->render();
+        return ConfigView::render('engines.mysql-family.files.admin-cnf', ['socket' => $socket, 'password' => $password]);
     }
 
     /**

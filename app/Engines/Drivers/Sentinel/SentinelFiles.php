@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Sentinel;
 
+use App\Engines\Data\MigrationStart;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\MigrationStart;
-use App\Engines\Requests\NodeConfigure;
+use App\Engines\Drivers\Support\ConfigView;
 
 final readonly class SentinelFiles
 {
@@ -18,55 +19,42 @@ final readonly class SentinelFiles
 
     public const string SNAPSHOT_SCHEDULE = '3600 1';
 
-    public static function serverConfOf(SentinelFamilyEngine $engine, NodeConfigure $request, string $primary): string
+    public static function serverConfOf(SentinelFamilyEngine $engine, NodeConfig $request, string $primary): string
     {
-        $home = $engine->home();
-        $password = self::quoted((string) $request->secrets->admin);
-        $lines = [
-            'port '.self::DATA_PORT, 'bind * -::*', 'protected-mode yes', 'tcp-backlog 511', 'tcp-keepalive 300', 'daemonize no', 'loglevel notice', 'logfile ""',
-            "dir {$home}/data", 'tls-port '.self::TLS_PORT, "tls-cert-file {$home}/tls/server.pem", "tls-key-file {$home}/tls/server.pem", "tls-ca-cert-file {$home}/tls/ca.crt",
-            'tls-auth-clients no', 'tls-protocols "TLSv1.2 TLSv1.3"', "requirepass {$password}", "masterauth {$password}", 'maxmemory-clients 10%',
-            'lazyfree-lazy-expire yes', 'lazyfree-lazy-server-del yes', 'lazyfree-lazy-user-del yes', 'lazyfree-lazy-user-flush yes', 'activedefrag yes', 'latency-monitor-threshold 100',
-            ...self::persistenceLines(self::persistent($request->settings)),
-        ];
         $settings = $request->settings;
+        unset($settings[SentinelSettings::PERSISTENCE]);
         ksort($settings, SORT_STRING);
 
-        foreach ($settings as $key => $value) {
-            if ($key !== SentinelSettings::PERSISTENCE) {
-                $lines[] = self::directiveOf($key, $value);
-            }
-        }
-
-        if ($request->clustered) {
-            array_push($lines, "replica-announce-ip {$request->ip}", 'min-replicas-to-write '.self::requiredReplicasFor(count($request->members)), 'min-replicas-max-lag 10');
-
-            if ($request->readOnly) {
-                $lines[] = 'replica-priority 0';
-            }
-
-            if ($primary !== '' && $primary !== $request->ip) {
-                $lines[] = "replicaof {$primary} ".self::DATA_PORT;
-            }
-        }
-
-        return implode("\n", $lines)."\n";
+        return ConfigView::render('engines.sentinel.files.server-conf', [
+            'dataPort' => self::DATA_PORT,
+            'tlsPort' => self::TLS_PORT,
+            'home' => $engine->home(),
+            'password' => self::quoted((string) $request->secrets->admin),
+            'persistent' => self::persistent($request->settings),
+            'snapshot' => self::SNAPSHOT_SCHEDULE,
+            'directives' => array_map(self::directiveOf(...), array_keys($settings), $settings),
+            'clustered' => $request->clustered,
+            'ip' => $request->ip,
+            'requiredReplicas' => self::requiredReplicasFor(count($request->members)),
+            'readOnly' => $request->readOnly,
+            'replicaOf' => $primary !== '' && $primary !== $request->ip ? $primary : null,
+        ]);
     }
 
-    public static function sentinelConfOf(SentinelFamilyEngine $engine, NodeConfigure $request, string $primary): string
+    public static function sentinelConfOf(SentinelFamilyEngine $engine, NodeConfig $request, string $primary): string
     {
-        $password = self::quoted((string) $request->secrets->admin);
-        $primary = $primary === '' ? $request->ip : $primary;
-
-        return implode("\n", [
-            'port '.self::SENTINEL_PORT, "bind {$request->ip} 127.0.0.1", 'daemonize no', 'dir '.$engine->home().'/sentinel', "requirepass {$password}",
-            "sentinel announce-ip {$request->ip}", 'sentinel announce-port '.self::SENTINEL_PORT, "sentinel sentinel-pass {$password}",
-            sprintf('sentinel monitor main %s %d %d', $primary, self::DATA_PORT, self::majorityOf(count($request->members))),
-            "sentinel auth-pass main {$password}", 'sentinel down-after-milliseconds main 5000', 'sentinel failover-timeout main 60000', 'sentinel parallel-syncs main 1',
-        ])."\n";
+        return ConfigView::render('engines.sentinel.files.sentinel-conf', [
+            'sentinelPort' => self::SENTINEL_PORT,
+            'dataPort' => self::DATA_PORT,
+            'ip' => $request->ip,
+            'home' => $engine->home(),
+            'password' => self::quoted((string) $request->secrets->admin),
+            'primary' => $primary === '' ? $request->ip : $primary,
+            'quorum' => self::majorityOf(count($request->members)),
+        ]);
     }
 
-    public static function manifestOf(SentinelFamilyEngine $engine, NodeConfigure $request): string
+    public static function manifestOf(SentinelFamilyEngine $engine, NodeConfig $request): string
     {
         $server = [...self::process($engine, $engine->serverUnit(), $request->clustered ? '15s' : '3s', '1m0s', [$engine->home()."/conf/{$engine->id}.conf"]), 'enabled' => true];
         $processes = [$server];
@@ -145,18 +133,6 @@ final readonly class SentinelFiles
     public static function majorityOf(int $size): int
     {
         return intdiv($size, 2) + 1;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function persistenceLines(bool $persistent): array
-    {
-        if (! $persistent) {
-            return ['save ""', 'appendonly no'];
-        }
-
-        return ['save '.self::SNAPSHOT_SCHEDULE, 'stop-writes-on-bgsave-error yes', 'dbfilename dump.rdb', 'appendonly yes', 'appendfilename "appendonly.aof"', 'appenddirname "appendonlydir"', 'appendfsync everysec', 'aof-use-rdb-preamble yes'];
     }
 
     /**

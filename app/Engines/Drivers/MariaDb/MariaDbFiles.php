@@ -10,6 +10,7 @@ use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\MySqlFamily\FamilyFiles;
 use App\Engines\Drivers\MySqlFamily\MySqlFamilyEngine;
+use App\Engines\Drivers\Support\ConfigView;
 use App\Engines\Drivers\Support\NodeState;
 
 final readonly class MariaDbFiles
@@ -81,7 +82,7 @@ final readonly class MariaDbFiles
 
     private static function myCnfOf(NodeConfig $request, string $line, MySqlFamilyEngine $engine): string
     {
-        return FamilyFiles::render('engines.mariadb.files.my-cnf', [
+        return ConfigView::render('engines.mariadb.files.my-cnf', [
             'config' => $request,
             'home' => self::HOME,
             'socket' => $engine->socket(),
@@ -123,6 +124,6 @@ final readonly class MariaDbFiles
 
     private static function agentCnfOf(string $password, MySqlFamilyEngine $engine): string
     {
-        return FamilyFiles::render('engines.mariadb.files.agent-cnf', ['password' => $password, 'socket' => $engine->socket(), 'home' => self::HOME]);
+        return ConfigView::render('engines.mariadb.files.agent-cnf', ['password' => $password, 'socket' => $engine->socket(), 'home' => self::HOME]);
     }
 }

@@ -15,4 +15,4 @@ if [ -f "$CONF" ] && [ "$DIRECTIVES" != '[]' ]; then
     write_conf "$text"
 fi
 unit_do restart "$FLAVOR-server"
-result '{}'
+echo "Restarted $FLAVOR."

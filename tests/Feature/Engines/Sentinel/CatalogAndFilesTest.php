@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Member;
 use App\Engines\Data\MigrationSource;
-use App\Engines\Drivers\NodeState;
+use App\Engines\Data\MigrationStart;
 use App\Engines\Drivers\Sentinel\SentinelFamilyEngine;
 use App\Engines\Drivers\Sentinel\SentinelFiles;
 use App\Engines\Drivers\Sentinel\SentinelSettings;
-use App\Engines\Requests\MigrationStart;
+use App\Engines\Drivers\Support\NodeState;
 
 it('offers exactly the fields the Go engine offers on each flavour and line', function (string $flavor, string $line) {
     $fields = array_map(fn (EngineField $field): array => $field->toArray(), SentinelSettings::catalogFor(SentinelFamilyEngine::of($flavor), $line)->fields);
@@ -31,7 +31,7 @@ it('tunes like the Go engine', function () {
 it('renders the server conf, sentinel conf and manifest byte for byte like Go', function (string $case) {
     $fixture = goFixture("configure-{$case}.json", 'sentinel');
     $engine = SentinelFamilyEngine::of($fixture['flavor']);
-    $request = configureFromFixture($fixture['request']);
+    $request = nodeConfigFromFixture($fixture['request']);
     $catalog = SentinelSettings::catalogFor($engine, '9');
     $effective = NodeState::withSettings($request, $catalog->effective($catalog->tuned(NodeState::selfOf($request)), $request->settings));
 

@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 final readonly class SentinelFamilyEngine
 {
-    private function __construct(
+    public function __construct(
         public string $id,
         public string $cli,
         public string $server,

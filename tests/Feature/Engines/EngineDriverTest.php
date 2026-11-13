@@ -102,3 +102,23 @@ it('reuses a running log with the same name', function () {
 
     expect($node->openLog('server: joining the cluster')->id)->toBe($node->openLog('server: joining the cluster')->id);
 });
+
+it('reports a task with the phase from its log', function () {
+    fakeSsh()
+        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'interrupted', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
+        ->respondToEngine('task log', ['lines' => "DATABASIFY_PHASE copying\n"]);
+
+    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
+
+    expect($operation->state)->toBe(OperationState::Interrupted)
+        ->and($operation->phase)->toBe('copying');
+});
+
+it('stops a task', function () {
+    $ssh = fakeSsh()->respondToEngine('task stop', ['key' => 'k.1', 'kind' => 'task', 'state' => 'interrupted', 'phase' => 'stopping', 'progress' => null, 'startedAt' => '2026-11-13T00:00:00Z', 'finishedAt' => null, 'error' => null]);
+
+    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->stopTask('k.1');
+
+    expect($operation->state)->toBe(OperationState::Interrupted)
+        ->and($ssh->scriptAt(0))->toContain('databasify task stop');
+});

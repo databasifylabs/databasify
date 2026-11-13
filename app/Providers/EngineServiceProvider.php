@@ -10,8 +10,8 @@ use App\Engines\Drivers\MariaDb\MariaDbDriver;
 use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\MySql\MySqlDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
-use App\Engines\Drivers\Sentinel\RedisDriver;
-use App\Engines\Drivers\Sentinel\ValkeyDriver;
+use App\Engines\Drivers\Redis\RedisDriver;
+use App\Engines\Drivers\Valkey\ValkeyDriver;
 use App\Plugins\RegisterEngine;
 use Illuminate\Support\ServiceProvider;
 
