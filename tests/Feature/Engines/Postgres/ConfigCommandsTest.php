@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Exceptions\Engines\EngineBusy;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts();
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);

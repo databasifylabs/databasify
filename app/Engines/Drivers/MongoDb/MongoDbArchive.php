@@ -8,7 +8,6 @@ use App\DTOs\Recovery\ArchiveStatus;
 use App\Engines\Contracts\Archive;
 use App\Engines\Data\Operation;
 use App\Engines\Data\Storage;
-use App\Engines\Responses\ArchiveStatus as ArchiveStatusReply;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\EngineUnsupported;
 use Carbon\CarbonImmutable;
@@ -35,7 +34,7 @@ final readonly class MongoDbArchive implements Archive
         $failed = ! in_array($reply->string('backupResult'), ['', 'success'], true);
         $snapshots = $reply->ints('snapshots');
         $window = RestorableWindow::of($snapshots, array_map(OplogRange::fromPayload(...), $reply->objects('chunks')));
-        $status = new ArchiveStatusReply(
+        $status = new ArchiveStatus(
             count($snapshots),
             $this->momentOf($window->earliest),
             $this->momentOf($window->latest),
@@ -47,7 +46,7 @@ final readonly class MongoDbArchive implements Archive
             $this->driver->run('mongodb/archive/back-up');
         }
 
-        return ArchiveStatus::fromEngine($status);
+        return $status;
     }
 
     public function restore(string $key, Storage $storage, CarbonImmutable $target): Operation
@@ -68,8 +67,8 @@ final readonly class MongoDbArchive implements Archive
         ]);
     }
 
-    private function momentOf(?int $seconds): ?string
+    private function momentOf(?int $seconds): ?CarbonImmutable
     {
-        return $seconds === null ? null : gmdate('Y-m-d\TH:i:s\Z', $seconds);
+        return $seconds === null ? null : CarbonImmutable::createFromTimestampUTC($seconds);
     }
 }

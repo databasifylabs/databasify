@@ -6,7 +6,6 @@ use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mongodb']]);
     $this->scripts = fakeScripts()->respond('mongodb/nodes/configure', ['changed' => true]);
     $this->node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 });

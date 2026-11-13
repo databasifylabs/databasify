@@ -4,16 +4,10 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers;
 
-use App\Engines\Requests\TlsInstall;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class TlsPair
 {
-    public static function check(TlsInstall $request): void
-    {
-        self::checkPair($request->certificate, $request->key, $request->ca);
-    }
-
     public static function checkPair(string $certificatePem, string $key, string $ca): void
     {
         $certificate = openssl_x509_read($certificatePem);

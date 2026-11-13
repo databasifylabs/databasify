@@ -6,8 +6,8 @@ namespace App\Engines\Drivers\Sentinel;
 
 use App\Engines\Data\MigrationStart;
 use App\Engines\Data\NodeConfig;
-use App\Engines\Drivers\GoJson;
 use App\Engines\Drivers\Support\ConfigView;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class SentinelFiles
 {
@@ -64,7 +64,7 @@ final readonly class SentinelFiles
             $processes[] = [...array_slice($watcher, 0, 3), 'after' => [$engine->serverUnit()], ...array_slice($watcher, 3), 'enabled' => false];
         }
 
-        return GoJson::indented(['processes' => $processes, 'schedules' => []]);
+        return IndentedJson::of(['processes' => $processes, 'schedules' => []]);
     }
 
     public static function shakeConfigOf(MigrationStart $request, string $dir, string $password): string

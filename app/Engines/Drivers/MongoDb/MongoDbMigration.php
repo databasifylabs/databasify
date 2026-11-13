@@ -10,8 +10,6 @@ use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
 use App\Engines\Data\Secrets;
-use App\Engines\Responses\MigrationCheck as MigrationCheckReply;
-use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MongoDbMigration implements Migration
@@ -35,7 +33,7 @@ final readonly class MongoDbMigration implements Migration
         $error = $facts->nullableString('error');
 
         if ($error !== null) {
-            return SourceReport::fromEngine(new MigrationCheckReply(false, $error, null, null, false, null, [], [], [], [], [], []));
+            return SourceReport::unreachable($error);
         }
 
         $version = $facts->string('version');
@@ -52,7 +50,7 @@ final readonly class MongoDbMigration implements Migration
             $warnings[] = "continuous sync needs the same major version ({$line}); only a one-shot copy is possible";
         }
 
-        return SourceReport::fromEngine(new MigrationCheckReply(true, null, $version, null, ! $standalone && $sameMajor, intdiv($facts->int('size'), 1 << 20), $facts->strings('databases'), $facts->strings('unreadable'), [], $facts->strings('occupied'), $warnings, []));
+        return SourceReport::checked($version, ! $standalone && $sameMajor, intdiv($facts->int('size'), 1 << 20), $facts->strings('databases'), $facts->strings('unreadable'), occupied: $facts->strings('occupied'), warnings: $warnings);
     }
 
     public function start(MigrationStart $start): void
@@ -76,7 +74,7 @@ final readonly class MongoDbMigration implements Migration
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromEngine(EngineMigrationProgress::fromPayload($this->driver->read('mongodb/migration/progress')));
+        return MigrationProgress::fromPayload(($this->driver->read('mongodb/migration/progress')));
     }
 
     public function stop(): void

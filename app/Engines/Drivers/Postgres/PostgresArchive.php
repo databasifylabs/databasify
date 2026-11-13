@@ -8,7 +8,6 @@ use App\DTOs\Recovery\ArchiveStatus;
 use App\Engines\Contracts\Archive;
 use App\Engines\Data\Operation;
 use App\Engines\Data\Storage;
-use App\Engines\Responses\ArchiveStatus as EngineArchiveStatus;
 use Carbon\CarbonImmutable;
 
 final readonly class PostgresArchive implements Archive
@@ -22,7 +21,7 @@ final readonly class PostgresArchive implements Archive
 
     public function status(bool $backUpNow): ArchiveStatus
     {
-        return ArchiveStatus::fromEngine(EngineArchiveStatus::fromPayload($this->driver->read('postgres/archive/status', $this->driver->data(), timeout: self::STATUS_TIMEOUT, env: ['BACK_UP_NOW' => $backUpNow ? 'true' : 'false'])));
+        return ArchiveStatus::fromPayload(($this->driver->read('postgres/archive/status', $this->driver->data(), timeout: self::STATUS_TIMEOUT, env: ['BACK_UP_NOW' => $backUpNow ? 'true' : 'false'])));
     }
 
     public function restore(string $key, Storage $storage, CarbonImmutable $target): Operation

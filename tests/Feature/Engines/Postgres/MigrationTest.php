@@ -8,7 +8,6 @@ use App\Enums\Migrations\MigrationPhase;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts();
     $this->node = engineNode();
     $this->source = new MigrationSource('db.example.com', 5432, 'migrator', "s3'cr et", true);

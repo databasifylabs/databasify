@@ -108,7 +108,7 @@ it('restores a database on a dropped SDK onto the newest supported image of its 
 
     $restored = inProjectDuring(fn (): Database => resolve(RestoreToPointInTime::class)->handle($source, new PointInTimeRestore('orders-restored', Server::factory()->ready()->create()->id, $target)));
 
-    expect($restored->image->sdk)->toBe('0.2.0');
+    expect($restored->image->sdk)->toBe('0.2.2');
 });
 
 it('lets storage credentials rotate while a database on a dropped SDK archives there', function () {
@@ -151,7 +151,7 @@ it('shows the read-only banner on the database page and lists the database on th
 
     $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/show')
-        ->where('sdkUnsupported', ['sdk' => '0.0.9', 'range' => '^0.2', 'author' => 'Databasify']));
+        ->where('sdkUnsupported', ['sdk' => '0.0.9', 'range' => '^0.2.2 || ^1.0', 'author' => 'Databasify']));
 
     $this->get(projectUrl('/dashboard'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('dashboard')
@@ -170,7 +170,7 @@ it('lists the databases another SDK range would make read-only', function () {
     idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
 
     $this->artisan('databases:check-sdks', ['--range' => '^0.3'])
-        ->expectsOutputToContain('cache runs SDK 0.2.0')
+        ->expectsOutputToContain('cache runs SDK 0.2.2')
         ->assertExitCode(0);
 
     $this->artisan('databases:check-sdks', ['--range' => '^0.2'])

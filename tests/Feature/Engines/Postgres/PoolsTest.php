@@ -9,7 +9,6 @@ use App\Exceptions\Engines\EngineNotFound;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts()
         ->respond('postgres/pools/list', ['pools' => [['name' => 'web', 'database' => 'shop', 'size' => 10, 'mode' => 'transaction']]])
         ->respond('postgres/accounts/list', ['users' => [], 'databases' => ['shop', 'blog']]);

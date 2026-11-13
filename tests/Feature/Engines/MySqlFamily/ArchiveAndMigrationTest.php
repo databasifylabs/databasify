@@ -11,7 +11,6 @@ use App\Models\DatabaseNode;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql', 'mariadb']]);
     $this->scripts = fakeScripts();
 });
 

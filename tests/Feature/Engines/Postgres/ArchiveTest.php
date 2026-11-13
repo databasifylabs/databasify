@@ -6,7 +6,6 @@ use App\Engines\Data\Storage;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts();
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);

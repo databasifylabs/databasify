@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsDatabaseSettings;
-use App\Casts\AsEngineCapabilities;
 use App\Casts\AsEngineFields;
 use App\Casts\AsEngineImage;
 use App\Contracts\Projects\Movable;
@@ -32,7 +31,6 @@ use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Engines\EngineSecrets;
-use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\GrantAccess;
@@ -83,7 +81,6 @@ use LogicException;
  * @property int $maintenance_day
  * @property int $maintenance_hour
  * @property DatabaseSettings $settings
- * @property EngineCapabilities|null $engine_capabilities
  * @property list<EngineField> $config_fields
  * @property list<string>|null $log_units
  * @property string|null $dns_zone_id
@@ -92,7 +89,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -1092,7 +1089,6 @@ class Database extends Model implements Movable
         return [
             'image' => AsEngineImage::class,
             'available_image' => AsEngineImage::class,
-            'engine_capabilities' => AsEngineCapabilities::class,
             'config_fields' => AsEngineFields::class,
             'log_units' => 'array',
             'mode' => DatabaseMode::class,

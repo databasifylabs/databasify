@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\Databases\NodeRole;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql', 'mariadb']]);
     $this->scripts = fakeScripts();
 });
 

@@ -229,7 +229,7 @@ it('refuses to install an offered image built on an SDK outside the range', func
     $image = $database->image;
 
     expect(fn () => resolve(UpgradeDatabase::class)->handle($database->fresh()))
-        ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.3.0; this Databasify supports ^0.2.')
+        ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.')
         ->and($database->fresh())->image->toEqual($image)->operation->toBeNull()
         ->and($ssh->runs)->toBe([]);
 });

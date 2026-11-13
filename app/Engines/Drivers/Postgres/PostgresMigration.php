@@ -9,8 +9,6 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
-use App\Engines\Responses\MigrationCheck as EngineMigrationCheck;
-use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
 use App\Engines\Scripts\ScriptView;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
@@ -29,7 +27,7 @@ final readonly class PostgresMigration implements Migration
     {
         $env = [...$this->sourceEnv($source), 'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR)];
 
-        return SourceReport::fromEngine(EngineMigrationCheck::fromPayload($this->driver->read('postgres/migration/check', $this->driver->data(), timeout: self::CHECK_TIMEOUT, env: $env)));
+        return SourceReport::fromPayload(($this->driver->read('postgres/migration/check', $this->driver->data(), timeout: self::CHECK_TIMEOUT, env: $env)));
     }
 
     public function start(MigrationStart $start): void
@@ -54,7 +52,7 @@ final readonly class PostgresMigration implements Migration
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromEngine(EngineMigrationProgress::fromPayload($this->driver->read('postgres/migration/progress', $this->driver->data())));
+        return MigrationProgress::fromPayload(($this->driver->read('postgres/migration/progress', $this->driver->data())));
     }
 
     public function stop(): void

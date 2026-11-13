@@ -157,7 +157,7 @@ it('stores the newest image of its line once, when it is created', function () {
     withImage('valkey', '8.1.11');
 
     expect(Database::query()->sole())
-        ->image->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10', '0.2.0'))
+        ->image->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-valkey', 'sha256:'.str_repeat('8', 64), '8.1.10', '0.2.2'))
         ->available_image->toBeNull();
 });
 
@@ -169,7 +169,7 @@ it('refuses to create a database from an image built on an SDK outside the range
     withImage('valkey', '9.0.3', sdk: $sdk);
 
     $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'version_line' => '9', 'primary_server_id' => $server->id])
-        ->assertSessionHasErrors(['version_line' => "Valkey 9.0.3 is built on SDK {$named}; this Databasify supports ^0.2."]);
+        ->assertSessionHasErrors(['version_line' => "Valkey 9.0.3 is built on SDK {$named}; this Databasify supports ^0.2.2 || ^1.0."]);
 
     expect(Database::query()->count())->toBe(0)
         ->and(DatabaseNode::query()->count())->toBe(0);

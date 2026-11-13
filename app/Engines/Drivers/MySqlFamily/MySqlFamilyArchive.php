@@ -9,7 +9,6 @@ use App\Engines\Contracts\Archive;
 use App\Engines\Data\Operation;
 use App\Engines\Data\Storage;
 use App\Engines\Payload;
-use App\Engines\Responses\ArchiveStatus as ArchiveStatusReply;
 use App\Exceptions\Engines\EngineUnsupported;
 use Carbon\CarbonImmutable;
 
@@ -43,13 +42,13 @@ final readonly class MySqlFamilyArchive implements Archive
         $failure = in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.";
 
         if ($bases === []) {
-            return ArchiveStatus::fromEngine(new ArchiveStatusReply(0, null, null, null, $failure));
+            return new ArchiveStatus(0, null, null, null, $failure);
         }
 
         $latest = end($bases);
         $recoverableUntil = $shipped !== null && $shipped->greaterThan($latest) ? $shipped : $latest;
 
-        return ArchiveStatus::fromEngine(new ArchiveStatusReply(count($bases), $this->timeOf($bases[0]), $this->timeOf($recoverableUntil), $this->timeOf($latest), $failure));
+        return new ArchiveStatus(count($bases), $bases[0]->utc(), $recoverableUntil->utc(), $latest->utc(), $failure);
     }
 
     public function restore(string $key, Storage $storage, CarbonImmutable $target): Operation

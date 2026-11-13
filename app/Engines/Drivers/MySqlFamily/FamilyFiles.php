@@ -6,8 +6,8 @@ namespace App\Engines\Drivers\MySqlFamily;
 
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Storage;
-use App\Engines\Drivers\GoJson;
 use App\Engines\Drivers\Support\ConfigView;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class FamilyFiles
 {
@@ -51,7 +51,7 @@ final readonly class FamilyFiles
         $server = ['name' => $engine->serverUnit(), 'argv' => $argv, 'user' => 'mysql', 'restart' => 'always', 'restartSec' => '3s', 'stopSignal' => 'TERM', 'stopTimeout' => '10m0s', 'enabled' => true];
 
         if ($request->archive === null) {
-            return GoJson::indented(['processes' => [$server, ...$extra], 'schedules' => []]);
+            return IndentedJson::of(['processes' => [$server, ...$extra], 'schedules' => []]);
         }
 
         $units = $engine->archiveUnits();
@@ -59,7 +59,7 @@ final readonly class FamilyFiles
         $streamEnv = ['STREAM_SERVER_ID' => (string) (self::serverIdOfAddress($request->ip) ^ self::STREAM_ID_BIT)];
         $backupEnv = [...$storage, 'RETENTION_DAYS' => (string) $request->archive->retentionDays, 'BACKUP_GALERA_INFO' => $engine->id === 'mariadb' && $request->clustered && ! $request->readOnly ? 'true' : 'false'];
 
-        return GoJson::indented([
+        return IndentedJson::of([
             'processes' => [$server, self::helper($units['stream'], self::jobOf($engine, 'binlog-stream'), $engine->serverUnit(), '10s', $streamEnv), ...$extra],
             'schedules' => [
                 ['name' => $units['ship'], 'every' => '1m0s', 'argv' => ['bash', self::jobOf($engine, 'binlog-ship')], 'env' => $storage, 'timeout' => '1h0m0s'],

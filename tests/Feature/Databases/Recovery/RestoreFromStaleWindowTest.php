@@ -108,7 +108,7 @@ it('refuses to restore when no image of the line is built on an SDK inside the r
     $ssh = fakeEngine();
 
     restoreTo($source, now()->subHour())
-        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.3.0; this Databasify supports ^0.2.']);
+        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.']);
 
     expect(Database::query()->where('name', 'orders-restored')->exists())->toBeFalse()
         ->and($ssh->runs)->toBe([]);

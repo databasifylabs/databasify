@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Engines\Drivers\Postgres;
 
 use App\Engines\Data\NodeConfig;
-use App\Engines\Drivers\GoJson;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class PostgresManifest
 {
@@ -65,7 +65,7 @@ SH;
             ]];
         }
 
-        return GoJson::indented($manifest);
+        return IndentedJson::of($manifest);
     }
 
     /**

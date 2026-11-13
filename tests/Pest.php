@@ -25,8 +25,6 @@ use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Engines\Drivers\Redis\RedisDriver;
 use App\Engines\Drivers\Valkey\ValkeyDriver;
 use App\Engines\Payload;
-use App\Engines\Requests\NodeConfigure;
-use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeKind;
@@ -111,27 +109,6 @@ function inProjectDuring(Closure $callback): mixed
     }
 }
 
-function configureFromFixture(array $request): NodeConfigure
-{
-    $archive = $request['archive'] === null ? null : new ArchiveSettings(
-        new Storage(...array_intersect_key($request['archive']['storage'], array_flip(['endpoint', 'bucket', 'region', 'accessKey', 'secretKey', 'pathStyle', 'path']))),
-        $request['archive']['retentionDays'],
-        $request['archive']['backupHour'],
-    );
-
-    return new NodeConfigure(
-        $request['clustered'],
-        $request['readOnly'],
-        $request['ip'],
-        $request['databaseId'],
-        array_map(fn (array $member): Member => new Member(...$member), $request['members']),
-        $request['settings'] ?? [],
-        new Secrets(...$request['secrets']),
-        $archive,
-        $request['primary'],
-    );
-}
-
 function nodeConfigFromFixture(array $request): NodeConfig
 {
     $archive = $request['archive'] === null ? null : new ArchiveSettings(
@@ -206,38 +183,6 @@ function fakeSsh(): FakeServerConnection
 /**
  * @return array<string, mixed>
  */
-function engineCapabilitiesPayload(string $engine): array
-{
-    $ports = match ($engine) {
-        'postgres' => ['client' => 25060, 'pool' => 25061, 'peers' => [8008, 2379, 2380]],
-        'mysql' => ['client' => 25060, 'pool' => null, 'peers' => [33061]],
-        'mariadb' => ['client' => 25060, 'pool' => null, 'peers' => [4444, 4567, 4568]],
-        'valkey', 'redis' => ['client' => 25061, 'pool' => null, 'peers' => [6379, 26379]],
-        default => ['client' => 25060, 'pool' => null, 'peers' => []],
-    };
-
-    [$users, $databases] = match ($engine) {
-        'postgres' => [['postgres', 'replicator', 'pgbouncer', 'patroni', 'admin'], ['postgres', 'template0', 'template1']],
-        'mysql' => [['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'databasify_repl', 'databasify_agent'], ['mysql', 'sys', 'performance_schema', 'information_schema']],
-        'mariadb' => [['root', 'mysql', 'mariadb.sys', 'databasify_sst', 'databasify_repl', 'databasify_agent'], ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify']],
-        'mongodb' => [['root', 'databasify_pbm', '__system'], ['admin', 'local', 'config']],
-        default => [[], []],
-    };
-
-    $commands = [...(in_array($engine, ['valkey', 'redis'], true) ? ['node status'] : ['account list', 'database create', 'database drop', 'node status', 'user create', 'user drop', 'user grant', 'user set-password']), 'runtime run'];
-    [$encryptions, $default] = match ($engine) {
-        'mysql' => [['caching_sha2_password', 'mysql_native_password'], 'caching_sha2_password'],
-        'mariadb' => [['mysql_native_password', 'ed25519', 'parsec'], 'mysql_native_password'],
-        'mongodb' => [['SCRAM-SHA-256', 'SCRAM-SHA-1'], 'SCRAM-SHA-256'],
-        default => [[], null],
-    };
-
-    return ['commands' => [...$commands, ...(in_array($engine, ['valkey', 'redis'], true) ? [] : ['archive status', 'restore start'])], 'passwordEncryptions' => $encryptions, 'defaultPasswordEncryption' => $default, 'reservedUsers' => $users, 'reservedDatabases' => $databases, 'ports' => $ports];
-}
-
-/**
- * @return array<string, mixed>
- */
 function engineFieldPayload(): array
 {
     return ['key' => 'max_connections', 'label' => 'Max connections', 'description' => 'Connections at once.', 'kind' => 'integer', 'default' => '100', 'options' => [], 'unit' => null, 'min' => 10, 'max' => 10000, 'pattern' => null, 'restart' => true, 'tuned' => false];
@@ -246,7 +191,6 @@ function engineFieldPayload(): array
 function withEngineDetails(Database $database): Database
 {
     $database->update([
-        'engine_capabilities' => EngineCapabilities::fromPayload(new Payload(engineCapabilitiesPayload($database->engine))),
         'config_fields' => [EngineField::fromPayload(new Payload(engineFieldPayload()))],
         'log_units' => [$database->engine, "databasify-{$database->engine}"],
     ]);
@@ -271,7 +215,7 @@ function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
     return $ssh
         ->respondToEngine('host remove', [])
         ->respondToEngine('logs read', ['units' => ['engine-server'], 'lines' => ['ready']])
-        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.2.0']);
+        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.2.2']);
 }
 
 function engineRequestIn(string $script): string
@@ -473,7 +417,7 @@ function newDatabase(string $engine, int $servers, DatabaseMode $mode = Database
     return $database;
 }
 
-function withImage(string $engine, string $release, ?string $digest = null, ?string $sdk = '0.2.0'): void
+function withImage(string $engine, string $release, ?string $digest = null, ?string $sdk = '0.2.2'): void
 {
     imageRegistry()->publish($engine, $release, $digest, $sdk);
 }

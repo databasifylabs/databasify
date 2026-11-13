@@ -6,7 +6,6 @@ use App\Engines\Data\Member;
 use App\Exceptions\Engines\EngineBusy;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql']]);
     $this->scripts = fakeScripts();
     $this->node = idleDatabase('mysql', 1, versionLine: '8.4')->nodes()->sole();
 });

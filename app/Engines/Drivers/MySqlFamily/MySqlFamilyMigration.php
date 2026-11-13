@@ -10,8 +10,6 @@ use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
 use App\Engines\Payload;
-use App\Engines\Responses\MigrationCheck as MigrationCheckReply;
-use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MySqlFamilyMigration implements Migration
@@ -34,7 +32,7 @@ final readonly class MySqlFamilyMigration implements Migration
         $error = $facts->nullableString('error');
 
         if ($error !== null) {
-            return SourceReport::fromEngine(new MigrationCheckReply(false, strtok($error, "\n") ?: $error, null, null, false, null, [], [], [], [], [], []));
+            return SourceReport::unreachable(strtok($error, "\n") ?: $error);
         }
 
         $visible = $facts->strings('visible');
@@ -70,7 +68,7 @@ final readonly class MySqlFamilyMigration implements Migration
         [$canReplicate, $readiness] = $engine->id === 'mysql' ? $this->mysqlReadiness($facts, $release) : $this->mariadbReadiness($facts, $version, $release);
         $problems = $engine->id === 'mysql' && ! $facts->bool('roleEdgesReadable') ? [self::ROLES_PROBLEM] : [];
 
-        return SourceReport::fromEngine(new MigrationCheckReply(true, null, $release, null, $canReplicate, intdiv($bytes, 1 << 20), $visible, $unreadable, [], $occupied, [...$warnings, ...$readiness], $problems));
+        return SourceReport::checked($release, $canReplicate, intdiv($bytes, 1 << 20), $visible, $unreadable, occupied: $occupied, warnings: [...$warnings, ...$readiness], problems: $problems);
     }
 
     public function start(MigrationStart $start): void
@@ -93,7 +91,7 @@ final readonly class MySqlFamilyMigration implements Migration
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromEngine(EngineMigrationProgress::fromPayload($this->scripts->read($this->driver, 'mysql-family/migration/progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
+        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'mysql-family/migration/progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
     }
 
     public function stop(): void

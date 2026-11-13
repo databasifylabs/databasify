@@ -8,7 +8,6 @@ use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mongodb']]);
     $this->scripts = fakeScripts();
     $this->node = idleDatabase('mongodb', 1)->nodes()->sole();
 });

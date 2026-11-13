@@ -11,7 +11,6 @@ use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql', 'mariadb']]);
     $this->local = localScripts()
         ->reply('FROM information_schema.SCHEMATA', '["app","mysql","shop","sys"]')
         ->reply("FROM mysql.user WHERE Host = '%'", '["app_user","databasify_repl","root"]');

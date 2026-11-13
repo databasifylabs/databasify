@@ -7,7 +7,7 @@ namespace App\Engines\Drivers\MongoDb;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Storage;
-use App\Engines\Drivers\GoJson;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class MongoDbFiles
 {
@@ -51,7 +51,7 @@ final readonly class MongoDbFiles
             'replication' => ['replSetName' => 'databasify'],
         ];
 
-        return (string) preg_replace('/"\\\\u0000number:([^"]*)"/', '$1', GoJson::indented(self::sorted($conf)))."\n";
+        return (string) preg_replace('/"\\\\u0000number:([^"]*)"/', '$1', IndentedJson::of(self::sorted($conf)))."\n";
     }
 
     public static function keyfileOf(string $replication): string
@@ -79,7 +79,7 @@ final readonly class MongoDbFiles
             ];
         }
 
-        return GoJson::indented(['processes' => $processes, 'schedules' => $schedules]);
+        return IndentedJson::of(['processes' => $processes, 'schedules' => $schedules]);
     }
 
     public static function hostOf(string $ip): string
@@ -111,7 +111,7 @@ final readonly class MongoDbFiles
 
     public static function pbmConfigOf(Storage $storage, bool $slicing): string
     {
-        return GoJson::indented(self::sorted([
+        return IndentedJson::of(self::sorted([
             'storage' => [
                 'type' => 's3',
                 's3' => [

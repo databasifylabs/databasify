@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts()->respond('postgres/nodes/configure', ['changed' => true]);
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);

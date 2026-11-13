@@ -6,7 +6,6 @@ use App\Engines\Data\Member;
 use App\Exceptions\Engines\EngineBusy;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mongodb']]);
     $this->scripts = fakeScripts();
     $this->node = idleDatabase('mongodb', 1)->nodes()->sole();
     respondToFileGet(fakeSsh(), 'state/node.json', json_encode(goFixture('configure-archived.json', 'mongodb')['request']));

@@ -21,7 +21,6 @@ use Symfony\Component\Finder\Finder;
 use Tests\Support\KeyDbDriver;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['valkey', 'redis']]);
     $this->scripts = fakeScripts();
 });
 

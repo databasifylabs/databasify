@@ -10,7 +10,6 @@ use App\Exceptions\Engines\EngineUnsupported;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mongodb']]);
     $this->scripts = fakeScripts();
     $this->node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 });

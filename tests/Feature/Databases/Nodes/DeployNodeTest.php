@@ -13,12 +13,13 @@ it('installs the newest engine-sdk release inside the required range before ever
     $ssh = fakeSsh();
     $node = engineNode();
     $repository = 'ghcr.io/databasifylabs/engine-sdk';
-    imageRegistry()->publishIn($repository, '0.2.1', FakeImageRegistry::digestIn($repository, '0.2.1'))
-        ->publishIn($repository, '0.3.0', FakeImageRegistry::digestIn($repository, '0.3.0'))
-        ->publishIn($repository, '0.2.2-a1b2c3d', FakeImageRegistry::digestIn($repository, '0.2.2-a1b2c3d'));
+    imageRegistry()->publishIn($repository, '0.2.3', FakeImageRegistry::digestIn($repository, '0.2.3'))
+        ->publishIn($repository, '1.0.1', FakeImageRegistry::digestIn($repository, '1.0.1'))
+        ->publishIn($repository, '2.0.0', FakeImageRegistry::digestIn($repository, '2.0.0'))
+        ->publishIn($repository, '1.0.2-a1b2c3d', FakeImageRegistry::digestIn($repository, '1.0.2-a1b2c3d'));
     Cache::flush();
     $before = count($ssh->runs);
-    $digest = FakeImageRegistry::digestIn($repository, '0.2.1');
+    $digest = FakeImageRegistry::digestIn($repository, '1.0.1');
 
     resolve(InstallHostBinary::class)->handle($node);
 
@@ -94,7 +95,7 @@ it('fails the deploy when the running engine reports an SDK outside the range', 
     $database = $node->database;
 
     expect(fn () => resolve(DeployNode::class)->handle($database, $node))
-        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK 0.3.0; this Databasify supports ^0.2.")
+        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.")
         ->and(recordedCalls())->not->toContain('nodes.installTls');
 });
 
@@ -104,5 +105,5 @@ it('names the SDK unknown when the running engine reports none', function () {
     $database = $node->database;
 
     expect(fn () => resolve(DeployNode::class)->handle($database, $node))
-        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK unknown; this Databasify supports ^0.2.");
+        ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK unknown; this Databasify supports ^0.2.2 || ^1.0.");
 });

@@ -6,7 +6,6 @@ use App\Engines\Data\Member;
 use App\Exceptions\Engines\EngineBusy;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mariadb']]);
     $this->scripts = fakeScripts();
     $this->node = idleDatabase('mariadb', 1, versionLine: '11.8')->nodes()->sole();
     $this->fixture = goFixture('configure-galera-11.8.json', 'mariadb');

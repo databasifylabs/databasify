@@ -8,7 +8,6 @@ use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql', 'mariadb']]);
     $this->scripts = fakeScripts()->respond('mysql-family/nodes/configure', ['changed' => true]);
 });
 

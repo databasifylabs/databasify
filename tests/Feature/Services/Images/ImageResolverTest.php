@@ -13,7 +13,7 @@ it('picks the highest exact version of the line and ignores every other tag', fu
     collect($tags)->each(fn (string $tag) => withImage($engine, $tag));
 
     expect(resolve(ImageResolver::class)->newest(new Database(['engine' => $engine]), $line))
-        ->toEqual(new EngineImage(EngineCatalog::find($engine)->imageRepository, FakeImageRegistry::digestFor($engine, $expected), $expected, '0.2.0'));
+        ->toEqual(new EngineImage(EngineCatalog::find($engine)->imageRepository, FakeImageRegistry::digestFor($engine, $expected), $expected, '0.2.2'));
 })->with([
     'postgres 18' => ['postgres', '18', ['17.11', '18.6', '18.10', '18', 'latest', '18.11-a1b2c3d', '180.1', '18.12-r3'], '18.10'],
     'mysql 8.4' => ['mysql', '8.4', ['8.0.40', '8.4.9', '8.4.13', '8.4', '8.4.14-0f00ba1', 'latest'], '8.4.13'],
@@ -46,7 +46,7 @@ it('refuses an image without an SDK label', function () {
     withImage('valkey', '9.0.3', sdk: null);
 
     expect(fn () => resolve(ImageResolver::class)->newest(new Database(['engine' => 'valkey']), '9'))
-        ->toThrow(ImageUnavailable::class, 'Valkey 9.0.3 is built on SDK unknown; this Databasify supports ^0.2.');
+        ->toThrow(ImageUnavailable::class, 'Valkey 9.0.3 is built on SDK unknown; this Databasify supports ^0.2.2 || ^1.0.');
 });
 
 it('falls back to the newest release of the line built on a supported SDK', function () {
@@ -63,5 +63,5 @@ it('refuses with the newest release when no release of the line is supported', f
     withImage('valkey', '9.0.4', sdk: '0.3.0');
 
     expect(fn () => resolve(ImageResolver::class)->newest(new Database(['engine' => 'valkey']), '9'))
-        ->toThrow(ImageUnavailable::class, 'Valkey 9.0.4 is built on SDK 0.3.0; this Databasify supports ^0.2.');
+        ->toThrow(ImageUnavailable::class, 'Valkey 9.0.4 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.');
 });
