@@ -10,6 +10,8 @@ use App\DTOs\Databases\EndpointPair;
 use App\DTOs\Databases\NodeResources;
 use App\DTOs\Databases\NodeStatus;
 use App\DTOs\Dns\HostPair;
+use App\DTOs\Ssh\LogGroup;
+use App\Engines\Drivers\AbstractEngineDriver;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\ResourceMetric;
@@ -27,6 +29,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * @property string $id
@@ -287,8 +290,28 @@ class DatabaseNode extends Model
         ];
     }
 
+    public function driver(bool $followsPrimary = false): AbstractEngineDriver
+    {
+        $driver = resolve($this->database->engine()->driver ?? throw $this->missingDriver(), ['node' => $this, 'followsPrimary' => $followsPrimary]);
+
+        return $driver instanceof AbstractEngineDriver ? $driver : throw $this->missingDriver();
+    }
+
+    public function openLog(string $name): ServerLog
+    {
+        $group = LogGroup::fromContext();
+
+        return $this->server->serverLogs()->running()->where('name', $name)->where('database_id', $this->database_id)->first()
+            ?? $this->server->serverLogs()->create(['name' => $name, 'database_id' => $this->database_id, 'group_id' => $group?->id, 'group_name' => $group?->name]);
+    }
+
     public function ssh(): Ssh
     {
         return $this->server->ssh($this->database);
+    }
+
+    private function missingDriver(): LogicException
+    {
+        return new LogicException("The {$this->database->engine} engine has no PHP driver.");
     }
 }

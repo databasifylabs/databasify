@@ -27,6 +27,7 @@ use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Grant;
+use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Engines\EngineSecrets;
@@ -757,6 +758,11 @@ class Database extends Model implements Movable
     public function primary(): ?DatabaseNode
     {
         return $this->nodes()->primary()->first();
+    }
+
+    public function driver(): AbstractEngineDriver
+    {
+        return $this->primaryOrSeed()->driver(followsPrimary: true);
     }
 
     public function primaryOrSeed(): DatabaseNode

@@ -21,9 +21,18 @@ final readonly class ScriptResult
         $lines = array_filter(explode("\n", $this->stdout), fn (string $line): bool => str_starts_with($line, self::RESULT));
 
         if ($lines === []) {
-            throw new EngineScriptFailed('script_failed', "{$this->script} printed no result line.");
+            return $this->wholeOutput();
         }
 
         return Payload::decode(substr((string) end($lines), strlen(self::RESULT)));
+    }
+
+    private function wholeOutput(): Payload
+    {
+        if (trim($this->stdout) === '') {
+            throw new EngineScriptFailed('script_failed', "{$this->script} printed nothing to read.");
+        }
+
+        return Payload::decode($this->stdout);
     }
 }
