@@ -5,6 +5,6 @@ main(() => {
   const primary = primaryOf(hosts());
   const config = configOf(primary.admin);
   if (memberOf(config, env.GONE)) reconfig(primary.admin, withoutHost(config, env.GONE), false);
-  result({});
+  emit('Removed ' + env.GONE + ' from the replica set.');
 });
 JS

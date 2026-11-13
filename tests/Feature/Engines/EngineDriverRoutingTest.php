@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\LearnEngine;
 use App\Engines\Data\Grant;
-use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\Sentinel\ValkeyDriver;
 use App\Engines\EngineClient;
 use App\Engines\Payload;
@@ -90,12 +89,12 @@ it('leaves engines that are not listed on the binary', function () {
 });
 
 it('reports a task-backed operation with the phase from its log', function () {
-    config(['databasify.php_engines' => ['mongodb'], 'engine.providers.mongodb.driver' => MongoDbDriver::class]);
+    config(['databasify.php_engines' => ['valkey'], 'engine.providers.valkey.driver' => ValkeyDriver::class]);
     fakeSsh()
         ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'interrupted', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
         ->respondToEngine('task log', ['lines' => "DATABASIFY_PHASE copying\n"]);
 
-    $operation = resolve(EngineClient::class)->send(idleDatabase('mongodb', 1)->nodes()->sole(), new OperationStatus('ready.1'));
+    $operation = resolve(EngineClient::class)->send(idleDatabase('valkey', 1)->nodes()->sole(), new OperationStatus('ready.1'));
 
     expect($operation->state)->toBe(OperationState::Interrupted)
         ->and($operation->phase)->toBe('copying');
@@ -110,6 +109,5 @@ it('cancels a task-backed operation and answers done', function (string $engine,
     expect($reply)->toBeInstanceOf(Done::class)
         ->and($ssh->scriptAt(0))->toContain('databasify task stop');
 })->with([
-    'mongodb' => ['mongodb', MongoDbDriver::class],
     'valkey' => ['valkey', ValkeyDriver::class],
 ]);

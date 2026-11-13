@@ -6,6 +6,6 @@ main(() => {
   } catch (error) {
     if (!hasCode(error, 48)) throw error;
   }
-  result({});
+  emit('Created database ' + env.NAME + '.');
 });
 JS

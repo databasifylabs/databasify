@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MongoDb;
 
+use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Storage;
 use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\NodeConfigure;
 
 final readonly class MongoDbFiles
 {
@@ -56,7 +56,7 @@ final readonly class MongoDbFiles
         return base64_encode(hash_hmac('sha256', 'mongodb keyfile', $replication, true));
     }
 
-    public static function manifestOf(NodeConfigure $request): string
+    public static function manifestOf(NodeConfig $request): string
     {
         $processes = [[
             'name' => self::SERVER_UNIT, 'argv' => ['mongod', '--config', self::HOME.'/conf/mongod.conf'], 'user' => 'mongodb',

@@ -2,17 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Engines\Contracts\Accounts;
 use App\Engines\Data\Grant;
-use App\Engines\EngineClient;
-use App\Engines\Requests\AccountList;
-use App\Engines\Requests\DatabaseCreate;
-use App\Engines\Requests\DatabaseDrop;
-use App\Engines\Requests\NodeMetrics;
-use App\Engines\Requests\NodeStatus;
-use App\Engines\Requests\UserCreate;
-use App\Engines\Requests\UserDrop;
-use App\Engines\Requests\UserGrant;
-use App\Engines\Requests\UserSetPassword;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeRole;
 use App\Exceptions\Engines\InvalidEngineRequest;
@@ -23,18 +14,11 @@ beforeEach(function () {
     $this->node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 });
 
-function sendToMongo(object $node, object $request): object
-{
-    return resolve(EngineClient::class)->send($node, $request);
-}
-
 it('creates a user with every value only in the env', function () {
-    $this->scripts->respond('mongodb/accounts/create-user', ['created' => true]);
     $password = "p'w\"\\\$`x";
 
-    $reply = sendToMongo($this->node, new UserCreate("o'b", $password, [new Grant('shop', GrantAccess::Write), new Grant('app', GrantAccess::Read)], null));
+    $this->node->driver()->accounts()->createUser("o'b", $password, [new Grant('shop', GrantAccess::Write), new Grant('app', GrantAccess::Read)], null);
 
-    expect($reply->created)->toBeTrue();
     $this->scripts->assertRan('mongodb/accounts/create-user', fn (string $script, array $env): bool => $env['NAME'] === "o'b"
         && $env['PASSWORD'] === $password
         && $env['ENCRYPTION'] === 'SCRAM-SHA-256'
@@ -45,28 +29,28 @@ it('creates a user with every value only in the env', function () {
         && str_contains($script, "'database ' + JSON.stringify(grant.database) + ' does not exist'"));
 });
 
-it('refuses what the Go engine refuses before running anything', function (object $request, string $message) {
-    expect(fn () => sendToMongo($this->node, $request))->toThrow(InvalidEngineRequest::class, $message);
+it('refuses what the Go engine refuses before running anything', function (Closure $call, string $message) {
+    expect(fn () => $call($this->node->driver()->accounts()))->toThrow(InvalidEngineRequest::class, $message);
     expect($this->scripts->ran())->toBe([]);
 })->with([
-    'reserved user' => [new UserDrop('databasify_pbm'), 'databasify_pbm is reserved'],
-    'reserved database' => [new DatabaseCreate('config'), 'config is reserved'],
-    'reserved grant' => [new UserGrant('app', [new Grant('admin', GrantAccess::Read)]), 'admin is reserved'],
-    'unknown encryption' => [new UserCreate('app', 'pw', [], 'MONGODB-X509'), 'password encryption "MONGODB-X509" is not offered'],
-    'control character' => [new UserSetPassword('app', "line\nbreak", null), 'a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab'],
+    'reserved user' => [fn (Accounts $accounts) => $accounts->dropUser('databasify_pbm'), 'databasify_pbm is reserved'],
+    'reserved database' => [fn (Accounts $accounts) => $accounts->createDatabase('config'), 'config is reserved'],
+    'reserved grant' => [fn (Accounts $accounts) => $accounts->grant('app', [new Grant('admin', GrantAccess::Read)], false), 'admin is reserved'],
+    'unknown encryption' => [fn (Accounts $accounts) => $accounts->createUser('app', 'pw', [], 'MONGODB-X509'), 'password encryption "MONGODB-X509" is not offered'],
+    'control character' => [fn (Accounts $accounts) => $accounts->setPassword('app', "line\nbreak", null), 'a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab'],
 ]);
 
 it('allows a control character with SCRAM-SHA-1, as Go does', function () {
-    sendToMongo($this->node, new UserSetPassword('app', "tab\there", 'SCRAM-SHA-1'));
+    $this->node->driver()->accounts()->setPassword('app', "tab\there", 'SCRAM-SHA-1');
 
     $this->scripts->assertRan('mongodb/accounts/set-password', fn (string $script, array $env): bool => $env['ENCRYPTION'] === 'SCRAM-SHA-1' && str_contains($script, "'user ' + JSON.stringify(env.NAME) + ' does not exist'"));
 });
 
 it('runs the other account commands with their Go behaviour', function () {
-    sendToMongo($this->node, new DatabaseCreate('shop'));
-    sendToMongo($this->node, new DatabaseDrop('shop'));
-    sendToMongo($this->node, new UserGrant('app', [new Grant('shop', GrantAccess::Read)], true));
-    sendToMongo($this->node, new UserDrop('app'));
+    $this->node->driver()->accounts()->createDatabase('shop');
+    $this->node->driver()->accounts()->dropDatabase('shop');
+    $this->node->driver()->accounts()->grant('app', [new Grant('shop', GrantAccess::Read)], true);
+    $this->node->driver()->accounts()->dropUser('app');
 
     $this->scripts->assertRan('mongodb/accounts/create-database', fn (string $script): bool => str_contains($script, "create: '_databasify'") && str_contains($script, 'hasCode(error, 48)'))
         ->assertRan('mongodb/accounts/drop-database', fn (string $script): bool => str_contains($script, 'revokeRolesFromUser') && str_contains($script, 'dropDatabase: 1'))
@@ -77,7 +61,7 @@ it('runs the other account commands with their Go behaviour', function () {
 it('lists accounts without the reserved ones', function () {
     $this->scripts->respond('mongodb/accounts/list', ['users' => ['root', 'zed', 'app'], 'databases' => ['shop', 'admin', 'app']]);
 
-    $accounts = sendToMongo($this->node, new AccountList);
+    $accounts = $this->node->driver()->accounts()->list();
 
     expect($accounts->users)->toBe(['app', 'zed'])->and($accounts->databases)->toBe(['app', 'shop']);
 });
@@ -86,8 +70,8 @@ it('reads status and metrics', function () {
     $this->scripts->respond('mongodb/nodes/status', ['role' => 'replica', 'version' => '8.0.4'])
         ->respond('mongodb/nodes/metrics', ['connections' => 3, 'queries' => 99, 'dataMb' => 12]);
 
-    $status = sendToMongo($this->node, new NodeStatus);
-    $metrics = sendToMongo($this->node, new NodeMetrics);
+    $status = $this->node->driver()->nodes()->status();
+    $metrics = $this->node->driver()->nodes()->metrics();
 
     expect($status->role)->toBe(NodeRole::Replica)->and($status->version)->toBe('8.0.4')
         ->and($metrics->queries)->toBe(99);

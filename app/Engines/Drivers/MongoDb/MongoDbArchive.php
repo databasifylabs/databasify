@@ -4,34 +4,34 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MongoDb;
 
-use App\Contracts\Engines\EngineScripts;
-use App\Engines\Requests\ArchiveStatus;
-use App\Engines\Requests\RestoreStart;
+use App\DTOs\Recovery\ArchiveStatus;
+use App\Engines\Contracts\Archive;
+use App\Engines\Data\Operation;
+use App\Engines\Data\Storage;
 use App\Engines\Responses\ArchiveStatus as ArchiveStatusReply;
-use App\Engines\Responses\Operation;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\EngineUnsupported;
-use App\Models\DatabaseNode;
+use Carbon\CarbonImmutable;
 
-final readonly class Archive
+final readonly class MongoDbArchive implements Archive
 {
     public function __construct(
-        private EngineScripts $scripts,
-        private Configuration $configuration,
+        private MongoDbDriver $driver,
+        private MongoDbConfiguration $configuration,
     ) {}
 
-    public function status(DatabaseNode $node, ArchiveStatus $request): ArchiveStatusReply
+    public function status(bool $backUpNow): ArchiveStatus
     {
-        $saved = $this->configuration->savedRequestOf($node);
+        $saved = $this->configuration->savedRequestOf();
 
         if ($saved->archive === null || $saved->secrets->agent === null) {
             throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
         }
 
-        $reply = $this->scripts->run($node, 'mongodb/archive/status', timeout: 900, env: [
+        $reply = $this->driver->read('mongodb/archive/status', timeout: 900, env: [
             'PBM_CONFIG' => MongoDbFiles::pbmConfigOf($saved->archive->storage, true),
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
-        ])->json();
+        ]);
         $failed = ! in_array($reply->string('backupResult'), ['', 'success'], true);
         $snapshots = $reply->ints('snapshots');
         $window = RestorableWindow::of($snapshots, array_map(OplogRange::fromPayload(...), $reply->objects('chunks')));
@@ -43,26 +43,26 @@ final readonly class Archive
             $failed ? 'The last backup failed, see the '.MongoDbFiles::BACKUP_UNIT.' log.' : $reply->nullableString('problem'),
         );
 
-        if ($request->backUpNow || ($status->backups === 0 && $status->problem === null)) {
-            $this->scripts->run($node, 'mongodb/archive/back-up');
+        if ($backUpNow || ($status->backups === 0 && $status->problem === null)) {
+            $this->driver->run('mongodb/archive/back-up');
         }
 
-        return $status;
+        return ArchiveStatus::fromEngine($status);
     }
 
-    public function restore(DatabaseNode $node, RestoreStart $request): Operation
+    public function restore(string $key, Storage $storage, CarbonImmutable $target): Operation
     {
-        $saved = $this->configuration->savedRequestOf($node);
+        $saved = $this->configuration->savedRequestOf();
 
         if ($saved->archive === null || $saved->secrets->agent === null) {
             throw new EngineBusy('busy', 'configure archive on this database before restoring into it');
         }
 
-        return $this->scripts->start($node, $request->key, 'mongodb/restore/start', env: [
+        return $this->driver->task($key, 'mongodb/restore/start', env: [
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
-            'RESTORE_CONFIG' => MongoDbFiles::pbmConfigOf($request->storage, false),
+            'RESTORE_CONFIG' => MongoDbFiles::pbmConfigOf($storage, false),
             'SAVED_CONFIG' => MongoDbFiles::pbmConfigOf($saved->archive->storage, false),
-            'TARGET' => $request->target->utc()->format('Y-m-d\TH:i:s'),
+            'TARGET' => $target->utc()->format('Y-m-d\TH:i:s'),
             'ADMIN_PASSWORD' => (string) $saved->secrets->admin,
             'AGENT_PASSWORD' => $saved->secrets->agent,
         ]);

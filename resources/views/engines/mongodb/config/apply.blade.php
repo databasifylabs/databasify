@@ -9,6 +9,6 @@ main(() => {
     const writeConcern = /^-?[0-9]+$/.test(env.WRITE_CONCERN) ? Number(env.WRITE_CONCERN) : env.WRITE_CONCERN;
     run('admin', { setDefaultRWConcern: 1, defaultReadConcern: { level: env.READ_CONCERN }, defaultWriteConcern: { w: writeConcern } });
   }
-  result({});
+  emit('Applied the online settings.');
 });
 JS

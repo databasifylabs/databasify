@@ -6,6 +6,6 @@ main(() => {
   } catch (error) {
     if (!hasCode(error, 11)) throw error;
   }
-  result({});
+  emit('Dropped user ' + env.NAME + '.');
 });
 JS

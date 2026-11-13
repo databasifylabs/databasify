@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Contracts\Engines\EngineDriver;
 use App\Contracts\Engines\EngineRequest;
-use App\Engines\Drivers\MongoDb\MongoDbDriver;
 use App\Engines\Drivers\Sentinel\RedisDriver;
 use App\Engines\Drivers\Sentinel\ValkeyDriver;
 use Symfony\Component\Finder\Finder;
@@ -28,7 +27,6 @@ it('answers every request the app sends except the binary, host and runtime ones
 
     expect($unanswered)->toBe(collect([...$binaryOnly, ...$notOffered])->sort()->values()->all());
 })->with([
-    'mongodb' => [MongoDbDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
     'valkey' => [ValkeyDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
     'redis' => [RedisDriver::class, ['PoolCreate', 'PoolDelete', 'PoolList', 'PoolUpdate']],
 ]);

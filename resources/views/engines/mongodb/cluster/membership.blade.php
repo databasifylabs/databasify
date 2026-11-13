@@ -11,6 +11,6 @@ main(() => {
   const config = configOf(primary.admin);
   const kept = membersOf(config).filter((member) => wanted.includes(member.host));
   if (kept.length !== membersOf(config).length) reconfig(primary.admin, withMembers(config, kept), false);
-  result({});
+  emit('Updated the replica set members.');
 });
 JS

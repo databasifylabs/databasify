@@ -51,4 +51,4 @@ main(() => {
   result({});
 });
 JS
-result '{}'
+echo 'Bootstrapped the admin and backup users.'

@@ -5,11 +5,11 @@ main(() => {
   const roles = rolesOf(JSON.parse(env.GRANTS), false);
   try {
     run('admin', { createUser: env.NAME, pwd: env.PASSWORD, mechanisms: [env.ENCRYPTION], roles: roles });
-    result({ created: true });
+    emit('Created user ' + env.NAME + '.');
   } catch (error) {
     if (codeOf(error) !== 'already_exists') throw error;
     run('admin', { updateUser: env.NAME, pwd: env.PASSWORD, mechanisms: [env.ENCRYPTION], roles: roles });
-    result({ created: false });
+    emit('Updated user ' + env.NAME + '.');
   }
 });
 JS

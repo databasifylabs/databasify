@@ -8,11 +8,11 @@ main(() => {
   const alone = withMembers(config, [votingAlone(self)]);
   if (primary.host === env.SELF) {
     reconfig(local(), alone, false);
-    return result({});
+    return emit('Left the replica set.');
   }
   const current = configOf(primary.admin);
   if (memberOf(current, env.SELF)) reconfig(primary.admin, withoutHost(current, env.SELF), false);
   reconfig(local(), alone, true);
-  result({});
+  emit('Left the replica set.');
 });
 JS

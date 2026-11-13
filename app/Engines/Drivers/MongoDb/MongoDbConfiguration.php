@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MongoDb;
 
-use App\Contracts\Engines\EngineScripts;
 use App\Engines\Data\ConfigFile;
-use App\Engines\Drivers\NodeState;
-use App\Engines\Requests\NodeConfigure;
-use App\Engines\Responses\NodeConfigure as NodeConfigureReply;
+use App\Engines\Data\NodeConfig;
+use App\Engines\Drivers\Support\NodeState;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
-use App\Models\DatabaseNode;
 
-final readonly class Configuration
+final readonly class MongoDbConfiguration
 {
     public const string TUNED_STATE = 'state/tuned.json';
 
@@ -22,11 +19,11 @@ final readonly class Configuration
     private const int MAX_REPLICA_SET = 50;
 
     public function __construct(
-        private EngineScripts $scripts,
+        private MongoDbDriver $driver,
         private NodeState $state,
     ) {}
 
-    public function configure(DatabaseNode $node, NodeConfigure $request): NodeConfigureReply
+    public function configure(NodeConfig $request): void
     {
         if ($request->secrets->admin === null || $request->secrets->replication === null) {
             throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin and replication secrets');
@@ -38,11 +35,11 @@ final readonly class Configuration
 
         $catalog = MongoDbSettings::catalog();
         $catalog->check($request->settings);
-        $saved = $this->state->tunedOf($node, self::TUNED_STATE);
+        $saved = $this->state->tunedOf($this->driver, self::TUNED_STATE);
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
         $conf = MongoDbFiles::HOME.'/conf';
 
-        $reply = $this->scripts->run($node, 'mongodb/nodes/configure', env: [
+        $this->driver->run('mongodb/nodes/configure', env: [
             'REQUEST_JSON' => NodeState::requestJsonOf($request),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
             'FILES' => $this->filesTsvOf([
@@ -53,29 +50,27 @@ final readonly class Configuration
             'MANIFEST' => base64_encode(MongoDbFiles::manifestOf($request)),
             'START_AGENT' => $request->archive !== null && $request->secrets->agent !== null ? 'true' : 'false',
         ]);
-
-        return new NodeConfigureReply($reply->json()->bool('changed'));
     }
 
-    public function savedRequestOf(DatabaseNode $node): NodeConfigure
+    public function savedRequestOf(): NodeConfig
     {
-        return $this->state->requestOf($node, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function tunedOf(DatabaseNode $node, NodeConfigure $request): array
-    {
-        return $this->state->tunedOrNewOf($node, self::TUNED_STATE, MongoDbSettings::catalog(), $request);
+        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
     }
 
     /**
      * @return array<string, string>
      */
-    public function effectiveOf(DatabaseNode $node, NodeConfigure $request): array
+    public function tunedOf(NodeConfig $request): array
     {
-        return MongoDbSettings::catalog()->effective($this->tunedOf($node, $request), $request->settings);
+        return $this->state->tunedOrNewOf($this->driver, self::TUNED_STATE, MongoDbSettings::catalog(), $request);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function effectiveOf(NodeConfig $request): array
+    {
+        return MongoDbSettings::catalog()->effective($this->tunedOf($request), $request->settings);
     }
 
     /**
