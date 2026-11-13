@@ -14,6 +14,7 @@ use App\Engines\Contracts\Pools;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Engines\Runtime\Runtime;
+use App\Engines\Scripts\ScriptView;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\NotPrimary;
 use App\Models\DatabaseNode;
@@ -70,6 +71,14 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     public function stopTask(string $key): Operation
     {
         return $this->runtime()->stopTask($this->node, $key);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function script(string $script, array $data = []): string
+    {
+        return resolve(ScriptView::class)->render($this->node, $script, $data);
     }
 
     public function putFile(string $path, string $content, int $mode, ?string $owner = null): void

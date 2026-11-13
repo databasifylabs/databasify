@@ -127,7 +127,7 @@ it('reports an unreachable source with the first line of the error', function ()
     expect($check->reachable)->toBeFalse()->and($check->error)->toContain("Can't connect");
 });
 
-it('starts the Go copy task in its transient unit without the password on argv', function (string $engine) {
+it('starts the copy job in its transient unit without the password on argv', function (string $engine) {
     idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole()->driver()->migration()->start(new MigrationStartData(new MigrationSource('10.0.0.9', 3306, 'm', "p'w", true), ['app', 'shop'], true, null));
 
     $this->scripts->assertRan('mysql-family/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_PASSWORD'] === "p'w"
@@ -135,7 +135,7 @@ it('starts the Go copy task in its transient unit without the password on argv',
         && $env['MIGRATION_CONTINUOUS'] === 'true'
         && $env['MIGRATION_TLS'] === 'true'
         && $env['MIGRATION_UNIT'] === "{$engine}-migration"
-        && str_contains($script, 'engine-task migration-copy')
+        && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'copy')
         && ! str_contains($script, "p'w"));
 })->with(['mysql', 'mariadb']);
 

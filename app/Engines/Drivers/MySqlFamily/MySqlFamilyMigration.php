@@ -12,6 +12,7 @@ use App\Engines\Data\MigrationStart;
 use App\Engines\Payload;
 use App\Engines\Responses\MigrationCheck as MigrationCheckReply;
 use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
+use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MySqlFamilyMigration implements Migration
 {
@@ -74,11 +75,19 @@ final readonly class MySqlFamilyMigration implements Migration
 
     public function start(MigrationStart $start): void
     {
+        $databases = $start->databases === [] ? $this->check($start->source, [])->databases : $start->databases;
+
+        if ($databases === []) {
+            throw new InvalidEngineRequest('invalid_request', 'the source has no databases to copy');
+        }
+
         $this->scripts->run($this->driver, 'mysql-family/migration/start', [
             ...$this->sourceEnvOf('MIGRATION', $start->source),
-            'MIGRATION_DATABASES' => implode(' ', $start->databases),
+            'MIGRATION_DATABASES' => implode(' ', $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
             'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
+            'MYSQLSH_URI' => rawurlencode($start->source->username)."@{$start->source->host}:{$start->source->port}",
+            'COPY_SCRIPT' => base64_encode($this->driver->script('mysql-family/jobs/migration-copy', ['engine' => $this->driver->engine()])),
         ]);
     }
 

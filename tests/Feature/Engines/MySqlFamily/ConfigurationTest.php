@@ -19,7 +19,10 @@ function configuredNode(string $engine, string $line): DatabaseNode
 
 function decodedFiles(array $env): array
 {
-    return array_map(fn (array $file): array => ['path' => $file['path'], 'mode' => octdec($file['mode']), 'content' => base64_decode($file['content'])], json_decode($env['FILES'], true));
+    return array_values(array_filter(
+        array_map(fn (array $file): array => ['path' => $file['path'], 'mode' => octdec($file['mode']), 'content' => base64_decode($file['content'])], json_decode($env['FILES'], true)),
+        fn (array $file): bool => ! str_ends_with($file['path'], '.sh'),
+    ));
 }
 
 it('configures a MySQL node with the Go-identical files and its first-start SQL', function (string $case) {

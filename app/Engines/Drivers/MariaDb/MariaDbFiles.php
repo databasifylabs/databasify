@@ -75,7 +75,7 @@ final readonly class MariaDbFiles
             $argv[] = '--wsrep-new-cluster';
         }
 
-        $watch = $request->clustered ? [FamilyFiles::helper(self::WATCH_UNIT, 'cluster-watch', $engine->serverUnit(), '3s')] : [];
+        $watch = $request->clustered ? [FamilyFiles::helper(self::WATCH_UNIT, FamilyFiles::jobOf($engine, 'cluster-watch'), $engine->serverUnit(), '3s')] : [];
 
         return FamilyFiles::manifestOf($engine, $request, $argv, $watch);
     }

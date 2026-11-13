@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\Engines\Data\ConfigFile;
 use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\Support\NodeState;
@@ -18,6 +19,8 @@ final readonly class PostgresConfiguration
     private const string POOL_SIZE_PLACEHOLDER = '__DEFAULT_POOL_SIZE__';
 
     private const int CONFIGURE_TIMEOUT = 300;
+
+    private const int JOB_MODE = 0o700;
 
     public function __construct(
         private PostgresDriver $driver,
@@ -37,7 +40,7 @@ final readonly class PostgresConfiguration
         $this->driver->run('postgres/nodes/configure', $this->driver->data(), timeout: self::CONFIGURE_TIMEOUT, env: [
             'REQUEST_JSON' => NodeState::requestJsonOf($config),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'FILES' => NodeState::filesJsonOf($files->files),
+            'FILES' => NodeState::filesJsonOf([...$files->files, ...$this->jobsFor($config)]),
             'MANIFEST' => base64_encode($files->manifest),
             'CLUSTERED' => $config->clustered ? 'true' : 'false',
             'READ_ONLY' => $config->readOnly ? 'true' : 'false',
@@ -46,6 +49,18 @@ final readonly class PostgresConfiguration
             'IP' => $config->ip,
             'MEMBERS' => json_encode(array_map(fn (Member $member): array => $member->toPayload(), $config->members), JSON_THROW_ON_ERROR),
         ]);
+    }
+
+    /**
+     * @return list<ConfigFile>
+     */
+    private function jobsFor(NodeConfig $config): array
+    {
+        if ($config->archive === null) {
+            return [];
+        }
+
+        return [new ConfigFile(PostgresManifest::BACKUP_JOB, self::JOB_MODE, $this->driver->script('postgres/jobs/backup', $this->driver->data()))];
     }
 
     /**

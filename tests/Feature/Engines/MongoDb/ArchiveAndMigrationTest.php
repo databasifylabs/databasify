@@ -100,6 +100,6 @@ it('starts, reads and stops the migration', function () {
     $this->node->driver()->migration()->stop();
 
     expect($progress->lagSeconds)->toBeNull();
-    $this->scripts->assertRan('mongodb/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true' && str_contains($script, 'engine-task migration-copy'))
+    $this->scripts->assertRan('mongodb/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true' && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'pcsm --log-no-color'))
         ->assertRan('mongodb/migration/stop', fn (string $script): bool => str_contains($script, 'pcsm_post /finalize') && str_contains($script, 'percona_clustersync_mongodb'));
 });

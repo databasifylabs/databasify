@@ -9,8 +9,10 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Secrets;
 use App\Engines\Responses\MigrationCheck as MigrationCheckReply;
 use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
+use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MongoDbMigration implements Migration
 {
@@ -55,14 +57,20 @@ final readonly class MongoDbMigration implements Migration
 
     public function start(MigrationStart $start): void
     {
+        $databases = $start->databases === [] ? $this->check($start->source, [])->databases : $start->databases;
+        $sourceUri = MongoDbFiles::sourceUriOf($start->source);
+        $admin = Secrets::of($this->driver->node->database->settings)->admin ?? throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin secret');
+        $targetUri = MongoDbFiles::localUriOf($admin);
+
         $this->driver->run('mongodb/migration/start', env: [
-            'MIGRATION_HOST' => $start->source->host,
-            'MIGRATION_PORT' => (string) $start->source->port,
-            'MIGRATION_USER' => $start->source->username,
-            'MIGRATION_PASSWORD' => $start->source->password,
-            'MIGRATION_TLS' => $start->source->tls ? 'true' : 'false',
-            'MIGRATION_DATABASES' => implode(' ', $start->databases),
+            'SOURCE_URI' => $sourceUri,
+            'TARGET_URI' => $targetUri,
+            'SOURCE_TOOL_CONFIG' => MongoDbFiles::toolConfigOf($sourceUri),
+            'TARGET_TOOL_CONFIG' => MongoDbFiles::toolConfigOf($targetUri),
+            'PCSM_START' => json_encode(['includeNamespaces' => array_map(fn (string $database): string => "{$database}.*", $databases)], JSON_THROW_ON_ERROR),
+            'MIGRATION_DATABASES' => implode(' ', $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
+            'COPY_SCRIPT' => base64_encode($this->driver->script('mongodb/jobs/migration-copy')),
         ]);
     }
 

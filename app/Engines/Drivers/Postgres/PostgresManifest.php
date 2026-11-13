@@ -25,7 +25,7 @@ final readonly class PostgresManifest
 
     private const string RESTART_WAIT = '3s';
 
-    private const string WRAPPER_PATH = '/usr/local/bin/databasify';
+    public const string BACKUP_JOB = PostgresFiles::CONF.'/backup.sh';
 
     private const string LOCKS_SCRIPT = 'pgrep -x postgres > /dev/null || rm -f /srv/postgres/run/.s.PGSQL.* /srv/postgres/data/postmaster.pid';
 
@@ -61,7 +61,7 @@ SH;
                 'name' => self::BACKUP_UNIT,
                 'onCalendar' => sprintf('%02d:00', $request->archive->backupHour),
                 'timeout' => '24h',
-                'argv' => [self::WRAPPER_PATH, 'engine-task', 'backup'],
+                'argv' => ['bash', self::BACKUP_JOB],
             ]];
         }
 

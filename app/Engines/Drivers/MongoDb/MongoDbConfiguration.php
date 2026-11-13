@@ -18,6 +18,8 @@ final readonly class MongoDbConfiguration
 
     private const int MAX_REPLICA_SET = 50;
 
+    private const int JOB_MODE = 0o700;
+
     public function __construct(
         private MongoDbDriver $driver,
         private NodeState $state,
@@ -46,6 +48,7 @@ final readonly class MongoDbConfiguration
                 new ConfigFile("{$conf}/mongod.conf", 0o600, MongoDbFiles::mongodConfOf($catalog->effective($tuned, $request->settings))),
                 new ConfigFile("{$conf}/keyfile", 0o400, MongoDbFiles::keyfileOf($request->secrets->replication)),
                 new ConfigFile("{$conf}/admin.pw", 0o600, $request->secrets->admin),
+                ...$this->jobsFor($request),
             ]),
             'MANIFEST' => base64_encode(MongoDbFiles::manifestOf($request)),
             'START_AGENT' => $request->archive !== null && $request->secrets->agent !== null ? 'true' : 'false',
@@ -71,6 +74,18 @@ final readonly class MongoDbConfiguration
     public function effectiveOf(NodeConfig $request): array
     {
         return MongoDbSettings::catalog()->effective($this->tunedOf($request), $request->settings);
+    }
+
+    /**
+     * @return list<ConfigFile>
+     */
+    private function jobsFor(NodeConfig $request): array
+    {
+        if ($request->archive === null || $request->secrets->agent === null) {
+            return [];
+        }
+
+        return [new ConfigFile(MongoDbFiles::BACKUP_JOB, self::JOB_MODE, $this->driver->script('mongodb/jobs/backup'))];
     }
 
     /**

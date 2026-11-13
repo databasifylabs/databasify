@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
+use App\Engines\Data\ConfigFile;
 use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\MariaDb\MariaDbFiles;
@@ -22,6 +23,8 @@ final readonly class MySqlFamilyConfiguration
     public const string REQUEST_STATE = 'state/node.json';
 
     private const int CONFIGURE_TIMEOUT = 600;
+
+    private const int JOB_MODE = 0o700;
 
     public function __construct(
         private MySqlFamilyDriver $driver,
@@ -62,10 +65,28 @@ final readonly class MySqlFamilyConfiguration
 
         return [
             'REQUEST_JSON' => NodeState::requestJsonOf($request),
-            'FILES' => NodeState::filesJsonOf($files->files),
+            'FILES' => NodeState::filesJsonOf([...$files->files, ...$this->jobsFor($engine, $request)]),
             'MANIFEST' => base64_encode($files->manifest),
             'MANIFEST_NEW_CLUSTER' => $engine->id === 'mariadb' ? base64_encode($this->filesOf($engine, $effective, $line, true)->manifest) : '',
         ];
+    }
+
+    /**
+     * @return list<ConfigFile>
+     */
+    private function jobsFor(MySqlFamilyEngine $engine, NodeConfig $request): array
+    {
+        $jobs = $request->archive === null ? [] : ['mysql-family/jobs/backup' => 'backup', 'mysql-family/jobs/binlog-ship' => 'binlog-ship', 'mysql-family/jobs/binlog-stream' => 'binlog-stream'];
+
+        if ($engine->id === 'mariadb' && $request->clustered) {
+            $jobs['mariadb/jobs/cluster-watch'] = 'cluster-watch';
+        }
+
+        return array_map(
+            fn (string $script, string $name): ConfigFile => new ConfigFile(FamilyFiles::jobOf($engine, $name), self::JOB_MODE, $this->driver->script($script, ['engine' => $engine])),
+            array_keys($jobs),
+            array_values($jobs),
+        );
     }
 
     public function catalogOf(): SettingsCatalog

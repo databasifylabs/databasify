@@ -32,7 +32,7 @@ final readonly class MySqlFamilyArchive implements Archive
         $backupUnit = $engine->archiveUnits()['backup'];
 
         $reply = $this->scripts->read($this->driver, 'mysql-family/archive/status', [
-            ...self::storageEnvOf($archive->storage),
+            ...FamilyFiles::storageEnvOf($archive->storage),
             'SUFFIX' => $engine->baseSuffix(),
             'BACKUP_UNIT' => $backupUnit,
             'BACK_UP_NOW' => $backUpNow ? 'true' : 'false',
@@ -57,26 +57,12 @@ final readonly class MySqlFamilyArchive implements Archive
         $target = $target->utc();
 
         return $this->scripts->start($this->driver, $key, '{engine}/restore/start', [
-            ...self::storageEnvOf($storage),
+            ...FamilyFiles::storageEnvOf($storage),
             'SUFFIX' => $this->driver->engine()->baseSuffix(),
             'TARGET' => $target->format('Y-m-d H:i:s'),
             'TARGET_STAMP' => $target->format(self::STAMP_FORMAT),
             'TARGET_RFC3339' => $this->timeOf($target),
         ]);
-    }
-
-    /**
-     * @return array{RCLONE_REMOTE: string, STORAGE_PATH: string, RCLONE_S3_ACCESS_KEY_ID: string, RCLONE_S3_SECRET_ACCESS_KEY: string, RCLONE_CONFIG: string}
-     */
-    public static function storageEnvOf(Storage $storage): array
-    {
-        return [
-            'RCLONE_REMOTE' => sprintf(':s3,provider=Other,endpoint="%s",region="%s",force_path_style=%s,no_check_bucket=true:%s/', $storage->endpoint, $storage->region, $storage->pathStyle ? 'true' : 'false', $storage->bucket),
-            'STORAGE_PATH' => trim($storage->path, '/'),
-            'RCLONE_S3_ACCESS_KEY_ID' => $storage->accessKey,
-            'RCLONE_S3_SECRET_ACCESS_KEY' => $storage->secretKey,
-            'RCLONE_CONFIG' => '/dev/null',
-        ];
     }
 
     /**
