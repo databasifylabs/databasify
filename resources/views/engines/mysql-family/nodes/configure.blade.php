@@ -40,4 +40,4 @@ if [ -n "$HELPERS" ]; then
     read -r -a helpers <<< "$HELPERS"
     unit_do start "${helpers[@]}"
 fi
-result "$(jq -cn --argjson changed "$changed" '{changed: $changed}')"
+[ "$changed" = true ] && echo "Wrote the new configuration." || echo "The configuration was already up to date."

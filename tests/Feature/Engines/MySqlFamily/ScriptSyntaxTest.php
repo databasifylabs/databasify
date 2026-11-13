@@ -9,7 +9,7 @@ use Symfony\Component\Finder\Finder;
 
 it('renders every MySQL family script to valid bash', function (string $engine) {
     $node = idleDatabase($engine, 1)->nodes()->sole();
-    $scripts = Finder::create()->files()->in([resource_path('views/engines/mysql-family'), resource_path("views/engines/{$engine}")])->name('*.blade.php')->notName('_*');
+    $scripts = Finder::create()->files()->in([resource_path('views/engines/mysql-family'), resource_path("views/engines/{$engine}")])->name('*.blade.php')->notName('_*')->notPath('#(^|/)files/#');
     $invalid = [];
 
     foreach ($scripts as $script) {
@@ -26,7 +26,7 @@ it('renders every MySQL family script to valid bash', function (string $engine) 
 })->with(['mysql', 'mariadb']);
 
 it('keeps SQL system variables inside verbatim blocks so Blade does not eat an @', function () {
-    $scripts = Finder::create()->files()->in(resource_path('views/engines'))->name('*.blade.php');
+    $scripts = Finder::create()->files()->in(resource_path('views/engines'))->name('*.blade.php')->notPath('#(^|/)files/#');
     $eaten = [];
 
     foreach ($scripts as $script) {

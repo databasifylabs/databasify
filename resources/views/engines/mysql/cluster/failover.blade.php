@@ -9,4 +9,4 @@ fi
 my '' > /dev/null <<SQL
 SELECT group_replication_set_as_primary($(my_string "$member"))
 SQL
-result '{}'
+echo "Handed the primary over to $TARGET."

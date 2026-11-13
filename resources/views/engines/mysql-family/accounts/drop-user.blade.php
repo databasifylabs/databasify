@@ -5,4 +5,4 @@ if user_exists; then
 DROP USER IF EXISTS $quoted_name@'%'
 SQL
 fi
-result '{}'
+echo "Dropped user $NAME."

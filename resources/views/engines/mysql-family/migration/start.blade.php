@@ -11,4 +11,4 @@ env_file="$ROOT/state/$MIGRATION_UNIT.env"
 )
 databasify ctl run -u "$MIGRATION_UNIT" -r -- /bin/bash -c '. "$0" && rm -f "$0" && exec /usr/local/bin/databasify engine-task migration-copy' "$env_file" > /dev/null 2>&1 \
     || { rm -f "$env_file"; databasify_fail internal "could not start $MIGRATION_UNIT"; }
-result '{}'
+echo "Started the migration copy."

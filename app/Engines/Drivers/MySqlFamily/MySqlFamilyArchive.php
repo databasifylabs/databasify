@@ -4,61 +4,61 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
+use App\DTOs\Recovery\ArchiveStatus;
+use App\Engines\Contracts\Archive;
+use App\Engines\Data\Operation;
 use App\Engines\Data\Storage;
 use App\Engines\Payload;
-use App\Engines\Requests\ArchiveStatus;
-use App\Engines\Requests\RestoreStart;
 use App\Engines\Responses\ArchiveStatus as ArchiveStatusReply;
-use App\Engines\Responses\Operation;
 use App\Exceptions\Engines\EngineUnsupported;
-use App\Models\DatabaseNode;
 use Carbon\CarbonImmutable;
 
-final readonly class Archive
+final readonly class MySqlFamilyArchive implements Archive
 {
     private const string INFO_SUFFIX = '.binlog-info';
 
     private const string STAMP_FORMAT = 'Ymd\THis\Z';
 
     public function __construct(
+        private MySqlFamilyDriver $driver,
         private FamilyScripts $scripts,
-        private Configuration $configuration,
+        private MySqlFamilyConfiguration $configuration,
     ) {}
 
-    public function status(DatabaseNode $node, ArchiveStatus $request): ArchiveStatusReply
+    public function status(bool $backUpNow): ArchiveStatus
     {
-        $engine = FamilyScripts::engineOf($node);
-        $archive = $this->configuration->savedRequestOf($node)->archive ?? throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
+        $engine = $this->driver->engine();
+        $archive = $this->configuration->savedRequestOf()->archive ?? throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
         $backupUnit = $engine->archiveUnits()['backup'];
 
-        $reply = $this->scripts->run($node, 'mysql-family/archive/status', [
+        $reply = $this->scripts->read($this->driver, 'mysql-family/archive/status', [
             ...self::storageEnvOf($archive->storage),
             'SUFFIX' => $engine->baseSuffix(),
             'BACKUP_UNIT' => $backupUnit,
-            'BACK_UP_NOW' => $request->backUpNow ? 'true' : 'false',
-        ], timeout: 900)->json();
+            'BACK_UP_NOW' => $backUpNow ? 'true' : 'false',
+        ], timeout: 900);
 
         $bases = $this->basesIn($reply->objects('base'), $engine->baseSuffix());
         $shipped = $this->latestOf($reply->strings('shipped'));
         $failure = in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.";
 
         if ($bases === []) {
-            return new ArchiveStatusReply(0, null, null, null, $failure);
+            return ArchiveStatus::fromEngine(new ArchiveStatusReply(0, null, null, null, $failure));
         }
 
         $latest = end($bases);
         $recoverableUntil = $shipped !== null && $shipped->greaterThan($latest) ? $shipped : $latest;
 
-        return new ArchiveStatusReply(count($bases), $this->timeOf($bases[0]), $this->timeOf($recoverableUntil), $this->timeOf($latest), $failure);
+        return ArchiveStatus::fromEngine(new ArchiveStatusReply(count($bases), $this->timeOf($bases[0]), $this->timeOf($recoverableUntil), $this->timeOf($latest), $failure));
     }
 
-    public function restore(DatabaseNode $node, RestoreStart $request): Operation
+    public function restore(string $key, Storage $storage, CarbonImmutable $target): Operation
     {
-        $target = $request->target->utc();
+        $target = $target->utc();
 
-        return $this->scripts->start($node, $request->key, '{engine}/restore/start', [
-            ...self::storageEnvOf($request->storage),
-            'SUFFIX' => FamilyScripts::engineOf($node)->baseSuffix(),
+        return $this->scripts->start($this->driver, $key, '{engine}/restore/start', [
+            ...self::storageEnvOf($storage),
+            'SUFFIX' => $this->driver->engine()->baseSuffix(),
             'TARGET' => $target->format('Y-m-d H:i:s'),
             'TARGET_STAMP' => $target->format(self::STAMP_FORMAT),
             'TARGET_RFC3339' => $this->timeOf($target),

@@ -13,4 +13,4 @@ fi
 if [ "${#helpers[@]}" -gt 0 ]; then
     unit_do start "${helpers[@]}"
 fi
-result '{}'
+echo "Started MariaDB."

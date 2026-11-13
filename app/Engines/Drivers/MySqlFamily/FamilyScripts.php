@@ -4,38 +4,37 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
-use App\Contracts\Engines\EngineScripts;
-use App\Engines\Responses\Operation;
-use App\Engines\Scripts\ScriptResult;
-use App\Models\DatabaseNode;
+use App\Engines\Data\Operation;
+use App\Engines\Payload;
 
 final readonly class FamilyScripts
 {
-    public function __construct(private EngineScripts $scripts) {}
+    /**
+     * @param  array<string, string>  $env
+     */
+    public function run(MySqlFamilyDriver $driver, string $script, array $env = [], int $timeout = 120): void
+    {
+        $driver->run($this->nameOf($driver, $script), ['engine' => $driver->engine()], $env, timeout: $timeout);
+    }
 
     /**
      * @param  array<string, string>  $env
      */
-    public function run(DatabaseNode $node, string $script, array $env = [], int $timeout = 120): ScriptResult
+    public function read(MySqlFamilyDriver $driver, string $script, array $env = [], int $timeout = 120): Payload
     {
-        return $this->scripts->run($node, $this->nameOf($node, $script), ['engine' => self::engineOf($node)], timeout: $timeout, env: $env);
+        return $driver->read($this->nameOf($driver, $script), ['engine' => $driver->engine()], $env, timeout: $timeout);
     }
 
     /**
      * @param  array<string, string>  $env
      */
-    public function start(DatabaseNode $node, string $key, string $script, array $env = []): Operation
+    public function start(MySqlFamilyDriver $driver, string $key, string $script, array $env = []): Operation
     {
-        return $this->scripts->start($node, $key, $this->nameOf($node, $script), ['engine' => self::engineOf($node)], env: $env);
+        return $driver->task($key, $this->nameOf($driver, $script), ['engine' => $driver->engine()], $env);
     }
 
-    public static function engineOf(DatabaseNode $node): MySqlFamilyEngine
+    private function nameOf(MySqlFamilyDriver $driver, string $script): string
     {
-        return MySqlFamilyEngine::of($node->database->engine);
-    }
-
-    private function nameOf(DatabaseNode $node, string $script): string
-    {
-        return str_replace('{engine}', self::engineOf($node)->id, $script);
+        return str_replace('{engine}', $driver->engine()->id, $script);
     }
 }

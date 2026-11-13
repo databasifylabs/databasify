@@ -21,4 +21,4 @@ else
 fi
 wait_until 21600 2 synced_now || databasify_fail internal 'the server was not ready within 6h0m0s'
 clear_new_cluster
-result '{}'
+echo "Bootstrapped the cluster from this node."

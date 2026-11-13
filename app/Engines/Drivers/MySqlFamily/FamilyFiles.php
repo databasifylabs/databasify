@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
+use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\NodeConfigure;
+use Illuminate\Contracts\View\Factory;
+use LogicException;
 
 final readonly class FamilyFiles
 {
@@ -17,7 +19,32 @@ final readonly class FamilyFiles
 
     public static function adminCnfOf(string $socket, string $password): string
     {
-        return "[client]\nuser=root\npassword={$password}\nsocket={$socket}\n";
+        return self::render('engines.mysql-family.files.admin-cnf', ['socket' => $socket, 'password' => $password]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function render(string $view, array $data): string
+    {
+        $views = resolve(Factory::class);
+
+        if (! $views->exists($view)) {
+            throw new LogicException("There is no config file view {$view}.");
+        }
+
+        return $views->make($view, $data)->render();
+    }
+
+    /**
+     * @param  array<string, string>  $settings
+     * @return array<string, string>
+     */
+    public static function sorted(array $settings): array
+    {
+        ksort($settings, SORT_STRING);
+
+        return $settings;
     }
 
     public static function serverIdOfAddress(string $ip): int
@@ -30,26 +57,10 @@ final readonly class FamilyFiles
     }
 
     /**
-     * @param  list<string>  $lines
-     * @param  array<string, string>  $settings
-     * @return list<string>
-     */
-    public static function withSettings(array $lines, array $settings): array
-    {
-        ksort($settings, SORT_STRING);
-
-        foreach ($settings as $key => $value) {
-            $lines[] = "{$key}={$value}";
-        }
-
-        return $lines;
-    }
-
-    /**
      * @param  list<string>  $argv
      * @param  list<array<string, mixed>>  $extra
      */
-    public static function manifestOf(MySqlFamilyEngine $engine, NodeConfigure $request, array $argv, array $extra = []): string
+    public static function manifestOf(MySqlFamilyEngine $engine, NodeConfig $request, array $argv, array $extra = []): string
     {
         $server = ['name' => $engine->serverUnit(), 'argv' => $argv, 'user' => 'mysql', 'restart' => 'always', 'restartSec' => '3s', 'stopSignal' => 'TERM', 'stopTimeout' => '10m0s', 'enabled' => true];
 

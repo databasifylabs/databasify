@@ -22,4 +22,4 @@ while IFS= read -r key; do
 done < <(jq -r --argjson keys "$KEYS" --argjson static "$STATIC" '(. // [])[] | select(. as $key | ($keys | index($key) | not) and ($static | index($key) | not))' <<< "$applied" 2> /dev/null)
 
 printf '%s' "$KEYS" | write_file "$ROOT/state/applied.json" 600 false || true
-result '{}'
+echo "Applied the settings."

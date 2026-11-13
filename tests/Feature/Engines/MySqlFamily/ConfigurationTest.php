@@ -2,12 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\ConfigApply;
-use App\Engines\Requests\ConfigFields;
-use App\Engines\Requests\ConfigShow;
-use App\Engines\Requests\ConfigSync;
-use App\Engines\Requests\ConfigTune;
+use App\Engines\Contracts\Config;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
@@ -31,9 +26,8 @@ it('configures a MySQL node with the Go-identical files and its first-start SQL'
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $fixture = goFixture("configure-{$case}.json", 'mysql');
 
-    $reply = resolve(EngineClient::class)->send(configuredNode('mysql', $fixture['line']), configureFromFixture($fixture['request']));
+    configuredNode('mysql', $fixture['line'])->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
-    expect($reply->changed)->toBeTrue();
     $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
         && base64_decode($env['MANIFEST']) === $fixture['manifest']
         && json_decode($env['TUNED_JSON'], true)['innodb_buffer_pool_size'] === '2560M'
@@ -48,7 +42,7 @@ it('configures a MariaDB node with both manifests so a seed starts a new cluster
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $fixture = goFixture('configure-seed-11.4.json', 'mariadb');
 
-    resolve(EngineClient::class)->send(configuredNode('mariadb', '11.4'), configureFromFixture($fixture['request']));
+    configuredNode('mariadb', '11.4')->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
     $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
         && base64_decode($env['MANIFEST_NEW_CLUSTER']) === $fixture['manifest']
@@ -63,7 +57,7 @@ it('starts the binlog stream of a MySQL node that archives', function () {
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $fixture = goFixture('configure-primary-9.7.json', 'mysql');
 
-    resolve(EngineClient::class)->send(configuredNode('mysql', '9.7'), configureFromFixture($fixture['request']));
+    configuredNode('mysql', '9.7')->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
     $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => $env['HELPERS'] === 'mysql-binlog-stream' && $env['SEED'] === 'false');
 });
@@ -71,7 +65,7 @@ it('starts the binlog stream of a MySQL node that archives', function () {
 it('refuses missing secrets with the Go wording before touching the node', function (string $engine, string $case, Closure $change, string $message) {
     $fixture = goFixture("configure-{$case}.json", $engine);
 
-    expect(fn () => resolve(EngineClient::class)->send(configuredNode($engine, $fixture['line']), configureFromFixture($change($fixture['request']))))
+    expect(fn () => configuredNode($engine, $fixture['line'])->driver()->nodes()->configure(nodeConfigFromFixture($change($fixture['request']))))
         ->toThrow(InvalidEngineRequest::class, $message);
     expect($this->scripts->ran())->toBe([]);
 })->with([
@@ -86,7 +80,7 @@ it('applies online settings with SET PERSIST on MySQL and SET GLOBAL on MariaDB'
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', '{"innodb_buffer_pool_size":"2560M","back_log":"256","max_connections":"256"}');
 
-    resolve(EngineClient::class)->send(configuredNode($engine, $fixture['line']), new ConfigApply);
+    configuredNode($engine, $fixture['line'])->driver()->config()->apply();
 
     $this->scripts->assertRan('mysql-family/config/apply', fn (string $script, array $env): bool => json_decode($env['SETS'], true) === $sets
         && json_decode($env['KEYS'], true) === $keys
@@ -97,20 +91,20 @@ it('applies online settings with SET PERSIST on MySQL and SET GLOBAL on MariaDB'
     'mariadb' => ['mariadb', 'standalone-10.11', ['SET GLOBAL innodb_buffer_pool_size = 2684354560', 'SET GLOBAL max_connections = 200'], ['back_log', 'default_time_zone', 'innodb_buffer_pool_size', 'max_connections'], ''],
 ]);
 
-it('needs a configured node to apply, show or tune', function (object $request) {
+it('needs a configured node to apply, show or tune', function (Closure $call) {
     respondToFileGet(fakeSsh(), 'state/node.json', null);
 
-    expect(fn () => resolve(EngineClient::class)->send(configuredNode('mysql', '8.4'), $request))->toThrow(EngineBusy::class, 'run node configure first');
+    expect(fn () => $call(configuredNode('mysql', '8.4')->driver()->config()))->toThrow(EngineBusy::class, 'run node configure first');
 })->with([
-    'apply' => [new ConfigApply],
-    'show' => [new ConfigShow],
-    'tune' => [new ConfigTune],
+    'apply' => [fn (Config $config) => $config->apply()],
+    'show' => [fn (Config $config) => $config->pendingRestart()],
+    'tune' => [fn (Config $config) => $config->tune()],
 ]);
 
 it('syncs nothing, as the Go engine does', function () {
     $ssh = fakeSsh();
 
-    resolve(EngineClient::class)->send(configuredNode('mariadb', '12.3'), new ConfigSync);
+    configuredNode('mariadb', '12.3')->driver()->config()->sync();
 
     expect($this->scripts->ran())->toBe([])->and($ssh->runs)->toBe([]);
 });
@@ -121,9 +115,9 @@ it('lists restart settings whose live value differs from the wanted one', functi
     respondToFileGet($ssh, 'state/tuned.json', '{"back_log":"256","innodb_read_io_threads":"4","innodb_buffer_pool_size":"2560M"}');
     $this->scripts->respond('mysql-family/config/show', ['values' => ['back_log' => '151', 'innodb_read_io_threads' => '4', 'time_zone' => '+06:00', 'innodb_buffer_pool_size' => '134217728', 'max_connections' => '151']]);
 
-    $show = resolve(EngineClient::class)->send(configuredNode('mysql', '8.4'), new ConfigShow);
+    $show = configuredNode('mysql', '8.4')->driver()->config()->pendingRestart();
 
-    expect($show->pendingRestart)->toBe(['back_log']);
+    expect($show)->toBe(['back_log']);
     $this->scripts->assertRan('mysql-family/config/show', fn (string $script, array $env): bool => str_contains($env['NAMES'], "'time_zone'") && ! str_contains($env['NAMES'], "'default_time_zone'"));
 });
 
@@ -133,9 +127,9 @@ it('reads the live settings through the real show script', function () {
     respondToFileGet($ssh, 'state/tuned.json', '{"back_log":"256"}');
     localScripts()->reply('SHOW GLOBAL VARIABLES', "back_log\t151\nmax_connections\t151");
 
-    $show = resolve(EngineClient::class)->send(configuredNode('mysql', '8.4'), new ConfigShow);
+    $show = configuredNode('mysql', '8.4')->driver()->config()->pendingRestart();
 
-    expect($show->pendingRestart)->toBe(['back_log']);
+    expect($show)->toBe(['back_log']);
 });
 
 it('offers tuned defaults once the node is configured', function () {
@@ -143,9 +137,9 @@ it('offers tuned defaults once the node is configured', function () {
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', null)->respondToEngine('file put', []);
 
-    $fields = resolve(EngineClient::class)->send(configuredNode('mariadb', '10.11'), new ConfigFields);
+    $fields = configuredNode('mariadb', '10.11')->driver()->config()->fields();
 
-    expect(collect($fields->fields)->firstWhere('key', 'innodb_buffer_pool_size')->default)->toBe('2560M');
+    expect(collect($fields)->firstWhere('key', 'innodb_buffer_pool_size')->default)->toBe('2560M');
 });
 
 it('retunes from the saved request and reports settings that need a restart', function () {
@@ -153,9 +147,9 @@ it('retunes from the saved request and reports settings that need a restart', fu
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', '{"back_log":"100","innodb_buffer_pool_size":"128M"}')->respondToEngine('file put', []);
 
-    $tune = resolve(EngineClient::class)->send(configuredNode('mysql', '8.4'), new ConfigTune);
+    $tune = configuredNode('mysql', '8.4')->driver()->config()->tune();
 
-    expect($tune->restart)->toContain('back_log')
-        ->and($tune->restart)->not->toContain('max_connections');
+    expect($tune)->toContain('back_log')
+        ->and($tune)->not->toContain('max_connections');
     $this->scripts->assertRan('mysql-family/nodes/configure')->assertRan('mysql-family/config/apply');
 });

@@ -5,19 +5,17 @@ declare(strict_types=1);
 namespace App\Engines\Drivers\MySqlFamily;
 
 use App\Engines\Data\ConfigFiles;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\MariaDb\MariaDbFiles;
 use App\Engines\Drivers\MariaDb\MariaDbSettings;
 use App\Engines\Drivers\MySql\MySqlFiles;
 use App\Engines\Drivers\MySql\MySqlSettings;
-use App\Engines\Drivers\NodeState;
-use App\Engines\Requests\NodeConfigure;
-use App\Engines\Responses\NodeConfigure as NodeConfigureReply;
+use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Settings\SettingsCatalog;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
-use App\Models\DatabaseNode;
 
-final readonly class Configuration
+final readonly class MySqlFamilyConfiguration
 {
     public const string TUNED_STATE = 'state/tuned.json';
 
@@ -26,21 +24,22 @@ final readonly class Configuration
     private const int CONFIGURE_TIMEOUT = 600;
 
     public function __construct(
+        private MySqlFamilyDriver $driver,
         private FamilyScripts $scripts,
         private NodeState $state,
     ) {}
 
-    public function configure(DatabaseNode $node, NodeConfigure $request): NodeConfigureReply
+    public function configure(NodeConfig $request): void
     {
-        $engine = FamilyScripts::engineOf($node);
+        $engine = $this->driver->engine();
         $this->refuseMissingSecrets($engine, $request);
-        $catalog = $this->catalogOf($node);
+        $catalog = $this->catalogOf();
         $catalog->check($request->settings);
-        $saved = $this->state->tunedOf($node, self::TUNED_STATE);
+        $saved = $this->state->tunedOf($this->driver, self::TUNED_STATE);
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
 
-        $reply = $this->scripts->run($node, 'mysql-family/nodes/configure', [
-            ...$this->filesEnvOf($node, $request, $tuned),
+        $this->scripts->run($this->driver, 'mysql-family/nodes/configure', [
+            ...$this->filesEnvOf($request, $tuned),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
             'INIT_SQL' => $this->initSqlOf($engine, $request),
             'INIT_COMMAND' => $this->initCommandOf($engine),
@@ -48,19 +47,17 @@ final readonly class Configuration
             'GROUPED_BOOT' => $engine->id === 'mysql' && $request->clustered && ! $request->readOnly ? 'true' : 'false',
             'HELPERS' => implode(' ', $this->helpersOf($engine, $request)),
         ], timeout: self::CONFIGURE_TIMEOUT);
-
-        return new NodeConfigureReply($reply->json()->bool('changed'));
     }
 
     /**
      * @param  array<string, string>  $tuned
      * @return array{REQUEST_JSON: string, FILES: string, MANIFEST: string, MANIFEST_NEW_CLUSTER: string}
      */
-    public function filesEnvOf(DatabaseNode $node, NodeConfigure $request, array $tuned): array
+    public function filesEnvOf(NodeConfig $request, array $tuned): array
     {
-        $engine = FamilyScripts::engineOf($node);
-        $line = $node->database->version_line;
-        $effective = NodeState::withSettings($request, $this->catalogOf($node)->effective($tuned, $request->settings));
+        $engine = $this->driver->engine();
+        $line = $this->driver->node->database->version_line;
+        $effective = NodeState::withSettings($request, $this->catalogOf()->effective($tuned, $request->settings));
         $files = $this->filesOf($engine, $effective, $line, false);
 
         return [
@@ -71,28 +68,28 @@ final readonly class Configuration
         ];
     }
 
-    public function catalogOf(DatabaseNode $node): SettingsCatalog
+    public function catalogOf(): SettingsCatalog
     {
-        return FamilyScripts::engineOf($node)->id === 'mysql' ? MySqlSettings::catalog() : MariaDbSettings::catalog();
+        return $this->driver->engine()->id === 'mysql' ? MySqlSettings::catalog() : MariaDbSettings::catalog();
     }
 
-    public function savedRequestOf(DatabaseNode $node): NodeConfigure
+    public function savedRequestOf(): NodeConfig
     {
-        return $this->state->requestOf($node, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
+        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
     }
 
     /**
      * @return array<string, string>
      */
-    public function tunedOf(DatabaseNode $node, NodeConfigure $request): array
+    public function tunedOf(NodeConfig $request): array
     {
-        return $this->state->tunedOrNewOf($node, self::TUNED_STATE, $this->catalogOf($node), $request);
+        return $this->state->tunedOrNewOf($this->driver, self::TUNED_STATE, $this->catalogOf(), $request);
     }
 
     /**
      * @return list<string>
      */
-    public function helpersOf(MySqlFamilyEngine $engine, NodeConfigure $request): array
+    public function helpersOf(MySqlFamilyEngine $engine, NodeConfig $request): array
     {
         $helpers = $request->archive === null ? [] : [$engine->archiveUnits()['stream']];
 
@@ -103,7 +100,7 @@ final readonly class Configuration
         return $helpers;
     }
 
-    private function refuseMissingSecrets(MySqlFamilyEngine $engine, NodeConfigure $request): void
+    private function refuseMissingSecrets(MySqlFamilyEngine $engine, NodeConfig $request): void
     {
         $label = $engine->label;
 
@@ -119,12 +116,12 @@ final readonly class Configuration
         }
     }
 
-    private function filesOf(MySqlFamilyEngine $engine, NodeConfigure $effective, string $line, bool $newCluster): ConfigFiles
+    private function filesOf(MySqlFamilyEngine $engine, NodeConfig $effective, string $line, bool $newCluster): ConfigFiles
     {
         return $engine->id === 'mysql' ? MySqlFiles::of($effective, $line) : MariaDbFiles::of($effective, $line, $newCluster);
     }
 
-    private function initSqlOf(MySqlFamilyEngine $engine, NodeConfigure $request): string
+    private function initSqlOf(MySqlFamilyEngine $engine, NodeConfig $request): string
     {
         if ($engine->id !== 'mysql') {
             return MariaDbFiles::initStatementsOf($request);
@@ -143,7 +140,7 @@ final readonly class Configuration
             : "mariadb-install-db --no-defaults --user=mysql --datadir={$data} --skip-test-db --auth-root-authentication-method=socket --extra-file={$init}";
     }
 
-    private function startsNewCluster(MySqlFamilyEngine $engine, NodeConfigure $request): bool
+    private function startsNewCluster(MySqlFamilyEngine $engine, NodeConfig $request): bool
     {
         return $engine->id === 'mariadb' && MariaDbFiles::galera($request) && ($request->primary === null || $request->primary === $request->ip);
     }

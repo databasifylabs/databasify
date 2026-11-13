@@ -9,4 +9,4 @@ seeds=$(tr ',' '\n' <<< "$current" | awk -v gone="$SEED" 'NF && $0 != gone && $0
 my '' > /dev/null <<SQL
 SET GLOBAL group_replication_group_seeds = $(my_string "$seeds")
 SQL
-result '{}'
+echo "Forgot $SEED."

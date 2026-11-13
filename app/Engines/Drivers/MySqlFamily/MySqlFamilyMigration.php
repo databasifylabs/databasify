@@ -4,37 +4,40 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
+use App\DTOs\Migrations\MigrationProgress;
+use App\DTOs\Migrations\SourceReport;
+use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
+use App\Engines\Data\MigrationStart;
 use App\Engines\Payload;
-use App\Engines\Requests\MigrationCheck;
-use App\Engines\Requests\MigrationStart;
-use App\Engines\Responses\Done;
 use App\Engines\Responses\MigrationCheck as MigrationCheckReply;
-use App\Engines\Responses\MigrationProgress;
-use App\Models\DatabaseNode;
+use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
 
-final readonly class Migration
+final readonly class MySqlFamilyMigration implements Migration
 {
     private const string ROLES_PROBLEM = 'MySQL Shell copies only as a source user with SELECT on mysql.* (it reads the roles), grant it and check again';
 
-    public function __construct(private FamilyScripts $scripts) {}
+    public function __construct(
+        private MySqlFamilyDriver $driver,
+        private FamilyScripts $scripts,
+    ) {}
 
-    public function check(DatabaseNode $node, MigrationCheck $request): MigrationCheckReply
+    public function check(MigrationSource $source, array $databases): SourceReport
     {
-        $engine = FamilyScripts::engineOf($node);
-        $facts = $this->scripts->run($node, 'mysql-family/migration/check', [
-            ...$this->sourceEnvOf('SOURCE', $request->source),
-            'DATABASES' => json_encode($request->databases, JSON_THROW_ON_ERROR),
+        $engine = $this->driver->engine();
+        $facts = $this->scripts->read($this->driver, 'mysql-family/migration/check', [
+            ...$this->sourceEnvOf('SOURCE', $source),
+            'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR),
             'RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR),
-        ], timeout: 600)->json();
+        ], timeout: 600);
         $error = $facts->nullableString('error');
 
         if ($error !== null) {
-            return new MigrationCheckReply(false, strtok($error, "\n") ?: $error, null, null, false, null, [], [], [], [], [], []);
+            return SourceReport::fromEngine(new MigrationCheckReply(false, strtok($error, "\n") ?: $error, null, null, false, null, [], [], [], [], [], []));
         }
 
         $visible = $facts->strings('visible');
-        $wanted = $request->databases === [] ? $visible : $request->databases;
+        $wanted = $databases === [] ? $visible : $databases;
         $sizes = $facts->object('sizes');
         $local = $facts->object('localTables');
         $missing = $facts->object('missingKeys');
@@ -66,31 +69,27 @@ final readonly class Migration
         [$canReplicate, $readiness] = $engine->id === 'mysql' ? $this->mysqlReadiness($facts, $release) : $this->mariadbReadiness($facts, $version, $release);
         $problems = $engine->id === 'mysql' && ! $facts->bool('roleEdgesReadable') ? [self::ROLES_PROBLEM] : [];
 
-        return new MigrationCheckReply(true, null, $release, null, $canReplicate, intdiv($bytes, 1 << 20), $visible, $unreadable, [], $occupied, [...$warnings, ...$readiness], $problems);
+        return SourceReport::fromEngine(new MigrationCheckReply(true, null, $release, null, $canReplicate, intdiv($bytes, 1 << 20), $visible, $unreadable, [], $occupied, [...$warnings, ...$readiness], $problems));
     }
 
-    public function start(DatabaseNode $node, MigrationStart $request): Done
+    public function start(MigrationStart $start): void
     {
-        $this->scripts->run($node, 'mysql-family/migration/start', [
-            ...$this->sourceEnvOf('MIGRATION', $request->source),
-            'MIGRATION_DATABASES' => implode(' ', $request->databases),
-            'MIGRATION_CONTINUOUS' => $request->continuous ? 'true' : 'false',
-            'MIGRATION_UNIT' => FamilyScripts::engineOf($node)->migrationUnit(),
+        $this->scripts->run($this->driver, 'mysql-family/migration/start', [
+            ...$this->sourceEnvOf('MIGRATION', $start->source),
+            'MIGRATION_DATABASES' => implode(' ', $start->databases),
+            'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
+            'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
         ]);
-
-        return new Done;
     }
 
-    public function progress(DatabaseNode $node): MigrationProgress
+    public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload($this->scripts->run($node, 'mysql-family/migration/progress', ['MIGRATION_UNIT' => FamilyScripts::engineOf($node)->migrationUnit()])->json());
+        return MigrationProgress::fromEngine(EngineMigrationProgress::fromPayload($this->scripts->read($this->driver, 'mysql-family/migration/progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
     }
 
-    public function stop(DatabaseNode $node): Done
+    public function stop(): void
     {
-        $this->scripts->run($node, 'mysql-family/migration/stop', ['MIGRATION_UNIT' => FamilyScripts::engineOf($node)->migrationUnit()], timeout: 600);
-
-        return new Done;
+        $this->scripts->run($this->driver, 'mysql-family/migration/stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()], timeout: 600);
     }
 
     /**

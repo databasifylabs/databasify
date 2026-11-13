@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\NodeMetrics;
-use App\Engines\Requests\NodeStatus;
 use App\Enums\Databases\NodeRole;
 
 beforeEach(function () {
@@ -15,7 +12,7 @@ beforeEach(function () {
 it('reads the role and version of a MySQL node', function () {
     $this->scripts->respond('mysql/nodes/status', ['role' => 'replica', 'version' => '8.4.13']);
 
-    $status = resolve(EngineClient::class)->send(idleDatabase('mysql', 1)->nodes()->sole(), new NodeStatus);
+    $status = idleDatabase('mysql', 1)->nodes()->sole()->driver()->nodes()->status();
 
     expect($status->role)->toBe(NodeRole::Replica)->and($status->version)->toBe('8.4.13');
     $this->scripts->assertRan('mysql/nodes/status', fn (string $script): bool => str_contains($script, "MEMBER_ID = @@server_uuid AND MEMBER_STATE = 'ONLINE'")
@@ -27,7 +24,7 @@ it('reads the role and version of a MySQL node', function () {
 it('reads the role and version of a MariaDB node', function () {
     $this->scripts->respond('mariadb/nodes/status', ['role' => 'primary', 'version' => '11.8.3']);
 
-    $status = resolve(EngineClient::class)->send(idleDatabase('mariadb', 1)->nodes()->sole(), new NodeStatus);
+    $status = idleDatabase('mariadb', 1)->nodes()->sole()->driver()->nodes()->status();
 
     expect($status->role)->toBe(NodeRole::Primary)->and($status->version)->toBe('11.8.3');
     $this->scripts->assertRan('mariadb/nodes/status', fn (string $script): bool => str_contains($script, "VARIABLE_NAME = 'WSREP_LOCAL_STATE_COMMENT'")
@@ -38,7 +35,7 @@ it('reads the role and version of a MariaDB node', function () {
 it('reads an offline node without a version', function (string $engine) {
     $this->scripts->respond("{$engine}/nodes/status", ['role' => 'offline', 'version' => null]);
 
-    $status = resolve(EngineClient::class)->send(idleDatabase($engine, 1)->nodes()->sole(), new NodeStatus);
+    $status = idleDatabase($engine, 1)->nodes()->sole()->driver()->nodes()->status();
 
     expect($status->role)->toBe(NodeRole::Offline)->and($status->version)->toBeNull();
     $this->scripts->assertRan("{$engine}/nodes/status", fn (string $script): bool => str_contains($script, '"role":"offline"'));
@@ -47,7 +44,7 @@ it('reads an offline node without a version', function (string $engine) {
 it('reads connections, queries and data size', function (string $engine) {
     $this->scripts->respond('mysql-family/nodes/metrics', ['connections' => 4, 'queries' => 1200, 'dataMb' => 38]);
 
-    $metrics = resolve(EngineClient::class)->send(idleDatabase($engine, 1)->nodes()->sole(), new NodeMetrics);
+    $metrics = idleDatabase($engine, 1)->nodes()->sole()->driver()->nodes()->metrics();
 
     expect($metrics)->connections->toBe(4)->queries->toBe(1200)->dataMb->toBe(38);
     $this->scripts->assertRan('mysql-family/nodes/metrics', fn (string $script): bool => str_contains($script, "VARIABLE_NAME IN ('Threads_connected', 'Questions')")

@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MySqlFamily;
 
+use App\Engines\Contracts\Config;
 use App\Engines\Data\EngineField;
-use App\Engines\Drivers\NodeState;
-use App\Engines\Responses\ConfigFields;
-use App\Engines\Responses\ConfigShow;
-use App\Engines\Responses\ConfigTune;
-use App\Engines\Responses\Done;
+use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Scripts\MySqlSql;
 use App\Engines\Settings\Setting;
 use App\Exceptions\Engines\EngineBusy;
-use App\Models\DatabaseNode;
 
-final readonly class ConfigCommands
+final readonly class MySqlFamilyConfig implements Config
 {
     private const array VARIABLES = ['default_time_zone' => 'time_zone'];
 
     private const array NUMERIC_KINDS = [Setting::BYTES, Setting::INTEGER, Setting::DECIMAL];
 
     public function __construct(
+        private MySqlFamilyDriver $driver,
         private FamilyScripts $scripts,
-        private Configuration $configuration,
+        private MySqlFamilyConfiguration $configuration,
         private NodeState $state,
     ) {}
 
-    public function apply(DatabaseNode $node): Done
+    public function apply(): void
     {
-        $request = $this->configuration->savedRequestOf($node);
-        $effective = $this->configuration->catalogOf($node)->effective($this->configuration->tunedOf($node, $request), $request->settings);
+        $request = $this->configuration->savedRequestOf();
+        $effective = $this->configuration->catalogOf()->effective($this->configuration->tunedOf($request), $request->settings);
         ksort($effective, SORT_STRING);
-        $static = $this->staticKeysOf($node);
-        $mysql = FamilyScripts::engineOf($node)->id === 'mysql';
+        $static = $this->staticKeysOf();
+        $mysql = $this->driver->engine()->id === 'mysql';
         $verb = $mysql ? 'SET PERSIST' : 'SET GLOBAL';
         $sets = [];
 
@@ -43,28 +40,23 @@ final readonly class ConfigCommands
             }
         }
 
-        $this->scripts->run($node, 'mysql-family/config/apply', [
+        $this->scripts->run($this->driver, 'mysql-family/config/apply', [
             'SETS' => json_encode($sets, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'KEYS' => json_encode(array_keys($effective), JSON_THROW_ON_ERROR),
             'STATIC' => json_encode($static, JSON_THROW_ON_ERROR),
             'FORGET' => $mysql ? 'RESET PERSIST IF EXISTS' : '',
         ]);
-
-        return new Done;
     }
 
-    public function sync(): Done
-    {
-        return new Done;
-    }
+    public function sync(): void {}
 
-    public function show(DatabaseNode $node): ConfigShow
+    public function pendingRestart(): array
     {
-        $request = $this->configuration->savedRequestOf($node);
-        $catalog = $this->configuration->catalogOf($node);
-        $effective = $catalog->effective($this->configuration->tunedOf($node, $request), $request->settings);
+        $request = $this->configuration->savedRequestOf();
+        $catalog = $this->configuration->catalogOf();
+        $effective = $catalog->effective($this->configuration->tunedOf($request), $request->settings);
         $names = implode(',', array_map(fn (EngineField $field): string => "'".$this->variableOf($field->key)."'", $catalog->fields));
-        $live = $this->scripts->run($node, 'mysql-family/config/show', ['NAMES' => $names])->json()->stringMap('values');
+        $live = $this->scripts->read($this->driver, 'mysql-family/config/show', ['NAMES' => $names])->stringMap('values');
         $pending = [];
 
         foreach ($catalog->fields as $field) {
@@ -75,41 +67,41 @@ final readonly class ConfigCommands
             }
         }
 
-        return new ConfigShow($pending);
+        return $pending;
     }
 
-    public function fields(DatabaseNode $node): ConfigFields
+    public function fields(): array
     {
-        $catalog = $this->configuration->catalogOf($node);
+        $catalog = $this->configuration->catalogOf();
 
         try {
-            $request = $this->configuration->savedRequestOf($node);
+            $request = $this->configuration->savedRequestOf();
         } catch (EngineBusy) {
-            return new ConfigFields($catalog->fields);
+            return $catalog->fields;
         }
 
-        return new ConfigFields($catalog->fieldsWith($this->configuration->tunedOf($node, $request)));
+        return $catalog->fieldsWith($this->configuration->tunedOf($request));
     }
 
-    public function tune(DatabaseNode $node): ConfigTune
+    public function tune(): array
     {
-        $request = $this->configuration->savedRequestOf($node);
-        $catalog = $this->configuration->catalogOf($node);
-        $previous = $this->configuration->tunedOf($node, $request);
+        $request = $this->configuration->savedRequestOf();
+        $catalog = $this->configuration->catalogOf();
+        $previous = $this->configuration->tunedOf($request);
         $tuned = $catalog->tuned(NodeState::selfOf($request));
-        $this->state->saveTuned($node, Configuration::TUNED_STATE, $tuned);
-        $this->configuration->configure($node, $request);
-        $this->apply($node);
+        $this->state->saveTuned($this->driver, MySqlFamilyConfiguration::TUNED_STATE, $tuned);
+        $this->configuration->configure($request);
+        $this->apply();
 
-        return new ConfigTune($catalog->restartChanged($previous, $tuned, $request->settings));
+        return $catalog->restartChanged($previous, $tuned, $request->settings);
     }
 
     /**
      * @return list<string>
      */
-    private function staticKeysOf(DatabaseNode $node): array
+    private function staticKeysOf(): array
     {
-        $restarting = array_filter($this->configuration->catalogOf($node)->fields, fn (EngineField $field): bool => $field->restart);
+        $restarting = array_filter($this->configuration->catalogOf()->fields, fn (EngineField $field): bool => $field->restart);
 
         return array_values(array_map(fn (EngineField $field): string => $field->key, $restarting));
     }

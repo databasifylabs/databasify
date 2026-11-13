@@ -20,4 +20,4 @@ ignoring_missing "RESET REPLICA ALL FOR CHANNEL 'migration'"
 ignoring_missing "STOP SLAVE 'migration'"
 ignoring_missing "RESET SLAVE 'migration' ALL"
 @endif
-result '{}'
+echo "Stopped the migration."

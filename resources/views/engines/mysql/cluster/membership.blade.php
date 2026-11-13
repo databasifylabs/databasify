@@ -2,4 +2,4 @@
 my '' > /dev/null <<SQL
 SET GLOBAL group_replication_group_seeds = $(my_string "$SEEDS")
 SQL
-result '{}'
+echo "Updated the group seeds to $SEEDS."

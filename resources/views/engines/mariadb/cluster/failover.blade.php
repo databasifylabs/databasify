@@ -38,4 +38,4 @@ wait_until 60 2 writable || {
     databasify_fail internal 'the server was not ready within 1m0s'
 }
 rm -f "$target_cnf"
-result '{}'
+echo "Handed the primary over to $TARGET."

@@ -2,4 +2,4 @@
 @include('engines.mysql-family._files')
 @include('engines.mysql-family._rewrite')
 write_config_files
-result '{}'
+echo "Updated the cluster members."

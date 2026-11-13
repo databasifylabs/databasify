@@ -14,4 +14,4 @@ CREATE USER $quoted_name@'%' $identified REQUIRE SSL
 SQL
 fi
 apply_grants
-result "{\"created\":$created}"
+[ "$created" = true ] && echo "Created user $NAME." || echo "Updated the password of $NAME."
