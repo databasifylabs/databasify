@@ -15,7 +15,7 @@ it('creates, resets and deletes users over http', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     $database->seed()->update(['role' => NodeRole::Primary]);
     idleDatabase('mysql', 1, DatabaseMode::Single, 'other')->users()->create(['name' => 'reporting', 'password' => 'secret']);
-    $ssh = fakeEngine();
+    fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'reporting'])->assertRedirect()->assertSessionHasNoErrors();
     $user = $database->users()->where('name', 'reporting')->sole();
@@ -26,24 +26,25 @@ it('creates, resets and deletes users over http', function () {
 
     $this->delete(projectUrl("/databases/{$database->id}/users/{$user->id}"))->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(json_decode($ssh->engineRequestAt(0), true))->name->toBe('reporting')->password->toBe($created)->encryption->toBe('caching_sha2_password')
-        ->and(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'reporting', 'password' => $reset, 'encryption' => 'caching_sha2_password'])
+    $create = recordedArgs('accounts.createUser')[0]['args'];
+    expect([$create[0], $create[1], $create[3]])->toBe(['reporting', $created, 'caching_sha2_password'])
+        ->and(recordedArgs('accounts.setPassword')[0]['args'])->toBe(['reporting', $reset, 'caching_sha2_password'])
         ->and($reset)->not->toBe($created)
-        ->and(json_decode($ssh->engineRequestAt(2), true))->toBe(['name' => 'reporting'])
+        ->and(recordedArgs('accounts.dropUser')[0]['args'])->toBe(['reporting'])
         ->and($database->users()->pluck('name')->all())->toBe(['databasify']);
 });
 
 it('creates a legacy user and switches its password encryption over http', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     $database->seed()->update(['role' => NodeRole::Primary]);
-    $ssh = fakeEngine();
+    fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/users"), ['name' => 'reporting', 'password_encryption' => 'mysql_native_password'])->assertRedirect()->assertSessionHasNoErrors();
     $user = $database->users()->where('name', 'reporting')->sole();
     $this->post(projectUrl("/databases/{$database->id}/users/{$user->id}/encryption"), ['password_encryption' => 'caching_sha2_password'])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(json_decode($ssh->engineRequestAt(0), true))->encryption->toBe('mysql_native_password')
-        ->and(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'reporting', 'password' => $user->password, 'encryption' => 'caching_sha2_password'])
+    expect(recordedArgs('accounts.createUser')[0]['args'][3])->toBe('mysql_native_password')
+        ->and(recordedArgs('accounts.setPassword')[0]['args'])->toBe(['reporting', $user->password, 'caching_sha2_password'])
         ->and($user->fresh()->password_encryption)->toBe('caching_sha2_password');
 });
 
@@ -101,13 +102,12 @@ it('refuses to delete the default user over http but still resets its password',
     $database = idleDatabase('mysql', 1, DatabaseMode::Single);
     $database->seed()->update(['role' => NodeRole::Primary]);
     $user = $database->users()->sole();
-    $ssh = fakeEngine();
+    fakeEngine();
 
     $this->delete(projectUrl("/databases/{$database->id}/users/{$user->id}"))->assertSessionHasErrors(['user' => "databasify is the default user and can't be deleted."]);
     $this->post(projectUrl("/databases/{$database->id}/users/{$user->id}/password"))->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($ssh->runs)->toHaveCount(1)
-        ->and($ssh->scriptAt(0))->toContain('| databasify user set-password ')
+    expect(recordedCalls())->toBe(['accounts.setPassword'])
         ->and($database->users()->pluck('name')->all())->toBe(['databasify']);
 });
 

@@ -8,15 +8,9 @@ use App\Actions\Databases\Domains\ClearNodeDns;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
 use App\Actions\Databases\Network\RemoveNodeFirewall;
-use App\Actions\Databases\Nodes\BuildNodeRequest;
+use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Contracts\Engines\Flow;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterDisable;
-use App\Engines\Requests\ClusterFailover;
-use App\Engines\Requests\ClusterMembership;
-use App\Engines\Requests\HostRemove;
-use App\Engines\Requests\MemberForget;
-use App\Engines\Requests\NodeReset;
+use App\Engines\Runtime\Runtime;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
@@ -29,8 +23,8 @@ final readonly class RemoveNodeFlow implements Flow
 {
     public function __construct(
         private FlowSteps $steps,
-        private EngineClient $engine,
-        private BuildNodeRequest $nodeRequest,
+        private Runtime $runtime,
+        private BuildNodeConfig $nodeConfig,
         private ApplyNodeFirewall $firewall,
         private RemoveNodeFirewall $removeFirewall,
         private ClearNodeDns $dns,
@@ -60,7 +54,7 @@ final readonly class RemoveNodeFlow implements Flow
         return [
             ...$this->failoverStepsOf($leaving, $standby),
             Step::prepare('take the node out of DNS', $this->steps->quick(fn () => $this->clearDnsOf($database, $leaving))),
-            Step::prepare('take the node out of the cluster', $this->tolerating($force, $this->steps->send($leaving, new ClusterDisable, 'leaving the cluster'))),
+            Step::prepare('take the node out of the cluster', $this->tolerating($force, $this->steps->quick(fn () => $leaving->driver()->cluster()->disable()))),
             ...$remaining->toBase()->flatMap(fn (DatabaseNode $node): array => $this->forgetStepsOn($database, $node, $leaving, $remaining))->all(),
             Step::finish('erase the node', $this->steps->quick(fn () => $this->erase($database, $leaving))),
             Step::finish('forget the node', $this->steps->quick(fn () => $this->forget($database, $leaving, $remaining))),
@@ -95,26 +89,26 @@ final readonly class RemoveNodeFlow implements Flow
             return [];
         }
 
-        return [Step::prepare('hand the primary to a standby', $this->steps->send($leaving, new ClusterFailover($standby->privateIp()), 'handing the primary over'))];
+        return [Step::prepare('hand the primary to a standby', $this->steps->quick(fn () => $leaving->driver()->cluster()->failover($standby->privateIp())))];
     }
 
     private function configureWithout(Database $database, DatabaseNode $node, DatabaseNode $leaving): void
     {
-        $this->engine->send($node, $this->nodeRequest->handle($database, $node, without: $leaving), "{$node->server->name}: configuring the node");
+        $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node, without: $leaving));
     }
 
     private function updateMembersWithout(Database $database, DatabaseNode $node, DatabaseNode $leaving): void
     {
-        $this->engine->send($node, new ClusterMembership($this->nodeRequest->membersOf($database, without: $leaving)), "{$node->server->name}: updating the members");
+        $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
     }
 
     private function forgetOn(DatabaseNode $node, DatabaseNode $leaving, DatabaseNodeCollection $remaining): void
     {
         try {
-            $this->engine->send($node, new MemberForget($leaving->privateIp()), "{$node->server->name}: forgetting {$leaving->server->name}");
+            $node->driver()->cluster()->forget($leaving->privateIp());
         } catch (EngineUnsupported) {
             $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
-            $this->engine->send($node, new NodeReset($remaining->count() - 1, $hosts), "{$node->server->name}: resetting its peers");
+            $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
         }
     }
 
@@ -130,7 +124,7 @@ final readonly class RemoveNodeFlow implements Flow
     private function erase(Database $database, DatabaseNode $node): void
     {
         try {
-            $this->engine->send($node, new HostRemove($database->id, erase: true), "{$node->server->name}: stopping and erasing its copy of the data", EngineClient::REMOVE_TIMEOUT);
+            $this->runtime->remove($node, erase: true);
             $this->removeFirewall->handle($database, $node);
         } catch (Throwable $exception) {
             $node->server->logFailure("{$node->server->name}: removing it from {$database->name}", "{$node->server->name} was removed; its server could not be reached, so its data was not erased: {$exception->getMessage()} Wipe or destroy {$node->server->name}.", $database);

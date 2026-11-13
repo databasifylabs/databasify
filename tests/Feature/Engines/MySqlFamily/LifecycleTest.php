@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Engines\Data\DefaultAccount;
 use App\Engines\Data\Secrets;
-use App\Engines\EngineClient;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
@@ -21,7 +20,6 @@ function lifecycleNode(string $engine): DatabaseNode
 
 it('starts, wakes and restarts a MySQL node the way the Go engine does', function () {
     $node = lifecycleNode('mysql');
-    $client = resolve(EngineClient::class);
     $node->driver()->nodes()->start();
     $node->driver()->nodes()->wake(all: false);
     $node->driver()->nodes()->restart();

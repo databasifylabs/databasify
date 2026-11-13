@@ -16,7 +16,7 @@ final readonly class RecordSchemas
      */
     public function handle(Database $database, array $names): array
     {
-        $candidates = array_values(array_diff(array_unique($names), $database->engine_capabilities->reservedDatabases ?? []));
+        $candidates = array_values(array_diff(array_unique($names), $database->facts()->reservedDatabases));
 
         $this->logSkipped($database, array_values(array_filter($candidates, fn (string $name): bool => ! SchemaName::isValid($name))));
 

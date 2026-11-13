@@ -44,12 +44,6 @@ it('fails with the last stderr line and keeps the tail in the server log', funct
         ->and($log->output)->toContain("a\nb\nboom");
 });
 
-it('reads the latest phase from a task log', function () {
-    fakeSsh()->respondToEngine('task log', ['lines' => "x\nDATABASIFY_PHASE starting\nDATABASIFY_PHASE waiting for the primary\ny\n"]);
-
-    expect(resolve(ScriptRunner::class)->phaseOf(engineNode(), 'ready.1'))->toBe('waiting for the primary');
-});
-
 it('renders the real view in the fake', function () {
     $scripts = fakeScripts()->respond('testing/echo', ['said' => 'yes']);
 

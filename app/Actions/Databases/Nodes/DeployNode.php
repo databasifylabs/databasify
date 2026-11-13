@@ -7,9 +7,7 @@ namespace App\Actions\Databases\Nodes;
 use App\Actions\Databases\Certificates\InstallNodeCertificate;
 use App\Actions\Databases\Certificates\IssueNodeCertificates;
 use App\Actions\Dns\EnsureZoneCertificate;
-use App\Engines\EngineClient;
-use App\Engines\Requests\EngineInfo;
-use App\Engines\Requests\HostDeploy;
+use App\Engines\Runtime\Runtime;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -20,7 +18,7 @@ final readonly class DeployNode
     public function __construct(
         private InstallHostBinary $hostBinary,
         private IssueNodeCertificates $certificates,
-        private EngineClient $engine,
+        private Runtime $runtime,
         private InstallNodeCertificate $certificate,
         private EnsureZoneCertificate $zoneCertificate,
     ) {}
@@ -31,7 +29,8 @@ final readonly class DeployNode
         $this->certificates->handle($database);
         $this->hostBinary->handle($node);
 
-        $this->engine->send($node, $this->deploymentOf($database, $node), "{$node->server->name}: deploying the engine");
+        $engine = $this->runtime->deploy($node, $database->image()->pinnedReference(), $database->facts()->hostProfile);
+        $this->ensureBuiltFor($database, $engine);
         $this->ensureSupportedSdkOn($database, $node);
 
         $this->certificate->handle($database->refresh(), $node);
@@ -54,7 +53,7 @@ final readonly class DeployNode
             return;
         }
 
-        $sdk = $this->engine->send($node, new EngineInfo)->sdk;
+        $sdk = $this->runtime->engineInfo($node)->sdk;
 
         if (SdkRange::allows($sdk)) {
             return;
@@ -63,8 +62,12 @@ final readonly class DeployNode
         throw ImageUnavailable::unsupportedSdk($database->engine()->label, $database->image(), $sdk);
     }
 
-    private function deploymentOf(Database $database, DatabaseNode $node): HostDeploy
+    private function ensureBuiltFor(Database $database, string $engine): void
     {
-        return new HostDeploy($database->image()->pinnedReference(), $database->id, $node->id);
+        if ($engine === $database->engine) {
+            return;
+        }
+
+        throw ImageUnavailable::builtForAnotherEngine($database->engine()->label, $database->image(), $engine);
     }
 }

@@ -52,9 +52,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function task(string $key, string $script, array $data = [], array $env = [], ?string $user = null): Operation
     {
-        $started = $this->scripts()->start($this->node, $key, $script, $data, $user, $env);
-
-        return new Operation($started->key, $started->kind, $started->state, $started->phase, $started->progress, $started->error);
+        return $this->scripts()->start($this->node, $key, $script, $data, $user, $env);
     }
 
     public function taskStatus(string $key): Operation

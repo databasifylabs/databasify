@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Engines\Data\Pool;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\PoolMode;
-use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -20,12 +20,11 @@ it('adds connection pools for known databases and applies them on every node', f
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'missing', 'mode' => 'transaction', 'size' => 20])->assertSessionHasErrors('schema');
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'app_pool', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 20])->assertSessionHasNoErrors();
     $pool = $database->connectionPools()->sole();
-    $ssh = fakeEngine();
+    fakeEngine();
 
     runJob(new ApplyConnectionPoolsJob($database->fresh()));
 
-    expect($ssh->scriptAt(1))->toContain('| databasify pool create ')
-        ->and(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'app_pool', 'database' => 'defaultdb', 'size' => 20, 'mode' => 'transaction']);
+    expect(recordedArgs('pools.create')[0]['args'])->toEqual([new Pool('app_pool', 'defaultdb', 20, 'transaction')]);
     Queue::assertPushed(ApplyConnectionPoolsJob::class);
 
     $this->delete(projectUrl("/databases/{$database->id}/pools/{$pool->id}"))->assertSessionHasNoErrors();
@@ -34,15 +33,12 @@ it('adds connection pools for known databases and applies them on every node', f
 
 it('applies a new pool on the nodes straight away when the queue runs it', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
-    $ssh = fakeEngine();
+    fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'session', 'size' => 5])->assertRedirect()->assertSessionHasNoErrors();
 
-    expect(json_decode($ssh->engineRequestAt(1), true))->toBe(['name' => 'reports', 'database' => 'defaultdb', 'size' => 5, 'mode' => 'session'])
-        ->and($database->fresh()->operation)->toBeNull()
-        ->and($database->serverLogs()->sole())
-        ->name->toBe("{$database->seed()->server->name}: updating connection pools")
-        ->status->toBe(ServerLogStatus::Succeeded);
+    expect(recordedArgs('pools.create')[0]['args'])->toEqual([new Pool('reports', 'defaultdb', 5, 'session')])
+        ->and($database->fresh()->operation)->toBeNull();
 });
 
 it('rejects pools with invalid input', function (array $input, string $field) {

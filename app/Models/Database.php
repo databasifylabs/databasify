@@ -25,6 +25,7 @@ use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
+use App\Engines\Data\EngineFacts;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Grant;
 use App\Engines\Drivers\AbstractEngineDriver;
@@ -37,13 +38,13 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\Persistence;
+use App\Enums\Engines\Feature;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Observers\DatabaseObserver;
-use App\Support\Databases\ClientPorts;
 use App\Support\Engines\SdkRange;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -649,12 +650,12 @@ class Database extends Model implements Movable
      */
     public function passwordEncryptions(): array
     {
-        return $this->engine_capabilities->passwordEncryptions ?? [];
+        return $this->facts()->passwordEncryptions;
     }
 
     public function passwordEncryptionFor(?string $chosen): ?string
     {
-        $default = $this->engine_capabilities?->defaultPasswordEncryption;
+        $default = $this->facts()->defaultPasswordEncryption;
 
         if ($default === null) {
             return null;
@@ -663,14 +664,21 @@ class Database extends Model implements Movable
         return $chosen ?? $default;
     }
 
-    public function runsEngineRuntime(): bool
+    public function facts(): EngineFacts
     {
-        return $this->engine_capabilities?->offers('runtime run') === true;
+        $driver = $this->engine()->driver ?? throw new LogicException("The {$this->engine} engine has no PHP driver.");
+
+        return $driver::facts($this->version_line);
+    }
+
+    public function offers(Feature $feature): bool
+    {
+        return $this->facts()->offers($feature);
     }
 
     public function managesAccounts(): bool
     {
-        return $this->engine_capabilities?->offers('user create') === true;
+        return $this->offers(Feature::Accounts);
     }
 
     public function ensureManagesAccounts(): void
@@ -938,12 +946,7 @@ class Database extends Model implements Movable
 
     public function archivesForRecovery(): bool
     {
-        return $this->offersArchives() && ($this->versionLine()->archives ?? true);
-    }
-
-    private function offersArchives(): bool
-    {
-        return $this->engine_capabilities?->offers('archive status') === true;
+        return $this->offers(Feature::Archive) && ($this->versionLine()->archives ?? true);
     }
 
     public function missingRecoveryMessage(): string
@@ -953,7 +956,7 @@ class Database extends Model implements Movable
 
     public function recoveryUnavailableMessage(): ?string
     {
-        if (! $this->offersArchives() || $this->archivesForRecovery()) {
+        if (! $this->offers(Feature::Archive) || $this->archivesForRecovery()) {
             return null;
         }
 
@@ -1015,7 +1018,7 @@ class Database extends Model implements Movable
 
     public function clientPort(): int
     {
-        return $this->engine_capabilities->ports->client ?? ClientPorts::CLIENT;
+        return $this->facts()->ports->client;
     }
 
     public function connectionProfile(): ConnectionProfile
@@ -1058,11 +1061,6 @@ class Database extends Model implements Movable
             'DB_PASSWORD' => $this->settings->defaultPassword(),
             ...$engine->environmentExtra,
         ];
-    }
-
-    public function capabilities(): EngineCapabilities
-    {
-        return $this->engine_capabilities ?? throw new LogicException("{$this->name} has not read its engine capabilities yet.");
     }
 
     /**

@@ -66,7 +66,7 @@ function fakeGithub(string $zip): void
 }
 
 it('installs a plugin from a GitHub repository and runs its engine from its own folder', function () {
-    fakeGithub(pluginZip('Clickhouse', 'clickhouse', "\$this->databasify()->database('clickhouse')->label('ClickHouse')->image('ghcr.io/acme/databasify-clickhouse')->versions('25.8', [['value' => '25.8', 'label' => 'ClickHouse 25.8']])->register();"));
+    fakeGithub(pluginZip('Clickhouse', 'clickhouse', "\$this->databasify()->database('clickhouse')->label('ClickHouse')->image('ghcr.io/acme/databasify-clickhouse')->versions('25.8', [['value' => '25.8', 'label' => 'ClickHouse 25.8']])->driver(\\Tests\\Support\\KeyDbDriver::class)->register();"));
 
     $this->post('/plugins', ['source' => 'https://github.com/acme/plugin', 'accepts_community_engines' => true])->assertRedirect()->assertSessionHasNoErrors();
 
@@ -220,7 +220,7 @@ it('updates an uploaded plugin from a newer zip', function () {
 });
 
 it('marks an engine a plugin registers as community, with the plugin author', function () {
-    $register = "\$this->databasify()->database('clickhouse')->label('ClickHouse')->register();";
+    $register = "\$this->databasify()->database('clickhouse')->label('ClickHouse')->driver(\\Tests\\Support\\KeyDbDriver::class)->register();";
     fakeGithub(pluginZip('Clickhouse', 'clickhouse', $register, authors: [['name' => 'Acme Labs']]));
     $this->post('/plugins', ['source' => 'acme/plugin', 'accepts_community_engines' => true])->assertSessionHasNoErrors();
     $this->post('/plugins', ['archive' => UploadedFile::fake()->createWithContent('keydb.zip', pluginZip('Keydb', 'keydb', "\$this->databasify()->database('keydb')->label('KeyDB')->register();")), 'accepts_community_engines' => true])->assertSessionHasNoErrors();

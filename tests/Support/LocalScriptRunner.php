@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Contracts\Engines\EngineScripts;
-use App\Engines\Responses\Operation;
+use App\Engines\Data\Operation;
 use App\Engines\Scripts\ScriptFailure;
 use App\Engines\Scripts\ScriptResult;
 use App\Engines\Scripts\ScriptView;
@@ -81,11 +81,6 @@ final class LocalScriptRunner implements EngineScripts
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
     {
         throw new LogicException('Tasks do not run locally.');
-    }
-
-    public function phaseOf(DatabaseNode $node, string $key): ?string
-    {
-        return null;
     }
 
     /**

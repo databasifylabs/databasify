@@ -9,6 +9,7 @@ use App\Contracts\Engines\EngineScripts;
 use App\Contracts\Images\ImageRegistry;
 use App\Contracts\Ssh\ServerConnection;
 use App\DTOs\Databases\NewDatabase;
+use App\DTOs\Databases\NodeStatus;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Updates\Release;
 use App\Engines\Data\ArchiveSettings;
@@ -17,6 +18,12 @@ use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Secrets;
 use App\Engines\Data\Storage;
+use App\Engines\Drivers\MariaDb\MariaDbDriver;
+use App\Engines\Drivers\MongoDb\MongoDbDriver;
+use App\Engines\Drivers\MySql\MySqlDriver;
+use App\Engines\Drivers\Postgres\PostgresDriver;
+use App\Engines\Drivers\Redis\RedisDriver;
+use App\Engines\Drivers\Valkey\ValkeyDriver;
 use App\Engines\Payload;
 use App\Engines\Requests\NodeConfigure;
 use App\Engines\Responses\EngineCapabilities;
@@ -26,6 +33,7 @@ use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
+use App\Exceptions\Engines\EngineUnavailable;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
@@ -50,11 +58,13 @@ use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\DriverRecorder;
 use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
 use Tests\Support\FakeScriptRunner;
 use Tests\Support\FakeServerConnection;
 use Tests\Support\LocalScriptRunner;
+use Tests\Support\RecordingDriver;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -244,58 +254,75 @@ function withEngineDetails(Database $database): Database
     return $database;
 }
 
+const BUILT_IN_ENGINES = ['postgres', 'mysql', 'mariadb', 'mongodb', 'valkey', 'redis'];
+
 function fakeEngine(?FakeServerConnection $ssh = null): FakeServerConnection
 {
-    $operation = fn (string $state): array => ['key' => 'k', 'kind' => 'long', 'state' => $state, 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-10T00:00:00Z', 'finishedAt' => null, 'error' => null];
+    useRecordingDrivers();
+    $ssh ??= fakeSsh();
 
-    return ($ssh ?? fakeSsh())
-        ->respondToEngine('host deploy', ['engine' => 'engine', 'container' => 'databasify-engine', 'created' => true, 'replaced' => false])
+    foreach (BUILT_IN_ENGINES as $engine) {
+        $ssh->respondWhen(
+            fn (string $server, string $script): bool => str_contains($script, '| databasify host deploy ') && str_contains(base64_decode(engineRequestIn($script)), "databasify-{$engine}"),
+            json_encode(['engine' => $engine], JSON_THROW_ON_ERROR),
+        );
+    }
+
+    return $ssh
         ->respondToEngine('host remove', [])
-        ->respondToEngine('tls install', [])
-        ->respondToEngine('node configure', ['changed' => true])
-        ->respondToEngine('node start', [])
-        ->respondToEngine('node bootstrap', [])
-        ->respondToEngine('node ready', $operation('running'))
-        ->respondToEngine('cluster enable', $operation('running'))
-        ->respondToEngine('cluster rejoin', $operation('running'))
-        ->respondToEngine('cluster membership', [])
-        ->respondToEngine('cluster disable', ['droppedSlots' => 0])
-        ->respondToEngine('cluster failover', [])
-        ->respondToEngine('member forget', [])
-        ->respondToEngine('node reset', [])
-        ->respondToEngine('user create', ['created' => true])
-        ->respondToEngine('user set-password', [])
-        ->respondToEngine('user drop', ['dropped' => true])
-        ->respondToEngine('user grant', [])
-        ->respondToEngine('database create', ['created' => true])
-        ->respondToEngine('database drop', ['dropped' => true])
-        ->respondToEngine('pool list', ['pools' => []])
-        ->respondToEngine('pool create', [])
-        ->respondToEngine('pool update', [])
-        ->respondToEngine('pool delete', [])
-        ->respondToEngine('account list', ['users' => ['databasify'], 'databases' => ['defaultdb'], 'grants' => (object) []])
-        ->respondToEngine('migration check', ['reachable' => true, 'error' => null, 'version' => '8.4.3', 'walLevel' => null, 'canReplicate' => true, 'sizeMb' => 12, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'keys' => null, 'warnings' => [], 'problems' => []])
-        ->respondToEngine('migration start', [])
-        ->respondToEngine('migration progress', ['copy' => 'running', 'log' => 'copying shop', 'subscribedTables' => 0, 'readyTables' => 0, 'lagSeconds' => null, 'lagUnknown' => true])
-        ->respondToEngine('migration stop', [])
         ->respondToEngine('logs read', ['units' => ['engine-server'], 'lines' => ['ready']])
-        ->respondToEngine('node metrics', ['connections' => 3, 'queries' => 120, 'dataMb' => 40, 'keys' => null, 'hits' => null, 'misses' => null, 'evicted' => null])
-        ->respondToEngine('operation status', $operation('succeeded'))
-        ->respondToEngine('node status', ['role' => 'primary', 'version' => '1.0'])
-        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.2.0'])
-        ->respondToEngine('engine capabilities', engineCapabilitiesPayload('postgres'))
-        ->respondToEngine('config fields', ['fields' => [engineFieldPayload()]]);
+        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.2.0']);
+}
+
+function engineRequestIn(string $script): string
+{
+    return preg_match("/^printf '%s' '([A-Za-z0-9+\/=]+)'/m", $script, $payload) === 1 ? $payload[1] : '';
+}
+
+function useRecordingDrivers(): DriverRecorder
+{
+    if (app()->bound(DriverRecorder::class)) {
+        return resolve(DriverRecorder::class);
+    }
+
+    $recorder = new DriverRecorder;
+    app()->instance(DriverRecorder::class, $recorder);
+
+    foreach ([PostgresDriver::class, MySqlDriver::class, MariaDbDriver::class, MongoDbDriver::class, ValkeyDriver::class, RedisDriver::class] as $driver) {
+        app()->bind($driver, fn ($app, array $parameters): RecordingDriver => new RecordingDriver($parameters['node'], $parameters['followsPrimary'] ?? false));
+    }
+
+    return $recorder;
+}
+
+/**
+ * @return list<string>
+ */
+function recordedCalls(?Server $server = null): array
+{
+    return useRecordingDrivers()->calls($server?->name);
+}
+
+/**
+ * @return list<array{server: string, args: list<mixed>}>
+ */
+function recordedArgs(string $call): array
+{
+    $calls = array_filter(useRecordingDrivers()->calls, fn (array $recorded): bool => $recorded['call'] === $call);
+
+    return array_values(array_map(fn (array $recorded): array => ['server' => $recorded['server'], 'args' => $recorded['args']], $calls));
+}
+
+function answerRead(string $call, mixed $answer, ?Server $server = null): DriverRecorder
+{
+    return useRecordingDrivers()->answer($call, $answer, $server?->name);
 }
 
 function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $role, ?string $version = null): FakeServerConnection
 {
-    $reply = $role === null ? ['error' => ['code' => 'unavailable', 'message' => 'unreachable', 'details' => (object) []]] : ['role' => $role, 'version' => $version];
+    answerRead('nodes.status', fn (): NodeStatus => $role === null ? throw new EngineUnavailable('unavailable', 'unreachable') : NodeStatus::reported(NodeRole::from($role), $version), $server);
 
-    return $ssh->respondFirstWhen(
-        fn (string $name, string $script): bool => $name === $server->name && str_contains($script, '| databasify node status '),
-        json_encode($reply, JSON_THROW_ON_ERROR),
-        $role === null ? 1 : 0,
-    );
+    return $ssh;
 }
 
 /**
@@ -303,10 +330,23 @@ function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $ro
  */
 function engineCommandsIn(FakeServerConnection $ssh): array
 {
-    return array_values(collect($ssh->runs)
-        ->map(fn (array $run): ?string => preg_match('/\\| databasify ([a-z-]+ [a-z-]+) 2>/', $run['script'], $match) === 1 ? "{$run['server']}: {$match[1]}" : null)
-        ->filter()
-        ->all());
+    $timeline = [];
+
+    foreach ($ssh->runs as $index => $run) {
+        if (preg_match('/\\| databasify ([a-z-]+ [a-z-]+) 2>/', $run['script'], $match) === 1) {
+            $timeline[] = ['at' => $index, 'order' => 1, 'command' => "{$run['server']}: {$match[1]}"];
+        }
+    }
+
+    if (app()->bound(DriverRecorder::class)) {
+        foreach (resolve(DriverRecorder::class)->calls as $call) {
+            $timeline[] = ['at' => $call['at'], 'order' => 0, 'command' => "{$call['server']}: {$call['call']}"];
+        }
+    }
+
+    usort($timeline, fn (array $a, array $b): int => [$a['at'], $a['order']] <=> [$b['at'], $b['order']]);
+
+    return array_column($timeline, 'command');
 }
 
 function advanceFlows(int $ticks = 20): void

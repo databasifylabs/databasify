@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\Databases\Nodes\BuildNodeRequest;
+use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Exceptions\Databases\ServerSizeUnknown;
 use App\Models\DatabaseNode;
 
@@ -11,7 +11,7 @@ it('builds the same request on every node except ip', function () {
     $database->update(['settings' => $database->settings->withConfig(['max_connections' => '200', 'work_mem' => ''])]);
     $nodes = $database->nodes()->with('server')->orderBy('position')->get();
 
-    $payloads = $nodes->map(fn (DatabaseNode $node): array => resolve(BuildNodeRequest::class)->handle($database->fresh(), $node)->toPayload());
+    $payloads = $nodes->map(fn (DatabaseNode $node): array => resolve(BuildNodeConfig::class)->handle($database->fresh(), $node)->toPayload());
 
     expect($payloads->map(fn (array $payload): array => array_diff_key($payload, ['ip' => true]))->unique()->count())->toBe(1)
         ->and($payloads->pluck('ip')->all())->toBe($nodes->map(fn (DatabaseNode $node): string => $node->privateIp())->all())
@@ -30,7 +30,7 @@ it('marks read-only nodes as non-voting', function () {
     $database = idleDatabase('postgres', 1);
     $readOnly = withReadOnlyNode($database);
 
-    $payload = resolve(BuildNodeRequest::class)->handle($database->fresh(), $readOnly->fresh())->toPayload();
+    $payload = resolve(BuildNodeConfig::class)->handle($database->fresh(), $readOnly->fresh())->toPayload();
 
     expect($payload)->readOnly->toBeTrue()->clustered->toBeTrue()
         ->and(array_column($payload['members'], 'voting'))->toBe([true, false]);
@@ -43,7 +43,7 @@ it('fails clearly when a server has no size', function () {
     $node->server->update(['memory_mb' => null]);
     $before = count($ssh->runs);
 
-    expect(fn () => resolve(BuildNodeRequest::class)->handle($database->fresh(), $database->nodes()->first()))
+    expect(fn () => resolve(BuildNodeConfig::class)->handle($database->fresh(), $database->nodes()->first()))
         ->toThrow(ServerSizeUnknown::class, "{$node->server->name} has no known CPU, memory or disk size yet.")
         ->and($ssh->runs)->toHaveCount($before);
 });

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Monitoring;
 
 use App\DTOs\Metrics\NodeMetrics;
-use App\Engines\EngineClient;
-use App\Engines\Requests\NodeMetrics as EngineNodeMetrics;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\NodeRunner;
@@ -18,7 +16,6 @@ final readonly class ReadDatabaseMetrics
 {
     public function __construct(
         private NodeRunner $nodeRunner,
-        private EngineClient $engine,
     ) {}
 
     /**
@@ -36,7 +33,7 @@ final readonly class ReadDatabaseMetrics
     private function metricsOf(Database $database, DatabaseNode $node): NodeMetrics
     {
         try {
-            $values = [...$this->hostMetricsOf($database, $node), ...$this->engine->send($node, new EngineNodeMetrics)->toValues()];
+            $values = [...$this->hostMetricsOf($database, $node), ...$node->driver()->nodes()->metrics()->toValues()];
 
             return new NodeMetrics($node->id, $node->server->name, true, $values);
         } catch (Throwable) {

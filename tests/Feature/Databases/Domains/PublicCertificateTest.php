@@ -11,15 +11,10 @@ use App\Jobs\Databases\RenewCertificatesJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Support\Facades\Queue;
-use Tests\Support\FakeServerConnection;
 
-function installedCertificates(FakeServerConnection $ssh, int $from): array
+function installedCertificates(): array
 {
-    return collect($ssh->runs)->slice($from)->keys()
-        ->map(fn (int $index): string => $ssh->engineRequestAt($index))
-        ->filter(fn (string $request): bool => str_contains($request, '"certificate"'))
-        ->map(fn (string $request): string => json_decode($request, true)['certificate'])
-        ->values()->all();
+    return array_map(fn (array $call): string => $call['args'][0], recordedArgs('nodes.installTls'));
 }
 
 function installEveryNodeCertificate(Database $database): void
@@ -28,16 +23,15 @@ function installEveryNodeCertificate(Database $database): void
 }
 
 it('issues the zone certificate before installing it on a node of a domain it has no certificate for yet', function () {
-    $ssh = fakeEngine();
+    fakeEngine();
     fakeCloudflare([['id' => 'txt-1', 'content' => '"challenge-token"', 'comment' => 'databasify']]);
     $authority = fakeCertificateAuthority();
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
-    $before = count($ssh->runs);
 
     resolve(DeployNode::class)->handle($database, $database->nodes()->sole());
 
     expect($authority->issued)->toBe(['*.db.example.com'])
-        ->and(installedCertificates($ssh, $before))->toBe([$database->dnsZone->fresh()->certificate]);
+        ->and(installedCertificates())->toBe([$database->dnsZone->fresh()->certificate]);
 });
 
 it('keeps the private connection details until every node serves the zone certificate', function () {

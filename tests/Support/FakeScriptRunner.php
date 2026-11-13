@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Contracts\Engines\EngineScripts;
-use App\Engines\Responses\Operation;
+use App\Engines\Data\Operation;
 use App\Engines\Scripts\ScriptResult;
 use App\Engines\Scripts\ScriptView;
 use App\Enums\Databases\OperationState;
@@ -53,11 +53,6 @@ final class FakeScriptRunner implements EngineScripts
         $this->record($node, $script, $data, $env);
 
         return new Operation($key, 'task', OperationState::Running, 'starting', null, null);
-    }
-
-    public function phaseOf(DatabaseNode $node, string $key): ?string
-    {
-        return null;
     }
 
     /**

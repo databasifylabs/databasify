@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Flows;
 
-use App\Engines\EngineClient;
+use App\Engines\Data\Operation;
 use App\Engines\Flows\StartedOperation;
 use App\Engines\Flows\Step;
-use App\Engines\Requests\OperationCancel;
-use App\Engines\Requests\OperationStatus;
-use App\Engines\Responses\Operation;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\OperationState;
 use App\Enums\Databases\StepKind;
@@ -27,7 +24,6 @@ final readonly class AdvanceFlow
     private const int MAX_ATTEMPTS = 30;
 
     public function __construct(
-        private EngineClient $engine,
         private FailFlow $fail,
     ) {}
 
@@ -87,7 +83,7 @@ final readonly class AdvanceFlow
     private function settleOperationOf(DatabaseFlow $flow): bool
     {
         try {
-            $operation = $this->engine->send($this->operationNodeOf($flow), new OperationStatus((string) $flow->operation_key));
+            $operation = $this->operationNodeOf($flow)->driver()->taskStatus((string) $flow->operation_key);
         } catch (EngineNotFound) {
             return $this->forget($flow);
         } catch (EngineNotRunning|EngineUnavailable|SshConnectionFailed) {
@@ -109,7 +105,7 @@ final readonly class AdvanceFlow
         }
 
         if ($flow->isWaiting()) {
-            rescue(fn () => $this->engine->send($this->operationNodeOf($flow), new OperationCancel((string) $flow->operation_key)), report: false);
+            rescue(fn () => $this->operationNodeOf($flow)->driver()->stopTask((string) $flow->operation_key), report: false);
         }
 
         $this->fail->handle($flow, 'Stopped by you.');

@@ -5,11 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Pools;
 
 use App\Engines\Data\Pool;
-use App\Engines\EngineClient;
-use App\Engines\Requests\PoolCreate;
-use App\Engines\Requests\PoolDelete;
-use App\Engines\Requests\PoolList;
-use App\Engines\Requests\PoolUpdate;
 use App\Models\ConnectionPool;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -18,7 +13,6 @@ use App\Services\Databases\NodeRunner;
 final readonly class ApplyConnectionPools
 {
     public function __construct(
-        private EngineClient $engine,
         private NodeRunner $nodeRunner,
     ) {}
 
@@ -44,10 +38,9 @@ final readonly class ApplyConnectionPools
      */
     private function syncOn(DatabaseNode $node, array $wanted): void
     {
-        $log = "{$node->server->name}: updating connection pools";
-        $current = collect($this->engine->send($node, new PoolList)->pools)->keyBy('name');
+        $current = collect($node->driver()->pools()->list())->keyBy('name');
 
-        $current->keys()->diff(array_keys($wanted))->each(fn (string $name) => $this->engine->send($node, new PoolDelete($name), $log));
+        $current->keys()->diff(array_keys($wanted))->each(fn (string $name) => $node->driver()->pools()->delete($name));
 
         foreach ($wanted as $name => $pool) {
             $existing = $current->get($name);
@@ -56,7 +49,7 @@ final readonly class ApplyConnectionPools
                 continue;
             }
 
-            $this->engine->send($node, $existing === null ? new PoolCreate($pool) : new PoolUpdate($pool), $log);
+            $existing === null ? $node->driver()->pools()->create($pool) : $node->driver()->pools()->update($pool);
         }
     }
 }

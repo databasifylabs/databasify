@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Flows;
 
-use App\Engines\Requests\ClusterFailover;
-use App\Engines\Requests\ClusterRejoin;
-use App\Engines\Requests\NodeReady;
-use App\Engines\Requests\NodeRestart;
+use App\Engines\Data\Operation;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -50,7 +47,7 @@ final readonly class RollingSteps
             }
 
             if ($id === $context->targetNodeId && $standby !== null) {
-                $steps[] = Step::prepare("hand the primary to {$standby->server->name}", $this->steps->send($node, new ClusterFailover($standby->privateIp()), 'handing the primary over'));
+                $steps[] = Step::prepare("hand the primary to {$standby->server->name}", $this->steps->quick(fn () => $node->driver()->cluster()->failover($standby->privateIp())));
             }
 
             array_push($steps, ...$stepsFor($node));
@@ -65,7 +62,7 @@ final readonly class RollingSteps
     public function restart(DatabaseFlow $flow): array
     {
         return $this->over($flow, fn (DatabaseNode $node): array => [
-            Step::prepare("restart {$node->server->name}", $this->steps->send($node, new NodeRestart, 'restarting the engine')),
+            Step::prepare("restart {$node->server->name}", $this->steps->quick(fn () => $node->driver()->nodes()->restart())),
             ...$this->backOnline($flow, $node),
         ]);
     }
@@ -76,12 +73,12 @@ final readonly class RollingSteps
     public function backOnline(DatabaseFlow $flow, DatabaseNode $node): array
     {
         $expectPrimary = $node->id === $flow->context->targetNodeId && $flow->context->failoverTo === null;
-        $ready = Step::prepare("wait for {$node->server->name}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, $expectPrimary), 'waiting for the node'));
+        $ready = Step::prepare("wait for {$node->server->name}", $this->steps->long($node, fn (string $key): Operation => $node->driver()->nodes()->ready($key, $expectPrimary), 'waiting for the node'));
 
         if (! $node->database->isClustered()) {
             return [$ready];
         }
 
-        return [$ready, Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, $node->isReadOnly()), 'rejoining the cluster'))];
+        return [$ready, Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): Operation => $node->driver()->cluster()->rejoin($key, $node->isReadOnly()), 'rejoining the cluster'))];
     }
 }

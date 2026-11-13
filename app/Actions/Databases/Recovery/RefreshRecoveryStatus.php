@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Recovery;
 
 use App\DTOs\Recovery\ArchiveStatus;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ArchiveStatus as EngineArchiveStatus;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Ssh\SshAccessDenied;
 use App\Exceptions\Ssh\SshConnectionFailed;
@@ -16,8 +14,6 @@ use Throwable;
 
 final readonly class RefreshRecoveryStatus
 {
-    public function __construct(private EngineClient $engine) {}
-
     public function handle(PointInTimeRecovery $recovery, bool $backUpNow = false): ArchiveStatus
     {
         $status = $this->statusOf($recovery, $backUpNow)->keepingLatestOf($recovery->latest_restorable_at);
@@ -38,7 +34,7 @@ final readonly class RefreshRecoveryStatus
         $log = $backUpNow ? "{$primary->server->name}: backing up now" : null;
 
         try {
-            return ArchiveStatus::fromEngine($this->engine->send($primary, new EngineArchiveStatus($backUpNow), $log));
+            return $primary->driver()->archive()->status($backUpNow);
         } catch (EngineError|SshConnectionFailed|SshAccessDenied) {
             return $this->unreachable($primary);
         } catch (Throwable $exception) {

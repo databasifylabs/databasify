@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Recovery\RefreshRecoveryStatus;
 use App\Actions\Databases\Recovery\UpdateRecoverySchedule;
+use App\DTOs\Recovery\ArchiveStatus;
 use App\DTOs\Recovery\RecoverySchedule;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
@@ -14,6 +15,7 @@ use App\Jobs\Databases\RefreshRecoveryStatusJob;
 use App\Models\PointInTimeRecovery;
 use App\Models\StorageProvider;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
@@ -242,34 +244,31 @@ it('reads the archive status from the primary and backs up on request', function
     $database = withRecovery(idleDatabase('postgres', 2));
     markRoles($database, NodeRole::Replica, NodeRole::Primary);
     $primary = $database->nodes()->orderBy('position')->get()[1]->server;
-    $ssh = fakeEngine(fakeSsh()->respondToEngine('archive status', ['backups' => 2, 'earliest' => '2026-11-01T00:00:00Z', 'latest' => '2026-11-10T00:00:00Z', 'lastBackup' => '2026-11-09T01:00:00Z', 'problem' => null]));
+    fakeEngine();
+    answerRead('archive.status', new ArchiveStatus(2, CarbonImmutable::parse('2026-11-01T00:00:00Z'), CarbonImmutable::parse('2026-11-10T00:00:00Z'), CarbonImmutable::parse('2026-11-09T01:00:00Z'), null));
 
     resolve(RefreshRecoveryStatus::class)->handle($database->fresh()->pointInTimeRecovery, backUpNow: true);
-    $status = collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify archive status '));
 
-    expect($ssh->runs[$status]['server'])->toBe($primary->name)
-        ->and(json_decode($ssh->engineRequestAt($status), true))->toBe(['backUpNow' => true])
+    expect(recordedArgs('archive.status'))->toBe([['server' => $primary->name, 'args' => [true]]])
         ->and($database->fresh()->pointInTimeRecovery)->backups_count->toBe(2)->latest_restorable_at->toIso8601ZuluString()->toBe('2026-11-10T00:00:00Z');
 });
 
 it('configures every node with the archive when point-in-time recovery is turned on', function () {
     $this->actingAs(User::factory()->create());
-    $ssh = fakeEngine()->respondToEngine('archive status', ['backups' => 0, 'earliest' => null, 'latest' => null, 'lastBackup' => null, 'problem' => null]);
+    fakeEngine();
     $database = withRecovery(idleDatabase('mysql', 2));
-    $configures = fn () => collect($ssh->runs)->keys()->filter(fn (int $index): bool => str_contains($ssh->scriptAt($index), '| databasify node configure '));
 
     resolve(UpdateRecoverySchedule::class)->handle($database->fresh(), new RecoverySchedule(7, 3));
     advanceFlows();
 
-    expect($configures())->toHaveCount(2)
-        ->and(json_decode($ssh->engineRequestAt($configures()->first()), true)['archive'])->retentionDays->toBe(7)->backupHour->toBe(3)
+    expect(recordedArgs('nodes.configure'))->toHaveCount(2)
+        ->and(recordedArgs('nodes.configure')[0]['args'][0]->archive)->retentionDays->toBe(7)->backupHour->toBe(3)
         ->and($database->fresh()->operation)->toBeNull();
 });
 
 it('applies the archive settings and restarts the nodes when the engine waits on a restart', function () {
-    $ssh = fakeEngine()->respondToEngine('config sync', ['restartedPrimary' => false])->respondToEngine('config apply', [])->respondToEngine('node restart', [])
-        ->respondToEngine('config show', ['values' => [['key' => 'archive_mode', 'value' => 'off', 'source' => 'default', 'pendingRestart' => true]]])
-        ->respondToEngine('archive status', ['backups' => 0, 'earliest' => null, 'latest' => null, 'lastBackup' => null, 'problem' => null]);
+    $ssh = fakeEngine();
+    answerRead('config.pendingRestart', ['archive_mode']);
     $database = withRecovery(idleDatabase('postgres', 2));
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->map->server->all();
@@ -278,7 +277,7 @@ it('applies the archive settings and restarts the nodes when the engine waits on
     advanceFlows(40);
 
     expect(engineCommandsIn($ssh))
-        ->toContain("{$primary->name}: config sync", "{$primary->name}: config apply", "{$primary->name}: node restart")
-        ->toContain("{$standby->name}: config apply", "{$standby->name}: node restart")
+        ->toContain("{$primary->name}: config.sync", "{$primary->name}: config.apply", "{$primary->name}: nodes.restart")
+        ->toContain("{$standby->name}: config.apply", "{$standby->name}: nodes.restart")
         ->and($database->fresh()->operation)->toBeNull();
 });

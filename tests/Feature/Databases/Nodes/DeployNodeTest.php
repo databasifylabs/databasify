@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Databases\Nodes\InstallHostBinary;
+use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Exceptions\Images\ImageUnavailable;
 use Illuminate\Support\Facades\Cache;
 use Tests\Support\FakeImageRegistry;
@@ -52,38 +53,49 @@ it('fails a deploy before touching the server when no engine-sdk release satisfi
         ->and(count($ssh->runs))->toBe($before);
 });
 
-it('deploys then installs the node certificate', function () {
-    $ssh = fakeSsh()
-        ->respondToEngine('host deploy', ['engine' => 'postgres', 'container' => 'databasify-postgres', 'created' => true, 'replaced' => false])
-        ->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.2.0'])
-        ->respondToEngine('tls install', []);
+it('deploys with the host profile of the engine then installs the node certificate', function () {
+    $ssh = fakeEngine();
     $node = engineNode();
     $database = $node->database;
     $before = count($ssh->runs);
 
     resolve(DeployNode::class)->handle($database, $node);
 
-    $engineCalls = collect($ssh->runs)->slice($before)->keys()->map(fn (int $index): string => $ssh->engineRequestAt($index))->filter()->values();
     $database->refresh();
+    $deploy = collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify host deploy '));
 
-    expect(collect($ssh->runs)->slice($before)->pluck('script')->map(fn (string $script): string => preg_match('/databasify (host deploy|engine info|tls install)/', $script, $match) === 1 ? $match[1] : 'script')->all())
-        ->toBe(['script', 'host deploy', 'engine info', 'tls install'])
-        ->and(json_decode($engineCalls[0], true))->toBe(['image' => "{$database->image->repository}:{$database->image->release}@{$database->image->digest}", 'databaseId' => $database->id, 'nodeId' => $node->id])
-        ->and(json_decode($engineCalls[2], true))->toBe([
-            'certificate' => $database->settings->nodeCertificate($node->id, 'server.crt'),
-            'key' => $database->settings->nodeCertificate($node->id, 'server.key'),
-            'ca' => $database->settings->certificate('ca.crt'),
+    expect(collect($ssh->runs)->slice($before)->pluck('script')->map(fn (string $script): string => preg_match('/databasify (host deploy|engine info)/', $script, $match) === 1 ? $match[1] : 'script')->all())
+        ->toBe(['script', 'host deploy', 'engine info'])
+        ->and(json_decode($ssh->engineRequestAt($deploy), true))->toBe([
+            'image' => "{$database->image->repository}:{$database->image->release}@{$database->image->digest}",
+            'databaseId' => $database->id,
+            'nodeId' => $node->id,
+            'hostProfile' => json_decode(json_encode(PostgresDriver::facts('18')->hostProfile->toPayload(), JSON_THROW_ON_ERROR), true),
+        ])
+        ->and(recordedArgs('nodes.installTls')[0]['args'])->toBe([
+            $database->settings->nodeCertificate($node->id, 'server.crt'),
+            $database->settings->nodeCertificate($node->id, 'server.key'),
+            $database->settings->certificate('ca.crt'),
         ]);
 });
 
+it('refuses an image built for another engine', function () {
+    fakeEngine(fakeSsh()->respondToEngine('host deploy', ['engine' => 'mysql']));
+    $node = engineNode();
+    $database = $node->database;
+
+    expect(fn () => resolve(DeployNode::class)->handle($database, $node))->toThrow(ImageUnavailable::class, "{$database->image->reference()} is built for mysql, not PostgreSQL.")
+        ->and(recordedCalls())->toBe([]);
+});
+
 it('fails the deploy when the running engine reports an SDK outside the range', function () {
-    $ssh = fakeEngine(fakeSsh()->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.3.0']));
+    fakeEngine(fakeSsh()->respondToEngine('engine info', ['engine' => 'postgres', 'line' => '18', 'version' => '18.6', 'sdk' => '0.3.0']));
     $node = engineNode();
     $database = $node->database;
 
     expect(fn () => resolve(DeployNode::class)->handle($database, $node))
         ->toThrow(ImageUnavailable::class, "{$database->engine()->label} {$database->image->release} is built on SDK 0.3.0; this Databasify supports ^0.2.")
-        ->and(engineCommandsIn($ssh))->not->toContain("{$node->server->name}: tls install");
+        ->and(recordedCalls())->not->toContain('nodes.installTls');
 });
 
 it('names the SDK unknown when the running engine reports none', function () {

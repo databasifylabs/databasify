@@ -7,21 +7,21 @@ namespace App\Actions\Databases\Nodes;
 use App\Engines\Data\ArchiveSettings;
 use App\Engines\Data\Member;
 use App\Engines\Data\Secrets;
-use App\Engines\Requests\NodeConfigure;
+use App\Engines\Data\NodeConfig;
 use App\Exceptions\Databases\ServerSizeUnknown;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Database\Eloquent\Builder;
 
-final readonly class BuildNodeRequest
+final readonly class BuildNodeConfig
 {
-    public function handle(Database $database, DatabaseNode $node, ?DatabaseNode $without = null): NodeConfigure
+    public function handle(Database $database, DatabaseNode $node, ?DatabaseNode $without = null): NodeConfig
     {
         $nodes = $this->nodesOf($database, $without);
         $primary = $nodes->first(fn (DatabaseNode $candidate): bool => $candidate->isPrimary()) ?? $nodes->firstOrFail();
 
-        return new NodeConfigure(
+        return new NodeConfig(
             clustered: $nodes->count() > 1,
             readOnly: $node->isReadOnly(),
             ip: $node->privateIp(),

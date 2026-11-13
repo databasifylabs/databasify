@@ -39,7 +39,7 @@ class MigrationSourceRequest extends FormRequest
             return null;
         }
 
-        return new SourceForm($form->defaultPort, $form->credentialsRequired, $form->selectsDatabases, $database->engine_capabilities->reservedDatabases ?? []);
+        return new SourceForm($form->defaultPort, $form->credentialsRequired, $form->selectsDatabases, $database->facts()->reservedDatabases);
     }
 
     public function source(): MigrationSource

@@ -23,7 +23,6 @@ class DatabaseResource extends DatabaseListResource
     public function toArray(Request $request): array
     {
         $engine = $this->engine();
-        $capabilities = $this->engine_capabilities;
 
         return [
             ...parent::toArray($request),
@@ -40,7 +39,7 @@ class DatabaseResource extends DatabaseListResource
             'hostnames' => $this->hostnamesArray(),
             'network' => $this->networkOfNodes(),
             'port' => $this->clientPort(),
-            'pool_port' => $capabilities?->ports->pool,
+            'pool_port' => $this->facts()->ports->pool,
             'supports_users' => $this->managesAccounts(),
             'password_encryptions' => $this->encryptionChoicesOf($this->passwordEncryptions()),
             'migration_source' => $engine->migrationSource?->toArray(),

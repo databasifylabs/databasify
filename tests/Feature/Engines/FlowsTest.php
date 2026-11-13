@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Databases\Flows\StartFlow;
-use App\Engines\EngineClient;
 use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\StartedOperation;
 use App\Engines\Flows\Step;
@@ -34,7 +33,7 @@ function longStep(array &$keys, string $kind = 'prepare'): Step
 
         $node = $flow->database->nodes->firstOrFail();
 
-        return new StartedOperation($node->id, $key, resolve(EngineClient::class)->openLog($node, 'long step')->id);
+        return new StartedOperation($node->id, $key, $node->openLog('long step')->id);
     });
 }
 
@@ -79,7 +78,7 @@ it('moves on when the operation succeeded', function () {
         $ran[] = 'after';
     })]));
 
-    fakeSsh()->respondToEngine('operation status', operationReply('succeeded'));
+    fakeSsh()->respondToEngine('task log', ['lines' => ''])->respondToEngine('task status', operationReply('succeeded'));
     runJob(new AdvanceDatabaseFlow($record));
 
     expect($ran)->toBe(['after'])
@@ -92,7 +91,7 @@ it('starts a lost operation again with a new key', function (array $reply, int $
     $flow = ScriptedFlow::bind([longStep($keys)]);
     $record = startScripted($this->database, $flow);
 
-    fakeSsh()->respondToEngine('operation status', $reply, $exit);
+    fakeSsh()->respondToEngine('task log', ['lines' => ''])->respondToEngine('task status', $reply, $exit);
     runJob(new AdvanceDatabaseFlow($record));
 
     expect($keys)->toHaveCount(2)
@@ -109,7 +108,7 @@ it('fails the flow and runs cleanup when a prepare or catch-up step fails', func
     $flow = ScriptedFlow::bind([longStep($keys, $kind)]);
     $record = startScripted($this->database, $flow);
 
-    fakeSsh()->respondToEngine('operation status', operationReply('failed'));
+    fakeSsh()->respondToEngine('task log', ['lines' => ''])->respondToEngine('task status', operationReply('failed'));
     runJob(new AdvanceDatabaseFlow($record));
 
     expect($record->fresh())->state->toBe(FlowState::Failed)->error->toBe('the copy broke')
@@ -152,7 +151,7 @@ it('does not start a step twice when the job runs again while waiting', function
     $keys = [];
     $record = startScripted($this->database, ScriptedFlow::bind([longStep($keys)]));
 
-    fakeSsh()->respondToEngine('operation status', operationReply('running'));
+    fakeSsh()->respondToEngine('task log', ['lines' => ''])->respondToEngine('task status', operationReply('running'));
     runJob(new AdvanceDatabaseFlow($record));
     runJob(new AdvanceDatabaseFlow($record));
 
@@ -173,7 +172,7 @@ it('copies the operation phase and progress onto the flow and the operation titl
     $keys = [];
     $record = startScripted($this->database, ScriptedFlow::bind([longStep($keys)]));
 
-    fakeSsh()->respondToEngine('operation status', operationReply('running', 'copying data', ['done' => 41, 'total' => 120, 'unit' => 'GB']));
+    fakeSsh()->respondToEngine('task log', ['lines' => ''])->respondToEngine('task status', operationReply('running', 'copying data', ['done' => 41, 'total' => 120, 'unit' => 'GB']));
     runJob(new AdvanceDatabaseFlow($record));
 
     expect($record->fresh())->phase->toBe('copying data')
@@ -185,7 +184,7 @@ it('cancels the operation and fails the flow when the owner stops it', function 
     $keys = [];
     $flow = ScriptedFlow::bind([longStep($keys)]);
     $record = startScripted($this->database, $flow);
-    $ssh = fakeSsh()->respondToEngine('operation cancel', []);
+    $ssh = fakeSsh()->respondToEngine('task stop', operationReply('cancelled'));
     $this->database->requestStop();
 
     runJob(new AdvanceDatabaseFlow($record));
@@ -193,7 +192,7 @@ it('cancels the operation and fails the flow when the owner stops it', function 
     expect($record->fresh())->state->toBe(FlowState::Failed)->error->toBe('Stopped by you.')->operation_log_id->toBeNull()
         ->and(ServerLog::query()->sole())->status->toBe(ServerLogStatus::Failed)->output->toContain('Stopped by you.')
         ->and($flow->cleanups)->toBe(1)
-        ->and($ssh->scriptAt(0))->toContain('| databasify operation cancel ')
+        ->and($ssh->scriptAt(0))->toContain('| databasify task stop ')
         ->and(json_decode($ssh->engineRequestAt(0), true))->toBe(['key' => $keys[0]]);
 });
 

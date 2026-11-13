@@ -31,8 +31,8 @@ it('reboots a single node database in place and waits for it to serve as the pri
     advanceFlows();
 
     expect(rebootsIn($ssh))->toBe([$database->seed()->server->name])
-        ->and(engineCommandsIn($ssh))->not->toContain("{$database->seed()->server->name}: cluster rejoin")
-        ->and(json_decode($ssh->engineRequestAt(collect($ssh->runs)->search(fn (array $run): bool => str_contains($run['script'], '| databasify node ready '))), true)['expectPrimary'])->toBeTrue()
+        ->and(recordedCalls())->not->toContain('cluster.rejoin')
+        ->and(recordedArgs('nodes.ready')[0]['args'][1])->toBeTrue()
         ->and($database->fresh()->operation)->toBeNull();
 });
 
