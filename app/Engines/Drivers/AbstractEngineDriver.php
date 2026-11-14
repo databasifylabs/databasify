@@ -20,6 +20,7 @@ use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\NotPrimary;
 use App\Models\DatabaseNode;
 use Closure;
+use Illuminate\Support\Str;
 
 abstract readonly class AbstractEngineDriver implements EngineDriver
 {
@@ -138,7 +139,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
 
     private function logNameOf(DatabaseNode $node, string $script): string
     {
-        return "{$node->server->name}: ".str_replace('-', ' ', basename($script));
+        return "{$node->server->name}: ".str_replace('-', ' ', Str::afterLast(Str::afterLast($script, '::'), '.'));
     }
 
     private function scripts(): EngineScripts

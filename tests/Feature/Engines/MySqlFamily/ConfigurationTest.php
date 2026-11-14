@@ -8,7 +8,7 @@ use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 
 beforeEach(function () {
-    $this->scripts = fakeScripts()->respond('mysql-family/nodes/configure', ['changed' => true]);
+    $this->scripts = fakeScripts()->respond('engines.mysql-family.nodes.configure', ['changed' => true]);
 });
 
 function configuredNode(string $engine, string $line): DatabaseNode
@@ -30,7 +30,7 @@ it('configures a MySQL node with the Go-identical files and its first-start SQL'
 
     configuredNode('mysql', $fixture['line'])->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
-    $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
+    $this->scripts->assertRan('engines.mysql-family.nodes.configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
         && base64_decode($env['MANIFEST']) === $fixture['manifest']
         && json_decode($env['TUNED_JSON'], true)['innodb_buffer_pool_size'] === '2560M'
         && json_decode($env['REQUEST_JSON'], true)['ip'] === $fixture['request']['ip']
@@ -46,7 +46,7 @@ it('configures a MariaDB node with both manifests so a seed starts a new cluster
 
     configuredNode('mariadb', '11.4')->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
-    $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
+    $this->scripts->assertRan('engines.mysql-family.nodes.configure', fn (string $script, array $env): bool => decodedFiles($env) == $fixture['files']
         && base64_decode($env['MANIFEST_NEW_CLUSTER']) === $fixture['manifest']
         && ! str_contains(base64_decode($env['MANIFEST']), '--wsrep-new-cluster')
         && $env['INIT_SQL'] === $fixture['init']
@@ -61,7 +61,7 @@ it('starts the binlog stream of a MySQL node that archives', function () {
 
     configuredNode('mysql', '9.7')->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
-    $this->scripts->assertRan('mysql-family/nodes/configure', fn (string $script, array $env): bool => $env['HELPERS'] === 'mysql-binlog-stream' && $env['SEED'] === 'false');
+    $this->scripts->assertRan('engines.mysql-family.nodes.configure', fn (string $script, array $env): bool => $env['HELPERS'] === 'mysql-binlog-stream' && $env['SEED'] === 'false');
 });
 
 it('refuses missing secrets with the Go wording before touching the node', function (string $engine, string $case, Closure $change, string $message) {
@@ -84,7 +84,7 @@ it('applies online settings with SET PERSIST on MySQL and SET GLOBAL on MariaDB'
 
     configuredNode($engine, $fixture['line'])->driver()->config()->apply();
 
-    $this->scripts->assertRan('mysql-family/config/apply', fn (string $script, array $env): bool => json_decode($env['SETS'], true) === $sets
+    $this->scripts->assertRan('engines.mysql-family.config.apply', fn (string $script, array $env): bool => json_decode($env['SETS'], true) === $sets
         && json_decode($env['KEYS'], true) === $keys
         && in_array('back_log', json_decode($env['STATIC'], true), true)
         && $env['FORGET'] === $forget);
@@ -115,12 +115,12 @@ it('lists restart settings whose live value differs from the wanted one', functi
     $fixture = goFixture('configure-standalone-8.4.json', 'mysql');
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', '{"back_log":"256","innodb_read_io_threads":"4","innodb_buffer_pool_size":"2560M"}');
-    $this->scripts->respond('mysql-family/config/show', ['values' => ['back_log' => '151', 'innodb_read_io_threads' => '4', 'time_zone' => '+06:00', 'innodb_buffer_pool_size' => '134217728', 'max_connections' => '151']]);
+    $this->scripts->respond('engines.mysql-family.config.show', ['values' => ['back_log' => '151', 'innodb_read_io_threads' => '4', 'time_zone' => '+06:00', 'innodb_buffer_pool_size' => '134217728', 'max_connections' => '151']]);
 
     $show = configuredNode('mysql', '8.4')->driver()->config()->pendingRestart();
 
     expect($show)->toBe(['back_log']);
-    $this->scripts->assertRan('mysql-family/config/show', fn (string $script, array $env): bool => str_contains($env['NAMES'], "'time_zone'") && ! str_contains($env['NAMES'], "'default_time_zone'"));
+    $this->scripts->assertRan('engines.mysql-family.config.show', fn (string $script, array $env): bool => str_contains($env['NAMES'], "'time_zone'") && ! str_contains($env['NAMES'], "'default_time_zone'"));
 });
 
 it('reads the live settings through the real show script', function () {
@@ -153,5 +153,5 @@ it('retunes from the saved request and reports settings that need a restart', fu
 
     expect($tune)->toContain('back_log')
         ->and($tune)->not->toContain('max_connections');
-    $this->scripts->assertRan('mysql-family/nodes/configure')->assertRan('mysql-family/config/apply');
+    $this->scripts->assertRan('engines.mysql-family.nodes.configure')->assertRan('engines.mysql-family.config.apply');
 });

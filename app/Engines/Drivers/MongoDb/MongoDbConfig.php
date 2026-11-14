@@ -21,7 +21,7 @@ final readonly class MongoDbConfig implements Config
     {
         $value = $this->valuesOf();
 
-        $this->driver->run('mongodb/config/apply', env: [
+        $this->driver->run('engines.mongodb.config.apply', env: [
             'VERBOSITY' => (string) (int) $value(MongoDbSettings::VERBOSITY),
             'LIFETIME' => (string) (int) $value(MongoDbSettings::TRANSACTIONS),
             'SLOW' => (string) (int) $value(MongoDbSettings::SLOW_OPERATION),
@@ -36,7 +36,7 @@ final readonly class MongoDbConfig implements Config
     public function pendingRestart(): array
     {
         $effective = $this->configuration->effectiveOf($this->configuration->savedRequestOf());
-        $live = $this->driver->read('mongodb/config/show')->stringMap('values');
+        $live = $this->driver->read('engines.mongodb.config.show')->stringMap('values');
         $pending = array_filter(MongoDbSettings::catalog()->fields, fn (EngineField $field): bool => $field->restart && isset($effective[$field->key]) && ($live[$field->key] ?? '') !== $effective[$field->key]);
 
         return array_values(array_map(fn (EngineField $field): string => $field->key, $pending));

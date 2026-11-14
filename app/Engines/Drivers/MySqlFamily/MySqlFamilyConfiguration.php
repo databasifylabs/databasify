@@ -41,7 +41,7 @@ final readonly class MySqlFamilyConfiguration
         $saved = $this->state->tunedOf($this->driver, self::TUNED_STATE);
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
 
-        $this->scripts->run($this->driver, 'mysql-family/nodes/configure', [
+        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.configure', [
             ...$this->filesEnvOf($request, $tuned),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
             'INIT_SQL' => $this->initSqlOf($engine, $request),
@@ -76,10 +76,10 @@ final readonly class MySqlFamilyConfiguration
      */
     private function jobsFor(MySqlFamilyEngine $engine, NodeConfig $request): array
     {
-        $jobs = $request->archive === null ? [] : ['mysql-family/jobs/backup' => 'backup', 'mysql-family/jobs/binlog-ship' => 'binlog-ship', 'mysql-family/jobs/binlog-stream' => 'binlog-stream'];
+        $jobs = $request->archive === null ? [] : ['engines.mysql-family.jobs.backup' => 'backup', 'engines.mysql-family.jobs.binlog-ship' => 'binlog-ship', 'engines.mysql-family.jobs.binlog-stream' => 'binlog-stream'];
 
         if ($engine->id === 'mariadb' && $request->clustered) {
-            $jobs['mariadb/jobs/cluster-watch'] = 'cluster-watch';
+            $jobs['engines.mariadb.jobs.cluster-watch'] = 'cluster-watch';
         }
 
         return array_map(

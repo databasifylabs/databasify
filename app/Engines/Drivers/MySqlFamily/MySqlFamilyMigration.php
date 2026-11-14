@@ -24,7 +24,7 @@ final readonly class MySqlFamilyMigration implements Migration
     public function check(MigrationSource $source, array $databases): SourceReport
     {
         $engine = $this->driver->engine();
-        $facts = $this->scripts->read($this->driver, 'mysql-family/migration/check', [
+        $facts = $this->scripts->read($this->driver, 'engines.mysql-family.migration.check', [
             ...$this->sourceEnvOf('SOURCE', $source),
             'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR),
             'RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR),
@@ -79,24 +79,24 @@ final readonly class MySqlFamilyMigration implements Migration
             throw new InvalidEngineRequest('invalid_request', 'the source has no databases to copy');
         }
 
-        $this->scripts->run($this->driver, 'mysql-family/migration/start', [
+        $this->scripts->run($this->driver, 'engines.mysql-family.migration.start', [
             ...$this->sourceEnvOf('MIGRATION', $start->source),
             'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
             'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
             'MYSQLSH_URI' => rawurlencode($start->source->username)."@{$start->source->host}:{$start->source->port}",
-            'COPY_SCRIPT' => base64_encode($this->driver->script('mysql-family/jobs/migration-copy', ['engine' => $this->driver->engine()])),
+            'COPY_SCRIPT' => base64_encode($this->driver->script('engines.mysql-family.jobs.migration-copy', ['engine' => $this->driver->engine()])),
         ]);
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'mysql-family/migration/progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
+        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'engines.mysql-family.migration.progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
     }
 
     public function stop(): void
     {
-        $this->scripts->run($this->driver, 'mysql-family/migration/stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()], timeout: 600);
+        $this->scripts->run($this->driver, 'engines.mysql-family.migration.stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()], timeout: 600);
     }
 
     /**

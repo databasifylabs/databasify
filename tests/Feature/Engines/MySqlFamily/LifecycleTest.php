@@ -23,21 +23,21 @@ it('starts, wakes and restarts a MySQL node the way the Go engine does', functio
     $node->driver()->nodes()->wake(all: false);
     $node->driver()->nodes()->restart();
 
-    $this->scripts->assertRan('mysql/nodes/start', fn (string $script): bool => str_contains($script, 'unit_do start mysql-server') && str_contains($script, 'mysql-binlog-stream'))
-        ->assertRan('mysql/nodes/wake', fn (string $script): bool => str_contains($script, 'reset-failed mysql-server') && str_contains($script, 'wait_until 1800'))
-        ->assertRan('mysql-family/nodes/restart', fn (string $script): bool => str_contains($script, 'unit_do restart "$SERVER_UNIT"') && str_contains($script, "SERVER_UNIT='mysql-server'"));
+    $this->scripts->assertRan('engines.mysql.nodes.start', fn (string $script): bool => str_contains($script, 'unit_do start mysql-server') && str_contains($script, 'mysql-binlog-stream'))
+        ->assertRan('engines.mysql.nodes.wake', fn (string $script): bool => str_contains($script, 'reset-failed mysql-server') && str_contains($script, 'wait_until 1800'))
+        ->assertRan('engines.mysql-family.nodes.restart', fn (string $script): bool => str_contains($script, 'unit_do restart "$SERVER_UNIT"') && str_contains($script, "SERVER_UNIT='mysql-server'"));
 });
 
 it('wakes a MariaDB node by killing and stopping it, as the Go engine does', function () {
     lifecycleNode('mariadb')->driver()->nodes()->wake(all: false);
 
-    $this->scripts->assertRan('mariadb/nodes/wake', fn (string $script): bool => str_contains($script, 'kill -s KILL mariadb-server') && str_contains($script, 'unit_do stop mariadb-server'));
+    $this->scripts->assertRan('engines.mariadb.nodes.wake', fn (string $script): bool => str_contains($script, 'kill -s KILL mariadb-server') && str_contains($script, 'unit_do stop mariadb-server'));
 });
 
 it('starts the MariaDB helpers the saved request asks for', function () {
     lifecycleNode('mariadb')->driver()->nodes()->start();
 
-    $this->scripts->assertRan('mariadb/nodes/start', fn (string $script): bool => str_contains($script, 'mariadb-cluster-watch') && str_contains($script, 'run node configure first'));
+    $this->scripts->assertRan('engines.mariadb.nodes.start', fn (string $script): bool => str_contains($script, 'mariadb-cluster-watch') && str_contains($script, 'run node configure first'));
 });
 
 it('does not reset either engine, as the Go engines do not', function (string $engine) {
@@ -46,25 +46,25 @@ it('does not reset either engine, as the Go engines do not', function (string $e
 })->with(['mysql', 'mariadb']);
 
 it('bootstraps the service users on the seed and then the default account', function (string $engine, string $fragment) {
-    $this->scripts->respond("{$engine}/nodes/bootstrap", ['seed' => true])
-        ->respond('mysql-family/accounts/create-user', ['created' => true]);
+    $this->scripts->respond("engines.{$engine}.nodes.bootstrap", ['seed' => true])
+        ->respond('engines.mysql-family.accounts.create-user', ['created' => true]);
 
     lifecycleNode($engine)->driver()->nodes()->bootstrap(new Secrets('adm', "re'p", 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw'));
 
-    $this->scripts->assertRan("{$engine}/nodes/bootstrap", fn (string $script, array $env): bool => $env['REPLICATION_PASSWORD'] === "re'p" && $env['AGENT_PASSWORD'] === 'agent' && str_contains($script, $fragment) && ! str_contains($script, "re'p"))
-        ->assertRan('mysql-family/accounts/create-database', fn (string $script, array $env): bool => $env['NAME'] === 'defaultdb')
-        ->assertRan('mysql-family/accounts/create-user', fn (string $script, array $env): bool => $env['NAME'] === 'databasify' && json_decode($env['GRANTS'], true) === [['database' => 'defaultdb', 'access' => 'write']]);
+    $this->scripts->assertRan("engines.{$engine}.nodes.bootstrap", fn (string $script, array $env): bool => $env['REPLICATION_PASSWORD'] === "re'p" && $env['AGENT_PASSWORD'] === 'agent' && str_contains($script, $fragment) && ! str_contains($script, "re'p"))
+        ->assertRan('engines.mysql-family.accounts.create-database', fn (string $script, array $env): bool => $env['NAME'] === 'defaultdb')
+        ->assertRan('engines.mysql-family.accounts.create-user', fn (string $script, array $env): bool => $env['NAME'] === 'databasify' && json_decode($env['GRANTS'], true) === [['database' => 'defaultdb', 'access' => 'write']]);
 })->with([
     'mysql' => ['mysql', 'GRANT REPLICATION SLAVE, BACKUP_ADMIN, CLONE_ADMIN, GROUP_REPLICATION_STREAM, CONNECTION_ADMIN ON *.* TO'],
     'mariadb' => ['mariadb', 'INSERT IGNORE INTO databasify.writer VALUES (1, '],
 ]);
 
 it('skips the default account on a node that is not the seed', function () {
-    $this->scripts->respond('mysql/nodes/bootstrap', ['seed' => false]);
+    $this->scripts->respond('engines.mysql.nodes.bootstrap', ['seed' => false]);
 
     lifecycleNode('mysql')->driver()->nodes()->bootstrap(new Secrets('adm', 'rep', 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw'));
 
-    $this->scripts->assertNotRan('mysql-family/accounts/create-database');
+    $this->scripts->assertNotRan('engines.mysql-family.accounts.create-database');
 });
 
 it('refuses to bootstrap without the replication and agent secrets', function (string $engine, string $message) {
@@ -80,7 +80,7 @@ it('installs TLS and reloads it with the engine statement', function (string $en
 
     lifecycleNode($engine)->driver()->nodes()->installTls($certificate, $key, $certificate);
 
-    $this->scripts->assertRan('mysql-family/nodes/tls-install', fn (string $script, array $env): bool => $env['KEY'] === $key && str_contains($script, $reload) && str_contains($script, 'tls/server.key" 600 true'));
+    $this->scripts->assertRan('engines.mysql-family.nodes.tls-install', fn (string $script, array $env): bool => $env['KEY'] === $key && str_contains($script, $reload) && str_contains($script, 'tls/server.key" 600 true'));
 })->with([
     'mysql' => ['mysql', 'ALTER INSTANCE RELOAD TLS'],
     'mariadb' => ['mariadb', 'FLUSH SSL'],
@@ -97,7 +97,7 @@ it('refuses a certificate that does not match its key', function () {
 it('waits for MySQL and rejoins its group as a task', function () {
     lifecycleNode('mysql')->driver()->nodes()->ready('ready.1', true);
 
-    $this->scripts->assertRan('mysql/nodes/ready', fn (string $script): bool => str_contains($script, 'wait_ready MySQL')
+    $this->scripts->assertRan('engines.mysql.nodes.ready', fn (string $script): bool => str_contains($script, 'wait_ready MySQL')
         && str_contains($script, 'phase "waiting for $1"')
         && str_contains($script, '$READY_LABEL keeps stopping while it starts, see its log')
         && str_contains($script, "phase 'joining the group'")
@@ -110,7 +110,7 @@ it('waits for MariaDB to sync and keeps the writer role as a task', function () 
 
     lifecycleNode('mariadb')->driver()->nodes()->ready('ready.1', false);
 
-    $this->scripts->assertRan('mariadb/nodes/ready', fn (string $script, array $env): bool => str_contains($script, "phase 'syncing'")
+    $this->scripts->assertRan('engines.mariadb.nodes.ready', fn (string $script, array $env): bool => str_contains($script, "phase 'syncing'")
         && str_contains($script, 'SELECT ip FROM databasify.writer WHERE id = 1')
         && base64_decode($env['MANIFEST']) === $fixture['manifest']);
 });

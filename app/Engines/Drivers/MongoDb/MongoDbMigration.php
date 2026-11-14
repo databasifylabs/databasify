@@ -22,7 +22,7 @@ final readonly class MongoDbMigration implements Migration
 
     public function check(MigrationSource $source, array $databases): SourceReport
     {
-        $facts = $this->driver->read('mongodb/migration/check', timeout: 600, env: [
+        $facts = $this->driver->read('engines.mongodb.migration.check', timeout: 600, env: [
             'SOURCE_HOST' => "{$source->host}:{$source->port}",
             'SOURCE_USER' => $source->username,
             'SOURCE_PASSWORD' => $source->password,
@@ -60,7 +60,7 @@ final readonly class MongoDbMigration implements Migration
         $admin = Secrets::of($this->driver->node->database->settings)->admin ?? throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin secret');
         $targetUri = MongoDbFiles::localUriOf($admin);
 
-        $this->driver->run('mongodb/migration/start', env: [
+        $this->driver->run('engines.mongodb.migration.start', env: [
             'SOURCE_URI' => $sourceUri,
             'TARGET_URI' => $targetUri,
             'SOURCE_TOOL_CONFIG' => MongoDbFiles::toolConfigOf($sourceUri),
@@ -68,17 +68,17 @@ final readonly class MongoDbMigration implements Migration
             'PCSM_START' => json_encode(['includeNamespaces' => array_map(fn (string $database): string => "{$database}.*", $databases)], JSON_THROW_ON_ERROR),
             'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
-            'COPY_SCRIPT' => base64_encode($this->driver->script('mongodb/jobs/migration-copy')),
+            'COPY_SCRIPT' => base64_encode($this->driver->script('engines.mongodb.jobs.migration-copy')),
         ]);
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->driver->read('mongodb/migration/progress')));
+        return MigrationProgress::fromPayload(($this->driver->read('engines.mongodb.migration.progress')));
     }
 
     public function stop(): void
     {
-        $this->driver->run('mongodb/migration/stop', timeout: 3900);
+        $this->driver->run('engines.mongodb.migration.stop', timeout: 3900);
     }
 }

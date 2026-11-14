@@ -16,7 +16,7 @@ beforeEach(function () {
 it('enables Galera as a task with both manifests', function () {
     $this->node->driver()->cluster()->enable('enable.1');
 
-    $this->scripts->assertRan('mariadb/cluster/enable', fn (string $script, array $env): bool => base64_decode($env['MANIFEST']) === $this->fixture['manifest']
+    $this->scripts->assertRan('engines.mariadb.cluster.enable', fn (string $script, array $env): bool => base64_decode($env['MANIFEST']) === $this->fixture['manifest']
         && str_contains(base64_decode($env['MANIFEST_NEW_CLUSTER']), '--wsrep-new-cluster')
         && str_contains($script, 'run node configure with clustered on first')
         && str_contains($script, "phase 'bootstrapping'")
@@ -28,7 +28,7 @@ it('enables Galera as a task with both manifests', function () {
 it('leaves the cluster by rewriting the files without clustering', function () {
     $this->node->driver()->cluster()->disable();
 
-    $this->scripts->assertRan('mariadb/cluster/disable', function (string $script, array $env): bool {
+    $this->scripts->assertRan('engines.mariadb.cluster.disable', function (string $script, array $env): bool {
         $myCnf = base64_decode(collect(json_decode($env['FILES'], true))->firstWhere('path', '/srv/mariadb/conf/my.cnf')['content']);
 
         return json_decode($env['REQUEST_JSON'], true)['clustered'] === false
@@ -41,7 +41,7 @@ it('leaves the cluster by rewriting the files without clustering', function () {
 it('moves the writer by recording it on the target over TLS', function () {
     $this->node->driver()->cluster()->failover('10.0.0.3');
 
-    $this->scripts->assertRan('mariadb/cluster/failover', fn (string $script, array $env): bool => $env['TARGET'] === '10.0.0.3'
+    $this->scripts->assertRan('engines.mariadb.cluster.failover', fn (string $script, array $env): bool => $env['TARGET'] === '10.0.0.3'
         && str_contains($script, 'REPLACE INTO databasify.writer VALUES (1, ')
         && str_contains($script, 'skip-ssl-verify-server-cert')
         && str_contains($script, 'SET GLOBAL read_only = ON'));
@@ -50,7 +50,7 @@ it('moves the writer by recording it on the target over TLS', function () {
 it('rewrites the files for new members without restarting', function () {
     $this->node->driver()->cluster()->membership([new Member('10.0.0.1', 1, true, 2, 4096, 80), new Member('10.0.0.2', 2, true, 2, 4096, 80)]);
 
-    $this->scripts->assertRan('mariadb/cluster/membership', function (string $script, array $env): bool {
+    $this->scripts->assertRan('engines.mariadb.cluster.membership', function (string $script, array $env): bool {
         $myCnf = base64_decode(collect(json_decode($env['FILES'], true))->firstWhere('path', '/srv/mariadb/conf/my.cnf')['content']);
 
         return str_contains($myCnf, "wsrep_cluster_address=gcomm://10.0.0.1,10.0.0.2\n") && ! str_contains($script, 'unit_do restart');
@@ -64,17 +64,17 @@ it('forgets a member without touching the node, as the Go engine does', function
 });
 
 it('reads the position from the server, grastate or a recovery run', function () {
-    $this->scripts->respond('mariadb/cluster/position', ['position' => 42]);
+    $this->scripts->respond('engines.mariadb.cluster.position', ['position' => 42]);
 
     expect($this->node->driver()->cluster()->position())->toBe(42);
-    $this->scripts->assertRan('mariadb/cluster/position', fn (string $script): bool => str_contains($script, 'WSREP_LAST_COMMITTED') && str_contains($script, '--wsrep-recover') && str_contains($script, 'grastate.dat'));
+    $this->scripts->assertRan('engines.mariadb.cluster.position', fn (string $script): bool => str_contains($script, 'WSREP_LAST_COMMITTED') && str_contains($script, '--wsrep-recover') && str_contains($script, 'grastate.dat'));
 });
 
 it('reads the quorum from the cluster size', function () {
-    $this->scripts->respond('mariadb/cluster/quorum', ['total' => 3, 'online' => 3]);
+    $this->scripts->respond('engines.mariadb.cluster.quorum', ['total' => 3, 'online' => 3]);
 
     expect($this->node->driver()->cluster()->quorum()->online)->toBe(3);
-    $this->scripts->assertRan('mariadb/cluster/quorum', fn (string $script): bool => str_contains($script, 'WSREP_CLUSTER_SIZE'));
+    $this->scripts->assertRan('engines.mariadb.cluster.quorum', fn (string $script): bool => str_contains($script, 'WSREP_CLUSTER_SIZE'));
 });
 
 it('forces quorum only once the other nodes are confirmed down', function () {
@@ -83,7 +83,7 @@ it('forces quorum only once the other nodes are confirmed down', function () {
 
     $this->node->driver()->cluster()->forceQuorum(true);
 
-    $this->scripts->assertRan('mariadb/cluster/force-quorum', fn (string $script): bool => str_contains($script, 'pc.bootstrap=YES')
+    $this->scripts->assertRan('engines.mariadb.cluster.force-quorum', fn (string $script): bool => str_contains($script, 'pc.bootstrap=YES')
         && str_contains($script, 'this node is already in a primary component')
         && str_contains($script, 'safe_to_bootstrap: 1'));
 });
@@ -91,7 +91,7 @@ it('forces quorum only once the other nodes are confirmed down', function () {
 it('rejoins as a task', function () {
     $this->node->driver()->cluster()->rejoin('rejoin.1', true);
 
-    $this->scripts->assertRan('mariadb/cluster/rejoin', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true'
+    $this->scripts->assertRan('engines.mariadb.cluster.rejoin', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true'
         && str_contains($script, "phase 'pointing replication at a synced member'")
         && str_contains($script, "phase 'waiting for Galera to sync'"));
 });

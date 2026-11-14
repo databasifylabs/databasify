@@ -25,18 +25,18 @@ final readonly class PostgresConfig implements Config
 
     public function apply(): void
     {
-        $this->driver->run('postgres/config/apply', $this->driver->data(), timeout: self::APPLY_TIMEOUT);
+        $this->driver->run('engines.postgres.config.apply', $this->driver->data(), timeout: self::APPLY_TIMEOUT);
     }
 
     public function sync(): void
     {
-        $this->driver->run('postgres/config/sync', $this->driver->data(), timeout: self::SYNC_TIMEOUT);
+        $this->driver->run('engines.postgres.config.sync', $this->driver->data(), timeout: self::SYNC_TIMEOUT);
     }
 
     public function pendingRestart(): array
     {
         $keys = implode(',', array_map(fn (EngineField $field): string => $field->key, $this->configuration->catalog()->fields));
-        $values = $this->driver->read('postgres/config/show', $this->driver->data(), env: ['KEYS' => $keys])->objects('values');
+        $values = $this->driver->read('engines.postgres.config.show', $this->driver->data(), env: ['KEYS' => $keys])->objects('values');
 
         return array_values(array_map(fn (Payload $value): string => $value->string('key'), array_filter($values, fn (Payload $value): bool => $value->bool('pendingRestart'))));
     }

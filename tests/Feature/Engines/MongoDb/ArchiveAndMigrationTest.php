@@ -21,30 +21,30 @@ function savedMongo(string $case): void
 
 it('reports the archive and starts a backup when there is none', function () {
     savedMongo('archived');
-    $this->scripts->respond('mongodb/archive/status', ['snapshots' => [], 'chunks' => [], 'problem' => null, 'backupResult' => 'success']);
+    $this->scripts->respond('engines.mongodb.archive.status', ['snapshots' => [], 'chunks' => [], 'problem' => null, 'backupResult' => 'success']);
 
     $status = $this->node->driver()->archive()->status(false);
 
     expect($status->backups)->toBe(0);
-    $this->scripts->assertRan('mongodb/archive/status', fn (string $script, array $env): bool => $env['PBM_CONFIG'] === goFixture('pbm-config.json', 'mongodb')['sliced']
+    $this->scripts->assertRan('engines.mongodb.archive.status', fn (string $script, array $env): bool => $env['PBM_CONFIG'] === goFixture('pbm-config.json', 'mongodb')['sliced']
         && $env['PBM_MONGODB_URI'] === goFixture('pbm-config.json', 'mongodb')['uri']
         && str_contains($script, 'pbm_run status --out=json'))
-        ->assertRan('mongodb/archive/back-up');
+        ->assertRan('engines.mongodb.archive.back-up');
 });
 
 it('reports a failed backup unit and does not start another', function () {
     savedMongo('archived');
-    $this->scripts->respond('mongodb/archive/status', ['snapshots' => [1794283200, 1794369600], 'chunks' => [['start' => 1794283201, 'end' => 1794470400]], 'problem' => null, 'backupResult' => 'exit-code']);
+    $this->scripts->respond('engines.mongodb.archive.status', ['snapshots' => [1794283200, 1794369600], 'chunks' => [['start' => 1794283201, 'end' => 1794470400]], 'problem' => null, 'backupResult' => 'exit-code']);
 
     $status = $this->node->driver()->archive()->status(false);
 
     expect($status->problem)->toBe('The last backup failed, see the mongodb-backup log.')->and($status->latest)->toEqual(CarbonImmutable::parse('2026-11-12T08:00:00Z'));
-    $this->scripts->assertNotRan('mongodb/archive/back-up');
+    $this->scripts->assertNotRan('engines.mongodb.archive.back-up');
 });
 
 it('offers only the times PBM can restore, from a base backup through its unbroken oplog', function (array $snapshots, array $chunks, ?string $earliest, ?string $latest) {
     savedMongo('archived');
-    $this->scripts->respond('mongodb/archive/status', ['snapshots' => $snapshots, 'chunks' => $chunks, 'problem' => null, 'backupResult' => 'success']);
+    $this->scripts->respond('engines.mongodb.archive.status', ['snapshots' => $snapshots, 'chunks' => $chunks, 'problem' => null, 'backupResult' => 'success']);
 
     $status = $this->node->driver()->archive()->status(false);
 
@@ -73,32 +73,32 @@ it('restores with PBM as a task', function () {
 
     $this->node->driver()->archive()->restore('r.1', new Storage('https://s3.example.com', 'bk', 'us-east-1', 'AK', 'SK', true, '/other'), CarbonImmutable::parse('2026-11-12 10:00:00', 'Asia/Dhaka'));
 
-    $this->scripts->assertRan('mongodb/restore/start', fn (string $script, array $env): bool => $env['TARGET'] === '2026-11-12T04:00:00'
+    $this->scripts->assertRan('engines.mongodb.restore.start', fn (string $script, array $env): bool => $env['TARGET'] === '2026-11-12T04:00:00'
         && str_contains($env['RESTORE_CONFIG'], '"prefix": "/other"') && str_contains($env['RESTORE_CONFIG'], '"enabled": false')
         && str_contains($script, "phase 'stopping oplog slicing'") && str_contains($script, 'PBM could not read the backup storage: ')
         && str_contains($script, 'pitr.enabled=true'));
 });
 
 it('checks a source with the Go readiness rules', function (string $version, string $setName, bool $canReplicate, array $warnings) {
-    $this->scripts->respond('mongodb/migration/check', ['error' => null, 'version' => $version, 'setName' => $setName, 'databases' => ['app'], 'unreadable' => ['gone'], 'occupied' => ['app'], 'size' => 3145728]);
+    $this->scripts->respond('engines.mongodb.migration.check', ['error' => null, 'version' => $version, 'setName' => $setName, 'databases' => ['app'], 'unreadable' => ['gone'], 'occupied' => ['app'], 'size' => 3145728]);
 
     $check = $this->node->driver()->migration()->check(new MigrationSource('10.0.0.9', 27017, 'm', "p'w", true), ['app', 'gone']);
 
     expect($check->supportsContinuous())->toBe($canReplicate)->and($check->warnings)->toBe($warnings)->and($check->facts['size_mb'])->toBe('3')->and($check->problems)->toBe(['Databasify cannot read gone on the source.']);
-    $this->scripts->assertRan('mongodb/migration/check', fn (string $script, array $env): bool => $env['SOURCE_HOST'] === '10.0.0.9:27017' && $env['SOURCE_PASSWORD'] === "p'w" && ! str_contains($script, "p'w"));
+    $this->scripts->assertRan('engines.mongodb.migration.check', fn (string $script, array $env): bool => $env['SOURCE_HOST'] === '10.0.0.9:27017' && $env['SOURCE_PASSWORD'] === "p'w" && ! str_contains($script, "p'w"));
 })->with([
     'same major replica set' => ['8.0.12', 'rs0', true, []],
     'standalone older' => ['7.0.3', '', false, ['the source is a standalone server without an oplog; only a one-shot copy is possible', 'continuous sync needs the same major version (8.0); only a one-shot copy is possible']],
 ]);
 
 it('starts, reads and stops the migration', function () {
-    $this->scripts->respond('mongodb/migration/progress', ['copy' => 'running', 'log' => 'x', 'lagSeconds' => null]);
+    $this->scripts->respond('engines.mongodb.migration.progress', ['copy' => 'running', 'log' => 'x', 'lagSeconds' => null]);
 
     $this->node->driver()->migration()->start(new MigrationStartData(new MigrationSource('10.0.0.9', 27017, 'm', 'pw', false), ['app'], true, null));
     $progress = $this->node->driver()->migration()->progress();
     $this->node->driver()->migration()->stop();
 
     expect($progress->lagSeconds)->toBeNull();
-    $this->scripts->assertRan('mongodb/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true' && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'pcsm --log-no-color'))
-        ->assertRan('mongodb/migration/stop', fn (string $script): bool => str_contains($script, 'pcsm_post /finalize') && str_contains($script, 'percona_clustersync_mongodb'));
+    $this->scripts->assertRan('engines.mongodb.migration.start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true' && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'pcsm --log-no-color'))
+        ->assertRan('engines.mongodb.migration.stop', fn (string $script): bool => str_contains($script, 'pcsm_post /finalize') && str_contains($script, 'percona_clustersync_mongodb'));
 });

@@ -6,7 +6,7 @@ use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    $this->scripts = fakeScripts()->respond('mongodb/nodes/configure', ['changed' => true]);
+    $this->scripts = fakeScripts()->respond('engines.mongodb.nodes.configure', ['changed' => true]);
     $this->node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 });
 
@@ -25,7 +25,7 @@ it('configures with the Go-identical files', function (string $case) {
 
     $this->node->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
-    $this->scripts->assertRan('mongodb/nodes/configure', function (string $script, array $env) use ($fixture): bool {
+    $this->scripts->assertRan('engines.mongodb.nodes.configure', function (string $script, array $env) use ($fixture): bool {
         $files = mongoFiles($env);
 
         return $files['/srv/mongodb/conf/mongod.conf'] === ['mode' => '600', 'content' => $fixture['mongodConf']]
@@ -56,7 +56,7 @@ it('applies the runtime settings like Go', function () {
 
     $this->node->driver()->config()->apply();
 
-    $this->scripts->assertRan('mongodb/config/apply', fn (string $script, array $env): bool => $env['VERBOSITY'] === '2' && $env['SLOW'] === '250' && $env['LIFETIME'] === '60' && $env['CACHE_MB'] === '1536'
+    $this->scripts->assertRan('engines.mongodb.config.apply', fn (string $script, array $env): bool => $env['VERBOSITY'] === '2' && $env['SLOW'] === '250' && $env['LIFETIME'] === '60' && $env['CACHE_MB'] === '1536'
         && $env['READ_CONCERN'] === 'local' && $env['WRITE_CONCERN'] === 'majority'
         && str_contains($script, "wiredTigerEngineRuntimeConfig: 'cache_size=' + env.CACHE_MB + 'M'")
         && str_contains($script, 'setDefaultRWConcern'));
@@ -66,7 +66,7 @@ it('lists the restart settings whose live value differs', function () {
     $fixture = goFixture('configure-standalone.json', 'mongodb');
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', '{"cacheSizeGB":"1.50","maxIncomingConnections":"2048"}');
-    $this->scripts->respond('mongodb/config/show', ['values' => ['maxIncomingConnections' => '1000000', 'cacheSizeGB' => '0.25', 'verbosity' => '0']]);
+    $this->scripts->respond('engines.mongodb.config.show', ['values' => ['maxIncomingConnections' => '1000000', 'cacheSizeGB' => '0.25', 'verbosity' => '0']]);
 
     expect($this->node->driver()->config()->pendingRestart())->toBe(['maxIncomingConnections']);
 });

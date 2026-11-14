@@ -14,19 +14,19 @@ beforeEach(function () {
 });
 
 it('checks a source with its credentials only in the env', function () {
-    $this->scripts->respond('postgres/migration/check', ['reachable' => true, 'error' => null, 'version' => '17.2', 'walLevel' => 'logical', 'canReplicate' => true, 'sizeMb' => 12, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'warnings' => [], 'problems' => []]);
+    $this->scripts->respond('engines.postgres.migration.check', ['reachable' => true, 'error' => null, 'version' => '17.2', 'walLevel' => 'logical', 'canReplicate' => true, 'sizeMb' => 12, 'databases' => ['shop'], 'unreadable' => [], 'unowned' => [], 'occupied' => [], 'warnings' => [], 'problems' => []]);
 
     $check = $this->node->driver()->migration()->check($this->source, ['shop']);
 
     expect($check)->reachable->toBeTrue()->databases->toBe(['shop']);
-    $this->scripts->assertRan('postgres/migration/check', fn (string $script, array $env): bool => $env['SOURCE_PASSWORD'] === "s3'cr et"
+    $this->scripts->assertRan('engines.postgres.migration.check', fn (string $script, array $env): bool => $env['SOURCE_PASSWORD'] === "s3'cr et"
         && $env['SOURCE_SSLMODE'] === 'require' && $env['DATABASES'] === '["shop"]' && ! str_contains($script, 's3'));
 });
 
 it('starts a one-time copy in its own unit with the copy script attached', function () {
     $this->node->driver()->migration()->start(new MigrationStartData($this->source, ['shop', 'blog'], false, 'databasify'));
 
-    $this->scripts->assertRan('postgres/migration/start', function (string $script, array $env): bool {
+    $this->scripts->assertRan('engines.postgres.migration.start', function (string $script, array $env): bool {
         $copy = base64_decode($env['COPY_SCRIPT']);
 
         return $env['MIGRATION_DATABASES'] === "shop\nblog" && $env['MIGRATION_OWNER'] === 'databasify' && $env['MIGRATION_CONTINUOUS'] === 'false'
@@ -43,11 +43,11 @@ it('refuses what the Go engine refuses', function (bool $continuous, ?string $ow
 ]);
 
 it('reads progress and stops the migration', function () {
-    $this->scripts->respond('postgres/migration/progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => null]);
+    $this->scripts->respond('engines.postgres.migration.progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => null]);
 
     $progress = $this->node->driver()->migration()->progress();
     $this->node->driver()->migration()->stop();
 
     expect($progress)->phase->toBe(MigrationPhase::Working)->detail->toBe('copying shop')->lagSeconds->toBeNull();
-    $this->scripts->assertRan('postgres/migration/stop', fn (string $script): bool => str_contains($script, 'DROP SUBSCRIPTION :"name"') && str_contains($script, 'DROP PUBLICATION IF EXISTS'));
+    $this->scripts->assertRan('engines.postgres.migration.stop', fn (string $script): bool => str_contains($script, 'DROP SUBSCRIPTION :"name"') && str_contains($script, 'DROP PUBLICATION IF EXISTS'));
 });

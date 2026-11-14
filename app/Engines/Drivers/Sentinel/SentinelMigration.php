@@ -20,7 +20,7 @@ final readonly class SentinelMigration implements Migration
 
     public function check(MigrationSource $source, array $databases): SourceReport
     {
-        $facts = $this->scripts->read($this->driver, 'migration/check', [
+        $facts = $this->scripts->read($this->driver, 'migration.check', [
             'SOURCE_HOST' => $source->host,
             'SOURCE_PORT' => (string) $source->port,
             'SOURCE_USER' => $source->username === 'default' ? '' : $source->username,
@@ -41,16 +41,16 @@ final readonly class SentinelMigration implements Migration
         $password = (string) $this->configuration->savedRequestOf()->secrets->admin;
         $directory = $this->driver::flavor()->home().'/migration';
 
-        $this->scripts->run($this->driver, 'migration/start', ['SHAKE' => base64_encode(SentinelFiles::shakeConfigOf($start, $directory, $password))]);
+        $this->scripts->run($this->driver, 'migration.start', ['SHAKE' => base64_encode(SentinelFiles::shakeConfigOf($start, $directory, $password))]);
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'migration/progress')));
+        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'migration.progress')));
     }
 
     public function stop(): void
     {
-        $this->scripts->run($this->driver, 'migration/stop');
+        $this->scripts->run($this->driver, 'migration.stop');
     }
 }

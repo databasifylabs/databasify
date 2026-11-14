@@ -18,7 +18,7 @@ it('creates a user with every value only in the env', function () {
 
     $this->node->driver()->accounts()->createUser("o'b", $password, [new Grant('shop', GrantAccess::Write), new Grant('app', GrantAccess::Read)], null);
 
-    $this->scripts->assertRan('mongodb/accounts/create-user', fn (string $script, array $env): bool => $env['NAME'] === "o'b"
+    $this->scripts->assertRan('engines.mongodb.accounts.create-user', fn (string $script, array $env): bool => $env['NAME'] === "o'b"
         && $env['PASSWORD'] === $password
         && $env['ENCRYPTION'] === 'SCRAM-SHA-256'
         && json_decode($env['GRANTS'], true) === [['database' => 'shop', 'access' => 'write'], ['database' => 'app', 'access' => 'read']]
@@ -42,7 +42,7 @@ it('refuses what the Go engine refuses before running anything', function (Closu
 it('allows a control character with SCRAM-SHA-1, as Go does', function () {
     $this->node->driver()->accounts()->setPassword('app', "tab\there", 'SCRAM-SHA-1');
 
-    $this->scripts->assertRan('mongodb/accounts/set-password', fn (string $script, array $env): bool => $env['ENCRYPTION'] === 'SCRAM-SHA-1' && str_contains($script, "'user ' + JSON.stringify(env.NAME) + ' does not exist'"));
+    $this->scripts->assertRan('engines.mongodb.accounts.set-password', fn (string $script, array $env): bool => $env['ENCRYPTION'] === 'SCRAM-SHA-1' && str_contains($script, "'user ' + JSON.stringify(env.NAME) + ' does not exist'"));
 });
 
 it('runs the other account commands with their Go behaviour', function () {
@@ -51,14 +51,14 @@ it('runs the other account commands with their Go behaviour', function () {
     $this->node->driver()->accounts()->grant('app', [new Grant('shop', GrantAccess::Read)], true);
     $this->node->driver()->accounts()->dropUser('app');
 
-    $this->scripts->assertRan('mongodb/accounts/create-database', fn (string $script): bool => str_contains($script, "create: '_databasify'") && str_contains($script, 'hasCode(error, 48)'))
-        ->assertRan('mongodb/accounts/drop-database', fn (string $script): bool => str_contains($script, 'revokeRolesFromUser') && str_contains($script, 'dropDatabase: 1'))
-        ->assertRan('mongodb/accounts/grant', fn (string $script, array $env): bool => $env['REPLICATION'] === 'true' && str_contains($script, "role: 'clusterMonitor'"))
-        ->assertRan('mongodb/accounts/drop-user', fn (string $script): bool => str_contains($script, 'hasCode(error, 11)'));
+    $this->scripts->assertRan('engines.mongodb.accounts.create-database', fn (string $script): bool => str_contains($script, "create: '_databasify'") && str_contains($script, 'hasCode(error, 48)'))
+        ->assertRan('engines.mongodb.accounts.drop-database', fn (string $script): bool => str_contains($script, 'revokeRolesFromUser') && str_contains($script, 'dropDatabase: 1'))
+        ->assertRan('engines.mongodb.accounts.grant', fn (string $script, array $env): bool => $env['REPLICATION'] === 'true' && str_contains($script, "role: 'clusterMonitor'"))
+        ->assertRan('engines.mongodb.accounts.drop-user', fn (string $script): bool => str_contains($script, 'hasCode(error, 11)'));
 });
 
 it('lists accounts without the reserved ones', function () {
-    $this->scripts->respond('mongodb/accounts/list', ['users' => ['root', 'zed', 'app'], 'databases' => ['shop', 'admin', 'app']]);
+    $this->scripts->respond('engines.mongodb.accounts.list', ['users' => ['root', 'zed', 'app'], 'databases' => ['shop', 'admin', 'app']]);
 
     $accounts = $this->node->driver()->accounts()->list();
 
@@ -66,14 +66,14 @@ it('lists accounts without the reserved ones', function () {
 });
 
 it('reads status and metrics', function () {
-    $this->scripts->respond('mongodb/nodes/status', ['role' => 'replica', 'version' => '8.0.4'])
-        ->respond('mongodb/nodes/metrics', ['connections' => 3, 'queries' => 99, 'dataMb' => 12]);
+    $this->scripts->respond('engines.mongodb.nodes.status', ['role' => 'replica', 'version' => '8.0.4'])
+        ->respond('engines.mongodb.nodes.metrics', ['connections' => 3, 'queries' => 99, 'dataMb' => 12]);
 
     $status = $this->node->driver()->nodes()->status();
     $metrics = $this->node->driver()->nodes()->metrics();
 
     expect($status->role)->toBe(NodeRole::Replica)->and($status->version)->toBe('8.0.4')
         ->and($metrics->queries)->toBe(99);
-    $this->scripts->assertRan('mongodb/nodes/status', fn (string $script): bool => str_contains($script, 'mongo_try none') && str_contains($script, 'mongo_js member'))
-        ->assertRan('mongodb/nodes/metrics', fn (string $script): bool => str_contains($script, 'opcounters') && str_contains($script, 'totalSize'));
+    $this->scripts->assertRan('engines.mongodb.nodes.status', fn (string $script): bool => str_contains($script, 'mongo_try none') && str_contains($script, 'mongo_js member'))
+        ->assertRan('engines.mongodb.nodes.metrics', fn (string $script): bool => str_contains($script, 'opcounters') && str_contains($script, 'totalSize'));
 });

@@ -21,7 +21,7 @@ final readonly class PostgresPools implements Pools
 
     public function list(): array
     {
-        return array_map(Pool::fromPayload(...), $this->driver->read('postgres/pools/list', $this->driver->data())->objects('pools'));
+        return array_map(Pool::fromPayload(...), $this->driver->read('engines.postgres.pools.list', $this->driver->data())->objects('pools'));
     }
 
     public function create(Pool $pool): void
@@ -65,7 +65,7 @@ final readonly class PostgresPools implements Pools
      */
     private function save(array $pools): void
     {
-        $this->driver->run('postgres/pools/save', $this->driver->data(), env: ['POOLS' => json_encode(array_map(fn (Pool $pool): array => $pool->toPayload(), $pools), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
+        $this->driver->run('engines.postgres.pools.save', $this->driver->data(), env: ['POOLS' => json_encode(array_map(fn (Pool $pool): array => $pool->toPayload(), $pools), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
     }
 
     private function requireDatabase(string $database): void

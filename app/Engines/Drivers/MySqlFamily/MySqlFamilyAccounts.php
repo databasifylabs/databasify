@@ -20,7 +20,7 @@ final readonly class MySqlFamilyAccounts implements Accounts
     public function list(): AccountList
     {
         $engine = $this->driver->engine();
-        $reply = $this->scripts->read($this->driver, 'mysql-family/accounts/list');
+        $reply = $this->scripts->read($this->driver, 'engines.mysql-family.accounts.list');
 
         return new AccountList($this->withoutReserved($reply->strings('users'), $engine->reservedUsers), $this->withoutReserved($reply->strings('databases'), $engine->reservedDatabases));
     }
@@ -28,38 +28,38 @@ final readonly class MySqlFamilyAccounts implements Accounts
     public function createDatabase(string $name): void
     {
         $this->refuseReserved($this->driver->engine()->reservedDatabases, $name);
-        $this->scripts->run($this->driver, 'mysql-family/accounts/create-database', ['NAME' => Shell::withoutNul($name)]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.create-database', ['NAME' => Shell::withoutNul($name)]);
     }
 
     public function dropDatabase(string $name): void
     {
         $this->refuseReserved($this->driver->engine()->reservedDatabases, $name);
-        $this->scripts->run($this->driver, 'mysql-family/accounts/drop-database', ['NAME' => Shell::withoutNul($name)]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.drop-database', ['NAME' => Shell::withoutNul($name)]);
     }
 
     public function createUser(string $name, string $password, array $grants, ?string $encryption): void
     {
         $env = [...$this->identifiedEnv($password, $encryption), ...$this->grantEnv($name, $grants)];
 
-        $this->scripts->run($this->driver, 'mysql-family/accounts/create-user', $env);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.create-user', $env);
     }
 
     public function setPassword(string $name, string $password, ?string $encryption): void
     {
         $env = $this->identifiedEnv($password, $encryption);
         $this->refuseReserved($this->driver->engine()->reservedUsers, $name);
-        $this->scripts->run($this->driver, 'mysql-family/accounts/set-password', [...$env, 'NAME' => Shell::withoutNul($name)]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.set-password', [...$env, 'NAME' => Shell::withoutNul($name)]);
     }
 
     public function grant(string $name, array $grants, bool $replication): void
     {
-        $this->scripts->run($this->driver, 'mysql-family/accounts/grant', [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.grant', [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
     }
 
     public function dropUser(string $name): void
     {
         $this->refuseReserved($this->driver->engine()->reservedUsers, $name);
-        $this->scripts->run($this->driver, 'mysql-family/accounts/drop-user', ['NAME' => Shell::withoutNul($name)]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.accounts.drop-user', ['NAME' => Shell::withoutNul($name)]);
     }
 
     /**

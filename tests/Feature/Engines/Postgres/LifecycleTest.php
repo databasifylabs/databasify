@@ -17,15 +17,15 @@ it('starts, wakes and restarts the node through its units', function () {
     $this->node->driver()->nodes()->wake(all: true);
     $this->node->driver()->nodes()->restart();
 
-    $this->scripts->assertRan('postgres/nodes/start', fn (string $script): bool => str_contains($script, 'unit_do enable "$name"') && str_contains($script, 'run node configure first'))
-        ->assertRan('postgres/nodes/wake', fn (string $script, array $env): bool => $env === ['ALL' => 'true'] && str_contains($script, 'unit_do start databasify-etcd'))
-        ->assertRan('postgres/nodes/restart', fn (string $script): bool => str_contains($script, 'databasify-patroni'));
+    $this->scripts->assertRan('engines.postgres.nodes.start', fn (string $script): bool => str_contains($script, 'unit_do enable "$name"') && str_contains($script, 'run node configure first'))
+        ->assertRan('engines.postgres.nodes.wake', fn (string $script, array $env): bool => $env === ['ALL' => 'true'] && str_contains($script, 'unit_do start databasify-etcd'))
+        ->assertRan('engines.postgres.nodes.restart', fn (string $script): bool => str_contains($script, 'databasify-patroni'));
 });
 
 it('bootstraps the service roles and the default account', function () {
     $this->node->driver()->nodes()->bootstrap(new Secrets('adm', 'rep', 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw'));
 
-    $this->scripts->assertRan('postgres/nodes/bootstrap', fn (string $script, array $env): bool => $env['ADMIN_PASSWORD'] === 'adm'
+    $this->scripts->assertRan('engines.postgres.nodes.bootstrap', fn (string $script, array $env): bool => $env['ADMIN_PASSWORD'] === 'adm'
         && $env['POOLER_PASSWORD'] === hash_hmac('sha256', 'pgbouncer', 'agent')
         && $env['ACCOUNT_DATABASE'] === 'defaultdb' && $env['ACCOUNT_USER'] === 'databasify'
         && str_contains($script, 'CREATE OR REPLACE FUNCTION pgbouncer.get_auth')
@@ -43,7 +43,7 @@ it('installs a matching certificate and refuses a mismatched one', function () {
 
     $this->node->driver()->nodes()->installTls($certificate, $key, $certificate);
 
-    $this->scripts->assertRan('postgres/nodes/tls-install', fn (string $script, array $env): bool => $env['KEY'] === $key && str_contains($script, 'write_file /srv/postgres/tls/server.key 600'));
+    $this->scripts->assertRan('engines.postgres.nodes.tls-install', fn (string $script, array $env): bool => $env['KEY'] === $key && str_contains($script, 'write_file /srv/postgres/tls/server.key 600'));
     expect(fn () => $this->node->driver()->nodes()->installTls($certificate, $otherKey, $certificate))
         ->toThrow(InvalidEngineRequest::class, 'the certificate and key are not a matching PEM pair')
         ->and(fn () => $this->node->driver()->nodes()->installTls($certificate, $key, 'not pem'))
@@ -55,8 +55,8 @@ it('waits for readiness and enables the cluster as tasks under their keys', func
     $enable = $this->node->driver()->cluster()->enable('flow.4.1');
 
     expect($ready->key)->toBe('flow.3.1')->and($enable->key)->toBe('flow.4.1');
-    $this->scripts->assertRan('postgres/nodes/ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "phase 'waiting for PostgreSQL'") && str_contains($script, 'PostgreSQL was not ready in time'))
-        ->assertRan('postgres/cluster/enable', fn (string $script): bool => str_contains($script, "phase 'starting Patroni'") && str_contains($script, 'Patroni did not lead or follow the cluster in time'));
+    $this->scripts->assertRan('engines.postgres.nodes.ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "phase 'waiting for PostgreSQL'") && str_contains($script, 'PostgreSQL was not ready in time'))
+        ->assertRan('engines.postgres.cluster.enable', fn (string $script): bool => str_contains($script, "phase 'starting Patroni'") && str_contains($script, 'Patroni did not lead or follow the cluster in time'));
 });
 
 it('does not reset PostgreSQL nodes', function () {

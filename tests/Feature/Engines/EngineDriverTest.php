@@ -9,6 +9,8 @@ use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\NotPrimary;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\View;
 use Tests\Support\ScriptedDriver;
 
 function useScriptedDriver(): void
@@ -26,7 +28,7 @@ it('writes what a change script prints to a log named after the script', functio
     fakeSsh()->respondToEngine('runtime run', scriptRun(0, "Created user app.\n"));
     $node = engineNode();
 
-    $node->driver()->run('testing/echo', ['word' => 'x']);
+    $node->driver()->run('engines.testing.echo', ['word' => 'x']);
 
     expect($node->server->serverLogs()->sole())
         ->name->toBe("{$node->server->name}: echo")
@@ -34,12 +36,28 @@ it('writes what a change script prints to a log named after the script', functio
         ->output->toContain('Created user app.');
 });
 
+it('runs a plugin script from its own view namespace', function () {
+    useScriptedDriver();
+    $ssh = fakeSsh()->respondToEngine('runtime run', scriptRun(0, "Started KeyDB.\n"));
+    $directory = sys_get_temp_dir().'/plugin-views-'.bin2hex(random_bytes(4));
+    File::ensureDirectoryExists("{$directory}/nodes");
+    File::put("{$directory}/nodes/start-server.blade.php", "echo 'Started KeyDB.'\n");
+    View::addNamespace('keydb', $directory);
+    $node = engineNode();
+
+    $node->driver()->run('keydb::nodes.start-server');
+    File::deleteDirectory($directory);
+
+    expect(json_decode($ssh->engineRequestAt(0), true)['script'])->toBe("echo 'Started KeyDB.'\n")
+        ->and($node->server->serverLogs()->sole()->name)->toBe("{$node->server->name}: start server");
+});
+
 it('fails the log and throws the typed error when a script calls databasify_fail', function () {
     useScriptedDriver();
     fakeSsh()->respondToEngine('runtime run', scriptRun(1, "DATABASIFY_ERROR busy\nrun node configure first\n"));
     $node = engineNode();
 
-    expect(fn () => $node->driver()->run('testing/echo', ['word' => 'x']))->toThrow(EngineBusy::class, 'run node configure first')
+    expect(fn () => $node->driver()->run('engines.testing.echo', ['word' => 'x']))->toThrow(EngineBusy::class, 'run node configure first')
         ->and($node->server->serverLogs()->sole()->status)->toBe(ServerLogStatus::Failed);
 });
 
@@ -48,7 +66,7 @@ it('reads one JSON object and leaves no log', function () {
     fakeSsh()->respondToEngine('runtime run', scriptRun(0, '{"role":"primary"}'."\n"));
     $node = engineNode();
 
-    expect($node->driver()->read('testing/echo', ['word' => 'x'])->string('role'))->toBe('primary')
+    expect($node->driver()->read('engines.testing.echo', ['word' => 'x'])->string('role'))->toBe('primary')
         ->and($node->server->serverLogs()->count())->toBe(0);
 });
 
@@ -62,7 +80,7 @@ it('runs once more on the new primary after not_primary', function () {
         ->respondWhen(fn (string $server, string $script): bool => $server === $second->server->name && str_contains($script, '| databasify runtime run '), json_encode(scriptRun(0, "done\n")));
     answerNodeStatus(answerNodeStatus($ssh, $first->server, 'replica'), $second->server, 'primary');
 
-    $database->driver()->run('testing/echo', ['word' => 'x']);
+    $database->driver()->run('engines.testing.echo', ['word' => 'x']);
 
     expect(collect($ssh->runs)->filter(fn (array $run): bool => str_contains($run['script'], '| databasify runtime run '))->pluck('server')->values()->all())
         ->toBe([$first->server->name, $second->server->name]);
@@ -75,7 +93,7 @@ it('gives up after a second not_primary', function () {
     $ssh = fakeSsh()->respondToEngine('runtime run', scriptRun(1, "DATABASIFY_ERROR not_primary\na replica now\n"));
     $database->nodes()->with('server')->get()->each(fn ($node) => answerNodeStatus($ssh, $node->server, 'replica'));
 
-    expect(fn () => $database->driver()->run('testing/echo', ['word' => 'x']))->toThrow(NotPrimary::class, 'a replica now');
+    expect(fn () => $database->driver()->run('engines.testing.echo', ['word' => 'x']))->toThrow(NotPrimary::class, 'a replica now');
 });
 
 it('returns the existing task when a task is started again with its key', function () {
@@ -83,8 +101,8 @@ it('returns the existing task when a task is started again with its key', functi
     $ssh = fakeSsh()->respondToEngine('task start', ['key' => 'run1.ready', 'kind' => 'task', 'state' => 'succeeded', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-13T00:00:00Z', 'finishedAt' => null, 'error' => null]);
     $driver = engineNode()->driver();
 
-    $first = $driver->task('run1.ready', 'testing/echo', ['word' => 'x']);
-    $again = $driver->task('run1.ready', 'testing/echo', ['word' => 'x']);
+    $first = $driver->task('run1.ready', 'engines.testing.echo', ['word' => 'x']);
+    $again = $driver->task('run1.ready', 'engines.testing.echo', ['word' => 'x']);
 
     expect($again->state)->toBe(OperationState::Succeeded)
         ->and($first->key)->toBe($again->key)

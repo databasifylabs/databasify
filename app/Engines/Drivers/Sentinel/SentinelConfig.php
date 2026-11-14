@@ -24,7 +24,7 @@ final readonly class SentinelConfig implements Config
         $keys = array_keys($settings);
         sort($keys, SORT_STRING);
 
-        $this->scripts->run($this->driver, 'config/apply', [
+        $this->scripts->run($this->driver, 'config.apply', [
             'DESIRED' => json_encode((object) $this->desiredOf($settings), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'SETTING_KEYS' => json_encode($keys, JSON_THROW_ON_ERROR),
             'CONFIG_KEYS' => json_encode($this->configKeys(), JSON_THROW_ON_ERROR),
@@ -38,7 +38,7 @@ final readonly class SentinelConfig implements Config
         $effective = $this->configuration->effectiveOf($this->configuration->savedRequestOf());
         $fields = $this->configuration->catalog()->fields;
         $names = array_values(array_unique(array_map(fn (EngineField $field): string => SentinelFiles::configKeyOf($field->key), $fields)));
-        $live = $this->scripts->read($this->driver, 'config/show', ['NAMES' => implode(' ', $names)])->stringMap('values');
+        $live = $this->scripts->read($this->driver, 'config.show', ['NAMES' => implode(' ', $names)])->stringMap('values');
         $pending = array_filter($fields, fn (EngineField $field): bool => $field->restart && isset($effective[$field->key]) && strcasecmp($live[SentinelFiles::configKeyOf($field->key)] ?? '', $effective[$field->key]) !== 0);
 
         return array_values(array_map(fn (EngineField $field): string => $field->key, $pending));

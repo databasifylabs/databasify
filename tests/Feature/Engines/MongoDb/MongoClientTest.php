@@ -18,7 +18,7 @@ function runMongoScript(string $stdout, string $stderr, int $exit): array
     file_put_contents("{$bin}/mongosh", "#!/bin/bash\nfor arg in \"\$@\"; do printf '%s\\n' \"\$arg\"; done > \"\$STUB_ARGS\"\nprintf '%s' \"\$STUB_STDOUT\"\nprintf '%s' \"\$STUB_STDERR\" >&2\nexit \"\$STUB_EXIT\"\n");
     chmod("{$bin}/timeout", 0755);
     chmod("{$bin}/mongosh", 0755);
-    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'testing/mongo-run');
+    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'engines.testing.mongo-run');
 
     $run = Process::input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'STUB_STDOUT' => $stdout, 'STUB_STDERR' => $stderr, 'STUB_EXIT' => (string) $exit, 'STUB_ARGS' => "{$bin}/args", 'WORD' => "it's"])->run(['bash', '-euo', 'pipefail', '-s']);
     $args = (string) @file_get_contents("{$bin}/args");
@@ -39,7 +39,7 @@ it('passes the result through and keeps secrets off argv', function () {
 it('turns script and connection failures into the codes Go reports', function (string $stdout, string $stderr, int $exit, string $class) {
     [$run] = runMongoScript($stdout, $stderr, $exit);
 
-    expect(ScriptFailure::of('testing/mongo-run', (int) $run->exitCode(), $run->output(), $run->errorOutput()))->toBeInstanceOf($class);
+    expect(ScriptFailure::of('engines.testing.mongo-run', (int) $run->exitCode(), $run->output(), $run->errorOutput()))->toBeInstanceOf($class);
 })->with([
     'not primary' => ["DATABASIFY_ERROR not_primary\nnot primary\n", '', 3, NotPrimary::class],
     'duplicate user' => ["DATABASIFY_ERROR already_exists\nUser \"a@admin\" already exists\n", '', 3, EngineAlreadyExists::class],
@@ -69,7 +69,7 @@ it('retries PBM while another operation runs and reports its real error', functi
     file_put_contents("{$bin}/replies", $replies);
     file_put_contents("{$bin}/pbm", "#!/bin/bash\nline=\$(head -n 1 \"\$STUB/replies\")\nsed -i.bak 1d \"\$STUB/replies\"\nif [[ \$line == ok* ]]; then echo \"\${line#ok }\"; exit 0; fi\necho \"\$line\" >&2\nexit 1\n");
     chmod("{$bin}/pbm", 0755);
-    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'testing/pbm-locked');
+    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'engines.testing.pbm-locked');
 
     $run = Process::timeout(30)->input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'STUB' => $bin])->run(['bash', '-euo', 'pipefail', '-s']);
     Process::run(['rm', '-rf', $bin]);

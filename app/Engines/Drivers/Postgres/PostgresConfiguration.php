@@ -37,7 +37,7 @@ final readonly class PostgresConfiguration
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($config));
         $files = $this->files->of(NodeState::withSettings($config, $catalog->effective($tuned, $config->settings)), $line, self::POOL_SIZE_PLACEHOLDER);
 
-        $this->driver->run('postgres/nodes/configure', $this->driver->data(), timeout: self::CONFIGURE_TIMEOUT, env: [
+        $this->driver->run('engines.postgres.nodes.configure', $this->driver->data(), timeout: self::CONFIGURE_TIMEOUT, env: [
             'REQUEST_JSON' => NodeState::requestJsonOf($config),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
             'FILES' => NodeState::filesJsonOf([...$files->files, ...$this->jobsFor($config)]),
@@ -60,7 +60,7 @@ final readonly class PostgresConfiguration
             return [];
         }
 
-        return [new ConfigFile(PostgresManifest::BACKUP_JOB, self::JOB_MODE, $this->driver->script('postgres/jobs/backup', $this->driver->data()))];
+        return [new ConfigFile(PostgresManifest::BACKUP_JOB, self::JOB_MODE, $this->driver->script('engines.postgres.jobs.backup', $this->driver->data()))];
     }
 
     /**

@@ -34,7 +34,7 @@ final readonly class SentinelNodes implements Nodes
     {
         $request = $this->configuration->savedRequestOf();
 
-        $this->scripts->run($this->driver, 'nodes/start', [
+        $this->scripts->run($this->driver, 'nodes.start', [
             'HOLDS' => $request->clustered && ! $request->readOnly ? 'true' : 'false',
             'PERSISTENT' => SentinelFiles::persistent($request->settings) ? 'true' : 'false',
         ], self::LIFECYCLE_TIMEOUT);
@@ -42,17 +42,17 @@ final readonly class SentinelNodes implements Nodes
 
     public function wake(bool $all): void
     {
-        $this->scripts->run($this->driver, 'nodes/wake', timeout: self::LIFECYCLE_TIMEOUT);
+        $this->scripts->run($this->driver, 'nodes.wake', timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function restart(): void
     {
-        $this->scripts->run($this->driver, 'nodes/restart', ['DIRECTIVES' => json_encode($this->restartDirectives(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)], self::LIFECYCLE_TIMEOUT);
+        $this->scripts->run($this->driver, 'nodes.restart', ['DIRECTIVES' => json_encode($this->restartDirectives(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)], self::LIFECYCLE_TIMEOUT);
     }
 
     public function reset(int $peers, array $hosts): void
     {
-        $this->scripts->run($this->driver, 'nodes/reset', ['PEERS' => (string) $peers, 'KEEP' => implode(' ', ['127.0.0.1', ...$hosts])], 180);
+        $this->scripts->run($this->driver, 'nodes.reset', ['PEERS' => (string) $peers, 'KEEP' => implode(' ', ['127.0.0.1', ...$hosts])], 180);
     }
 
     public function bootstrap(Secrets $secrets, ?DefaultAccount $account): void {}
@@ -60,14 +60,14 @@ final readonly class SentinelNodes implements Nodes
     public function installTls(string $certificate, string $key, string $ca): void
     {
         TlsPair::checkPair($certificate, $key, $ca);
-        $this->scripts->run($this->driver, 'nodes/tls-install', ['PEM' => rtrim($certificate, "\n")."\n".$key, 'CA' => $ca]);
+        $this->scripts->run($this->driver, 'nodes.tls-install', ['PEM' => rtrim($certificate, "\n")."\n".$key, 'CA' => $ca]);
     }
 
     public function ready(string $key, bool $expectPrimary): Operation
     {
         $saved = $this->configuration->savedRequestOf();
 
-        return $this->scripts->start($this->driver, $key, 'nodes/ready', [
+        return $this->scripts->start($this->driver, $key, 'nodes.ready', [
             'CLUSTERED' => $saved->clustered ? 'true' : 'false',
             'READ_ONLY' => $saved->readOnly ? 'true' : 'false',
             'SELF' => $saved->ip,
@@ -76,14 +76,14 @@ final readonly class SentinelNodes implements Nodes
 
     public function status(): NodeStatus
     {
-        $reply = $this->scripts->read($this->driver, 'nodes/status');
+        $reply = $this->scripts->read($this->driver, 'nodes.status');
 
         return NodeStatus::reported(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
     }
 
     public function metrics(): NodeMetrics
     {
-        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'nodes/metrics'));
+        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'nodes.metrics'));
     }
 
     /**

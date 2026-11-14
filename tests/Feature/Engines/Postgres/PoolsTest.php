@@ -10,8 +10,8 @@ use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
     $this->scripts = fakeScripts()
-        ->respond('postgres/pools/list', ['pools' => [['name' => 'web', 'database' => 'shop', 'size' => 10, 'mode' => 'transaction']]])
-        ->respond('postgres/accounts/list', ['users' => [], 'databases' => ['shop', 'blog']]);
+        ->respond('engines.postgres.pools.list', ['pools' => [['name' => 'web', 'database' => 'shop', 'size' => 10, 'mode' => 'transaction']]])
+        ->respond('engines.postgres.accounts.list', ['users' => [], 'databases' => ['shop', 'blog']]);
     $this->node = engineNode();
 });
 
@@ -24,7 +24,7 @@ it('lists the saved pools', function () {
 it('adds, changes and removes pools in the saved list', function () {
     $this->node->driver()->pools()->create(new Pool('api', 'blog', 5, 'session'));
 
-    $this->scripts->assertRan('postgres/pools/save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === [
+    $this->scripts->assertRan('engines.postgres.pools.save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === [
         ['name' => 'web', 'database' => 'shop', 'size' => 10, 'mode' => 'transaction'],
         ['name' => 'api', 'database' => 'blog', 'size' => 5, 'mode' => 'session'],
     ] && str_contains($script, 'kill -s HUP databasify-pgbouncer'));
@@ -32,8 +32,8 @@ it('adds, changes and removes pools in the saved list', function () {
     $this->node->driver()->pools()->update(new Pool('web', 'blog', 20, 'transaction'));
     $this->node->driver()->pools()->delete('web');
 
-    $this->scripts->assertRan('postgres/pools/save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === [['name' => 'web', 'database' => 'blog', 'size' => 20, 'mode' => 'transaction']])
-        ->assertRan('postgres/pools/save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === []);
+    $this->scripts->assertRan('engines.postgres.pools.save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === [['name' => 'web', 'database' => 'blog', 'size' => 20, 'mode' => 'transaction']])
+        ->assertRan('engines.postgres.pools.save', fn (string $script, array $env): bool => json_decode($env['POOLS'], true) === []);
 });
 
 it('refuses reserved, duplicate and unknown pools with the Go wording', function (Closure $call, string $exception, string $message) {

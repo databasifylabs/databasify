@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    $this->scripts = fakeScripts()->respond('postgres/nodes/configure', ['changed' => true]);
+    $this->scripts = fakeScripts()->respond('engines.postgres.nodes.configure', ['changed' => true]);
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);
 });
@@ -16,7 +16,7 @@ it('configures with the saved tuning and the Go-identical files', function () {
 
     $this->node->fresh()->driver()->nodes()->configure($request);
 
-    $this->scripts->assertRan('postgres/nodes/configure', function (string $script, array $env): bool {
+    $this->scripts->assertRan('engines.postgres.nodes.configure', function (string $script, array $env): bool {
         $files = collect(json_decode($env['FILES'], true))->keyBy('path');
         $serverConf = base64_decode($files['/srv/postgres/conf/postgresql.conf']['content']);
 
@@ -40,7 +40,7 @@ it('tunes from the node itself when nothing is saved yet', function () {
 
     $this->node->fresh()->driver()->nodes()->configure($request);
 
-    $this->scripts->assertRan('postgres/nodes/configure', fn (string $script, array $env): bool => json_decode($env['TUNED_JSON'], true)['shared_buffers'] === '1024MB'
+    $this->scripts->assertRan('engines.postgres.nodes.configure', fn (string $script, array $env): bool => json_decode($env['TUNED_JSON'], true)['shared_buffers'] === '1024MB'
         && $env['CLUSTERED'] === 'true' && $env['ARCHIVE'] === 'true' && $env['IP'] === '10.0.0.2');
 });
 

@@ -38,7 +38,7 @@ final readonly class SentinelConfiguration
         $effective = NodeState::withSettings($request, $catalog->effective($tuned, $request->settings));
         $primary = $this->primaryFor($request);
 
-        $this->scripts->run($this->driver, 'nodes/configure', [
+        $this->scripts->run($this->driver, 'nodes.configure', [
             'PASSWORD' => $request->secrets->admin,
             'SERVER_CONF' => base64_encode(SentinelFiles::serverConfOf($engine, $effective, $primary)),
             'SENTINEL_CONF' => $request->clustered ? base64_encode(SentinelFiles::sentinelConfOf($engine, $request, $primary)) : '',
@@ -98,7 +98,7 @@ final readonly class SentinelConfiguration
             return '';
         }
 
-        $reported = $this->scripts->read($this->driver, 'nodes/primary', ['PEERS' => $this->peersOf($request), 'CLI_SECRET' => (string) $request->secrets->admin])->string('primary');
+        $reported = $this->scripts->read($this->driver, 'nodes.primary', ['PEERS' => $this->peersOf($request), 'CLI_SECRET' => (string) $request->secrets->admin])->string('primary');
 
         return $reported !== '' ? $reported : ($request->primary ?? '');
     }

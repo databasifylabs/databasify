@@ -46,14 +46,14 @@ function tabFilesOf(string $files): array
 }
 
 it('schedules the postgres backup as a bash job', function () {
-    $scripts = fakeScripts()->respond('postgres/nodes/configure', ['changed' => true]);
+    $scripts = fakeScripts()->respond('engines.postgres.nodes.configure', ['changed' => true]);
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $node = engineNode();
     $node->database->update(['version_line' => '18']);
 
     $node->fresh()->driver()->nodes()->configure(nodeConfigFromFixture(goFixture('configure-primary.json')['request']));
 
-    $scripts->assertRan('postgres/nodes/configure', function (string $script, array $env): bool {
+    $scripts->assertRan('engines.postgres.nodes.configure', function (string $script, array $env): bool {
         $files = collect(json_decode($env['FILES'], true))->keyBy('path');
         $schedule = json_decode((string) base64_decode($env['MANIFEST']), true)['schedules'][0];
 
@@ -64,14 +64,14 @@ it('schedules the postgres backup as a bash job', function () {
 });
 
 it('schedules the mongodb backup as a bash job with its storage in env', function () {
-    $scripts = fakeScripts()->respond('mongodb/nodes/configure', ['changed' => true]);
+    $scripts = fakeScripts()->respond('engines.mongodb.nodes.configure', ['changed' => true]);
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
     $request = goFixture('configure-archived.json', 'mongodb')['request'];
 
     $node->driver()->nodes()->configure(nodeConfigFromFixture($request));
 
-    $scripts->assertRan('mongodb/nodes/configure', function (string $script, array $env) use ($request): bool {
+    $scripts->assertRan('engines.mongodb.nodes.configure', function (string $script, array $env) use ($request): bool {
         $files = tabFilesOf($env['FILES']);
         $schedule = json_decode((string) base64_decode($env['MANIFEST']), true)['schedules'][0];
 
@@ -85,12 +85,12 @@ it('schedules the mongodb backup as a bash job with its storage in env', functio
 });
 
 it('starts the mongodb migration copy as a bash job', function () {
-    $scripts = fakeScripts()->respond('mongodb/migration/start');
+    $scripts = fakeScripts()->respond('engines.mongodb.migration.start');
     $node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 
     $node->driver()->migration()->start(new MigrationStart(new MigrationSource('src.example.com', 27017, 'reader', 'p@ss:w/rd', true), ['shop'], false, null));
 
-    $scripts->assertRan('mongodb/migration/start', function (string $script, array $env): bool {
+    $scripts->assertRan('engines.mongodb.migration.start', function (string $script, array $env): bool {
         return str_contains((string) base64_decode($env['COPY_SCRIPT']), 'mongodump')
             && $env['SOURCE_URI'] === 'mongodb://reader:p%40ss%3Aw%2Frd@src.example.com:27017/?authSource=admin&tls=true&tlsInsecure=true'
             && str_starts_with($env['TARGET_URI'], 'mongodb://root:')
@@ -104,16 +104,16 @@ it('renders every job script as valid bash', function (string $engine, string $j
 
     expect(bashErrorsIn(resolve(ScriptView::class)->render($node, $job, ['port' => 25060])))->toBe('');
 })->with([
-    ['postgres', 'postgres/jobs/backup'],
-    ['mongodb', 'mongodb/jobs/backup'],
-    ['mongodb', 'mongodb/jobs/migration-copy'],
+    ['postgres', 'engines.postgres.jobs.backup'],
+    ['mongodb', 'engines.mongodb.jobs.backup'],
+    ['mongodb', 'engines.mongodb.jobs.migration-copy'],
 ]);
 
 it('copies a mongodb database whose name has a space', function () {
     $node = idleDatabase('mongodb', 1)->nodes()->sole();
     $log = 'printf "%s\n" "$0 $*" >> "$STUB_DIR/commands.log"'.PHP_EOL;
 
-    $commands = runJobLocally($node, 'mongodb/jobs/migration-copy', [], [
+    $commands = runJobLocally($node, 'engines.mongodb.jobs.migration-copy', [], [
         'mongodump' => "#!/bin/bash\n".$log,
         'mongorestore' => "#!/bin/bash\ncat > /dev/null\n".$log,
     ], ['MIGRATION_DATABASES' => "my db\nshop", 'MIGRATION_CONTINUOUS' => 'false', 'SOURCE_TOOL_CONFIG' => 'uri: x', 'TARGET_TOOL_CONFIG' => 'uri: y']);
@@ -125,7 +125,7 @@ it('takes a diff backup when a recent full one exists and a full one otherwise',
     $node = idleDatabase('postgres', 1)->nodes()->sole();
     $stop = now()->subDays($daysSinceFull)->getTimestamp();
 
-    $log = runJobLocally($node, 'postgres/jobs/backup', ['port' => 25060], [
+    $log = runJobLocally($node, 'engines.postgres.jobs.backup', ['port' => 25060], [
         'psql' => "#!/bin/bash\ncat > /dev/null\necho f\n",
         'pgbackrest' => "#!/bin/bash\nprintf 'pgbackrest %s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\nif [[ \$* == *info* ]]; then echo '[{\"backup\":[{\"type\":\"full\",\"timestamp\":{\"stop\":{$stop}}}]}]'; fi\n",
     ]);
@@ -136,7 +136,7 @@ it('takes a diff backup when a recent full one exists and a full one otherwise',
 it('skips the postgres backup on a standby', function () {
     $node = idleDatabase('postgres', 1)->nodes()->sole();
 
-    $log = runJobLocally($node, 'postgres/jobs/backup', ['port' => 25060], [
+    $log = runJobLocally($node, 'engines.postgres.jobs.backup', ['port' => 25060], [
         'psql' => "#!/bin/bash\ncat > /dev/null\necho t\n",
         'pgbackrest' => "#!/bin/bash\nprintf 'pgbackrest %s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\n",
     ]);
@@ -206,14 +206,14 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
 }
 
 it('runs the mysql binlog stream, shipper and backup as bash jobs', function (string $engine, string $fixture, string $line) {
-    $scripts = fakeScripts()->respond('mysql-family/nodes/configure', ['changed' => true]);
+    $scripts = fakeScripts()->respond('engines.mysql-family.nodes.configure', ['changed' => true]);
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $node = idleDatabase($engine, 1, versionLine: $line)->nodes()->sole();
     $request = goFixture($fixture, $engine)['request'];
 
     $node->driver()->nodes()->configure(nodeConfigFromFixture($request));
 
-    $scripts->assertRan('mysql-family/nodes/configure', function (string $script, array $env) use ($engine): bool {
+    $scripts->assertRan('engines.mysql-family.nodes.configure', function (string $script, array $env) use ($engine): bool {
         $files = collect(json_decode($env['FILES'], true))->keyBy('path');
         $manifest = json_decode((string) base64_decode($env['MANIFEST']), true);
         $stream = collect($manifest['processes'])->firstWhere('name', "{$engine}-binlog-stream");
@@ -234,13 +234,13 @@ it('renders every mysql family job as valid bash', function (string $engine, str
 
     expect(bashErrorsIn(resolve(ScriptView::class)->render($node, $job, ['engine' => MySqlFamilyEngine::of($engine)])))->toBe('');
 })->with([
-    ['mysql', 'mysql-family/jobs/backup'], ['mysql', 'mysql-family/jobs/binlog-ship'], ['mysql', 'mysql-family/jobs/binlog-stream'], ['mysql', 'mysql-family/jobs/migration-copy'],
-    ['mariadb', 'mysql-family/jobs/backup'], ['mariadb', 'mysql-family/jobs/binlog-ship'], ['mariadb', 'mysql-family/jobs/binlog-stream'], ['mariadb', 'mysql-family/jobs/migration-copy'],
-    ['mariadb', 'mariadb/jobs/cluster-watch'],
+    ['mysql', 'engines.mysql-family.jobs.backup'], ['mysql', 'engines.mysql-family.jobs.binlog-ship'], ['mysql', 'engines.mysql-family.jobs.binlog-stream'], ['mysql', 'engines.mysql-family.jobs.migration-copy'],
+    ['mariadb', 'engines.mysql-family.jobs.backup'], ['mariadb', 'engines.mysql-family.jobs.binlog-ship'], ['mariadb', 'engines.mysql-family.jobs.binlog-stream'], ['mariadb', 'engines.mysql-family.jobs.migration-copy'],
+    ['mariadb', 'engines.mariadb.jobs.cluster-watch'],
 ]);
 
 it('ships only closed binlogs', function () {
-    $run = runFamilyJobLocally('mysql', 'mysql-family/jobs/binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [
         'archive/binlogs/bin.000001' => 'closed',
         'archive/binlogs/bin.000002' => 'open',
         'state/binlog-rotated' => 'bin.000002 4',
@@ -251,7 +251,7 @@ it('ships only closed binlogs', function () {
 });
 
 it('never ships the binlog the stream is still writing, even below a stale higher one', function () {
-    $run = runFamilyJobLocally('mysql', 'mysql-family/jobs/binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [
         'archive/binlogs/bin.000001' => 'being written',
         'archive/binlogs/bin.000009' => 'stale',
         'state/binlog-rotated' => 'bin.000001 13',
@@ -266,7 +266,7 @@ it('expires bases older than the retention days', function () {
     $stamp = fn (int $days): string => $now->copy()->subDays($days)->format('Ymd\THis\Z');
     $listing = json_encode(collect([1, 8, 15])->flatMap(fn (int $days): array => [['Path' => "{$stamp($days)}.xbstream"], ['Path' => "{$stamp($days)}.binlog-info"]])->all());
 
-    $run = runFamilyJobLocally('mysql', 'mysql-family/jobs/backup', ['MEMBER_ROLE' => 'PRIMARY'], [], [
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.backup', ['MEMBER_ROLE' => 'PRIMARY'], [], [
         'xtrabackup' => "#!/bin/bash\necho backup\nfor arg; do [[ \$arg != --extra-lsndir=* ]] || touch \"\${arg#*=}/xtrabackup_info\"; done\n",
         'rclone' => "#!/bin/bash\nprintf 'rclone %s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\n[ \"\$1\" != rcat ] || cat > /dev/null\n[ \"\$1\" != lsjson ] || echo '{$listing}'\n",
     ], ['RETENTION_DAYS' => '7']);
@@ -278,7 +278,7 @@ it('expires bases older than the retention days', function () {
 });
 
 it('keeps the galera writer on the lowest live node', function () {
-    $run = runFamilyJobLocally('mariadb', 'mariadb/jobs/cluster-watch', [
+    $run = runFamilyJobLocally('mariadb', 'engines.mariadb.jobs.cluster-watch', [
         'WSREP_CLUSTER_STATUS' => "1\t1\tPrimary\tSynced\t0",
         'databasify.writer WHERE' => '10.0.0.9',
         'WSREP_INCOMING_ADDRESSES' => '10.0.0.3:3306,10.0.0.2:3306',

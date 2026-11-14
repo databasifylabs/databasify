@@ -31,17 +31,17 @@ final readonly class PostgresNodes implements Nodes
 
     public function start(): void
     {
-        $this->driver->run('postgres/nodes/start', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT);
+        $this->driver->run('engines.postgres.nodes.start', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function restart(): void
     {
-        $this->driver->run('postgres/nodes/restart', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT);
+        $this->driver->run('engines.postgres.nodes.restart', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function wake(bool $all): void
     {
-        $this->driver->run('postgres/nodes/wake', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT, env: ['ALL' => $all ? 'true' : 'false']);
+        $this->driver->run('engines.postgres.nodes.wake', $this->driver->data(), timeout: self::LIFECYCLE_TIMEOUT, env: ['ALL' => $all ? 'true' : 'false']);
     }
 
     public function reset(int $peers, array $hosts): void
@@ -53,7 +53,7 @@ final readonly class PostgresNodes implements Nodes
     {
         $passwords = PostgresFiles::passwordsOf($secrets);
 
-        $this->driver->run('postgres/nodes/bootstrap', $this->driver->data(), env: [
+        $this->driver->run('engines.postgres.nodes.bootstrap', $this->driver->data(), env: [
             'ADMIN_PASSWORD' => $passwords['admin'],
             'REPLICATION_PASSWORD' => $passwords['replication'],
             'POOLER_PASSWORD' => $passwords['pooler'],
@@ -67,23 +67,23 @@ final readonly class PostgresNodes implements Nodes
     public function installTls(string $certificate, string $key, string $ca): void
     {
         TlsPair::checkPair($certificate, $key, $ca);
-        $this->driver->run('postgres/nodes/tls-install', $this->driver->data(), env: ['CERTIFICATE' => $certificate, 'KEY' => $key, 'CA' => $ca]);
+        $this->driver->run('engines.postgres.nodes.tls-install', $this->driver->data(), env: ['CERTIFICATE' => $certificate, 'KEY' => $key, 'CA' => $ca]);
     }
 
     public function ready(string $key, bool $expectPrimary): Operation
     {
-        return $this->driver->task($key, 'postgres/nodes/ready', $this->driver->data(), env: ['EXPECT_PRIMARY' => $expectPrimary ? 'true' : 'false']);
+        return $this->driver->task($key, 'engines.postgres.nodes.ready', $this->driver->data(), env: ['EXPECT_PRIMARY' => $expectPrimary ? 'true' : 'false']);
     }
 
     public function status(): NodeStatus
     {
-        $reply = $this->driver->read('postgres/nodes/status', $this->driver->data());
+        $reply = $this->driver->read('engines.postgres.nodes.status', $this->driver->data());
 
         return NodeStatus::reported(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
     }
 
     public function metrics(): NodeMetrics
     {
-        return NodeMetrics::fromPayload($this->driver->read('postgres/nodes/metrics', $this->driver->data()));
+        return NodeMetrics::fromPayload($this->driver->read('engines.postgres.nodes.metrics', $this->driver->data()));
     }
 }

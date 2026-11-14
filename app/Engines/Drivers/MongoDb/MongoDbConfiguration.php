@@ -41,7 +41,7 @@ final readonly class MongoDbConfiguration
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
         $conf = MongoDbFiles::HOME.'/conf';
 
-        $this->driver->run('mongodb/nodes/configure', env: [
+        $this->driver->run('engines.mongodb.nodes.configure', env: [
             'REQUEST_JSON' => NodeState::requestJsonOf($request),
             'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
             'FILES' => $this->filesTsvOf([
@@ -85,7 +85,7 @@ final readonly class MongoDbConfiguration
             return [];
         }
 
-        return [new ConfigFile(MongoDbFiles::BACKUP_JOB, self::JOB_MODE, $this->driver->script('mongodb/jobs/backup'))];
+        return [new ConfigFile(MongoDbFiles::BACKUP_JOB, self::JOB_MODE, $this->driver->script('engines.mongodb.jobs.backup'))];
     }
 
     /**

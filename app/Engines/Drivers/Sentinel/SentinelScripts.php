@@ -14,7 +14,7 @@ final readonly class SentinelScripts
      */
     public function run(SentinelDriver $driver, string $script, array $env = [], int $timeout = 120): void
     {
-        $driver->run("sentinel/{$script}", ['engine' => $driver::flavor()], $env, timeout: $timeout);
+        $driver->run("engines.sentinel.{$script}", ['engine' => $driver::flavor()], $env, timeout: $timeout);
     }
 
     /**
@@ -22,7 +22,7 @@ final readonly class SentinelScripts
      */
     public function read(SentinelDriver $driver, string $script, array $env = [], int $timeout = 120): Payload
     {
-        return $driver->read("sentinel/{$script}", ['engine' => $driver::flavor()], $env, timeout: $timeout);
+        return $driver->read("engines.sentinel.{$script}", ['engine' => $driver::flavor()], $env, timeout: $timeout);
     }
 
     /**
@@ -30,6 +30,6 @@ final readonly class SentinelScripts
      */
     public function start(SentinelDriver $driver, string $key, string $script, array $env = []): Operation
     {
-        return $driver->task($key, "sentinel/{$script}", ['engine' => $driver::flavor()], $env);
+        return $driver->task($key, "engines.sentinel.{$script}", ['engine' => $driver::flavor()], $env);
     }
 }

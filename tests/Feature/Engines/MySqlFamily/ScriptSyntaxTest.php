@@ -13,7 +13,7 @@ it('renders every MySQL family script to valid bash', function (string $engine) 
     $invalid = [];
 
     foreach ($scripts as $script) {
-        $name = (str_contains($script->getPath(), 'mysql-family') ? 'mysql-family/' : "{$engine}/").str_replace('.blade.php', '', $script->getRelativePathname());
+        $name = (str_contains($script->getPath(), 'mysql-family') ? 'engines.mysql-family.' : "engines.{$engine}.").str_replace(['.blade.php', '/'], ['', '.'], $script->getRelativePathname());
         $check = Process::input(resolve(ScriptView::class)->render($node, $name, ['engine' => MySqlFamilyEngine::of($engine)]))->run(['bash', '-n']);
 
         if (! $check->successful()) {

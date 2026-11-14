@@ -12,7 +12,7 @@ it('renders every MongoDB script to valid bash and valid JavaScript', function (
     $invalid = [];
 
     foreach ($scripts as $script) {
-        $name = 'mongodb/'.str_replace('.blade.php', '', $script->getRelativePathname());
+        $name = 'engines.mongodb.'.str_replace(['.blade.php', '/'], ['', '.'], $script->getRelativePathname());
         $rendered = resolve(ScriptView::class)->render($node, $name);
         $bash = Process::input($rendered)->run(['bash', '-n']);
 

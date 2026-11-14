@@ -28,13 +28,11 @@ final readonly class ScriptView
      */
     private function viewOf(string $script): string
     {
-        $name = 'engines.'.str_replace('/', '.', $script);
-
-        if (! $this->views->exists($name)) {
+        if (! $this->views->exists($script)) {
             throw new InvalidArgumentException("There is no engine script {$script}.");
         }
 
-        return $name;
+        return $script;
     }
 
     private function quotingFor(string $engine): SqlQuoting

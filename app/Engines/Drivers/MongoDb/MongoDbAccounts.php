@@ -26,7 +26,7 @@ final readonly class MongoDbAccounts implements Accounts
 
     public function list(): AccountList
     {
-        $reply = $this->driver->read('mongodb/accounts/list');
+        $reply = $this->driver->read('engines.mongodb.accounts.list');
         $users = $this->withoutReserved($reply->strings('users'), self::RESERVED_USERS);
         $databases = $this->withoutReserved($reply->strings('databases'), self::RESERVED_DATABASES);
 
@@ -36,13 +36,13 @@ final readonly class MongoDbAccounts implements Accounts
     public function createDatabase(string $name): void
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $name);
-        $this->driver->run('mongodb/accounts/create-database', env: ['NAME' => Shell::withoutNul($name)]);
+        $this->driver->run('engines.mongodb.accounts.create-database', env: ['NAME' => Shell::withoutNul($name)]);
     }
 
     public function dropDatabase(string $name): void
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $name);
-        $this->driver->run('mongodb/accounts/drop-database', env: ['NAME' => Shell::withoutNul($name)]);
+        $this->driver->run('engines.mongodb.accounts.drop-database', env: ['NAME' => Shell::withoutNul($name)]);
     }
 
     public function createUser(string $name, string $password, array $grants, ?string $encryption): void
@@ -50,25 +50,25 @@ final readonly class MongoDbAccounts implements Accounts
         $this->refuseReserved(self::RESERVED_USERS, $name);
         $env = [...$this->passwordEnv($password, $encryption), ...$this->grantEnv($name, $grants)];
 
-        $this->driver->run('mongodb/accounts/create-user', env: $env);
+        $this->driver->run('engines.mongodb.accounts.create-user', env: $env);
     }
 
     public function setPassword(string $name, string $password, ?string $encryption): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
-        $this->driver->run('mongodb/accounts/set-password', env: [...$this->passwordEnv($password, $encryption), 'NAME' => Shell::withoutNul($name)]);
+        $this->driver->run('engines.mongodb.accounts.set-password', env: [...$this->passwordEnv($password, $encryption), 'NAME' => Shell::withoutNul($name)]);
     }
 
     public function grant(string $name, array $grants, bool $replication): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
-        $this->driver->run('mongodb/accounts/grant', env: [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
+        $this->driver->run('engines.mongodb.accounts.grant', env: [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
     }
 
     public function dropUser(string $name): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
-        $this->driver->run('mongodb/accounts/drop-user', env: ['NAME' => Shell::withoutNul($name)]);
+        $this->driver->run('engines.mongodb.accounts.drop-user', env: ['NAME' => Shell::withoutNul($name)]);
     }
 
     /**

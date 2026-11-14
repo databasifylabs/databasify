@@ -22,17 +22,17 @@ final readonly class MongoDbCluster implements Cluster
 
     public function enable(string $key): Operation
     {
-        return $this->driver->task($key, 'mongodb/cluster/enable', env: $this->setEnvOf());
+        return $this->driver->task($key, 'engines.mongodb.cluster.enable', env: $this->setEnvOf());
     }
 
     public function disable(): void
     {
-        $this->driver->run('mongodb/cluster/disable', timeout: self::WAITING_TIMEOUT, env: $this->setEnvOf());
+        $this->driver->run('engines.mongodb.cluster.disable', timeout: self::WAITING_TIMEOUT, env: $this->setEnvOf());
     }
 
     public function failover(string $targetIp): void
     {
-        $this->driver->run('mongodb/cluster/failover', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf(), 'TARGET' => $targetIp, 'TARGET_HOST' => MongoDbFiles::hostOf($targetIp)]);
+        $this->driver->run('engines.mongodb.cluster.failover', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf(), 'TARGET' => $targetIp, 'TARGET_HOST' => MongoDbFiles::hostOf($targetIp)]);
     }
 
     public function forceQuorum(bool $othersDown): void
@@ -41,13 +41,13 @@ final readonly class MongoDbCluster implements Cluster
             throw new EngineBusy('busy', 'forcing the replica set while other members may be alive would roll back writes; confirm the others are down');
         }
 
-        $this->driver->run('mongodb/cluster/force-quorum');
+        $this->driver->run('engines.mongodb.cluster.force-quorum');
     }
 
     public function membership(array $members): void
     {
         $nonVoting = array_filter($members, fn (Member $member): bool => ! $member->voting);
-        $this->driver->run('mongodb/cluster/membership', timeout: self::WAITING_TIMEOUT, env: [
+        $this->driver->run('engines.mongodb.cluster.membership', timeout: self::WAITING_TIMEOUT, env: [
             ...$this->setEnvOf(),
             'WANTED' => $this->hostsOf($members),
             'NON_VOTING' => $this->hostsOf($nonVoting),
@@ -56,24 +56,24 @@ final readonly class MongoDbCluster implements Cluster
 
     public function position(): ?int
     {
-        return $this->driver->read('mongodb/cluster/position')->nullableInt('position');
+        return $this->driver->read('engines.mongodb.cluster.position')->nullableInt('position');
     }
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->driver->read('mongodb/cluster/quorum');
+        $reply = $this->driver->read('engines.mongodb.cluster.quorum');
 
         return new QuorumCount($reply->int('total'), $reply->int('online'));
     }
 
     public function rejoin(string $key, bool $readOnly): Operation
     {
-        return $this->driver->task($key, 'mongodb/cluster/rejoin', env: $this->setEnvOf());
+        return $this->driver->task($key, 'engines.mongodb.cluster.rejoin', env: $this->setEnvOf());
     }
 
     public function forget(string $ip): void
     {
-        $this->driver->run('mongodb/members/forget', env: [...$this->setEnvOf(), 'GONE' => MongoDbFiles::hostOf($ip)]);
+        $this->driver->run('engines.mongodb.members.forget', env: [...$this->setEnvOf(), 'GONE' => MongoDbFiles::hostOf($ip)]);
     }
 
     /**

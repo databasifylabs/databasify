@@ -27,7 +27,7 @@ final readonly class PostgresMigration implements Migration
     {
         $env = [...$this->sourceEnv($source), 'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR)];
 
-        return SourceReport::fromPayload(($this->driver->read('postgres/migration/check', $this->driver->data(), timeout: self::CHECK_TIMEOUT, env: $env)));
+        return SourceReport::fromPayload(($this->driver->read('engines.postgres.migration.check', $this->driver->data(), timeout: self::CHECK_TIMEOUT, env: $env)));
     }
 
     public function start(MigrationStart $start): void
@@ -40,24 +40,24 @@ final readonly class PostgresMigration implements Migration
             throw new InvalidEngineRequest('invalid_request', 'continuous PostgreSQL migrations need a publication');
         }
 
-        $this->driver->run('postgres/migration/start', $this->driver->data(), env: [
+        $this->driver->run('engines.postgres.migration.start', $this->driver->data(), env: [
             ...$this->sourceEnv($start->source),
             'MIGRATION_DATABASES' => implode("\n", $start->databases),
             'MIGRATION_OWNER' => $start->owner,
             'MIGRATION_CONTINUOUS' => 'false',
             'MIGRATION_PUBLICATION' => '',
-            'COPY_SCRIPT' => base64_encode($this->views->render($this->driver->node, 'postgres/migration/copy', $this->driver->data())),
+            'COPY_SCRIPT' => base64_encode($this->views->render($this->driver->node, 'engines.postgres.migration.copy', $this->driver->data())),
         ]);
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->driver->read('postgres/migration/progress', $this->driver->data())));
+        return MigrationProgress::fromPayload(($this->driver->read('engines.postgres.migration.progress', $this->driver->data())));
     }
 
     public function stop(): void
     {
-        $this->driver->run('postgres/migration/stop', $this->driver->data(), timeout: self::STOP_TIMEOUT);
+        $this->driver->run('engines.postgres.migration.stop', $this->driver->data(), timeout: self::STOP_TIMEOUT);
     }
 
     /**

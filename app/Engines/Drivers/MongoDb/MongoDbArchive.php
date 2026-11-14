@@ -27,7 +27,7 @@ final readonly class MongoDbArchive implements Archive
             throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
         }
 
-        $reply = $this->driver->read('mongodb/archive/status', timeout: 900, env: [
+        $reply = $this->driver->read('engines.mongodb.archive.status', timeout: 900, env: [
             'PBM_CONFIG' => MongoDbFiles::pbmConfigOf($saved->archive->storage, true),
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
         ]);
@@ -43,7 +43,7 @@ final readonly class MongoDbArchive implements Archive
         );
 
         if ($backUpNow || ($status->backups === 0 && $status->problem === null)) {
-            $this->driver->run('mongodb/archive/back-up');
+            $this->driver->run('engines.mongodb.archive.back-up');
         }
 
         return $status;
@@ -57,7 +57,7 @@ final readonly class MongoDbArchive implements Archive
             throw new EngineBusy('busy', 'configure archive on this database before restoring into it');
         }
 
-        return $this->driver->task($key, 'mongodb/restore/start', env: [
+        return $this->driver->task($key, 'engines.mongodb.restore.start', env: [
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
             'RESTORE_CONFIG' => MongoDbFiles::pbmConfigOf($storage, false),
             'SAVED_CONFIG' => MongoDbFiles::pbmConfigOf($saved->archive->storage, false),

@@ -23,7 +23,7 @@ function archivedNode(string $engine, string $case): DatabaseNode
 }
 
 it('reads the base backups and shipped binlogs like the Go engine', function () {
-    $this->scripts->respond('mysql-family/archive/status', [
+    $this->scripts->respond('engines.mysql-family.archive.status', [
         'base' => [
             ['Path' => '20261110T030000Z.xbstream', 'ModTime' => '2026-11-10T03:05:00Z'],
             ['Path' => '20261110T030000Z.binlog-info', 'ModTime' => '2026-11-10T03:05:00Z'],
@@ -42,7 +42,7 @@ it('reads the base backups and shipped binlogs like the Go engine', function () 
         ->and($status->lastBackup)->toEqual(CarbonImmutable::parse('2026-11-11T03:00:00Z'))
         ->and($status->latest)->toEqual(CarbonImmutable::parse('2026-11-12T02:15:30.5Z'))
         ->and($status->problem)->toBe('The last base backup failed, see the mysql-backup log.');
-    $this->scripts->assertRan('mysql-family/archive/status', fn (string $script, array $env): bool => $env['RCLONE_REMOTE'] === ':s3,provider=Other,endpoint="https://s3.example.com:9000",region="us-east-1",force_path_style=true,no_check_bucket=true:bk/'
+    $this->scripts->assertRan('engines.mysql-family.archive.status', fn (string $script, array $env): bool => $env['RCLONE_REMOTE'] === ':s3,provider=Other,endpoint="https://s3.example.com:9000",region="us-east-1",force_path_style=true,no_check_bucket=true:bk/'
         && $env['STORAGE_PATH'] === 'db/x'
         && $env['RCLONE_S3_SECRET_ACCESS_KEY'] === "S'K"
         && $env['RCLONE_CONFIG'] === '/dev/null'
@@ -62,7 +62,7 @@ it('restores to a point in time as a task', function (string $engine, string $su
 
     idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole()->driver()->archive()->restore('restore.1', $storage, CarbonImmutable::parse('2026-11-12 09:30:00', 'Asia/Dhaka'));
 
-    $this->scripts->assertRan("{$engine}/restore/start", fn (string $script, array $env): bool => $env['TARGET'] === '2026-11-12 03:30:00'
+    $this->scripts->assertRan("engines.{$engine}.restore.start", fn (string $script, array $env): bool => $env['TARGET'] === '2026-11-12 03:30:00'
         && $env['TARGET_STAMP'] === '20261112T033000Z'
         && $env['TARGET_RFC3339'] === '2026-11-12T03:30:00Z'
         && $env['SUFFIX'] === $suffix
@@ -75,7 +75,7 @@ it('restores to a point in time as a task', function (string $engine, string $su
 ]);
 
 it('checks a MySQL source with the Go readiness rules', function () {
-    $this->scripts->respond('mysql-family/migration/check', [
+    $this->scripts->respond('engines.mysql-family.migration.check', [
         'error' => null,
         'version' => '9.7.1-commercial',
         'visible' => ['app', 'shop'],
@@ -102,11 +102,11 @@ it('checks a MySQL source with the Go readiness rules', function () {
             'the source runs 9.7.1, newer than this server; copying to an older version is not supported',
         ])
         ->and($check->problems)->toBe(['Databasify cannot read gone on the source.', 'MySQL Shell copies only as a source user with SELECT on mysql.* (it reads the roles), grant it and check again']);
-    $this->scripts->assertRan('mysql-family/migration/check', fn (string $script, array $env): bool => $env['SOURCE_PASSWORD'] === "p'w" && $env['SOURCE_TLS'] === 'true' && ! str_contains($script, "p'w"));
+    $this->scripts->assertRan('engines.mysql-family.migration.check', fn (string $script, array $env): bool => $env['SOURCE_PASSWORD'] === "p'w" && $env['SOURCE_TLS'] === 'true' && ! str_contains($script, "p'w"));
 });
 
 it('checks a MySQL source for MariaDB as a one-shot copy only', function () {
-    $this->scripts->respond('mysql-family/migration/check', [
+    $this->scripts->respond('engines.mysql-family.migration.check', [
         'error' => null, 'version' => '8.4.13', 'visible' => ['app'], 'sizes' => ['app' => 0], 'localTables' => ['app' => 0], 'missingKeys' => ['app' => 0],
         'logBin' => '1', 'binlogFormat' => 'ROW', 'grants' => ['GRANT ALL PRIVILEGES ON *.* TO `m`@`%`'], 'localVersion' => '11.8.3-MariaDB-ubu2404',
     ]);
@@ -119,7 +119,7 @@ it('checks a MySQL source for MariaDB as a one-shot copy only', function () {
 });
 
 it('reports an unreachable source with the first line of the error', function () {
-    $this->scripts->respond('mysql-family/migration/check', ['error' => "ERROR 2003 (HY000): Can't connect to MySQL server on '10.0.0.9:3306' (111)"]);
+    $this->scripts->respond('engines.mysql-family.migration.check', ['error' => "ERROR 2003 (HY000): Can't connect to MySQL server on '10.0.0.9:3306' (111)"]);
 
     $check = idleDatabase('mysql', 1)->nodes()->sole()->driver()->migration()->check(new MigrationSource('10.0.0.9', 3306, 'm', 'pw', false), []);
 
@@ -129,7 +129,7 @@ it('reports an unreachable source with the first line of the error', function ()
 it('starts the copy job in its transient unit without the password on argv', function (string $engine) {
     idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole()->driver()->migration()->start(new MigrationStartData(new MigrationSource('10.0.0.9', 3306, 'm', "p'w", true), ['app', 'shop'], true, null));
 
-    $this->scripts->assertRan('mysql-family/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_PASSWORD'] === "p'w"
+    $this->scripts->assertRan('engines.mysql-family.migration.start', fn (string $script, array $env): bool => $env['MIGRATION_PASSWORD'] === "p'w"
         && $env['MIGRATION_DATABASES'] === "app\nshop"
         && $env['MIGRATION_CONTINUOUS'] === 'true'
         && $env['MIGRATION_TLS'] === 'true'
@@ -139,14 +139,14 @@ it('starts the copy job in its transient unit without the password on argv', fun
 })->with(['mysql', 'mariadb']);
 
 it('reads the migration progress and stops the copy', function (string $engine, string $ignored) {
-    $this->scripts->respond('mysql-family/migration/progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => 3]);
+    $this->scripts->respond('engines.mysql-family.migration.progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => 3]);
     $node = idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole();
 
     $progress = $node->driver()->migration()->progress();
     $node->driver()->migration()->stop();
 
     expect($progress->phase)->toBe(MigrationPhase::Working)->and($progress->detail)->toBe('copying shop');
-    $this->scripts->assertRan('mysql-family/migration/stop', fn (string $script): bool => str_contains($script, $ignored));
+    $this->scripts->assertRan('engines.mysql-family.migration.stop', fn (string $script): bool => str_contains($script, $ignored));
 })->with([
     'mysql' => ['mysql', "'Error 3074 '"],
     'mariadb' => ['mariadb', "'Error 1617 '"],
@@ -176,9 +176,9 @@ it('collects the source facts by running the real check script', function () {
 });
 
 it('requires TLS to a MariaDB source when the source asks for it', function () {
-    $this->scripts->respond('mysql-family/migration/check', ['error' => 'unreachable']);
+    $this->scripts->respond('engines.mysql-family.migration.check', ['error' => 'unreachable']);
 
     idleDatabase('mariadb', 1)->nodes()->sole()->driver()->migration()->check(new MigrationSource('10.0.0.9', 3306, 'm', 'pw', true), []);
 
-    $this->scripts->assertRan('mysql-family/migration/check', fn (string $script): bool => str_contains($script, "printf 'ssl\\nskip-ssl-verify-server-cert\\n'"));
+    $this->scripts->assertRan('engines.mysql-family.migration.check', fn (string $script): bool => str_contains($script, "printf 'ssl\\nskip-ssl-verify-server-cert\\n'"));
 });

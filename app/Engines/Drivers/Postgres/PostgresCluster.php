@@ -21,50 +21,50 @@ final readonly class PostgresCluster implements Cluster
 
     public function enable(string $key): Operation
     {
-        return $this->driver->task($key, 'postgres/cluster/enable', $this->driver->data());
+        return $this->driver->task($key, 'engines.postgres.cluster.enable', $this->driver->data());
     }
 
     public function disable(): void
     {
-        $this->driver->run('postgres/cluster/disable-stop', $this->driver->data());
+        $this->driver->run('engines.postgres.cluster.disable-stop', $this->driver->data());
         $config = $this->configuration->savedConfig() ?? throw new EngineBusy('busy', 'run node configure first');
         $this->configuration->configure(new NodeConfig(false, false, $config->ip, $config->databaseId, $config->members, $config->settings, $config->secrets, $config->archive, $config->primary));
-        $this->driver->run('postgres/cluster/disable-finish', $this->driver->data(), timeout: 420);
+        $this->driver->run('engines.postgres.cluster.disable-finish', $this->driver->data(), timeout: 420);
     }
 
     public function failover(string $targetIp): void
     {
-        $this->driver->run('postgres/cluster/failover', $this->driver->data(), timeout: 480, env: ['TARGET' => $targetIp]);
+        $this->driver->run('engines.postgres.cluster.failover', $this->driver->data(), timeout: 480, env: ['TARGET' => $targetIp]);
     }
 
     public function forceQuorum(bool $othersDown): void
     {
-        $this->driver->run('postgres/cluster/force-quorum', $this->driver->data(), timeout: self::WAITING_TIMEOUT, env: ['OTHERS_DOWN' => $othersDown ? 'true' : 'false']);
+        $this->driver->run('engines.postgres.cluster.force-quorum', $this->driver->data(), timeout: self::WAITING_TIMEOUT, env: ['OTHERS_DOWN' => $othersDown ? 'true' : 'false']);
     }
 
     public function membership(array $members): void
     {
-        $this->driver->run('postgres/cluster/membership', $this->driver->data(), env: ['HOSTS' => PostgresFiles::etcdHostsOf($members)]);
+        $this->driver->run('engines.postgres.cluster.membership', $this->driver->data(), env: ['HOSTS' => PostgresFiles::etcdHostsOf($members)]);
     }
 
     public function rejoin(string $key, bool $readOnly): Operation
     {
-        return $this->driver->task($key, 'postgres/cluster/rejoin', $this->driver->data());
+        return $this->driver->task($key, 'engines.postgres.cluster.rejoin', $this->driver->data());
     }
 
     public function forget(string $ip): void
     {
-        $this->driver->run('postgres/members/forget', $this->driver->data(), env: ['IP' => $ip]);
+        $this->driver->run('engines.postgres.members.forget', $this->driver->data(), env: ['IP' => $ip]);
     }
 
     public function position(): ?int
     {
-        return $this->driver->read('postgres/cluster/position', $this->driver->data(), timeout: 180, env: ['LINE' => $this->driver->node->database->version_line])->nullableInt('position');
+        return $this->driver->read('engines.postgres.cluster.position', $this->driver->data(), timeout: 180, env: ['LINE' => $this->driver->node->database->version_line])->nullableInt('position');
     }
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->driver->read('postgres/cluster/quorum', $this->driver->data(), timeout: 300);
+        $reply = $this->driver->read('engines.postgres.cluster.quorum', $this->driver->data(), timeout: 300);
 
         return new QuorumCount($reply->int('total'), $reply->int('online'));
     }

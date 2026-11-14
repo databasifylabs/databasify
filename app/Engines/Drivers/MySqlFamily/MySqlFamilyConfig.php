@@ -40,7 +40,7 @@ final readonly class MySqlFamilyConfig implements Config
             }
         }
 
-        $this->scripts->run($this->driver, 'mysql-family/config/apply', [
+        $this->scripts->run($this->driver, 'engines.mysql-family.config.apply', [
             'SETS' => json_encode($sets, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'KEYS' => json_encode(array_keys($effective), JSON_THROW_ON_ERROR),
             'STATIC' => json_encode($static, JSON_THROW_ON_ERROR),
@@ -56,7 +56,7 @@ final readonly class MySqlFamilyConfig implements Config
         $catalog = $this->configuration->catalogOf();
         $effective = $catalog->effective($this->configuration->tunedOf($request), $request->settings);
         $names = implode(',', array_map(fn (EngineField $field): string => "'".$this->variableOf($field->key)."'", $catalog->fields));
-        $live = $this->scripts->read($this->driver, 'mysql-family/config/show', ['NAMES' => $names])->stringMap('values');
+        $live = $this->scripts->read($this->driver, 'engines.mysql-family.config.show', ['NAMES' => $names])->stringMap('values');
         $pending = [];
 
         foreach ($catalog->fields as $field) {

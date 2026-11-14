@@ -28,7 +28,7 @@ it('refuses a NUL byte', function (Closure $quote) {
 
 it('quotes in bash exactly as in PHP', function (string $engine, string $value) {
     $node = idleDatabase($engine, 1)->nodes()->sole();
-    $script = resolve(ScriptView::class)->render($node, 'testing/my-quote', ['engine' => MySqlFamilyEngine::of($engine)]);
+    $script = resolve(ScriptView::class)->render($node, 'engines.testing.my-quote', ['engine' => MySqlFamilyEngine::of($engine)]);
 
     $run = Process::input($script)->env(['VALUE' => $value])->run(['bash', '-euo', 'pipefail', '-s']);
 
@@ -56,12 +56,12 @@ function runWithClient(string $engine, string $stderr, int $exit): EngineError
     chmod("{$bin}/timeout", 0755);
     chmod("{$bin}/{$engine}", 0755);
     $node = idleDatabase($engine, 1)->nodes()->sole();
-    $script = resolve(ScriptView::class)->render($node, 'testing/my-run', ['engine' => MySqlFamilyEngine::of($engine)]);
+    $script = resolve(ScriptView::class)->render($node, 'engines.testing.my-run', ['engine' => MySqlFamilyEngine::of($engine)]);
 
     $run = Process::input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'CLIENT_STDERR' => $stderr])->run(['bash', '-euo', 'pipefail', '-s']);
     Process::run(['rm', '-rf', $bin]);
 
-    return ScriptFailure::of('testing/my-run', (int) $run->exitCode(), $run->output(), $run->errorOutput());
+    return ScriptFailure::of('engines.testing.my-run', (int) $run->exitCode(), $run->output(), $run->errorOutput());
 }
 
 it('turns client errors into the codes Go reports', function (string $stderr, string $class, string $message) {
@@ -91,7 +91,7 @@ it('turns off NO_BACKSLASH_ESCAPES for its own session so the quoting always hol
     chmod("{$bin}/timeout", 0755);
     chmod("{$bin}/{$engine}", 0755);
     $node = idleDatabase($engine, 1)->nodes()->sole();
-    $script = resolve(ScriptView::class)->render($node, 'testing/my-run', ['engine' => MySqlFamilyEngine::of($engine)]);
+    $script = resolve(ScriptView::class)->render($node, 'engines.testing.my-run', ['engine' => MySqlFamilyEngine::of($engine)]);
 
     Process::input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'ARGS_FILE' => "{$bin}/args"])->run(['bash', '-euo', 'pipefail', '-s'])->throw();
     $args = file_get_contents("{$bin}/args");
@@ -104,7 +104,7 @@ it('turns off NO_BACKSLASH_ESCAPES for its own session so the quoting always hol
 
 it('stops the script when a piped file write fails', function () {
     $node = idleDatabase('mysql', 1)->nodes()->sole();
-    $script = resolve(ScriptView::class)->render($node, 'testing/write-fails', ['engine' => MySqlFamilyEngine::of('mysql')]);
+    $script = resolve(ScriptView::class)->render($node, 'engines.testing.write-fails', ['engine' => MySqlFamilyEngine::of('mysql')]);
 
     $run = Process::input($script)->env(['TEST_ROOT' => sys_get_temp_dir().'/no-such-root-'.uniqid()])->run(['bash', '-euo', 'pipefail', '-s']);
 

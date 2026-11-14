@@ -30,7 +30,7 @@ final readonly class MySqlFamilyArchive implements Archive
         $archive = $this->configuration->savedRequestOf()->archive ?? throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
         $backupUnit = $engine->archiveUnits()['backup'];
 
-        $reply = $this->scripts->read($this->driver, 'mysql-family/archive/status', [
+        $reply = $this->scripts->read($this->driver, 'engines.mysql-family.archive.status', [
             ...FamilyFiles::storageEnvOf($archive->storage),
             'SUFFIX' => $engine->baseSuffix(),
             'BACKUP_UNIT' => $backupUnit,
@@ -55,7 +55,7 @@ final readonly class MySqlFamilyArchive implements Archive
     {
         $target = $target->utc();
 
-        return $this->scripts->start($this->driver, $key, '{engine}/restore/start', [
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.restore.start', [
             ...FamilyFiles::storageEnvOf($storage),
             'SUFFIX' => $this->driver->engine()->baseSuffix(),
             'TARGET' => $target->format('Y-m-d H:i:s'),

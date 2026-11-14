@@ -28,7 +28,7 @@ final readonly class MySqlFamilyCluster implements Cluster
         $reserved = ['RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR)];
         $env = $engine->id === 'mysql' ? ['GROUP_NAME' => MySqlFiles::groupNameOf($saved->databaseId)] : $this->filesEnvOf($saved);
 
-        return $this->scripts->start($this->driver, $key, '{engine}/cluster/enable', [...$reserved, ...$env]);
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.cluster.enable', [...$reserved, ...$env]);
     }
 
     public function disable(): void
@@ -40,12 +40,12 @@ final readonly class MySqlFamilyCluster implements Cluster
             $env = $this->filesEnvOf(new NodeConfig(false, $saved->readOnly, $saved->ip, $saved->databaseId, $saved->members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary));
         }
 
-        $this->scripts->run($this->driver, '{engine}/cluster/disable', $env, timeout: self::WAITING_TIMEOUT);
+        $this->scripts->run($this->driver, 'engines.{engine}.cluster.disable', $env, timeout: self::WAITING_TIMEOUT);
     }
 
     public function failover(string $targetIp): void
     {
-        $this->scripts->run($this->driver, '{engine}/cluster/failover', ['TARGET' => $targetIp], timeout: 180);
+        $this->scripts->run($this->driver, 'engines.{engine}.cluster.failover', ['TARGET' => $targetIp], timeout: 180);
     }
 
     public function forceQuorum(bool $othersDown): void
@@ -59,42 +59,42 @@ final readonly class MySqlFamilyCluster implements Cluster
         }
 
         $env = $mysql ? [] : $this->filesEnvOf($this->configuration->savedRequestOf());
-        $this->scripts->run($this->driver, '{engine}/cluster/force-quorum', $env, timeout: self::WAITING_TIMEOUT);
+        $this->scripts->run($this->driver, 'engines.{engine}.cluster.force-quorum', $env, timeout: self::WAITING_TIMEOUT);
     }
 
     public function membership(array $members): void
     {
         if ($this->driver->engine()->id === 'mysql') {
-            $this->scripts->run($this->driver, 'mysql/cluster/membership', ['SEEDS' => MySqlFiles::seedsOf($members)]);
+            $this->scripts->run($this->driver, 'engines.mysql.cluster.membership', ['SEEDS' => MySqlFiles::seedsOf($members)]);
 
             return;
         }
 
         $saved = $this->configuration->savedRequestOf();
-        $this->scripts->run($this->driver, 'mariadb/cluster/membership', $this->filesEnvOf(new NodeConfig($saved->clustered, $saved->readOnly, $saved->ip, $saved->databaseId, $members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary)));
+        $this->scripts->run($this->driver, 'engines.mariadb.cluster.membership', $this->filesEnvOf(new NodeConfig($saved->clustered, $saved->readOnly, $saved->ip, $saved->databaseId, $members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary)));
     }
 
     public function position(): ?int
     {
         if ($this->driver->engine()->id === 'mariadb') {
-            return $this->scripts->read($this->driver, 'mariadb/cluster/position', timeout: 300)->nullableInt('position');
+            return $this->scripts->read($this->driver, 'engines.mariadb.cluster.position', timeout: 300)->nullableInt('position');
         }
 
-        $executed = $this->scripts->read($this->driver, 'mysql/cluster/position')->nullableString('executed');
+        $executed = $this->scripts->read($this->driver, 'engines.mysql.cluster.position')->nullableString('executed');
 
         return $executed === null ? -1 : $this->transactionsIn($executed);
     }
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->scripts->read($this->driver, '{engine}/cluster/quorum');
+        $reply = $this->scripts->read($this->driver, 'engines.{engine}.cluster.quorum');
 
         return new QuorumCount($reply->int('total'), $reply->int('online'));
     }
 
     public function rejoin(string $key, bool $readOnly): Operation
     {
-        return $this->scripts->start($this->driver, $key, '{engine}/cluster/rejoin', ['READ_ONLY' => $readOnly ? 'true' : 'false']);
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.cluster.rejoin', ['READ_ONLY' => $readOnly ? 'true' : 'false']);
     }
 
     public function forget(string $ip): void
@@ -103,7 +103,7 @@ final readonly class MySqlFamilyCluster implements Cluster
             return;
         }
 
-        $this->scripts->run($this->driver, 'mysql/members/forget', ['SEED' => "{$ip}:".MySqlFiles::GROUP_PORT]);
+        $this->scripts->run($this->driver, 'engines.mysql.members.forget', ['SEED' => "{$ip}:".MySqlFiles::GROUP_PORT]);
     }
 
     /**

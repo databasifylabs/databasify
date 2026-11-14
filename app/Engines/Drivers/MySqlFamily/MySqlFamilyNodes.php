@@ -41,17 +41,17 @@ final readonly class MySqlFamilyNodes implements Nodes
 
     public function start(): void
     {
-        $this->scripts->run($this->driver, '{engine}/nodes/start', timeout: self::LIFECYCLE_TIMEOUT);
+        $this->scripts->run($this->driver, 'engines.{engine}.nodes.start', timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function wake(bool $all): void
     {
-        $this->scripts->run($this->driver, '{engine}/nodes/wake', timeout: self::WAKE_TIMEOUT);
+        $this->scripts->run($this->driver, 'engines.{engine}.nodes.wake', timeout: self::WAKE_TIMEOUT);
     }
 
     public function restart(): void
     {
-        $this->scripts->run($this->driver, 'mysql-family/nodes/restart', timeout: self::LIFECYCLE_TIMEOUT);
+        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.restart', timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function reset(int $peers, array $hosts): void
@@ -65,7 +65,7 @@ final readonly class MySqlFamilyNodes implements Nodes
             throw new InvalidEngineRequest('invalid_request', $this->driver->engine()->label.' needs the replication and agent secrets');
         }
 
-        $seed = $this->scripts->read($this->driver, '{engine}/nodes/bootstrap', ['REPLICATION_PASSWORD' => $secrets->replication, 'AGENT_PASSWORD' => $secrets->agent])->bool('seed');
+        $seed = $this->scripts->read($this->driver, 'engines.{engine}.nodes.bootstrap', ['REPLICATION_PASSWORD' => $secrets->replication, 'AGENT_PASSWORD' => $secrets->agent])->bool('seed');
 
         if ($seed && $account !== null) {
             $this->accounts->createDatabase($account->database);
@@ -76,24 +76,24 @@ final readonly class MySqlFamilyNodes implements Nodes
     public function installTls(string $certificate, string $key, string $ca): void
     {
         TlsPair::checkPair($certificate, $key, $ca);
-        $this->scripts->run($this->driver, 'mysql-family/nodes/tls-install', ['CERTIFICATE' => $certificate, 'KEY' => $key, 'CA' => $ca]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.tls-install', ['CERTIFICATE' => $certificate, 'KEY' => $key, 'CA' => $ca]);
     }
 
     public function ready(string $key, bool $expectPrimary): Operation
     {
-        return $this->scripts->start($this->driver, $key, '{engine}/nodes/ready', ['MANIFEST' => $this->manifestWithoutNewCluster()]);
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.nodes.ready', ['MANIFEST' => $this->manifestWithoutNewCluster()]);
     }
 
     public function status(): NodeStatus
     {
-        $reply = $this->scripts->read($this->driver, '{engine}/nodes/status');
+        $reply = $this->scripts->read($this->driver, 'engines.{engine}.nodes.status');
 
         return NodeStatus::reported(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
     }
 
     public function metrics(): NodeMetrics
     {
-        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'mysql-family/nodes/metrics'));
+        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'engines.mysql-family.nodes.metrics'));
     }
 
     private function manifestWithoutNewCluster(): string

@@ -18,7 +18,7 @@ it('creates a user with its name and password only in the env', function () {
 
     $this->node->driver()->accounts()->createUser($name, $password, [new Grant('shop', GrantAccess::Write)], null);
 
-    $this->scripts->assertRan('postgres/accounts/create-user', fn (string $script, array $env): bool => $env['NAME'] === $name
+    $this->scripts->assertRan('engines.postgres.accounts.create-user', fn (string $script, array $env): bool => $env['NAME'] === $name
         && $env['PASSWORD'] === $password
         && json_decode($env['GRANTS'], true) === [['database' => 'shop', 'access' => 'write']]
         && json_decode($env['RESERVED_DATABASES'], true) === ['postgres', 'template0', 'template1']
@@ -41,7 +41,7 @@ it('refuses reserved names and encryption choices before running anything', func
 ]);
 
 it('lists accounts without the reserved ones, sorted', function () {
-    $this->scripts->respond('postgres/accounts/list', ['users' => ['zed', 'postgres', 'app', 'replicator'], 'databases' => ['shop', 'postgres', 'app']]);
+    $this->scripts->respond('engines.postgres.accounts.list', ['users' => ['zed', 'postgres', 'app', 'replicator'], 'databases' => ['shop', 'postgres', 'app']]);
 
     $reply = $this->node->driver()->accounts()->list();
 
@@ -53,8 +53,8 @@ it('creates and drops a database by name', function () {
     $this->node->driver()->accounts()->createDatabase('shop');
     $this->node->driver()->accounts()->dropDatabase('shop');
 
-    $this->scripts->assertRan('postgres/accounts/create-database', fn (string $script, array $env): bool => $env === ['NAME' => 'shop'] && str_contains($script, 'CREATE DATABASE :"name";'))
-        ->assertRan('postgres/accounts/drop-database', fn (string $script, array $env): bool => $env === ['NAME' => 'shop'] && str_contains($script, 'WITH (FORCE)'));
+    $this->scripts->assertRan('engines.postgres.accounts.create-database', fn (string $script, array $env): bool => $env === ['NAME' => 'shop'] && str_contains($script, 'CREATE DATABASE :"name";'))
+        ->assertRan('engines.postgres.accounts.drop-database', fn (string $script, array $env): bool => $env === ['NAME' => 'shop'] && str_contains($script, 'WITH (FORCE)'));
 });
 
 it('sets a password, grants with replication and drops a user', function () {
@@ -62,7 +62,7 @@ it('sets a password, grants with replication and drops a user', function () {
     $this->node->driver()->accounts()->grant('app', [new Grant('shop', GrantAccess::Read)], replication: true);
     $this->node->driver()->accounts()->dropUser('app');
 
-    $this->scripts->assertRan('postgres/accounts/set-password', fn (string $script, array $env): bool => $env === ['NAME' => 'app', 'PASSWORD' => 'n3w'])
-        ->assertRan('postgres/accounts/grant', fn (string $script, array $env): bool => $env['REPLICATION'] === 'true' && str_contains($script, 'ALTER ROLE :"name" REPLICATION'))
-        ->assertRan('postgres/accounts/drop-user', fn (string $script, array $env): bool => $env === ['NAME' => 'app'] && str_contains($script, 'REASSIGN OWNED BY'));
+    $this->scripts->assertRan('engines.postgres.accounts.set-password', fn (string $script, array $env): bool => $env === ['NAME' => 'app', 'PASSWORD' => 'n3w'])
+        ->assertRan('engines.postgres.accounts.grant', fn (string $script, array $env): bool => $env['REPLICATION'] === 'true' && str_contains($script, 'ALTER ROLE :"name" REPLICATION'))
+        ->assertRan('engines.postgres.accounts.drop-user', fn (string $script, array $env): bool => $env === ['NAME' => 'app'] && str_contains($script, 'REASSIGN OWNED BY'));
 });
