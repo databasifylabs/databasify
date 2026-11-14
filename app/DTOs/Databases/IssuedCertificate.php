@@ -35,17 +35,6 @@ final readonly class IssuedCertificate
         return new self(self::namesIn($alternatives), CarbonImmutable::createFromTimestamp($facts['validTo_time_t']), self::hasRsaKey($pem));
     }
 
-    public static function fingerprintOf(string $pem): ?string
-    {
-        if ($pem === '') {
-            return null;
-        }
-
-        $fingerprint = openssl_x509_fingerprint($pem, 'sha256');
-
-        return $fingerprint === false ? null : $fingerprint;
-    }
-
     /**
      * @param  list<string>  $names
      */

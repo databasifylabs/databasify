@@ -29,7 +29,7 @@ final readonly class ImageResolver
         $images = $this->releasesIn($engine->imageRepository, $line)->remember();
         $newest = $images->first() ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $engine->imageRepository);
 
-        return new LineImages($newest, $images->first(fn (EngineImage $image): bool => SdkRange::allows($image->sdk)));
+        return new LineImages($newest, $images->first(fn (EngineImage $image): bool => SdkRange::supports($image)));
     }
 
     /**

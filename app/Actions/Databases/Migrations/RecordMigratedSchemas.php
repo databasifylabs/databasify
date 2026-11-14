@@ -22,7 +22,15 @@ final readonly class RecordMigratedSchemas
             return;
         }
 
-        $copied = $this->record->handle($database, $this->sourceDatabasesOf($migration));
+        $source = $migration->source;
+        $report = $source->databases === [] ? rescue(fn (): SourceReport => $this->check->handle($database, $source), report: false) : null;
+        $names = match (true) {
+            $source->databases !== [] => $source->databases,
+            $report?->reachable === true => $report->databases,
+            default => $source->discovered,
+        };
+
+        $copied = $this->record->handle($database, $names);
         $default = $database->settings->defaultUsername();
 
         if ($copied === [] || $default === '') {
@@ -30,25 +38,5 @@ final readonly class RecordMigratedSchemas
         }
 
         $database->driver()->accounts()->grant($default, $database->writeGrants(), false);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function sourceDatabasesOf(DatabaseMigration $migration): array
-    {
-        $source = $migration->source;
-
-        if ($source->databases !== []) {
-            return $source->databases;
-        }
-
-        $report = rescue(fn (): SourceReport => $this->check->handle($migration->database, $source), report: false);
-
-        if ($report?->reachable !== true) {
-            return $source->discovered;
-        }
-
-        return $report->databases;
     }
 }

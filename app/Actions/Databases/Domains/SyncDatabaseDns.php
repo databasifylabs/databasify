@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Domains;
 
-use App\DTOs\Databases\DatabaseHostnames;
 use App\DTOs\Dns\HostPair;
 use App\Exceptions\Providers\ProviderRequestFailed;
 use App\Models\Database;
@@ -29,69 +28,50 @@ final readonly class SyncDatabaseDns
     public function handle(Database $loaded): void
     {
         try {
-            $loaded->dnsLock()->block(self::WAIT_SECONDS, fn () => $this->syncCurrent($loaded));
+            $loaded->dnsLock()->block(self::WAIT_SECONDS, function () use ($loaded): void {
+                $database = $loaded->fresh();
+                $zone = $database?->dnsZone;
+                $hostnames = $database?->hostnames();
+
+                if ($database === null || $zone === null || $hostnames === null) {
+                    return;
+                }
+
+                $failureKey = "dns-sync-failed:{$database->id}";
+
+                try {
+                    $nodes = $database->nodesWithServers()->each(fn (DatabaseNode $node) => $node->setRelation('database', $database));
+                    $members = $nodes->members();
+                    $primary = $members->soloPrimary();
+
+                    if ($primary !== null) {
+                        $this->pointPair($zone, $hostnames->primary, collect([$primary]));
+                        $this->pointPair($zone, $hostnames->replica, $members->readers($primary));
+                    }
+
+                    $nodes->readOnly()->each(function (DatabaseNode $node) use ($zone): void {
+                        $pair = $node->hostnames();
+
+                        if ($pair !== null) {
+                            $this->pointPair($zone, $pair, collect([$node]));
+                        }
+                    });
+
+                    $records = $database->serviceRecords();
+
+                    if ($records !== null) {
+                        $this->services->handle($records, $nodes);
+                    }
+
+                    Cache::forget($failureKey);
+                } catch (ProviderRequestFailed $failure) {
+                    if (Cache::add($failureKey, true, self::REMIND_SECONDS)) {
+                        $database->seed()->server->logFailure('Sync DNS records', "Could not update the DNS records of {$database->name}: {$failure->getMessage()}", $database);
+                    }
+                }
+            });
         } catch (LockTimeoutException) {
             return;
-        }
-    }
-
-    private function syncCurrent(Database $loaded): void
-    {
-        $database = $loaded->fresh();
-        $zone = $database?->dnsZone;
-        $hostnames = $database?->hostnames();
-
-        if ($database === null || $zone === null || $hostnames === null) {
-            return;
-        }
-
-        try {
-            $this->publish($database, $zone, $hostnames);
-            Cache::forget($this->failureKeyOf($database));
-        } catch (ProviderRequestFailed $failure) {
-            $this->reportOnce($database, $failure);
-        }
-    }
-
-    private function reportOnce(Database $database, ProviderRequestFailed $failure): void
-    {
-        if (! Cache::add($this->failureKeyOf($database), true, self::REMIND_SECONDS)) {
-            return;
-        }
-
-        $database->seed()->server->logFailure('Sync DNS records', "Could not update the DNS records of {$database->name}: {$failure->getMessage()}", $database);
-    }
-
-    private function failureKeyOf(Database $database): string
-    {
-        return "dns-sync-failed:{$database->id}";
-    }
-
-    private function publish(Database $database, DnsZone $zone, DatabaseHostnames $hostnames): void
-    {
-        $nodes = $database->nodesWithServers()->each(fn (DatabaseNode $node) => $node->setRelation('database', $database));
-        $members = $nodes->members();
-        $primary = $members->soloPrimary();
-
-        if ($primary !== null) {
-            $this->pointPair($zone, $hostnames->primary, collect([$primary]));
-            $this->pointPair($zone, $hostnames->replica, $members->readers($primary));
-        }
-
-        $nodes->readOnly()->each(fn (DatabaseNode $node) => $this->pointNode($zone, $node));
-        $records = $database->serviceRecords();
-
-        if ($records !== null) {
-            $this->services->handle($records, $nodes);
-        }
-    }
-
-    private function pointNode(DnsZone $zone, DatabaseNode $node): void
-    {
-        $hostnames = $node->hostnames();
-
-        if ($hostnames !== null) {
-            $this->pointPair($zone, $hostnames, collect([$node]));
         }
     }
 
@@ -100,17 +80,7 @@ final readonly class SyncDatabaseDns
      */
     private function pointPair(DnsZone $zone, HostPair $pair, Collection $nodes): void
     {
-        $this->dns->point($zone, $pair->public, $this->addressesOf($nodes, fn (DatabaseNode $node): string => $node->server->address()));
-        $this->dns->point($zone, $pair->private, $this->addressesOf($nodes, fn (DatabaseNode $node): string => $node->privateIp()));
-    }
-
-    /**
-     * @param  Collection<int, DatabaseNode>  $nodes
-     * @param  callable(DatabaseNode): string  $address
-     * @return list<string>
-     */
-    private function addressesOf(Collection $nodes, callable $address): array
-    {
-        return array_values($nodes->map($address)->unique()->sort()->all());
+        $this->dns->point($zone, $pair->public, array_values($nodes->map(fn (DatabaseNode $node): string => $node->server->address())->unique()->sort()->all()));
+        $this->dns->point($zone, $pair->private, array_values($nodes->map(fn (DatabaseNode $node): string => $node->privateIp())->unique()->sort()->all()));
     }
 }

@@ -20,7 +20,6 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Jobs\Concerns\FinishesOperation;
-use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\StorageProvider;
@@ -54,7 +53,7 @@ final class CreateDatabaseJob implements ShouldQueue
     ): void {
         $database = $this->database;
         $database->markCreating();
-        $nodes = $this->nodesOf($database);
+        $nodes = $database->orderedNodesWithout();
 
         foreach ($nodes as $node) {
             $deploy->handle($database, $node);
@@ -69,8 +68,23 @@ final class CreateDatabaseJob implements ShouldQueue
             $tasks->await($node, 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, expectPrimary: $node->isSeed()));
         }
 
-        $nodes->each($this->bootstrap(...));
-        $this->restoreArchiveOf($database, $tasks, $restoredAccounts);
+        $settings = $database->settings;
+
+        foreach ($nodes as $node) {
+            try {
+                $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
+            } catch (EngineUnsupported) {
+            }
+        }
+
+        $source = $settings->restore;
+
+        if ($source !== null) {
+            $seed = $database->seed();
+            $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
+            $tasks->await($seed, 'restoring the archive', fn (string $key): Operation => $seed->driver()->archive()->restore($key, $storage, $source->target));
+            $restoredAccounts->handle($database);
+        }
 
         if ($nodes->count() > 1) {
             $nodes->each(fn (DatabaseNode $node) => $tasks->await($node, 'joining the cluster', fn (string $key): Operation => $node->driver()->cluster()->enable($key)));
@@ -83,7 +97,7 @@ final class CreateDatabaseJob implements ShouldQueue
     protected function endFailed(Database $database): void
     {
         $runtime = resolve(Runtime::class);
-        $database->ignoringStop(fn () => $this->nodesOf($database)->each(fn (DatabaseNode $node) => rescue(fn () => $runtime->remove($node, erase: true))));
+        $database->ignoringStop(fn () => $database->orderedNodesWithout()->each(fn (DatabaseNode $node) => rescue(fn () => $runtime->remove($node, erase: true))));
         $database->markFailed();
     }
 
@@ -95,34 +109,5 @@ final class CreateDatabaseJob implements ShouldQueue
     protected function operationName(): string
     {
         return "Create {$this->database->engine()->label} database";
-    }
-
-    private function bootstrap(DatabaseNode $node): void
-    {
-        $settings = $node->database->settings;
-
-        try {
-            $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
-        } catch (EngineUnsupported) {
-        }
-    }
-
-    private function restoreArchiveOf(Database $database, EngineTasks $tasks, ReconcileRestoredAccounts $restoredAccounts): void
-    {
-        $source = $database->settings->restore;
-
-        if ($source === null) {
-            return;
-        }
-
-        $seed = $database->seed();
-        $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
-        $tasks->await($seed, 'restoring the archive', fn (string $key): Operation => $seed->driver()->archive()->restore($key, $storage, $source->target));
-        $restoredAccounts->handle($database);
-    }
-
-    private function nodesOf(Database $database): DatabaseNodeCollection
-    {
-        return $database->nodes()->with('server', 'database')->orderBy('position')->get();
     }
 }

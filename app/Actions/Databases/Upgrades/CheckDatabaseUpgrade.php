@@ -20,7 +20,16 @@ final readonly class CheckDatabaseUpgrade
     public function handle(Database $database): ?EngineImage
     {
         $images = $this->resolver->imagesOf($database, $database->version_line);
-        $this->warnUnlessSupported($images->newest, $database);
+        $newest = $images->newest;
+        $refusalKey = "sdk-refused:{$database->id}";
+
+        if (SdkRange::supports($newest)) {
+            Cache::forget($refusalKey);
+        } elseif (Cache::get($refusalKey) !== $newest->digest) {
+            Cache::put($refusalKey, $newest->digest, now()->addDays(self::REFUSAL_TTL_DAYS));
+            $label = $database->engine()->label;
+            event(new DatabaseAlertRaised($database, "{$database->name} stays on {$label} {$database->image->release}", SdkRange::refusalFor($label, $newest)));
+        }
 
         if ($images->supported === null) {
             return null;
@@ -30,27 +39,5 @@ final readonly class CheckDatabaseUpgrade
         $database->recordAvailableImage($image);
 
         return $image;
-    }
-
-    private function warnUnlessSupported(EngineImage $newest, Database $database): void
-    {
-        if (SdkRange::allows($newest->sdk)) {
-            Cache::forget($this->refusalKeyOf($database));
-
-            return;
-        }
-
-        if (Cache::get($this->refusalKeyOf($database)) === $newest->digest) {
-            return;
-        }
-
-        Cache::put($this->refusalKeyOf($database), $newest->digest, now()->addDays(self::REFUSAL_TTL_DAYS));
-        $label = $database->engine()->label;
-        event(new DatabaseAlertRaised($database, "{$database->name} stays on {$label} {$database->image->release}", SdkRange::refusalOf("{$label} {$newest->release}", $newest->sdk)));
-    }
-
-    private function refusalKeyOf(Database $database): string
-    {
-        return "sdk-refused:{$database->id}";
     }
 }

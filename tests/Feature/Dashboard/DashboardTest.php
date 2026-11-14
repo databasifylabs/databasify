@@ -61,8 +61,10 @@ it('counts the running logs in the summary', function () {
 it('previews ten servers and databases but counts every one in the summary', function () {
     $this->actingAs(User::factory()->create());
     Server::factory()->ready()->count(10)->create();
-    idleDatabase('valkey', 1, DatabaseMode::Single, 'cache')->update(['status' => DatabaseStatus::Ready]);
-    withReadOnlyNode(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
+    idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
+    $orders = idleDatabase('mysql', 1, DatabaseMode::Single, 'orders');
+    withReadOnlyNode($orders);
+    $orders->update(['status' => DatabaseStatus::Pending]);
 
     $this->get(projectUrl('/dashboard'))->assertInertia(fn (AssertableInertia $page) => $page
         ->has('servers.data', 10)

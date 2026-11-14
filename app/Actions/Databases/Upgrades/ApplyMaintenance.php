@@ -23,18 +23,11 @@ final readonly class ApplyMaintenance
         }
 
         try {
-            $this->upgradeIfAvailable($database);
+            if ($this->check->handle($database) !== null) {
+                $this->upgrade->handle($database);
+            }
         } catch (ImageUnavailable|ValidationException) {
             return;
         }
-    }
-
-    private function upgradeIfAvailable(Database $database): void
-    {
-        if ($this->check->handle($database) === null) {
-            return;
-        }
-
-        $this->upgrade->handle($database);
     }
 }

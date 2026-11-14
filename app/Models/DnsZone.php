@@ -7,6 +7,7 @@ namespace App\Models;
 use App\DTOs\Acme\AcmeCertificate;
 use App\DTOs\Databases\IssuedCertificate;
 use App\Models\Concerns\OrdersByName;
+use App\Support\Tls\CertificateFingerprint;
 use Carbon\CarbonImmutable;
 use Database\Factories\DnsZoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -82,7 +83,7 @@ class DnsZone extends Model
 
     public function certificateFingerprint(): ?string
     {
-        return IssuedCertificate::fingerprintOf($this->certificate ?? '');
+        return CertificateFingerprint::of($this->certificate ?? '');
     }
 
     public function certificateBundle(): ?string

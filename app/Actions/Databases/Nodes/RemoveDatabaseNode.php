@@ -14,14 +14,13 @@ final readonly class RemoveDatabaseNode
 {
     public function __construct(
         private RefreshDatabaseStatus $refresh,
-        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(DatabaseNode $node, bool $force = false): void
     {
         $database = $node->database;
         $database->ensureIdle();
-        $this->sized->handle($database, without: $node);
+        $database->nodesOtherThan($node)->each(fn (DatabaseNode $peer) => $peer->server->ensureSized());
         $this->refresh->handle($database);
         $node->refresh();
 

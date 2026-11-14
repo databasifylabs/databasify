@@ -7,7 +7,10 @@ namespace App\Models;
 use App\Casts\AsMigrationPosition;
 use App\Casts\AsMigrationSource;
 use App\DTOs\Migrations\MigrationPosition;
+use App\DTOs\Migrations\MigrationProgress;
 use App\DTOs\Migrations\MigrationSource;
+use App\Engines\Data\MigrationSource as EngineSource;
+use App\Engines\Data\MigrationStart;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Services\Ssh\Ssh;
@@ -20,6 +23,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * @property string $id
@@ -100,6 +104,30 @@ class DatabaseMigration extends Model
     public function isOneTime(): bool
     {
         return $this->mode === MigrationMode::OneTime;
+    }
+
+    public function start(): MigrationStart
+    {
+        $owner = $this->database->settings->defaultUsername();
+
+        return new MigrationStart(EngineSource::of($this->source), $this->source->databases, ! $this->isOneTime(), $owner === '' ? null : $owner);
+    }
+
+    public function currentProgress(): MigrationProgress
+    {
+        try {
+            $host = $this->host();
+
+            if (! $host->isPrimary()) {
+                return $this->hostLostPrimary()
+                    ? MigrationProgress::broken("The primary moved away from {$host->server->name} during the migration, start it again.")
+                    : MigrationProgress::stalled("{$host->server->name} did not report as the primary, checking again.");
+            }
+
+            return $host->driver()->migration()->progress();
+        } catch (Throwable $exception) {
+            return MigrationProgress::stalled("Could not check the migration: {$exception->getMessage()}");
+        }
     }
 
     public function hostLostPrimary(): bool

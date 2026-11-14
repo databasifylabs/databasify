@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\Databases\Certificates\IssueNodeCertificates;
 use App\Casts\AsDatabaseSettings;
 use App\Casts\AsEngineFields;
 use App\Casts\AsEngineImage;
@@ -17,7 +18,7 @@ use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\IssuedCertificate;
 use App\DTOs\Databases\LastFailure;
 use App\DTOs\Databases\MaintenanceWindow;
-use App\DTOs\Databases\ServerAccounts;
+use App\DTOs\Databases\NodeCertificate;
 use App\DTOs\Databases\ServiceRecords;
 use App\DTOs\Databases\UnsupportedSdk;
 use App\DTOs\Databases\VersionLine;
@@ -25,6 +26,7 @@ use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
+use App\Engines\Data\AccountList;
 use App\Engines\Data\EngineFacts;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Grant;
@@ -123,6 +125,21 @@ class Database extends Model implements Movable
         return $this->memberCount() > 1;
     }
 
+    public function certificateFor(DatabaseNode $node): NodeCertificate
+    {
+        $zone = $this->publicCertificateZone();
+
+        if ($zone?->certificate !== null && $zone->certificate_key !== null) {
+            return new NodeCertificate($zone->certificate, $zone->certificate_key, $zone->certificate);
+        }
+
+        return new NodeCertificate(
+            $this->settings->nodeCertificate($node->id, IssueNodeCertificates::CERTIFICATE) ?? '',
+            $this->settings->nodeCertificate($node->id, IssueNodeCertificates::KEY) ?? '',
+            $this->settings->certificate(self::CERTIFICATE_AUTHORITY),
+        );
+    }
+
     public function clientCaCertificate(): ?string
     {
         return $this->servesPublicCertificate() ? null : $this->settings->certificate(self::CERTIFICATE_AUTHORITY);
@@ -181,6 +198,11 @@ class Database extends Model implements Movable
     public function membersWithServers(): DatabaseNodeCollection
     {
         return $this->nodes()->members()->get();
+    }
+
+    public function orderedNodesWithout(?DatabaseNode $without = null): DatabaseNodeCollection
+    {
+        return $this->nodes()->with('server')->when($without, fn (Builder $query, DatabaseNode $leaving): Builder => $query->whereKeyNot($leaving->id))->orderBy('position')->get();
     }
 
     public function nodesOtherThan(DatabaseNode $node): DatabaseNodeCollection
@@ -470,7 +492,7 @@ class Database extends Model implements Movable
 
     public function runsSupportedSdk(?string $constraint = null): bool
     {
-        return SdkRange::allows($this->image->sdk, $constraint);
+        return SdkRange::supports($this->image, $constraint);
     }
 
     public function ensureRunsSupportedSdk(): void
@@ -708,7 +730,7 @@ class Database extends Model implements Movable
         $this->schemas()->createMany($source->schemas()->get()->map(fn (Schema $schema): array => $schema->only(['name'])));
     }
 
-    public function forgetAccountsMissingFrom(ServerAccounts $accounts): void
+    public function forgetAccountsMissingFrom(AccountList $accounts): void
     {
         $this->users()->whereNotIn('name', [...$accounts->users, $this->settings->defaultUsername()])->delete();
         $this->schemas()->whereNotIn('name', [...$accounts->databases, $this->settings->defaultSchema()])->delete();
@@ -812,10 +834,7 @@ class Database extends Model implements Movable
         return $this->availableImage()?->refreshes($this->image()) ?? false;
     }
 
-    /**
-     * @return Collection<int, DatabaseNode>
-     */
-    public function reachableMembers(): Collection
+    public function reachableMembers(): DatabaseNodeCollection
     {
         return $this->membersWithServers()
             ->filter(fn (DatabaseNode $node): bool => $node->role->isReachable() && $node->isAnswering())

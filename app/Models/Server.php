@@ -122,6 +122,18 @@ class Server extends Model implements Movable
         return NodeResources::of($this);
     }
 
+    /**
+     * @phpstan-assert int $this->cpus
+     * @phpstan-assert int $this->memory_mb
+     * @phpstan-assert int $this->disk_gb
+     */
+    public function ensureSized(): void
+    {
+        if ($this->cpus === null || $this->memory_mb === null || $this->disk_gb === null) {
+            throw ValidationException::withMessages(['server_id' => "{$this->name} has no known CPU, memory or disk size yet."]);
+        }
+    }
+
     public function isReady(): bool
     {
         return $this->status === ServerStatus::Ready;
@@ -358,6 +370,11 @@ class Server extends Model implements Movable
     public function logFailure(string $name, string $message, ?Database $database = null): void
     {
         $this->serverLogs()->create(['name' => $name, 'database_id' => $database?->id, 'status' => ServerLogStatus::Failed, 'output' => ServerLog::noteOf($message)]);
+    }
+
+    public function bootId(): string
+    {
+        return trim($this->ssh()->exec('ssh.servers.os.boot-id', timeout: 30));
     }
 
     public function ssh(?Database $database = null): Ssh

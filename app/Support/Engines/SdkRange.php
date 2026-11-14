@@ -20,9 +20,14 @@ final readonly class SdkRange
         return VersionConstraint::allows($constraint ?? self::constraint(), Str::of($sdk)->ltrim('v')->before('+')->value());
     }
 
+    public static function supports(EngineImage $image, ?string $constraint = null): bool
+    {
+        return self::allows($image->sdk, $constraint);
+    }
+
     public static function supported(string $engine, EngineImage $image): EngineImage
     {
-        if (self::allows($image->sdk)) {
+        if (self::supports($image)) {
             return $image;
         }
 
@@ -34,6 +39,11 @@ final readonly class SdkRange
         $built = $sdk ?? 'unknown';
 
         return "{$image} is built on SDK {$built}; this Databasify supports ".self::constraint().'.';
+    }
+
+    public static function refusalFor(string $engineLabel, EngineImage $image): string
+    {
+        return self::refusalOf("{$engineLabel} {$image->release}", $image->sdk);
     }
 
     public static function constraint(): string

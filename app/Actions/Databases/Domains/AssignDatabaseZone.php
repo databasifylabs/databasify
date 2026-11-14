@@ -23,37 +23,25 @@ final readonly class AssignDatabaseZone
     public function handle(Database $database, ?DnsZone $zone): void
     {
         $database->ensureIdle();
-        $this->ensureZoneChangesFor($database, $zone);
+
+        if ($zone?->id === $database->dns_zone_id) {
+            throw ValidationException::withMessages(['dns_zone_id' => $zone === null ? "{$database->name} doesn't use a domain." : "{$database->name} already uses {$zone->name}."]);
+        }
 
         if ($zone !== null) {
             $this->free->handle($zone, $database->hostnamesClaimedUnder($zone), 'dns_zone_id');
         }
 
         $database->dnsLock()->block(self::DNS_WAIT_SECONDS, function () use ($database, $zone): void {
-            $this->clearRecordsOf($database);
+            try {
+                $this->clear->handle($database);
+            } catch (ProviderRequestFailed $failure) {
+                throw ValidationException::withMessages(['dns_zone_id' => "Could not remove the DNS records of {$database->name}, try again: {$failure->getMessage()}"]);
+            }
+
             $database->moveToZone($zone);
         });
 
         $this->redeploy->handle($database);
-    }
-
-    private function clearRecordsOf(Database $database): void
-    {
-        try {
-            $this->clear->handle($database);
-        } catch (ProviderRequestFailed $failure) {
-            throw ValidationException::withMessages(['dns_zone_id' => "Could not remove the DNS records of {$database->name}, try again: {$failure->getMessage()}"]);
-        }
-    }
-
-    private function ensureZoneChangesFor(Database $database, ?DnsZone $zone): void
-    {
-        if ($zone?->id !== $database->dns_zone_id) {
-            return;
-        }
-
-        $message = $zone === null ? "{$database->name} doesn't use a domain." : "{$database->name} already uses {$zone->name}.";
-
-        throw ValidationException::withMessages(['dns_zone_id' => $message]);
     }
 }

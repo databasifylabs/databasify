@@ -29,45 +29,29 @@ final readonly class RefreshNodeStatuses
         }
 
         $previous = $database->nodesWithServers()->health();
-
         $statuses = $this->nodeRunner->map(
             $nodes,
             fn (DatabaseNode $node): NodeStatus => $this->readStatus->handle($database, $node),
             NodeStatus::class,
         );
         $anotherAnswersAsPrimary = collect($statuses)->contains(fn (NodeStatus $status): bool => $status->role === NodeRole::Primary);
-        $nodes->values()->each(fn (DatabaseNode $node, int $index) => $this->recordStatusOn($node, $statuses[$index] ?? NodeStatus::unreachable(), $anotherAnswersAsPrimary));
+
+        $nodes->values()->each(function (DatabaseNode $node, int $index) use ($statuses, $anotherAnswersAsPrimary): void {
+            $status = $statuses[$index] ?? NodeStatus::unreachable();
+            $status->isUnreachable() && $anotherAnswersAsPrimary && $node->isPrimary() ? $node->markUnreachable() : $node->recordStatus($status);
+        });
 
         $all = $database->nodesWithServers();
-        $this->announceChange($database, $all, $previous, $all->health());
+        $health = $all->health();
+
+        if ($previous !== $health && ! $database->status->isSettingUp()) {
+            event($health === 'healthy'
+                ? new DatabaseAlertRaised($database, "{$database->name} is healthy again", 'Every node is back and exactly one primary is serving writes.')
+                : new DatabaseAlertRaised($database, "{$database->name} is {$health}", $all->problems()));
+        }
+
         rescue(fn () => $this->dns->handle($database));
 
         return $all;
-    }
-
-    private function recordStatusOn(DatabaseNode $node, NodeStatus $status, bool $anotherAnswersAsPrimary): void
-    {
-        if ($status->isUnreachable() && $anotherAnswersAsPrimary && $node->isPrimary()) {
-            $node->markUnreachable();
-
-            return;
-        }
-
-        $node->recordStatus($status);
-    }
-
-    private function announceChange(Database $database, DatabaseNodeCollection $nodes, string $previous, string $health): void
-    {
-        if ($previous === $health || $database->status->isSettingUp()) {
-            return;
-        }
-
-        if ($health === 'healthy') {
-            event(new DatabaseAlertRaised($database, "{$database->name} is healthy again", 'Every node is back and exactly one primary is serving writes.'));
-
-            return;
-        }
-
-        event(new DatabaseAlertRaised($database, "{$database->name} is {$health}", $nodes->problems()));
     }
 }

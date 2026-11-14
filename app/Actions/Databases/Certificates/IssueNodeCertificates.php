@@ -21,7 +21,9 @@ final readonly class IssueNodeCertificates
 
     public function handle(Database $database): void
     {
-        $authority = $this->authorityOf($database);
+        $certificate = $database->settings->certificate(Database::CERTIFICATE_AUTHORITY);
+        $key = $database->settings->certificate(self::AUTHORITY_KEY);
+        $authority = $certificate !== '' && $key !== '' ? new KeyPair($certificate, $key) : $this->authority->newAuthority("{$database->name} CA");
         $settings = $database->settings->mergingCertificates([Database::CERTIFICATE_AUTHORITY => $authority->certificate, self::AUTHORITY_KEY => $authority->key]);
 
         foreach ($database->nodes()->with('server')->get() as $node) {
@@ -36,17 +38,5 @@ final readonly class IssueNodeCertificates
         }
 
         $database->update(['settings' => $settings]);
-    }
-
-    private function authorityOf(Database $database): KeyPair
-    {
-        $certificate = $database->settings->certificate(Database::CERTIFICATE_AUTHORITY);
-        $key = $database->settings->certificate(self::AUTHORITY_KEY);
-
-        if ($certificate !== '' && $key !== '') {
-            return new KeyPair($certificate, $key);
-        }
-
-        return $this->authority->newAuthority("{$database->name} CA");
     }
 }

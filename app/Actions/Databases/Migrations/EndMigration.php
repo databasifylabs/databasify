@@ -18,7 +18,11 @@ final readonly class EndMigration
 
     public function handle(DatabaseMigration $migration, bool $cutover, bool $force = false): void
     {
-        if (! $this->claimEndOf($migration, $cutover) && ! $force) {
+        $claimed = $cutover
+            ? $migration->finishIfActive(MigrationStatus::Completed, 'Finished: the database no longer follows the source, point your app at it.')
+            : $migration->finishIfActive(MigrationStatus::Stopped, 'Stopped before finishing.');
+
+        if (! $claimed && ! $force) {
             return;
         }
 
@@ -40,12 +44,5 @@ final readonly class EndMigration
         } catch (Throwable $exception) {
             throw_unless($force, $exception);
         }
-    }
-
-    private function claimEndOf(DatabaseMigration $migration, bool $cutover): bool
-    {
-        return $cutover
-            ? $migration->finishIfActive(MigrationStatus::Completed, 'Finished: the database no longer follows the source, point your app at it.')
-            : $migration->finishIfActive(MigrationStatus::Stopped, 'Stopped before finishing.');
     }
 }

@@ -21,4 +21,9 @@ final readonly class AccountList
     {
         return new self($payload->strings('users'), $payload->strings('databases'));
     }
+
+    public function hasUser(string $name): bool
+    {
+        return in_array($name, $this->users, true);
+    }
 }

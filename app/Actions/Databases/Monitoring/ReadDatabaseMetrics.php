@@ -25,28 +25,17 @@ final readonly class ReadDatabaseMetrics
     {
         return $this->nodeRunner->map(
             $database->nodesWithServers(),
-            fn (DatabaseNode $node): NodeMetrics => $this->metricsOf($database, $node),
+            function (DatabaseNode $node) use ($database): NodeMetrics {
+                try {
+                    $engine = $database->runsSupportedSdk() ? $node->driver()->nodes()->metrics()->toValues() : [];
+                    $host = KeyValueOutput::parse($node->ssh()->exec('ssh.databases.monitoring.metrics', ['directory' => "/srv/{$database->engine}"]));
+
+                    return new NodeMetrics($node->id, $node->server->name, true, [...$host, ...$engine]);
+                } catch (Throwable) {
+                    return NodeMetrics::unreachable($node);
+                }
+            },
             NodeMetrics::class,
         );
-    }
-
-    private function metricsOf(Database $database, DatabaseNode $node): NodeMetrics
-    {
-        try {
-            $engine = $database->runsSupportedSdk() ? $node->driver()->nodes()->metrics()->toValues() : [];
-            $values = [...$this->hostMetricsOf($database, $node), ...$engine];
-
-            return new NodeMetrics($node->id, $node->server->name, true, $values);
-        } catch (Throwable) {
-            return NodeMetrics::unreachable($node);
-        }
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function hostMetricsOf(Database $database, DatabaseNode $node): array
-    {
-        return KeyValueOutput::parse($node->ssh()->exec('ssh.databases.monitoring.metrics', ['directory' => "/srv/{$database->engine}"]));
     }
 }

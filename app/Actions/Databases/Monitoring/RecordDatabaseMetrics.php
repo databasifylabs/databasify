@@ -20,12 +20,7 @@ final readonly class RecordDatabaseMetrics
         $this->metrics->handle($database)
             ->filter(fn (NodeMetrics $metrics): bool => $metrics->reachable)
             ->each(fn (NodeMetrics $metrics) => NodeMetricSample::query()->create(
-                MetricSample::from($metrics, $at, $this->latestSampleOf($metrics->nodeId))->toRow(),
+                MetricSample::from($metrics, $at, NodeMetricSample::query()->where('database_node_id', $metrics->nodeId)->latest('sampled_at')->first())->toRow(),
             ));
-    }
-
-    private function latestSampleOf(string $nodeId): ?NodeMetricSample
-    {
-        return NodeMetricSample::query()->where('database_node_id', $nodeId)->latest('sampled_at')->first();
     }
 }

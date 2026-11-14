@@ -17,7 +17,6 @@ final readonly class AddDatabaseNode
 {
     public function __construct(
         private EnsureHostnamesFree $free,
-        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(Database $database, NewDatabaseNode $data): void
@@ -25,25 +24,14 @@ final readonly class AddDatabaseNode
         $database->ensureIdle();
         $database->ensureRoomFor($data->kind);
         $name = $data->kind === NodeKind::ReadOnly ? $data->name : null;
-        $this->ensureNamesFree($database, $name);
-
-        $node = $database->markBusyWith(DatabaseStatus::Scaling, function (Database $locked) use ($data, $name): DatabaseNode {
-            $node = $locked->addNode($data->server->id, $data->kind, $name);
-            $this->sized->handle($locked);
-
-            return $node;
-        });
-        dispatch(new AddNodeJob($database, $node));
-    }
-
-    private function ensureNamesFree(Database $database, ?string $name): void
-    {
         $zone = $database->dnsZone;
 
-        if ($zone === null || $name === null) {
-            return;
+        if ($zone !== null && $name !== null) {
+            $this->free->handle($zone, HostPair::under($zone, $name)->all(), 'name');
         }
 
-        $this->free->handle($zone, HostPair::under($zone, $name)->all(), 'name');
+        $data->server->ensureSized();
+        $node = $database->markBusyWith(DatabaseStatus::Scaling, fn (Database $locked): DatabaseNode => $locked->addNode($data->server->id, $data->kind, $name));
+        dispatch(new AddNodeJob($database, $node));
     }
 }

@@ -24,16 +24,12 @@ final readonly class ClearDatabaseDns
         }
 
         $database->nodes()->readOnly()->get()->each($this->clearNode->handle(...));
-        $this->withdrawServiceOf($database);
-        $this->clear->handle($zone, $hostnames->all());
-    }
-
-    private function withdrawServiceOf(Database $database): void
-    {
         $records = $database->serviceRecords();
 
         if ($records !== null) {
             $this->services->handle($records, $database->nodes()->get());
         }
+
+        $this->clear->handle($zone, $hostnames->all());
     }
 }

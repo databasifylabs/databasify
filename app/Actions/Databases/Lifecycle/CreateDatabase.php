@@ -4,20 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Lifecycle;
 
-use App\Actions\Databases\Nodes\EnsureNodesSized;
 use App\DTOs\Databases\DatabaseSettings;
-use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
-use App\Engines\Engine;
 use App\Engines\EngineSecrets;
 use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Jobs\Databases\CreateDatabaseJob;
 use App\Models\Database;
+use App\Models\DatabaseNode;
 use App\Services\Images\ImageResolver;
 use App\Support\Databases\DefaultAccount;
 use App\Support\Engines\SdkRange;
-use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -25,7 +22,6 @@ final readonly class CreateDatabase
 {
     public function __construct(
         private ImageResolver $newestImage,
-        private EnsureNodesSized $sized,
     ) {}
 
     public function handle(NewDatabase $data): Database
@@ -33,9 +29,21 @@ final readonly class CreateDatabase
         $draft = new Database(['engine' => $data->engine]);
         $engine = $draft->engine();
         $line = $data->versionLine ?? $engine->defaultLine;
-        $image = $this->unlessUnavailable(fn (): EngineImage => SdkRange::supported($engine->label, $data->image ?? $this->newestImage->newest($draft, $line)));
 
-        $database = DB::transaction(function () use ($data, $engine, $line, $image): Database {
+        try {
+            $image = SdkRange::supported($engine->label, $data->image ?? $this->newestImage->newest($draft, $line));
+        } catch (ImageUnavailable $unavailable) {
+            throw ValidationException::withMessages(['version_line' => $unavailable->refused !== null ? $unavailable->getMessage() : "{$unavailable->getMessage()} Try again in a moment."]);
+        }
+
+        $settings = new DatabaseSettings(
+            secrets: $data->secrets ?? [...($engine->laravelConnection === null ? [] : DefaultAccount::secrets()), ...EngineSecrets::generate()],
+            config: $data->config,
+            persistence: $data->persistence,
+            restore: $data->restore,
+        );
+
+        $database = DB::transaction(function () use ($data, $line, $image, $settings): Database {
             $database = Database::query()->create([
                 'name' => $data->name,
                 'engine' => $data->engine,
@@ -43,12 +51,17 @@ final readonly class CreateDatabase
                 'mode' => $data->mode(),
                 'status' => DatabaseStatus::Pending,
                 'image' => $image,
-                'settings' => $this->settingsFor($data, $engine),
+                'settings' => $settings,
             ]);
 
             collect($data->memberServerIds())->each(fn (string $serverId) => $database->addNode($serverId));
-            $this->sized->handle($database);
-            $this->recordAccountsOf($database, $data);
+            $database->nodesWithServers()->each(fn (DatabaseNode $node) => $node->server->ensureSized());
+
+            if ($data->accountsFrom !== null) {
+                $database->copyAccountsFrom($data->accountsFrom);
+            } else {
+                $database->recordDefaultAccounts();
+            }
 
             if ($data->recovery !== null) {
                 $database->recordRecovery($data->recovery);
@@ -60,53 +73,5 @@ final readonly class CreateDatabase
         dispatch(new CreateDatabaseJob($database));
 
         return $database;
-    }
-
-    private function recordAccountsOf(Database $database, NewDatabase $data): void
-    {
-        if ($data->accountsFrom !== null) {
-            $database->copyAccountsFrom($data->accountsFrom);
-
-            return;
-        }
-
-        $database->recordDefaultAccounts();
-    }
-
-    private function settingsFor(NewDatabase $data, Engine $engine): DatabaseSettings
-    {
-        return new DatabaseSettings(
-            secrets: $data->secrets ?? [...$this->accountSecretsOf($engine), ...EngineSecrets::generate()],
-            config: $data->config,
-            persistence: $data->persistence,
-            restore: $data->restore,
-        );
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function accountSecretsOf(Engine $engine): array
-    {
-        if ($engine->laravelConnection === null) {
-            return [];
-        }
-
-        return DefaultAccount::secrets();
-    }
-
-    /**
-     * @template TImage
-     *
-     * @param  Closure(): TImage  $resolve
-     * @return TImage
-     */
-    private function unlessUnavailable(Closure $resolve): mixed
-    {
-        try {
-            return $resolve();
-        } catch (ImageUnavailable $unavailable) {
-            throw ValidationException::withMessages(['version_line' => $unavailable->refused !== null ? $unavailable->getMessage() : "{$unavailable->getMessage()} Try again in a moment."]);
-        }
     }
 }

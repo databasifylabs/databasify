@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\DTOs\Databases\ServerAccounts;
-use App\DTOs\Recovery\RecoverySource;
 use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
 use App\Models\DatabaseUser;
@@ -23,40 +21,24 @@ final readonly class ReconcileRestoredAccounts
         }
 
         try {
-            $listed = $this->verifiedAccountsOf($database);
-            $database->users()->whereIn('name', $listed->users)->get()->each(fn (DatabaseUser $user) => $this->resetPasswordOf($database, $user));
+            $listed = $database->driver()->accounts()->list();
+            $default = $database->settings->defaultUsername();
+
+            if (! $listed->hasUser($default)) {
+                throw new RuntimeException("The list did not include the default user {$default}.");
+            }
+
+            $database->users()->whereIn('name', $listed->users)->get()
+                ->each(fn (DatabaseUser $user) => $database->driver()->accounts()->setPassword($user->name, $user->password, $user->password_encryption));
             $database->forgetAccountsMissingFrom($listed);
         } catch (OperationStopped $stopped) {
             throw $stopped;
         } catch (Throwable $exception) {
-            $this->logUnverifiedAccountsOf($database, $source, $exception);
+            $database->primaryServer()->logFailure(
+                'Verify restored accounts',
+                "Could not verify the users and databases of {$database->name}, so it keeps every one {$source->database} has now. Delete the ones it did not have at the restore point yourself: {$exception->getMessage()}",
+                $database,
+            );
         }
-    }
-
-    private function resetPasswordOf(Database $database, DatabaseUser $user): void
-    {
-        $database->driver()->accounts()->setPassword($user->name, $user->password, $user->password_encryption);
-    }
-
-    private function verifiedAccountsOf(Database $database): ServerAccounts
-    {
-        $reply = $database->driver()->accounts()->list();
-        $listed = new ServerAccounts($reply->users, $reply->databases);
-        $default = $database->settings->defaultUsername();
-
-        if (! $listed->hasUser($default)) {
-            throw new RuntimeException("The list did not include the default user {$default}.");
-        }
-
-        return $listed;
-    }
-
-    private function logUnverifiedAccountsOf(Database $database, RecoverySource $source, Throwable $exception): void
-    {
-        $database->primaryServer()->logFailure(
-            'Verify restored accounts',
-            "Could not verify the users and databases of {$database->name}, so it keeps every one {$source->database} has now. Delete the ones it did not have at the restore point yourself: {$exception->getMessage()}",
-            $database,
-        );
     }
 }

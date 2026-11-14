@@ -14,7 +14,6 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Jobs\Concerns\FinishesOperation;
-use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -56,16 +55,41 @@ final class RemoveNodeJob implements ShouldQueue
             $leaving->driver()->cluster()->failover($this->standby->privateIp());
         }
 
-        $this->clearDnsOf($database, $leaving, $dns);
-        $this->takeOutOfCluster($leaving);
+        try {
+            $dns->handle($leaving);
+        } catch (Throwable $exception) {
+            $leaving->server->logFailure('Remove DNS records', "Could not remove the Cloudflare records of {$leaving->server->name}, delete them by hand: {$exception->getMessage()}", $database);
+        }
+
+        try {
+            $leaving->driver()->cluster()->disable();
+        } catch (Throwable $exception) {
+            throw_unless($this->force, $exception);
+            report($exception);
+        }
 
         $database->ignoringStop(function () use ($database, $leaving, $remaining, $nodeConfig, $runtime, $removeFirewall, $firewall, $refresh): void {
-            $remaining->each(function (DatabaseNode $node) use ($database, $leaving, $remaining, $nodeConfig): void {
+            $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
+
+            foreach ($remaining as $node) {
                 $node->driver()->nodes()->configure($nodeConfig->handle($database, $node, without: $leaving));
-                $this->forgetOn($node, $leaving, $remaining);
+
+                try {
+                    $node->driver()->cluster()->forget($leaving->privateIp());
+                } catch (EngineUnsupported) {
+                    $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
+                }
+
                 $node->driver()->cluster()->membership($nodeConfig->membersOf($database, without: $leaving));
-            });
-            $this->erase($database, $leaving, $runtime, $removeFirewall);
+            }
+
+            try {
+                $runtime->remove($leaving, erase: true);
+                $removeFirewall->handle($database, $leaving);
+            } catch (Throwable $exception) {
+                $leaving->server->logFailure("{$leaving->server->name}: removing it from {$database->name}", "{$leaving->server->name} was removed; its server could not be reached, so its data was not erased: {$exception->getMessage()} Wipe or destroy {$leaving->server->name}.", $database);
+            }
+
             $leaving->delete();
             $database->forgetNodeCertificates($leaving);
             $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $firewall->handle($database, $peer, $database->trustedCidrs())));
@@ -82,44 +106,5 @@ final class RemoveNodeJob implements ShouldQueue
     protected function operationName(): string
     {
         return "Remove {$this->node->displayName()}";
-    }
-
-    private function takeOutOfCluster(DatabaseNode $leaving): void
-    {
-        try {
-            $leaving->driver()->cluster()->disable();
-        } catch (Throwable $exception) {
-            throw_unless($this->force, $exception);
-            report($exception);
-        }
-    }
-
-    private function forgetOn(DatabaseNode $node, DatabaseNode $leaving, DatabaseNodeCollection $remaining): void
-    {
-        try {
-            $node->driver()->cluster()->forget($leaving->privateIp());
-        } catch (EngineUnsupported) {
-            $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
-            $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
-        }
-    }
-
-    private function clearDnsOf(Database $database, DatabaseNode $node, ClearNodeDns $dns): void
-    {
-        try {
-            $dns->handle($node);
-        } catch (Throwable $exception) {
-            $node->server->logFailure('Remove DNS records', "Could not remove the Cloudflare records of {$node->server->name}, delete them by hand: {$exception->getMessage()}", $database);
-        }
-    }
-
-    private function erase(Database $database, DatabaseNode $node, Runtime $runtime, RemoveNodeFirewall $removeFirewall): void
-    {
-        try {
-            $runtime->remove($node, erase: true);
-            $removeFirewall->handle($database, $node);
-        } catch (Throwable $exception) {
-            $node->server->logFailure("{$node->server->name}: removing it from {$database->name}", "{$node->server->name} was removed; its server could not be reached, so its data was not erased: {$exception->getMessage()} Wipe or destroy {$node->server->name}.", $database);
-        }
     }
 }

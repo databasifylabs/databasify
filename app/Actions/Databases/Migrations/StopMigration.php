@@ -14,8 +14,12 @@ final readonly class StopMigration
 {
     public function handle(DatabaseMigration $migration, bool $cutover, bool $force = false): void
     {
-        if (! $migration->isActive()) {
-            $this->ensureCleanableAgain($migration, $force);
+        if (! $migration->isActive() && (! $force || ! $migration->cleanupFailed())) {
+            throw ValidationException::withMessages(['migration' => 'This migration has already ended.']);
+        }
+
+        if (! $migration->isActive() && $migration->database->isMigrating()) {
+            throw ValidationException::withMessages(['migration' => "Another migration is running on {$migration->database->name}, stop it first."]);
         }
 
         if ($cutover && $migration->status !== MigrationStatus::Syncing) {
@@ -24,16 +28,5 @@ final readonly class StopMigration
 
         $migration->database->markBusy(DatabaseStatus::Migrating);
         dispatch(new StopMigrationJob($migration, $cutover, $force));
-    }
-
-    private function ensureCleanableAgain(DatabaseMigration $migration, bool $force): void
-    {
-        if (! $force || ! $migration->cleanupFailed()) {
-            throw ValidationException::withMessages(['migration' => 'This migration has already ended.']);
-        }
-
-        if ($migration->database->isMigrating()) {
-            throw ValidationException::withMessages(['migration' => "Another migration is running on {$migration->database->name}, stop it first."]);
-        }
     }
 }

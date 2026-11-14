@@ -11,6 +11,7 @@ use App\DTOs\Databases\NodeResources;
 use App\DTOs\Databases\NodeStatus;
 use App\DTOs\Dns\HostPair;
 use App\DTOs\Ssh\LogGroup;
+use App\Engines\Data\Member;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
@@ -295,6 +296,14 @@ class DatabaseNode extends Model
         $driver = resolve($this->database->engine()->driver ?? throw $this->missingDriver(), ['node' => $this, 'followsPrimary' => $followsPrimary]);
 
         return $driver instanceof AbstractEngineDriver ? $driver : throw $this->missingDriver();
+    }
+
+    public function member(): Member
+    {
+        $server = $this->server;
+        $server->ensureSized();
+
+        return new Member($this->privateIp(), $this->position, ! $this->isReadOnly(), $server->cpus, $server->memory_mb, $server->disk_gb);
     }
 
     public function openLog(string $name): ServerLog

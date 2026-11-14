@@ -17,7 +17,12 @@ final readonly class ClearNodeDns
 
     public function handle(DatabaseNode $node): void
     {
-        $this->clearMemberHostOf($node);
+        $records = $node->database->serviceRecords();
+
+        if ($records !== null && $node->isMember()) {
+            $this->dns->clear($records->zone, DnsRecordType::A, $records->memberHostOf($node));
+        }
+
         $zone = $node->database->dnsZone;
         $hostnames = $node->hostnames();
 
@@ -26,14 +31,5 @@ final readonly class ClearNodeDns
         }
 
         $this->clear->handle($zone, $hostnames->all());
-    }
-
-    private function clearMemberHostOf(DatabaseNode $node): void
-    {
-        $records = $node->database->serviceRecords();
-
-        if ($records !== null && $node->isMember()) {
-            $this->dns->clear($records->zone, DnsRecordType::A, $records->memberHostOf($node));
-        }
     }
 }

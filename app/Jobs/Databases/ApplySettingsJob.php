@@ -47,7 +47,11 @@ final class ApplySettingsJob implements ShouldQueue
         }
 
         $refresh->handle($database);
-        $this->backUpAfterArchiveChange($database->refresh(), $recovery);
+        $archive = $database->refresh()->pointInTimeRecovery;
+
+        if ($this->archiveChanged && $archive !== null) {
+            $recovery->handle($archive, backUpNow: true);
+        }
     }
 
     protected function operatingStatus(): DatabaseStatus
@@ -62,14 +66,5 @@ final class ApplySettingsJob implements ShouldQueue
         }
 
         return $this->database->pointInTimeRecovery === null ? 'Turn off point-in-time recovery' : 'Update point-in-time recovery';
-    }
-
-    private function backUpAfterArchiveChange(Database $database, RefreshRecoveryStatus $recovery): void
-    {
-        if (! $this->archiveChanged || $database->pointInTimeRecovery === null) {
-            return;
-        }
-
-        $recovery->handle($database->pointInTimeRecovery, backUpNow: true);
     }
 }

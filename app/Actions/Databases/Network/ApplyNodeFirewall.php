@@ -14,29 +14,20 @@ final readonly class ApplyNodeFirewall
      */
     public function handle(Database $database, DatabaseNode $node, array $sources): void
     {
-        $node->ssh()->exec(
-            'ssh.databases.network.trusted-sources',
-            $this->rulesFor($database, $node, $sources),
-            "{$node->server->name}: applying trusted sources",
-        );
-    }
-
-    /**
-     * @param  array<int, string>  $sources
-     * @return array<string, mixed>
-     */
-    private function rulesFor(Database $database, DatabaseNode $node, array $sources): array
-    {
         $ports = $database->facts()->ports;
 
-        return [
-            'table' => $database->firewallTable(),
-            'remove' => false,
-            'ports' => array_filter([$ports->client, $ports->pool], is_int(...)),
-            'peerPorts' => $ports->peers,
-            'peers' => $database->peerAddresses(),
-            'sources' => array_values(array_unique($sources)),
-            'vpcSubnet' => $node->server->network?->cidr,
-        ];
+        $node->ssh()->exec(
+            'ssh.databases.network.trusted-sources',
+            [
+                'table' => $database->firewallTable(),
+                'remove' => false,
+                'ports' => array_filter([$ports->client, $ports->pool], is_int(...)),
+                'peerPorts' => $ports->peers,
+                'peers' => $database->peerAddresses(),
+                'sources' => array_values(array_unique($sources)),
+                'vpcSubnet' => $node->server->network?->cidr,
+            ],
+            "{$node->server->name}: applying trusted sources",
+        );
     }
 }

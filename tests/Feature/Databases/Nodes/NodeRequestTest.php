@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\BuildNodeConfig;
-use App\Exceptions\Databases\ServerSizeUnknown;
 use App\Models\DatabaseNode;
+use Illuminate\Validation\ValidationException;
 
 it('builds the same request on every node except ip', function () {
     $database = idleDatabase('postgres', 3);
@@ -44,6 +44,6 @@ it('fails clearly when a server has no size', function () {
     $before = count($ssh->runs);
 
     expect(fn () => resolve(BuildNodeConfig::class)->handle($database->fresh(), $database->nodes()->first()))
-        ->toThrow(ServerSizeUnknown::class, "{$node->server->name} has no known CPU, memory or disk size yet.")
+        ->toThrow(ValidationException::class, "{$node->server->name} has no known CPU, memory or disk size yet.")
         ->and($ssh->runs)->toHaveCount($before);
 });

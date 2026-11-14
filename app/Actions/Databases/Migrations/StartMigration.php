@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Migrations;
 
 use App\DTOs\Migrations\MigrationSource;
-use App\DTOs\Migrations\SourceReport;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Jobs\Databases\RunMigrationJob;
@@ -23,26 +22,7 @@ final readonly class StartMigration
         $database->ensureIdle();
         $primary = $database->primary() ?? throw ValidationException::withMessages(['database' => "{$database->name} has no healthy primary to migrate into."]);
         $report = $this->check->handle($database, $source);
-        $this->ensureReady($report, $mode);
-        $source = $this->sourceDiscoveredBy($source, $report);
 
-        $migration = $database->markBusyWith(DatabaseStatus::Migrating, fn (Database $locked): DatabaseMigration => $locked->startMigration($primary, $source, $mode));
-        dispatch(new RunMigrationJob($migration));
-
-        return $migration;
-    }
-
-    private function sourceDiscoveredBy(MigrationSource $source, SourceReport $report): MigrationSource
-    {
-        if ($source->databases !== []) {
-            return $source;
-        }
-
-        return $source->withDiscovered($report->databases);
-    }
-
-    private function ensureReady(SourceReport $report, MigrationMode $mode): void
-    {
         if (! $report->reachable) {
             throw ValidationException::withMessages(['source' => "Could not connect to the source: {$report->error}"]);
         }
@@ -60,5 +40,12 @@ final readonly class StartMigration
         if ($mode === MigrationMode::Continuous && ! $report->supportsContinuous()) {
             throw ValidationException::withMessages(['mode' => array_merge(['Continuous sync is not possible with this source:'], $report->blockers)]);
         }
+
+        $source = $source->databases === [] ? $source->withDiscovered($report->databases) : $source;
+
+        $migration = $database->markBusyWith(DatabaseStatus::Migrating, fn (Database $locked): DatabaseMigration => $locked->startMigration($primary, $source, $mode));
+        dispatch(new RunMigrationJob($migration));
+
+        return $migration;
     }
 }

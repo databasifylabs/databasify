@@ -20,8 +20,8 @@ final readonly class UpgradeDatabase
 
         $label = $database->engine()->label;
 
-        if (! SdkRange::allows($image->sdk)) {
-            throw ValidationException::withMessages(['version' => SdkRange::refusalOf("{$label} {$image->release}", $image->sdk)]);
+        if (! SdkRange::supports($image)) {
+            throw ValidationException::withMessages(['version' => SdkRange::refusalFor($label, $image)]);
         }
 
         $database->markBusyWith(DatabaseStatus::Upgrading, fn (Database $locked) => $locked->recordInstalledImage($image));

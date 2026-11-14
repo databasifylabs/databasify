@@ -69,7 +69,16 @@ final class AddNodeJob implements ShouldQueue
         $joiner = $database->nodes()->with('server')->find($this->node->id);
 
         if ($joiner !== null) {
-            $this->removeJoiner($database, $joiner);
+            $nodeConfig = resolve(BuildNodeConfig::class);
+            rescue(fn () => resolve(Runtime::class)->remove($joiner, erase: true));
+            rescue(fn () => resolve(ClearNodeDns::class)->handle($joiner));
+            $joiner->delete();
+            $database->forgetNodeCertificates($joiner);
+
+            $database->nodes()->with('server')->get()->each(function (DatabaseNode $node) use ($database, $nodeConfig): void {
+                rescue(fn () => $node->driver()->nodes()->configure($nodeConfig->handle($database, $node)));
+                rescue(fn () => $node->driver()->cluster()->membership($nodeConfig->membersOf($database)));
+            });
         }
 
         rescue(fn () => resolve(RefreshDatabaseStatus::class)->handle($database));
@@ -89,19 +98,5 @@ final class AddNodeJob implements ShouldQueue
     protected function operationName(): string
     {
         return "Add {$this->node->kind->label()} node {$this->node->displayName()}";
-    }
-
-    private function removeJoiner(Database $database, DatabaseNode $joiner): void
-    {
-        $nodeConfig = resolve(BuildNodeConfig::class);
-        rescue(fn () => resolve(Runtime::class)->remove($joiner, erase: true));
-        rescue(fn () => resolve(ClearNodeDns::class)->handle($joiner));
-        $joiner->delete();
-        $database->forgetNodeCertificates($joiner);
-
-        $database->nodes()->with('server')->get()->each(function (DatabaseNode $node) use ($database, $nodeConfig): void {
-            rescue(fn () => $node->driver()->nodes()->configure($nodeConfig->handle($database, $node)));
-            rescue(fn () => $node->driver()->cluster()->membership($nodeConfig->membersOf($database)));
-        });
     }
 }

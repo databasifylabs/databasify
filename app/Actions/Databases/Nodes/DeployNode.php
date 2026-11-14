@@ -25,49 +25,29 @@ final readonly class DeployNode
 
     public function handle(Database $database, DatabaseNode $node): void
     {
-        $this->ensurePublicCertificateOf($database);
+        $zone = $database->publicCertificateZone();
+
+        if ($zone !== null) {
+            rescue(fn () => $this->zoneCertificate->handle($zone));
+        }
+
         $this->certificates->handle($database);
         $this->hostBinary->handle($node);
 
         $engine = $this->runtime->deploy($node, $database->image()->pinnedReference(), $database->facts()->hostProfile);
-        $this->ensureBuiltFor($database, $engine);
-        $this->ensureSupportedSdkOn($database, $node);
+
+        if ($engine !== $database->engine) {
+            throw ImageUnavailable::builtForAnotherEngine($database->engine()->label, $database->image(), $engine);
+        }
+
+        if ($database->runsSupportedSdk()) {
+            $sdk = $this->runtime->engineInfo($node)->sdk;
+
+            if (! SdkRange::allows($sdk)) {
+                throw ImageUnavailable::unsupportedSdk($database->engine()->label, $database->image(), $sdk);
+            }
+        }
 
         $this->certificate->handle($database->refresh(), $node);
-    }
-
-    private function ensurePublicCertificateOf(Database $database): void
-    {
-        $zone = $database->publicCertificateZone();
-
-        if ($zone === null) {
-            return;
-        }
-
-        rescue(fn () => $this->zoneCertificate->handle($zone));
-    }
-
-    private function ensureSupportedSdkOn(Database $database, DatabaseNode $node): void
-    {
-        if (! $database->runsSupportedSdk()) {
-            return;
-        }
-
-        $sdk = $this->runtime->engineInfo($node)->sdk;
-
-        if (SdkRange::allows($sdk)) {
-            return;
-        }
-
-        throw ImageUnavailable::unsupportedSdk($database->engine()->label, $database->image(), $sdk);
-    }
-
-    private function ensureBuiltFor(Database $database, string $engine): void
-    {
-        if ($engine === $database->engine) {
-            return;
-        }
-
-        throw ImageUnavailable::builtForAnotherEngine($database->engine()->label, $database->image(), $engine);
     }
 }

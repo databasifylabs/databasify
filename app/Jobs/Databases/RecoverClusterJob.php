@@ -18,7 +18,6 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Support\Collection;
 use RuntimeException;
 
 #[Queue(QueueGroup::Databases)]
@@ -42,7 +41,13 @@ final class RecoverClusterJob implements ShouldQueue
     {
         $nodes = DatabaseNode::query()->with('server')->findMany($this->nodeIds)->sortBy('position')->values()->toBase();
         $nodes->each(fn (DatabaseNode $node) => $node->driver()->nodes()->wake(all: false));
-        $survivor = $this->mostAdvancedOf($nodes);
+        $positions = $nodes->map(fn (DatabaseNode $node): ?int => $node->driver()->cluster()->position());
+
+        if ($positions->contains(null)) {
+            throw new RuntimeException('A member could not say how far its data got, so Databasify will not pick a new primary. Check the members and recover again.');
+        }
+
+        $survivor = $nodes->sortByDesc(fn (DatabaseNode $node, int $index): ?int => $positions[$index])->firstOrFail();
 
         $survivor->driver()->cluster()->forceQuorum($this->othersDown);
         $nodes->reject(fn (DatabaseNode $node): bool => $node->is($survivor))
@@ -59,19 +64,5 @@ final class RecoverClusterJob implements ShouldQueue
     protected function operationName(): string
     {
         return 'Recover from a lost primary';
-    }
-
-    /**
-     * @param  Collection<int, DatabaseNode>  $nodes
-     */
-    private function mostAdvancedOf(Collection $nodes): DatabaseNode
-    {
-        $positions = $nodes->map(fn (DatabaseNode $node): ?int => $node->driver()->cluster()->position());
-
-        if ($positions->contains(null)) {
-            throw new RuntimeException('A member could not say how far its data got, so Databasify will not pick a new primary. Check the members and recover again.');
-        }
-
-        return $nodes->sortByDesc(fn (DatabaseNode $node, int $index): ?int => $positions[$index])->firstOrFail();
     }
 }

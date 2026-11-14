@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Engines\Data\Pool;
 use App\Enums\Databases\PoolMode;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -41,5 +42,10 @@ class ConnectionPool extends Model
             'mode' => PoolMode::class,
             'size' => 'integer',
         ];
+    }
+
+    public function toPool(): Pool
+    {
+        return new Pool($this->name, $this->schema, $this->size, $this->mode->value);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Collections;
 
+use App\Engines\Data\Member;
 use App\Enums\Databases\NodeRole;
 use App\Models\DatabaseNode;
 use Illuminate\Database\Eloquent\Collection;
@@ -107,5 +108,21 @@ final class DatabaseNodeCollection extends Collection
         }
 
         return $this->isHealthy() ? 'healthy' : 'degraded';
+    }
+
+    /**
+     * @return list<Member>
+     */
+    public function toMembers(): array
+    {
+        return array_values($this->toBase()->map(fn (DatabaseNode $node): Member => $node->member())->all());
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function ids(): array
+    {
+        return array_values(array_filter($this->modelKeys(), is_string(...)));
     }
 }

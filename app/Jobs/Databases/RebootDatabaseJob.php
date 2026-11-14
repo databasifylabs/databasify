@@ -10,7 +10,6 @@ use App\Enums\Queues\QueueGroup;
 use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use App\Models\Server;
 use App\Services\Databases\RollingNodes;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,8 +28,6 @@ final class RebootDatabaseJob implements ShouldQueue
 {
     use FinishesOperation, Queueable;
 
-    private const int BOOT_ID_TIMEOUT_SECONDS = 30;
-
     private const int COME_BACK_MINUTES = 15;
 
     private const int POLL_SECONDS = 5;
@@ -40,9 +37,19 @@ final class RebootDatabaseJob implements ShouldQueue
     public function handle(RollingNodes $rolling, RefreshDatabaseStatus $refresh): void
     {
         $rolling->each($this->database, function (DatabaseNode $node, bool $expectPrimary) use ($rolling): void {
-            $bootId = $this->bootIdOf($node->server);
-            $node->server->ssh($node->database)->exec('ssh.servers.os.reboot', log: "{$node->server->name}: rebooting");
-            $this->awaitNewBootOf($node->server, $bootId);
+            $server = $node->server;
+            $bootId = $server->bootId();
+            $server->ssh($node->database)->exec('ssh.servers.os.reboot', log: "{$server->name}: rebooting");
+            $polls = 0;
+
+            while (rescue(fn (): string => $server->bootId(), $bootId, report: false) === $bootId) {
+                if (++$polls > self::COME_BACK_MINUTES * 60 / self::POLL_SECONDS) {
+                    throw new RuntimeException("{$server->name} did not come back within ".self::COME_BACK_MINUTES.' minutes of the reboot.');
+                }
+
+                Sleep::for(self::POLL_SECONDS)->seconds();
+            }
+
             $rolling->backOnline($node, $expectPrimary);
         });
 
@@ -57,23 +64,5 @@ final class RebootDatabaseJob implements ShouldQueue
     protected function operationName(): string
     {
         return 'Reboot servers';
-    }
-
-    private function awaitNewBootOf(Server $server, string $previous): void
-    {
-        foreach (range(1, self::COME_BACK_MINUTES * 60 / self::POLL_SECONDS) as $poll) {
-            if (rescue(fn (): string => $this->bootIdOf($server), $previous, report: false) !== $previous) {
-                return;
-            }
-
-            Sleep::for(self::POLL_SECONDS)->seconds();
-        }
-
-        throw new RuntimeException("{$server->name} did not come back within ".self::COME_BACK_MINUTES.' minutes of the reboot.');
-    }
-
-    private function bootIdOf(Server $server): string
-    {
-        return trim($server->ssh()->exec('ssh.servers.os.boot-id', timeout: self::BOOT_ID_TIMEOUT_SECONDS));
     }
 }

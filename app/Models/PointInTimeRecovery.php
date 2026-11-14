@@ -11,6 +11,9 @@ use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\RecoverySource;
 use App\DTOs\Recovery\StoredArchive;
 use App\Enums\Recovery\ArchiveHealth;
+use App\Exceptions\Engines\EngineError;
+use App\Exceptions\Ssh\SshAccessDenied;
+use App\Exceptions\Ssh\SshConnectionFailed;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\PointInTimeRecoveryFactory;
@@ -20,6 +23,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Throwable;
 
 /**
  * @property string $id
@@ -83,6 +87,30 @@ class PointInTimeRecovery extends Model
     public function sourceAt(CarbonInterface $target): RecoverySource
     {
         return new RecoverySource($this->database->name, $this->storage_provider_id, $this->path, CarbonImmutable::instance($target)->utc());
+    }
+
+    public function readStatus(bool $backUpNow = false): ArchiveStatus
+    {
+        $database = $this->database;
+        $primary = $database->primary();
+
+        if (! $database->runsSupportedSdk()) {
+            return ArchiveStatus::unreadable("{$database->name} runs an engine image this Databasify no longer supports, so its archive is not read.");
+        }
+
+        if ($primary === null) {
+            return ArchiveStatus::unreadable("{$database->name} has no healthy primary to read the archive from.");
+        }
+
+        try {
+            return $primary->driver()->archive()->status($backUpNow);
+        } catch (Throwable $exception) {
+            if (! $exception instanceof EngineError && ! $exception instanceof SshConnectionFailed && ! $exception instanceof SshAccessDenied) {
+                report($exception);
+            }
+
+            return ArchiveStatus::unreadable("Could not reach {$primary->server->name} to read the archive.");
+        }
     }
 
     public function recordStatus(ArchiveStatus $status): void
