@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Lifecycle;
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Nodes\EnsureNodesSized;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabase;
 use App\Engines\Engine;
 use App\Engines\EngineSecrets;
-use App\Engines\Flows\CreateDatabaseFlow;
-use App\Engines\Flows\FlowContext;
 use App\Enums\Databases\DatabaseStatus;
 use App\Exceptions\Images\ImageUnavailable;
+use App\Jobs\Databases\CreateDatabaseJob;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use App\Support\Databases\DefaultAccount;
@@ -27,8 +25,6 @@ final readonly class CreateDatabase
 {
     public function __construct(
         private ImageResolver $newestImage,
-        private StartFlow $startFlow,
-        private CreateDatabaseFlow $createFlow,
         private EnsureNodesSized $sized,
     ) {}
 
@@ -45,7 +41,7 @@ final readonly class CreateDatabase
                 'engine' => $data->engine,
                 'version_line' => $line,
                 'mode' => $data->mode(),
-                'status' => DatabaseStatus::Creating,
+                'status' => DatabaseStatus::Pending,
                 'image' => $image,
                 'settings' => $this->settingsFor($data, $engine),
             ]);
@@ -61,7 +57,7 @@ final readonly class CreateDatabase
             return $database;
         });
 
-        $this->startFlow->handle($database, $this->createFlow, new FlowContext(array_values(array_filter($database->nodes()->pluck('id')->all(), is_string(...)))));
+        dispatch(new CreateDatabaseJob($database));
 
         return $database;
     }

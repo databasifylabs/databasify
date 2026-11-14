@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Engines\Data\Pool;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\PoolMode;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
 use App\Models\User;
@@ -38,7 +39,7 @@ it('applies a new pool on the nodes straight away when the queue runs it', funct
     $this->post(projectUrl("/databases/{$database->id}/pools"), ['name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'session', 'size' => 5])->assertRedirect()->assertSessionHasNoErrors();
 
     expect(recordedArgs('pools.create')[0]['args'])->toEqual([new Pool('reports', 'defaultdb', 5, 'session')])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('rejects pools with invalid input', function (array $input, string $field) {

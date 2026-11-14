@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Databases\Lifecycle\DeleteDatabase;
 use App\Actions\Databases\Lifecycle\TearDownDatabase;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Ssh\SshConnectionFailed;
@@ -42,7 +43,7 @@ it('keeps the database when a node cannot be cleaned up unless forced', function
 
     expect(fn () => runJob(new DeleteDatabaseJob($database, eraseData: false, force: false)))->toThrow(SshConnectionFailed::class)
         ->and(Database::query()->whereKey($database->id)->exists())->toBeTrue()
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 
     resolve(TearDownDatabase::class)->handle($database, eraseData: false, force: true);
 
@@ -69,7 +70,7 @@ it('passes the erase and force choices on to the delete job', function () {
 
     $this->delete(projectUrl("/databases/{$database->id}"), ['force' => true])->assertRedirect(projectUrl('/databases'));
 
-    expect($database->fresh()->operation)->toBe('Delete database');
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Deleting);
     Queue::assertPushed(DeleteDatabaseJob::class, fn (DeleteDatabaseJob $job): bool => $job->database->is($database) && ! $job->eraseData && $job->force);
 });
 
@@ -77,11 +78,11 @@ it('refuses to delete a busy or migrating database', function () {
     $this->actingAs(User::factory()->create());
     $database = migratingDatabase('mysql');
     Queue::fake([DeleteDatabaseJob::class]);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
-    $this->delete(projectUrl("/databases/{$database->id}"))->assertSessionHasErrors(['database' => "{$database->name} is busy with Upgrade, try again when it finishes."]);
+    $this->delete(projectUrl("/databases/{$database->id}"))->assertSessionHasErrors(['database' => "{$database->name} is busy upgrading, try again when it finishes."]);
 
-    $database->finishOperation();
+    $database->markReady();
     migrationOf($database, MigrationMode::Continuous);
 
     $this->delete(projectUrl("/databases/{$database->id}"))->assertSessionHasErrors(['database' => "{$database->name} is migrating data in, finish or stop the migration first."]);
@@ -141,3 +142,16 @@ function hostRemovesIn(FakeServerConnection $ssh): array
         ->map(fn (int $index): mixed => json_decode($ssh->engineRequestAt($index), true))
         ->all());
 }
+
+it('keeps a database whose setup failed marked failed when its delete fails', function () {
+    $database = idleDatabase('mysql', 1, DatabaseMode::Single);
+    $database->markFailed();
+    Queue::fake([DeleteDatabaseJob::class]);
+    fakeSsh()->failWith(SshConnectionFailed::onServer($database->seed()->server, 'connect timed out'));
+
+    resolve(DeleteDatabase::class)->handle($database);
+    $job = Queue::pushed(DeleteDatabaseJob::class)->sole();
+
+    expect(fn () => runJob($job))->toThrow(SshConnectionFailed::class)
+        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Failed);
+});

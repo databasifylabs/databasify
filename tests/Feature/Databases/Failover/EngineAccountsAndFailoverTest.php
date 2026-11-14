@@ -14,6 +14,7 @@ use App\Actions\Databases\Pools\ApplyConnectionPools;
 use App\DTOs\Databases\QuorumCount;
 use App\Engines\Data\Grant;
 use App\Engines\Data\Pool;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\PoolMode;
@@ -74,8 +75,7 @@ it('never forces quorum without the owner confirmation', function () {
     expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'confirm they are down')
         ->and(recordedArgs('cluster.forceQuorum'))->toBe([]);
 
-    resolve(RecoverDatabase::class)->handle($database->fresh(), othersAreDown: true);
-    advanceFlows();
+    runOperation(fn () => resolve(RecoverDatabase::class)->handle($database->fresh(), othersAreDown: true));
 
     expect(recordedArgs('cluster.forceQuorum'))->toBe([['server' => $alive->name, 'args' => [true]]]);
 });
@@ -90,13 +90,12 @@ it('rejoins each node after a forced quorum on the most advanced member', functi
     }
     answerRead('cluster.quorum', new QuorumCount(3, 0));
 
-    resolve(RecoverDatabase::class)->handle($database, othersAreDown: true);
-    advanceFlows();
+    runOperation(fn () => resolve(RecoverDatabase::class)->handle($database, othersAreDown: true));
 
     expect(recordedArgs('cluster.forceQuorum'))->toBe([['server' => $servers[1]->name, 'args' => [true]]])
         ->and(collect(serversOf('cluster.rejoin'))->sort()->values()->all())->toBe(collect([$servers[0]->name, $servers[2]->name])->sort()->values()->all())
         ->and(recordedArgs('nodes.wake'))->toHaveCount(3)
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('refuses users and databases on engines without accounts', function (string $engine) {
@@ -165,13 +164,12 @@ it('rejoins only the members outside a group that still has its majority', funct
     fakeEngine(answerNodeStatus(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica'), $restarted, 'offline'));
     answerRead('cluster.quorum', new QuorumCount(3, 2));
 
-    resolve(RecoverDatabase::class)->handle($database);
-    advanceFlows();
+    runOperation(fn () => resolve(RecoverDatabase::class)->handle($database));
 
     expect(serversOf('cluster.rejoin'))->toBe([$restarted->name])
         ->and(recordedArgs('cluster.forceQuorum'))->toBe([])
         ->and(recordedArgs('nodes.wake'))->toBe([])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('leaves a member that just stopped answering out of a recovery', function () {
@@ -192,11 +190,10 @@ it('starts a member whose container stopped before it rejoins the group', functi
     answerRead('nodes.status', fn () => throw new EngineNotRunning('not_running', "No engine container is running on {$stopped->name}."), $stopped);
     answerRead('cluster.quorum', new QuorumCount(3, 2));
 
-    resolve(RecoverDatabase::class)->handle($database);
-    advanceFlows();
+    runOperation(fn () => resolve(RecoverDatabase::class)->handle($database));
 
     $deploys = collect($ssh->runs)->filter(fn (array $run): bool => str_contains($run['script'], '| databasify host deploy '))->pluck('server')->values()->all();
     expect($deploys)->toBe([$stopped->name])
         ->and(serversOf('cluster.rejoin'))->toBe([$stopped->name])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });

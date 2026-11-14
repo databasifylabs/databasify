@@ -1,4 +1,5 @@
 import { Head, Link, usePoll } from '@inertiajs/react';
+import { databaseStatus } from '@/lib/status';
 import type { LucideIcon } from 'lucide-react';
 import {
     Activity as ActivityIcon,
@@ -318,7 +319,9 @@ function DatabasesPanel({
                                         </div>
                                     </TableCell>
                                     <TableCell className="pr-6 text-right">
-                                        <StatusBadge status={database.status} />
+                                        <StatusBadge
+                                            status={databaseStatus(database)}
+                                        />
                                     </TableCell>
                                 </TableRow>
                                 <ReadOnlyRows

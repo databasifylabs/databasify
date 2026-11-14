@@ -42,42 +42,43 @@ Options that were tried or rejected, and why.
 
 ## Index
 
-| #                                                           | Decision                                                 | Status   |
-| ----------------------------------------------------------- | -------------------------------------------------------- | -------- |
-| [0001](0001-ssh-control-plane.md)                           | Laravel over SSH is the only control plane               | Accepted |
-| [0002](0002-container-per-node.md)                          | One engine container per node                            | Accepted |
-| [0003](0003-engine-binary-pid1.md)                          | The engine binary is PID 1 and reads a process manifest  | Accepted |
-| [0004](0004-image-digest-pinning.md)                        | Engine images pinned by digest per database              | Accepted |
-| [0005](0005-engine-uid-64999.md)                            | Engine user is uid/gid 64999, data under `/srv/<engine>` | Accepted |
-| [0006](0006-operations-and-server-logs.md)                  | One operation per database, one server log per SSH call  | Accepted |
-| [0007](0007-ha-per-engine.md)                               | Each engine keeps its own HA mechanism                   | Accepted |
-| [0008](0008-private-networking.md)                          | Provider VPC, custom network or WireGuard mesh           | Accepted |
-| [0009](0009-nftables-firewall.md)                           | One nftables table per database                          | Accepted |
-| [0010](0010-tls-private-ca.md)                              | Private CA per database; public wildcard for key-value   | Accepted |
-| [0011](0011-secrets-and-ssh-keys.md)                        | Encrypted secrets, one app SSH key, pinned host keys     | Accepted |
-| [0012](0012-dns-hostnames.md)                               | DNS names follow the primary                             | Accepted |
-| [0013](0013-data-protection-and-migration.md)               | Engine-native PITR and migrations over plain S3          | Accepted |
-| [0014](0014-app-architecture.md)                            | Application architecture and distribution                | Accepted |
-| [0015](0015-browser-terminal.md)                            | Browser terminal as a queued SSH shell                   | Accepted |
-| [0016](0016-host-os-and-provisioning.md)                    | Supported host operating systems and provisioning        | Accepted |
-| [0017](0017-providers-order-vm-only.md)                     | Cloud providers only order the server                    | Accepted |
-| [0018](0018-monitoring-by-ssh-polling.md)                   | Monitoring is the app polling over SSH                   | Accepted |
-| [0019](0019-app-state-sqlite-and-redis.md)                  | App state in SQLite, queues in Redis                     | Accepted |
-| [0020](0020-live-ui-by-polling.md)                          | Live UI by polling, Reverb only for streams              | Accepted |
-| [0021](0021-testing-with-boundary-fakes.md)                 | Tests fake the boundaries; real servers tested by hand   | Accepted |
-| [0022](0022-wireguard-address-blocks.md)                    | WireGuard address blocks of a chosen size, CGNAT only    | Accepted |
-| [0023](0023-provider-http-client-with-dns-write-retries.md) | One provider HTTP client; DNS record writes retry too    | Accepted |
-| [0024](0024-projects-as-a-global-scope.md)                  | Projects as a global scope                               | Accepted |
-| [0025](0025-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers    | Accepted |
-| [0026](0026-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`              | Accepted |
-| [0027](0027-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                       | Accepted |
-| [0028](0028-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows  | Accepted |
-| [0029](0029-engines-ship-only-as-images.md)                 | Engines ship only as images                              | Accepted |
-| [0030](0030-community-engines.md)                           | Plugin engines are community engines                     | Accepted |
-| [0031](0031-one-sdk-range-per-app-release.md)               | Each app release runs one engine SDK range               | Accepted |
-| [0032](0032-databases-on-a-dropped-sdk-run-read-only.md)    | Databases on a dropped SDK run read-only                 | Accepted |
-| [0033](0033-self-update-through-a-host-helper.md)           | Self-update through a host helper                        | Accepted |
-| [0034](0034-a-frozen-engine-runtime.md)                     | A frozen engine runtime                                  | Accepted |
-| [0035](0035-engine-api.md)                                  | The app drives engines through PHP drivers               | Accepted |
+| #                                                           | Decision                                                 | Status             |
+| ----------------------------------------------------------- | -------------------------------------------------------- | ------------------ |
+| [0001](0001-ssh-control-plane.md)                           | Laravel over SSH is the only control plane               | Accepted           |
+| [0002](0002-container-per-node.md)                          | One engine container per node                            | Accepted           |
+| [0003](0003-engine-binary-pid1.md)                          | The engine binary is PID 1 and reads a process manifest  | Accepted           |
+| [0004](0004-image-digest-pinning.md)                        | Engine images pinned by digest per database              | Accepted           |
+| [0005](0005-engine-uid-64999.md)                            | Engine user is uid/gid 64999, data under `/srv/<engine>` | Accepted           |
+| [0006](0006-operations-and-server-logs.md)                  | One operation per database, one server log per SSH call  | Accepted           |
+| [0007](0007-ha-per-engine.md)                               | Each engine keeps its own HA mechanism                   | Accepted           |
+| [0008](0008-private-networking.md)                          | Provider VPC, custom network or WireGuard mesh           | Accepted           |
+| [0009](0009-nftables-firewall.md)                           | One nftables table per database                          | Accepted           |
+| [0010](0010-tls-private-ca.md)                              | Private CA per database; public wildcard for key-value   | Accepted           |
+| [0011](0011-secrets-and-ssh-keys.md)                        | Encrypted secrets, one app SSH key, pinned host keys     | Accepted           |
+| [0012](0012-dns-hostnames.md)                               | DNS names follow the primary                             | Accepted           |
+| [0013](0013-data-protection-and-migration.md)               | Engine-native PITR and migrations over plain S3          | Accepted           |
+| [0014](0014-app-architecture.md)                            | Application architecture and distribution                | Accepted           |
+| [0015](0015-browser-terminal.md)                            | Browser terminal as a queued SSH shell                   | Accepted           |
+| [0016](0016-host-os-and-provisioning.md)                    | Supported host operating systems and provisioning        | Accepted           |
+| [0017](0017-providers-order-vm-only.md)                     | Cloud providers only order the server                    | Accepted           |
+| [0018](0018-monitoring-by-ssh-polling.md)                   | Monitoring is the app polling over SSH                   | Accepted           |
+| [0019](0019-app-state-sqlite-and-redis.md)                  | App state in SQLite, queues in Redis                     | Accepted           |
+| [0020](0020-live-ui-by-polling.md)                          | Live UI by polling, Reverb only for streams              | Accepted           |
+| [0021](0021-testing-with-boundary-fakes.md)                 | Tests fake the boundaries; real servers tested by hand   | Accepted           |
+| [0022](0022-wireguard-address-blocks.md)                    | WireGuard address blocks of a chosen size, CGNAT only    | Accepted           |
+| [0023](0023-provider-http-client-with-dns-write-retries.md) | One provider HTTP client; DNS record writes retry too    | Accepted           |
+| [0024](0024-projects-as-a-global-scope.md)                  | Projects as a global scope                               | Accepted           |
+| [0025](0025-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers    | Accepted           |
+| [0026](0026-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`              | Accepted           |
+| [0027](0027-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                       | Accepted           |
+| [0028](0028-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows  | Superseded by 0036 |
+| [0029](0029-engines-ship-only-as-images.md)                 | Engines ship only as images                              | Accepted           |
+| [0030](0030-community-engines.md)                           | Plugin engines are community engines                     | Accepted           |
+| [0031](0031-one-sdk-range-per-app-release.md)               | Each app release runs one engine SDK range               | Accepted           |
+| [0032](0032-databases-on-a-dropped-sdk-run-read-only.md)    | Databases on a dropped SDK run read-only                 | Accepted           |
+| [0033](0033-self-update-through-a-host-helper.md)           | Self-update through a host helper                        | Accepted           |
+| [0034](0034-a-frozen-engine-runtime.md)                     | A frozen engine runtime                                  | Accepted           |
+| [0035](0035-engine-api.md)                                  | The app drives engines through PHP drivers               | Accepted           |
+| [0036](0036-operations-as-one-job.md)                       | A database operation is one action and one job           | Accepted           |
 
 The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.

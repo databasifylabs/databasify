@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Servers\ServerOperation;
 use App\Enums\Servers\ServerStatus;
@@ -27,7 +28,7 @@ it('refuses reboots and updates on a busy database or its primary', function () 
     $this->post(projectUrl("/servers/{$standby->server->id}/operations/reboot"))->assertSessionHasNoErrors();
 
     Queue::assertPushed(RebootServerJob::class, 1);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $this->post(projectUrl("/servers/{$standby->server->id}/operations/update-packages"))->assertSessionHasErrors('database');
 });
 

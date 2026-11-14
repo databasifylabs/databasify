@@ -27,6 +27,7 @@ class DatabaseResource extends DatabaseListResource
         return [
             ...parent::toArray($request),
             'engine' => $this->engine,
+            'last_failure' => $this->lastFailure()?->toArray(),
             'version_line' => $this->version_line,
             'version_label' => $this->versionLabel(),
             'engine_community' => $engine->isCommunity(),

@@ -28,10 +28,15 @@ use App\DTOs\Databases\NewDatabaseNode;
 use App\DTOs\Recovery\PointInTimeRestore;
 use App\DTOs\Recovery\RecoverySchedule;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\PoolMode;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\ApplySettingsJob;
+use App\Jobs\Databases\CreateDatabaseJob;
 use App\Jobs\Databases\FailoverDatabaseJob;
+use App\Jobs\Databases\RebootDatabaseJob;
 use App\Jobs\Databases\RefreshRecoveryStatusJob;
+use App\Jobs\Databases\RetuneDatabaseJob;
+use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
@@ -42,7 +47,7 @@ use Inertia\Testing\AssertableInertia;
 const DROPPED_SDK_REFUSAL = 'main runs an engine image built on SDK 0.0.9, which this Databasify no longer supports. Wait for Databasify to publish a new image.';
 
 beforeEach(function () {
-    Queue::fake([AdvanceDatabaseFlow::class, FailoverDatabaseJob::class, RefreshRecoveryStatusJob::class]);
+    Queue::fake([CreateDatabaseJob::class, UpgradeDatabaseJob::class, ApplySettingsJob::class, RebootDatabaseJob::class, RetuneDatabaseJob::class, FailoverDatabaseJob::class, RefreshRecoveryStatusJob::class]);
 });
 
 function onSdk(Database $database, ?string $sdk): Database
@@ -79,9 +84,9 @@ it('keeps backups, failover, outage recovery and delete working on a dropped SDK
 
     resolve(BackUpNow::class)->handle(withRecovery($database));
     resolve(FailoverDatabase::class)->handle($database->refresh());
-    $database->refresh()->finishOperation();
+    $database->refresh()->markReady();
     expect(fn () => resolve(RecoverDatabase::class)->handle($database->refresh()))->not->toThrow(ValidationException::class, 'no longer supports');
-    $database->refresh()->finishOperation();
+    $database->refresh()->markReady();
     resolve(DeleteDatabase::class)->handle($database->refresh(), force: true);
 
     Queue::assertPushed(RefreshRecoveryStatusJob::class);
@@ -120,7 +125,7 @@ it('lets storage credentials rotate while a database on a dropped SDK archives t
     $this->put(projectUrl("/storage-providers/{$provider?->id}"), [...$provider?->bucket()->location(), 'name' => 'renamed', 'path_style' => '1', 'access_key_id' => 'NEWKEY', 'secret_access_key' => 'newsecret'])
         ->assertSessionHasNoErrors();
 
-    expect($database->fresh()->operation)->toBe('Update archive credentials');
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Updating);
 });
 
 it('names the plugin author of a community engine in the refusal', function () {

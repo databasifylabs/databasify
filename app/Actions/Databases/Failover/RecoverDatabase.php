@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Failover;
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
-use App\Engines\Flows\FlowContext;
-use App\Engines\Flows\RecoverClusterFlow;
-use App\Engines\Flows\RejoinMembersFlow;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
+use App\Jobs\Databases\RecoverClusterJob;
+use App\Jobs\Databases\RejoinMembersJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,9 +19,6 @@ final readonly class RecoverDatabase
     public function __construct(
         private RefreshDatabaseStatus $refresh,
         private DetectQuorum $quorum,
-        private StartFlow $startFlow,
-        private RecoverClusterFlow $flow,
-        private RejoinMembersFlow $rejoin,
     ) {}
 
     public function handle(Database $database, bool $othersAreDown = false): void
@@ -38,10 +34,8 @@ final readonly class RecoverDatabase
             return;
         }
 
-        $this->startFlow->handle($database, $this->flow, new FlowContext(
-            nodeIds: $this->idsOf($reachable),
-            force: $othersAreDown,
-        ));
+        $database->markBusy(DatabaseStatus::Recovering);
+        dispatch(new RecoverClusterJob($database, $this->idsOf($reachable), $othersAreDown));
     }
 
     private function ensureRecoverable(Database $database, int $reachable, bool $othersAreDown): void
@@ -68,7 +62,8 @@ final readonly class RecoverDatabase
             throw $this->rejection("{$database->name} still has a majority, use failover instead.");
         }
 
-        $this->startFlow->handle($database, $this->rejoin, new FlowContext(nodeIds: $this->idsOf($outsiders)));
+        $database->markBusy(DatabaseStatus::Recovering);
+        dispatch(new RejoinMembersJob($database, $this->idsOf($outsiders)));
     }
 
     /**

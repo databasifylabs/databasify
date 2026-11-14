@@ -20,6 +20,14 @@ const statuses: Record<string, { label: string; tone: StatusTone }> = {
     copying: { label: 'Copying', tone: 'progress' },
     queued: { label: 'Queued', tone: 'progress' },
     pending: { label: 'Pending', tone: 'progress' },
+    updating: { label: 'Updating', tone: 'progress' },
+    upgrading: { label: 'Upgrading', tone: 'progress' },
+    rebooting: { label: 'Rebooting', tone: 'progress' },
+    redeploying: { label: 'Redeploying', tone: 'progress' },
+    scaling: { label: 'Scaling', tone: 'progress' },
+    recovering: { label: 'Recovering', tone: 'progress' },
+    migrating: { label: 'Migrating', tone: 'progress' },
+    deleting: { label: 'Deleting', tone: 'progress' },
     degraded: { label: 'Degraded', tone: 'warning' },
     offline: { label: 'Offline', tone: 'danger' },
     connected: { label: 'Connected', tone: 'success' },
@@ -37,6 +45,19 @@ export function statusLabel(status: string): string {
 
 export function statusTone(status: string): StatusTone {
     return statuses[status]?.tone ?? 'neutral';
+}
+
+export function databaseOperation(database: { status: string }): string | null {
+    return database.status === 'ready' || database.status === 'failed'
+        ? null
+        : statusLabel(database.status);
+}
+
+export function databaseStatus(database: {
+    status: string;
+    health: string;
+}): string {
+    return database.status === 'ready' ? database.health : database.status;
 }
 
 export function isWorking(status: string): boolean {

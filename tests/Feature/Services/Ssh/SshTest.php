@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Events\ServerLogOutputReceived;
 use App\Exceptions\Databases\OperationStopped;
@@ -117,7 +118,7 @@ it('refuses the next step of a database once it is asked to stop', function () {
     $ssh = fakeSsh();
     $database = idleDatabase('postgres', 1);
     $node = $database->nodes()->with('server')->sole();
-    $database->startOperation('Reboot servers');
+    $database->update(['status' => DatabaseStatus::Rebooting]);
 
     $database->requestStop();
 

@@ -16,18 +16,19 @@ it('reads only the given nodes but judges health from every node', function () {
     $primary = $database->nodes()->get()[0];
     answerNodeStatus(fakeSsh(), $database->nodes()->orderBy('position')->first()->server, 'primary');
 
-    $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
+    $nodes = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
 
-    expect(recordedCalls())->toHaveCount(1)->and($status)->toBe(DatabaseStatus::Degraded);
+    expect(recordedCalls())->toHaveCount(1)->and($nodes)->toHaveCount(3)->and($nodes->isHealthy())->toBeFalse();
 });
 
-it('marks the database offline when every node is offline', function () {
+it('reports no serving node when every node is offline without touching the status', function () {
     $database = idleDatabase('mysql', 2);
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     fakeSsh()->respond('', 69);
 
-    $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers());
+    $nodes = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers());
 
-    expect($status)->toBe(DatabaseStatus::Offline)->and($database->fresh()->status)->toBe(DatabaseStatus::Offline);
+    expect($nodes->anyServes())->toBeFalse()->and($database->fresh()->status)->toBe(DatabaseStatus::Upgrading);
 });
 
 it('keeps the database degraded when the primary answers and a replica does not', function () {
@@ -36,9 +37,9 @@ it('keeps the database degraded when the primary answers and a replica does not'
     $primary = $database->nodes()->get()[0];
     answerNodeStatus(fakeSsh(), $primary->server, 'primary');
 
-    $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
+    $nodes = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
 
-    expect($status)->toBe(DatabaseStatus::Degraded);
+    expect($nodes->isHealthy())->toBeFalse()->and($nodes->anyServes())->toBeTrue();
 });
 
 it('records a node whose container is stopped as offline', function () {

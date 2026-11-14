@@ -1,4 +1,5 @@
 import { Head, Link, router, usePoll } from '@inertiajs/react';
+import { databaseOperation, databaseStatus } from '@/lib/status';
 import { ArrowUpCircle, DatabaseZap, Plus } from 'lucide-react';
 import { Fragment } from 'react';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
@@ -175,9 +176,9 @@ export default function DatabasesIndex({
                                                                 className="flex items-center gap-3"
                                                             >
                                                                 <StatusDot
-                                                                    status={
-                                                                        database.status
-                                                                    }
+                                                                    status={databaseStatus(
+                                                                        database,
+                                                                    )}
                                                                 />
                                                                 <BrandIcon
                                                                     group="database-providers"
@@ -192,10 +193,15 @@ export default function DatabasesIndex({
                                                                             database.name
                                                                         }
                                                                     </div>
-                                                                    {database.operation ? (
+                                                                    {databaseOperation(
+                                                                        database,
+                                                                    ) ? (
                                                                         <OperationLabel
                                                                             operation={
-                                                                                database.operation
+                                                                                databaseOperation(
+                                                                                    database,
+                                                                                ) ??
+                                                                                ''
                                                                             }
                                                                         />
                                                                     ) : (
@@ -237,9 +243,9 @@ export default function DatabasesIndex({
                                                         </TableCell>
                                                         <TableCell>
                                                             <StatusBadge
-                                                                status={
-                                                                    database.status
-                                                                }
+                                                                status={databaseStatus(
+                                                                    database,
+                                                                )}
                                                             />
                                                         </TableCell>
                                                         <TableCell className="text-muted-foreground">
@@ -257,8 +263,9 @@ export default function DatabasesIndex({
                                                                     database
                                                                 }
                                                                 busy={
-                                                                    database.operation !==
-                                                                    null
+                                                                    databaseOperation(
+                                                                        database,
+                                                                    ) !== null
                                                                 }
                                                             />
                                                         </TableCell>

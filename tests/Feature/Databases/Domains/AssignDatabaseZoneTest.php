@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Domains\AssignDatabaseZone;
 use App\Enums\Databases\DatabaseMode;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\DnsZone;
 use App\Models\User;
 use Illuminate\Http\Client\Request;
@@ -20,22 +21,22 @@ it('serves the database under a picked domain after checking its names are free'
     fakeCloudflare([]);
     $database = idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db');
     withReadOnlyNode($database, ['name' => 'reports']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
     $zone = DnsZone::factory()->create(['name' => 'example.com']);
 
     $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $zone->id])->assertRedirect()->assertSessionHasNoErrors();
 
     $checked = collect(Http::recorded())->map(fn (array $pair): string => $pair[0]['name'])->sort()->values()->all();
     expect($database->fresh()->dns_zone_id)->toBe($zone->id)
-        ->and($database->fresh()->operation)->toBe('Serve on app-db.db.example.com')
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Redeploying)
         ->and($checked)->toBe(['app-db.db.example.com', 'private-app-db.db.example.com', 'private-replica-app-db.db.example.com', 'private-reports.db.example.com', 'replica-app-db.db.example.com', 'reports.db.example.com']);
-    Queue::assertPushed(AdvanceDatabaseFlow::class, fn (AdvanceDatabaseFlow $job): bool => $job->flow->database->is($database));
+    Queue::assertPushed(UpgradeDatabaseJob::class, fn (UpgradeDatabaseJob $job): bool => $job->database->is($database));
 });
 
 it('refuses a name that has records databasify did not create', function () {
     fakeCloudflare([['id' => 'theirs', 'content' => '192.0.2.1']]);
     $database = idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db');
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
     $zone = DnsZone::factory()->create(['name' => 'example.com']);
 
     $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $zone->id])
@@ -49,33 +50,33 @@ it('refuses a name that has records databasify did not create', function () {
 it('reuses names that only hold records databasify created', function () {
     fakeCloudflare();
     $database = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => DnsZone::factory()->create(['name' => 'example.com'])->id])->assertSessionHasNoErrors();
 
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+    Queue::assertPushed(UpgradeDatabaseJob::class);
 });
 
 it('clears the old names when it moves to another domain or stops using one', function () {
     fakeCloudflare();
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
     $other = DnsZone::factory()->create(['name' => 'example.org', 'external_id' => 'zone-1']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
 
     resolve(AssignDatabaseZone::class)->handle($database, $other);
-    $database->finishOperation();
+    $database->markReady();
     resolve(AssignDatabaseZone::class)->handle($database->fresh() ?? $database, null);
 
     $looked = collect(Http::recorded(fn (Request $request): bool => $request->method() === 'GET'))->map(fn (array $pair): string => $pair[0]['name']);
     expect($looked)->toContain('cache.db.example.com', 'replica-cache.db.example.com', 'cache.db.example.org')
         ->and($database->fresh()->dns_zone_id)->toBeNull()
-        ->and($database->fresh()->operation)->toBe('Stop using a domain');
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Redeploying);
 });
 
 it('refuses to pick the domain it already uses, or none when it has none', function () {
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
     $plain = idleDatabase('valkey', 1, DatabaseMode::Single, 'plain');
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $database->dns_zone_id])->assertSessionHasErrors(['dns_zone_id' => 'cache already uses example.com.']);
     $this->put(projectUrl("/databases/{$plain->id}/domain"), ['dns_zone_id' => null])->assertSessionHasErrors(['dns_zone_id' => "plain doesn't use a domain."]);
@@ -87,9 +88,9 @@ it('refuses to pick the domain it already uses, or none when it has none', funct
 it('keeps the domain while the database is busy', function () {
     Http::fake();
     $database = newDatabase('valkey', 1, DatabaseMode::Single);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
 
-    expect(fn () => resolve(AssignDatabaseZone::class)->handle($database, DnsZone::factory()->create()))->toThrow(ValidationException::class, 'busy with Create Valkey database')
+    expect(fn () => resolve(AssignDatabaseZone::class)->handle($database, DnsZone::factory()->create()))->toThrow(ValidationException::class, 'busy pending')
         ->and($database->fresh()->dns_zone_id)->toBeNull();
     Http::assertNothingSent();
 });
@@ -97,11 +98,11 @@ it('keeps the domain while the database is busy', function () {
 it('keeps the database in its domain when its records cannot be removed', function () {
     Http::fake(['api.cloudflare.com/*' => Http::response(['success' => false], 403)]);
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([UpgradeDatabaseJob::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => null])->assertSessionHasErrors('dns_zone_id');
 
     expect($database->fresh()->dns_zone_id)->toBe($database->dns_zone_id)
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
     Queue::assertNothingPushed();
 });

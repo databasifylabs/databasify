@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Nodes\AddDatabaseNode;
 use App\Actions\Databases\Nodes\RebootDatabase;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
@@ -11,15 +10,13 @@ use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabaseNode;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Operation;
-use App\Engines\Flows\CreateDatabaseFlow;
-use App\Engines\Flows\FlowContext;
-use App\Engines\Flows\RedeployNodeFlow;
 use App\Engines\Payload;
-use App\Enums\Databases\FlowState;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\OperationState;
 use App\Exceptions\Engines\EngineUnsupported;
+use App\Jobs\Databases\RedeployNodeJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\Server;
@@ -55,8 +52,7 @@ function failingTaskOn(Server $server, int $call): void
 
 function addThroughFlow(Database $database, Server $server, NodeKind $kind = NodeKind::Member): void
 {
-    resolve(AddDatabaseNode::class)->handle($database, new NewDatabaseNode($server, $kind, $kind === NodeKind::ReadOnly ? 'reports' : null));
-    advanceFlows();
+    runOperation(fn () => resolve(AddDatabaseNode::class)->handle($database, new NewDatabaseNode($server, $kind, $kind === NodeKind::ReadOnly ? 'reports' : null)));
 }
 
 it('adds a node in the documented order', function () {
@@ -73,8 +69,7 @@ it('adds a node in the documented order', function () {
         ->and($existing->map(fn (Server $peer): array => sentTo($peer, $ssh))->all())->each->toBe(['nodes.configure', 'cluster.membership', 'nodes.status'])
         ->and(array_search("{$existing[0]->name}: cluster.membership", $commands, true))->toBeGreaterThan(array_search("{$server->name}: nodes.ready", $commands, true))
         ->and(argsOn($existing[0], 'cluster.membership')[0])->toHaveCount(3)
-        ->and($database->flows()->latest('id')->where('flow', '!=', CreateDatabaseFlow::class)->sole()->state)->toBe(FlowState::Succeeded)
-        ->and($database->fresh()->operation)->toBeNull()
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
         ->and($database->nodes()->count())->toBe(3);
 });
 
@@ -116,7 +111,7 @@ it('removes the new node and puts the old members back when the copy fails', fun
         ->and(json_decode($ssh->engineRequestAt(collect($ssh->runs)->search(fn (array $run): bool => $run['server'] === $server->name && str_contains($run['script'], '| databasify host remove '))), true))->toBe(['databaseId' => $database->id, 'erase' => true])
         ->and(sentTo($existing[0], $ssh))->toBe(['nodes.configure', 'cluster.membership', 'nodes.configure', 'cluster.membership', 'nodes.status'])
         ->and($database->nodes()->count())->toBe(2)
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('removes a node in the documented order', function () {
@@ -126,8 +121,7 @@ it('removes a node in the documented order', function () {
     [$primary, $staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
     $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
-    resolve(RemoveDatabaseNode::class)->handle($leaving);
-    advanceFlows();
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
 
     expect(sentTo($leaving->server, $ssh))->toBe(['nodes.status', 'cluster.disable', 'host remove'])
         ->and(sentTo($primary->server, $ssh))->toBe(['nodes.status', 'nodes.configure', 'cluster.forget', 'cluster.membership', 'nodes.status'])
@@ -144,8 +138,7 @@ it('falls back to node reset when member forget is unsupported', function () {
     [$primary, $staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
     $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
-    resolve(RemoveDatabaseNode::class)->handle($leaving);
-    advanceFlows();
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
 
     expect(sentTo($staying->server, $ssh))->toBe(['nodes.status', 'nodes.configure', 'cluster.forget', 'nodes.reset', 'cluster.membership', 'nodes.status'])
         ->and(argsOn($staying->server, 'nodes.reset'))->toBe([1, [$primary->privateIp(), $staying->privateIp()]]);
@@ -158,8 +151,7 @@ it('fails over before removing the primary', function () {
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
     $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
 
-    resolve(RemoveDatabaseNode::class)->handle($primary);
-    advanceFlows();
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($primary));
 
     expect(sentTo($primary->server, $ssh))->toBe(['nodes.status', 'cluster.failover', 'cluster.disable', 'host remove'])
         ->and(argsOn($primary->server, 'cluster.failover'))->toBe([$standby->privateIp()])
@@ -172,8 +164,8 @@ it('redeploys a cluster member and rejoins it', function () {
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
     $standby = $database->nodes()->orderBy('position')->get()[1];
 
-    resolve(StartFlow::class)->handle($database, resolve(RedeployNodeFlow::class), fn (): FlowContext => new FlowContext([$standby->id], $standby->id));
-    advanceFlows();
+    $database->markBusy(DatabaseStatus::Scaling);
+    runOperation(fn () => dispatch(new RedeployNodeJob($database, $standby)));
 
     expect(sentTo($standby->server, $ssh))->toBe(['host deploy', 'engine info', 'nodes.installTls', 'nodes.ready', 'task.status', 'cluster.rejoin', 'task.status', 'nodes.status']);
 });
@@ -184,8 +176,7 @@ it('reboots standbys first, fails over, then reboots the former primary', functi
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
     $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'))->bootIdChangesAfterReboot();
 
-    resolve(RebootDatabase::class)->handle($database);
-    advanceFlows(40);
+    runOperation(fn () => resolve(RebootDatabase::class)->handle($database));
     $commands = engineCommandsIn($ssh);
     $rebootOf = fn (Server $server): int|false => collect($ssh->runs)->search(fn (array $run): bool => $run['server'] === $server->name && str_contains($run['script'], 'sleep 2; reboot'));
 
@@ -194,7 +185,7 @@ it('reboots standbys first, fails over, then reboots the former primary', functi
         ->and(array_search("{$primary->server->name}: cluster.failover", $commands, true))->toBeGreaterThan(array_search("{$standby->server->name}: cluster.rejoin", $commands, true))
         ->and(argsOn($primary->server, 'cluster.failover'))->toBe([$standby->privateIp()])
         ->and(sentTo($primary->server, $ssh))->toContain('cluster.rejoin')
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('upgrades in the documented order and reads the engine again afterwards', function () {
@@ -206,8 +197,7 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
     $database->update(['available_image' => $offered, 'config_fields' => []]);
     answerRead('config.fields', [EngineField::fromPayload(new Payload(engineFieldPayload()))]);
 
-    resolve(UpgradeDatabase::class)->handle($database->fresh());
-    advanceFlows(40);
+    runOperation(fn () => resolve(UpgradeDatabase::class)->handle($database->fresh()));
     $commands = engineCommandsIn($ssh);
     $at = fn (Server $server, string $command): int|false => array_search("{$server->name}: {$command}", $commands, true);
 
@@ -218,7 +208,7 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and($at($standby->server, 'host deploy'))->toBeLessThan($at($standby->server, 'nodes.configure'))
         ->and($at($standby->server, 'nodes.configure'))->toBeLessThan($at($standby->server, 'nodes.ready'))
         ->and(json_decode($ssh->engineRequestAt(collect($ssh->runs)->search(fn (array $run): bool => $run['server'] === $primary->server->name && str_contains($run['script'], '| databasify host deploy '))), true)['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
-        ->and($database->fresh())->image->toEqual($offered)->available_image->toBeNull()->operation->toBeNull()
+        ->and($database->fresh())->image->toEqual($offered)->available_image->toBeNull()->status->toBe(DatabaseStatus::Ready)
         ->and($database->fresh()->config_fields)->toHaveCount(1);
 });
 
@@ -230,7 +220,7 @@ it('refuses to install an offered image built on an SDK outside the range', func
 
     expect(fn () => resolve(UpgradeDatabase::class)->handle($database->fresh()))
         ->toThrow(ValidationException::class, 'MySQL 8.4.9 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.')
-        ->and($database->fresh())->image->toEqual($image)->operation->toBeNull()
+        ->and($database->fresh())->image->toEqual($image)->status->toBe(DatabaseStatus::Ready)
         ->and($ssh->runs)->toBe([]);
 });
 

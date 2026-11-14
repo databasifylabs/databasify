@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Failover;
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Jobs\Databases\FailoverDatabaseJob;
 use App\Models\Database;
 use Illuminate\Validation\ValidationException;
@@ -18,7 +19,7 @@ final readonly class FailoverDatabase
             throw ValidationException::withMessages(['database' => 'Failover needs at least one standby node.']);
         }
 
-        $database->startOperation('Fail over');
+        $database->markBusy(DatabaseStatus::Recovering);
         dispatch(new FailoverDatabaseJob($database));
     }
 }

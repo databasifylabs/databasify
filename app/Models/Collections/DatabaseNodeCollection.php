@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models\Collections;
 
-use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Models\DatabaseNode;
 use Illuminate\Database\Eloquent\Collection;
@@ -91,14 +90,22 @@ final class DatabaseNodeCollection extends Collection
         ])->filter()->implode(' ');
     }
 
-    public function healthStatus(): DatabaseStatus
+    public function isHealthy(): bool
     {
-        if ($this->doesntContain(fn (DatabaseNode $node): bool => $node->role->serves())) {
-            return DatabaseStatus::Offline;
+        return $this->primaryCount() === 1 && $this->every(fn (DatabaseNode $node): bool => $node->role->serves());
+    }
+
+    public function anyServes(): bool
+    {
+        return $this->contains(fn (DatabaseNode $node): bool => $node->role->serves());
+    }
+
+    public function health(): string
+    {
+        if (! $this->anyServes()) {
+            return 'offline';
         }
 
-        $healthy = $this->primaryCount() === 1 && $this->every(fn (DatabaseNode $node): bool => $node->role->serves());
-
-        return $healthy ? DatabaseStatus::Ready : DatabaseStatus::Degraded;
+        return $this->isHealthy() ? 'healthy' : 'degraded';
     }
 }

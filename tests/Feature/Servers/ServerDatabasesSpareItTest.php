@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
 use App\Models\Server;
@@ -30,10 +31,10 @@ it('refuses the primary of a database with other members', function () {
 it('refuses any member of a busy database', function () {
     $database = idleDatabase('valkey', 2);
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $replica = $database->nodes()->where('role', NodeRole::Replica)->firstOrFail();
 
-    expect(fn () => $replica->server->ensureDatabasesSpareIt())->toThrow(ValidationException::class, 'is busy with Upgrade');
+    expect(fn () => $replica->server->ensureDatabasesSpareIt())->toThrow(ValidationException::class, 'is busy upgrading');
 });
 
 it('refuses a member of a database that is migrating data in', function () {

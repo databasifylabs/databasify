@@ -6,7 +6,7 @@ use App\Actions\Databases\Certificates\InstallNodeCertificate;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Actions\Dns\EnsureZoneCertificate;
 use App\Enums\Databases\DatabaseMode;
-use App\Enums\Databases\DatabaseStatus;
+use App\Enums\Databases\NodeRole;
 use App\Jobs\Databases\RenewCertificatesJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -90,7 +90,8 @@ it('queues a certificate renewal for the other databases on a zone once it gets 
     fakeCertificateAuthority();
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
     $other = idleDatabase('redis', 1, DatabaseMode::Single, 'sessions');
-    $other->update(['dns_zone_id' => $database->dns_zone_id, 'status' => DatabaseStatus::Ready]);
+    $other->update(['dns_zone_id' => $database->dns_zone_id]);
+    markRoles($other, NodeRole::Primary);
     Queue::fake([RenewCertificatesJob::class]);
 
     resolve(EnsureZoneCertificate::class)->handle($database->dnsZone);

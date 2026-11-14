@@ -15,6 +15,7 @@ use App\DTOs\Databases\DatabaseHostnames;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\IssuedCertificate;
+use App\DTOs\Databases\LastFailure;
 use App\DTOs\Databases\MaintenanceWindow;
 use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Databases\ServiceRecords;
@@ -39,6 +40,7 @@ use App\Enums\Databases\Persistence;
 use App\Enums\Engines\Feature;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
+use App\Enums\Servers\ServerLogStatus;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
@@ -62,6 +64,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -73,8 +76,6 @@ use LogicException;
  * @property string $version_line
  * @property DatabaseMode $mode
  * @property DatabaseStatus $status
- * @property string|null $operation
- * @property CarbonImmutable|null $operation_started_at
  * @property EngineImage $image
  * @property EngineImage|null $available_image
  * @property CarbonImmutable|null $retune_needed_at
@@ -89,7 +90,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -408,7 +409,7 @@ class Database extends Model implements Movable
     #[Scope]
     protected function operational(Builder $query): void
     {
-        $query->whereNotIn('status', [DatabaseStatus::Creating, DatabaseStatus::Failed]);
+        $query->whereNotIn('status', [DatabaseStatus::Pending, DatabaseStatus::Creating, DatabaseStatus::Failed]);
     }
 
     /**
@@ -419,33 +420,6 @@ class Database extends Model implements Movable
     {
         $utc = $moment->copy()->utc();
         $query->where('maintenance_day', $utc->dayOfWeek)->where('maintenance_hour', $utc->hour);
-    }
-
-    public function startOperation(string $title): void
-    {
-        $claimed = self::query()->whereKey($this->id)->whereNull('operation')->update(['operation' => $title, 'operation_started_at' => now()]);
-
-        $this->refresh();
-
-        if ($claimed === 0) {
-            throw $this->busyError();
-        }
-
-        $this->forgetStopFlags();
-    }
-
-    public function retitleOperation(string $title): void
-    {
-        self::query()->whereKey($this->id)->whereNotNull('operation')->update(['operation' => $title]);
-        $this->forceFill(['operation' => $title])->syncOriginalAttributes(['operation']);
-    }
-
-    public function finishOperation(): void
-    {
-        $idle = ['operation' => null, 'operation_started_at' => null];
-        self::query()->whereKey($this->id)->update($idle);
-        $this->forceFill($idle)->syncOriginalAttributes(array_keys($idle));
-        $this->forgetStopFlags();
     }
 
     public function requestStop(): void
@@ -477,15 +451,7 @@ class Database extends Model implements Movable
 
     public function isBusy(): bool
     {
-        return $this->operation !== null;
-    }
-
-    /**
-     * @return HasMany<DatabaseFlow, $this>
-     */
-    public function flows(): HasMany
-    {
-        return $this->hasMany(DatabaseFlow::class);
+        return $this->status->isBusy();
     }
 
     /**
@@ -553,44 +519,75 @@ class Database extends Model implements Movable
 
     public function busyError(): ValidationException
     {
-        return ValidationException::withMessages(['database' => "{$this->name} is busy with {$this->operation}, try again when it finishes."]);
+        return ValidationException::withMessages(['database' => "{$this->name} is busy {$this->status->value}, try again when it finishes."]);
+    }
+
+    public function markBusy(DatabaseStatus $status): void
+    {
+        $this->markBusyWith($status, fn (): null => null);
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(self): TResult  $changes
+     * @return TResult
+     */
+    public function markBusyWith(DatabaseStatus $status, Closure $changes): mixed
+    {
+        return DB::transaction(function () use ($status, $changes): mixed {
+            if ($this->refreshForUpdate()->isBusy()) {
+                throw $this->busyError();
+            }
+
+            if ($this->status === DatabaseStatus::Failed && $status !== DatabaseStatus::Deleting) {
+                throw ValidationException::withMessages(['database' => "{$this->name} failed to set up, retry the setup or delete it."]);
+            }
+
+            $result = $changes($this);
+            $this->update(['status' => $status]);
+
+            return $result;
+        });
+    }
+
+    public function lastFailure(): ?LastFailure
+    {
+        $latest = $this->serverLogs()->latest('id')->first(['id', 'name', 'status', 'updated_at']);
+
+        if ($latest === null || $latest->status !== ServerLogStatus::Failed) {
+            return null;
+        }
+
+        return new LastFailure($latest->id, $latest->name, $latest->updated_at?->toIso8601String());
     }
 
     public function markCreating(): void
     {
-        $this->update(['status' => DatabaseStatus::Creating]);
+        $this->recordStatusAs(DatabaseStatus::Creating);
+    }
+
+    public function markReady(): void
+    {
+        $this->recordStatusAs(DatabaseStatus::Ready);
+        $this->forgetStopFlags();
+    }
+
+    public function abandonOperation(): void
+    {
+        $this->status->isSettingUp() ? $this->markFailed() : $this->markReady();
     }
 
     public function markFailed(): void
     {
-        $this->update(['status' => DatabaseStatus::Failed]);
+        $this->recordStatusAs(DatabaseStatus::Failed);
+        $this->forgetStopFlags();
     }
 
-    public function failSetup(): void
+    private function recordStatusAs(DatabaseStatus $status): void
     {
-        if ($this->status === DatabaseStatus::Creating) {
-            $this->markFailed();
-        }
-    }
-
-    public function recordStatus(DatabaseStatus $status): void
-    {
-        $this->update(['status' => $status]);
-    }
-
-    public function hasFailed(): bool
-    {
-        return $this->status === DatabaseStatus::Failed;
-    }
-
-    public function isReady(): bool
-    {
-        return $this->status === DatabaseStatus::Ready;
-    }
-
-    public function isServing(): bool
-    {
-        return $this->status->isServing();
+        self::query()->whereKey($this->id)->update(['status' => $status]);
+        $this->forceFill(['status' => $status])->syncOriginalAttributes(['status']);
     }
 
     public function addNode(string $serverId, NodeKind $kind = NodeKind::Member, ?string $name = null): DatabaseNode
@@ -1097,7 +1094,6 @@ class Database extends Model implements Movable
             'maintenance_day' => 'integer',
             'maintenance_hour' => 'integer',
             'retune_needed_at' => 'datetime',
-            'operation_started_at' => 'datetime',
         ];
     }
 }

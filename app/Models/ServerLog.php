@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Events\ServerLogOutputReceived;
 use Carbon\CarbonImmutable;
@@ -162,7 +163,7 @@ class ServerLog extends Model
     #[Scope]
     protected function outsideRunningOperations(Builder $query): void
     {
-        $query->whereDoesntHave('database', fn (Builder $database): Builder => $database->whereNotNull('operation'));
+        $query->whereDoesntHave('database', fn (Builder $database): Builder => $database->whereNotIn('status', [DatabaseStatus::Ready, DatabaseStatus::Failed]));
     }
 
     /**

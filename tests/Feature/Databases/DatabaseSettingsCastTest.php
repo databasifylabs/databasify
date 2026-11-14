@@ -10,11 +10,11 @@ it('keeps settings saved by a newer copy when a stale copy only changes the stat
     $stale->settings;
 
     $database->update(['settings' => $database->settings->withConfig(['maxmemory-policy' => 'allkeys-lru'])]);
-    $stale->update(['status' => DatabaseStatus::Degraded]);
+    $stale->update(['status' => DatabaseStatus::Upgrading]);
 
     expect($stale->isDirty('settings'))->toBeFalse()
         ->and($database->fresh()->settings->config)->toMatchArray(['maxmemory-policy' => 'allkeys-lru'])
-        ->and($database->fresh()->status)->toBe(DatabaseStatus::Degraded);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Upgrading);
 });
 
 it('still saves settings that really changed', function () {

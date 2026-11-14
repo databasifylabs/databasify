@@ -5,8 +5,9 @@ declare(strict_types=1);
 use App\Actions\Databases\Recovery\DeleteArchive;
 use App\DTOs\Recovery\StoredArchive;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\ApplySettingsJob;
 use App\Jobs\Databases\DeleteRecoveryBackupsJob;
 use App\Models\Database;
 use App\Models\ServerLog;
@@ -71,10 +72,10 @@ it('deletes the backups from the bucket after turning point-in-time recovery off
     Bus::fake();
 
     $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
-    Bus::assertDispatched(AdvanceDatabaseFlow::class);
+    Bus::assertDispatched(ApplySettingsJob::class);
     Bus::assertNotDispatched(DeleteRecoveryBackupsJob::class);
 
-    $database->fresh()->finishOperation();
+    $database->fresh()->markReady();
     $database = withRecovery($database);
     $this->delete(projectUrl("/databases/{$database->id}/recovery"), ['delete_backups' => true])->assertSessionHasNoErrors();
     Bus::assertDispatched(DeleteRecoveryBackupsJob::class, fn (DeleteRecoveryBackupsJob $job): bool => $job->database->is($database) && $job->archive->path === $path && $job->archive->prefix() === "{$path}/" && $job->delay !== null);
@@ -97,7 +98,7 @@ it('deletes the backups under its own operation and finishes it', function () {
 
     dispatch_sync(new DeleteRecoveryBackupsJob($database, new StoredArchive($provider->id, 'mysql/orders-1')));
 
-    expect($database->fresh()->operation)->toBeNull();
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Ready);
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST');
 });
 
@@ -128,14 +129,14 @@ it('deletes the database even when the bucket refuses to delete its backups', fu
 it('leaves a foreign operation untouched when busy at start', function () {
     $database = idleDatabase('mysql', 1, DatabaseMode::Single, 'orders');
     $provider = StorageProvider::factory()->create();
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $log = ServerLog::factory()->for($database->seed()->server)->create(['database_id' => $database->id, 'status' => ServerLogStatus::Running]);
     fakeArchiveBucket([[]]);
     $job = new DeleteRecoveryBackupsJob($database, new StoredArchive($provider->id, 'mysql/orders-1'));
 
     expect(fn () => dispatch_sync($job))->toThrow(ValidationException::class);
 
-    expect($database->fresh()->operation)->toBe('Upgrade')
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Upgrading)
         ->and($log->fresh()->status)->toBe(ServerLogStatus::Running);
     Http::assertNothingSent();
 });
@@ -147,5 +148,5 @@ it('releases its own operation when deletion fails', function () {
 
     expect(fn () => dispatch_sync(new DeleteRecoveryBackupsJob($database, new StoredArchive($provider->id, 'mysql/orders-1'))))->toThrow(RuntimeException::class);
 
-    expect($database->fresh()->operation)->toBeNull();
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });

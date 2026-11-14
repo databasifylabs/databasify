@@ -16,6 +16,6 @@ final readonly class AddTrustedSource
         $database->ensureIdle();
         $database->trustedSources()->firstOrCreate(['cidr' => $data->cidr], ['label' => $data->label]);
 
-        $this->queue->handle($database, "Allow {$data->cidr}");
+        $this->queue->handle($database);
     }
 }

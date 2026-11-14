@@ -1,4 +1,5 @@
-import { Head, usePoll } from '@inertiajs/react';
+import { Head, Link, usePoll } from '@inertiajs/react';
+import { databaseOperation, databaseStatus } from '@/lib/status';
 import {
     ArchiveRestore,
     ChartLine,
@@ -10,6 +11,7 @@ import {
     ShieldCheck,
     Users,
     Waypoints,
+    TriangleAlert,
 } from 'lucide-react';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
 import DatabaseActions from '@/components/databases/actions/database-actions';
@@ -40,6 +42,7 @@ import OverviewTab from '@/components/databases/tabs/overview-tab';
 import PoolsTab from '@/components/databases/tabs/pools-tab';
 import SettingsTab from '@/components/databases/tabs/settings-tab';
 import UsersTab from '@/components/databases/tabs/users-tab';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useQueryTab } from '@/hooks/use-query-tab';
 import type {
@@ -106,7 +109,8 @@ export default function ShowDatabase({
         tabs.map((entry) => entry.value),
         'overview',
     );
-    const busy = database.operation !== null;
+    const operation = databaseOperation(database);
+    const busy = operation !== null;
 
     usePoll(5000, () => ({
         only: ['database', 'availableServers', ...liveLogProps(logs, log)],
@@ -125,7 +129,7 @@ export default function ShowDatabase({
                                 size="lg"
                             />
                             <StatusDot
-                                status={database.status}
+                                status={databaseStatus(database)}
                                 className="absolute -right-1 -bottom-1 rounded-full ring-2 ring-background"
                             />
                         </div>
@@ -134,21 +138,23 @@ export default function ShowDatabase({
                                 <h1 className="text-2xl font-semibold tracking-tight">
                                     {database.name}
                                 </h1>
-                                <StatusBadge status={database.status} />
+                                <StatusBadge
+                                    status={databaseStatus(database)}
+                                />
                                 {database.engine_community && (
                                     <CommunityBadge
                                         author={database.engine_author}
                                     />
                                 )}
-                                {database.operation && (
+                                {operation && (
                                     <>
                                         <OperationLabel
-                                            operation={database.operation}
+                                            operation={operation}
                                             className="text-sm"
                                         />
                                         <StopOperationButton
                                             database={database}
-                                            operation={database.operation}
+                                            operation={operation}
                                         />
                                     </>
                                 )}
@@ -173,6 +179,31 @@ export default function ShowDatabase({
                         name={database.name}
                         unsupported={sdkUnsupported}
                     />
+                )}
+
+                {!busy && database.last_failure && (
+                    <Alert variant="destructive">
+                        <TriangleAlert />
+                        <AlertTitle>
+                            {database.last_failure.name} failed
+                        </AlertTitle>
+                        <AlertDescription>
+                            <Link
+                                href={DatabaseController.show(
+                                    { database: database.id },
+                                    {
+                                        query: {
+                                            tab: 'logs',
+                                            log: database.last_failure.log_id,
+                                        },
+                                    },
+                                )}
+                                className="underline"
+                            >
+                                See what went wrong
+                            </Link>
+                        </AlertDescription>
+                    </Alert>
                 )}
 
                 <Tabs value={tab} onValueChange={navigate} className="gap-6">

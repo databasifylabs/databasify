@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Nodes;
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
-use App\Engines\Flows\FlowContext;
-use App\Engines\Flows\RemoveNodeFlow;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\RemoveNodeJob;
 use App\Models\DatabaseNode;
 use Illuminate\Validation\ValidationException;
 
 final readonly class RemoveDatabaseNode
 {
     public function __construct(
-        private StartFlow $startFlow,
-        private RemoveNodeFlow $flow,
         private RefreshDatabaseStatus $refresh,
         private EnsureNodesSized $sized,
     ) {}
@@ -35,11 +32,7 @@ final readonly class RemoveDatabaseNode
         $remaining = $database->nodesOtherThan($node);
         $standby = $node->isPrimary() ? $remaining->first(fn (DatabaseNode $peer): bool => $peer->isMember() && $peer->isReplica()) : null;
 
-        $this->startFlow->handle($database, $this->flow, new FlowContext(
-            nodeIds: array_values(array_filter($remaining->modelKeys(), is_string(...))),
-            targetNodeId: $node->id,
-            failoverTo: $standby?->id,
-            force: $force,
-        ));
+        $database->markBusy(DatabaseStatus::Scaling);
+        dispatch(new RemoveNodeJob($database, $node, $standby, $force));
     }
 }

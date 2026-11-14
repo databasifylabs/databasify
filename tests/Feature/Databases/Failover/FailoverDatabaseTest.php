@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Jobs\Databases\FailoverDatabaseJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -19,7 +20,7 @@ it('moves the primary to a standby from the database page', function () {
     $this->post(projectUrl("/databases/{$database->id}/failover"))->assertRedirect();
 
     expect(recordedArgs('cluster.failover'))->toBe([['server' => $primary->server->name, 'args' => [$standby->privateIp()]]])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('refuses to fail over without a standby member', function () {
@@ -35,7 +36,7 @@ it('refuses to fail over without a standby member', function () {
 it('refuses to fail over while another operation runs', function () {
     $database = idleDatabase('valkey', 2);
     Queue::fake([FailoverDatabaseJob::class]);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
     $this->post(projectUrl("/databases/{$database->id}/failover"))->assertSessionHasErrors('database');
 

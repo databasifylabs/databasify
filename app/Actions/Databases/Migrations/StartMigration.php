@@ -6,12 +6,12 @@ namespace App\Actions\Databases\Migrations;
 
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Migrations\SourceReport;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Jobs\Databases\RunMigrationJob;
 use App\Models\Database;
 use App\Models\DatabaseMigration;
 use App\Support\Migrations\NameList;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final readonly class StartMigration
@@ -26,11 +26,7 @@ final readonly class StartMigration
         $this->ensureReady($report, $mode);
         $source = $this->sourceDiscoveredBy($source, $report);
 
-        $migration = DB::transaction(function () use ($database, $primary, $source, $mode): DatabaseMigration {
-            $database->startOperation("Migrate from {$source->address()}");
-
-            return $database->startMigration($primary, $source, $mode);
-        });
+        $migration = $database->markBusyWith(DatabaseStatus::Migrating, fn (Database $locked): DatabaseMigration => $locked->startMigration($primary, $source, $mode));
         dispatch(new RunMigrationJob($migration));
 
         return $migration;

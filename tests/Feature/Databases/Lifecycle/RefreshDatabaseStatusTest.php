@@ -50,17 +50,16 @@ it('reports a node whose engine container is stopped as offline instead of unrea
 it('alerts when a ready database degrades and again when it heals', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 2);
-    $database->update(['status' => DatabaseStatus::Ready]);
     [$primary, $replica] = $database->nodes()->orderBy('position')->get()->map->server;
     $unreachable = $replica->name;
     answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, null);
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Degraded);
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->isHealthy())->toBeFalse();
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main is degraded' && $alert->message === "Unreachable: {$unreachable}.");
 
     answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica');
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Ready)
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->isHealthy())->toBeTrue()
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main is healthy again');
 });
@@ -68,30 +67,32 @@ it('alerts when a ready database degrades and again when it heals', function () 
 it('reports a database without a single primary as degraded', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 2);
-    $database->update(['status' => DatabaseStatus::Ready]);
     $ssh = fakeSsh();
     $database->nodes->each(fn (DatabaseNode $node) => answerNodeStatus($ssh, $node->server, 'primary'));
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Degraded);
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->isHealthy())->toBeFalse();
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === '2 nodes claim to be primary.');
 });
 
 it('raises an offline alert when no node answers any more', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->update(['status' => DatabaseStatus::Ready]);
+    markRoles($database, NodeRole::Primary);
     fakeSsh()->respond('', 255);
+    resolve(RefreshDatabaseStatus::class)->handle($database);
+    resolve(RefreshDatabaseStatus::class)->handle($database);
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Offline);
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->anyServes())->toBeFalse();
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main is offline');
 });
 
 it('stays quiet while a database is still being created', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    $database->update(['status' => DatabaseStatus::Creating]);
     fakeSsh()->respond('', 255);
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Offline);
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->anyServes())->toBeFalse();
     Event::assertNotDispatched(DatabaseAlertRaised::class);
 });
 
@@ -107,7 +108,7 @@ it('queues a status refresh from the database page', function () {
 
 it('skips a queued refresh while the database is busy', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $ssh = fakeSsh();
 
     (new RefreshDatabaseStatusJob($database))->handle(resolve(RefreshDatabaseStatus::class));
@@ -115,9 +116,8 @@ it('skips a queued refresh while the database is busy', function () {
     expect($ssh->runs)->toBeEmpty();
 });
 
-it('queues a status check for databases that are neither creating nor failed', function () {
+it('queues a status check for databases that are neither setting up nor failed', function () {
     $ready = idleDatabase('valkey', 1, DatabaseMode::Single, 'ready');
-    $ready->update(['status' => DatabaseStatus::Degraded]);
     idleDatabase('valkey', 1, DatabaseMode::Single, 'broken')->update(['status' => DatabaseStatus::Failed]);
     newDatabase('valkey', 1, DatabaseMode::Single, 'creating');
     Queue::fake([RefreshDatabaseStatusJob::class]);
@@ -131,17 +131,16 @@ it('queues a status check for databases that are neither creating nor failed', f
 it('keeps the last known role through two missed reads and marks the node unreachable on the third', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->update(['status' => DatabaseStatus::Ready]);
     markRoles($database, NodeRole::Primary);
     fakeSsh()->failWith(new SshConnectionFailed('Connection closed due to timeout'));
 
     $missed = [resolve(RefreshDatabaseStatus::class)->handle($database), resolve(RefreshDatabaseStatus::class)->handle($database)];
 
-    expect($missed)->toBe([DatabaseStatus::Ready, DatabaseStatus::Ready])
+    expect(array_map(fn ($nodes): bool => $nodes->isHealthy(), $missed))->toBe([true, true])
         ->and($database->nodes()->sole()->role)->toBe(NodeRole::Primary);
     Event::assertNotDispatched(DatabaseAlertRaised::class);
 
-    expect(resolve(RefreshDatabaseStatus::class)->handle($database))->toBe(DatabaseStatus::Offline)
+    expect(resolve(RefreshDatabaseStatus::class)->handle($database)->anyServes())->toBeFalse()
         ->and($database->nodes()->sole()->role)->toBe(NodeRole::Unknown);
     Event::assertDispatchedTimes(DatabaseAlertRaised::class, 1);
 });
@@ -149,7 +148,6 @@ it('keeps the last known role through two missed reads and marks the node unreac
 it('counts missed reads again from zero after a node answers', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->update(['status' => DatabaseStatus::Ready]);
     markRoles($database, NodeRole::Primary);
     $server = $database->nodes()->sole()->server;
     $missOnce = function () use ($database): void {

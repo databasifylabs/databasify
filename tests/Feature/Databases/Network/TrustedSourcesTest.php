@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Databases\ApplyTrustedSourcesJob;
 use App\Models\User;
@@ -17,7 +18,7 @@ it('validates trusted sources over http', function () {
     $this->post(projectUrl("/databases/{$database->id}/trusted-sources"), ['cidr' => '198.51.100.0/24'])->assertSessionHasNoErrors();
 
     $source = $database->trustedSources()->sole();
-    $database->fresh()->finishOperation();
+    $database->fresh()->markReady();
     $this->delete(projectUrl("/databases/{$database->id}/trusted-sources/{$source->id}"))->assertSessionHasNoErrors();
 
     expect($database->trustedSources()->count())->toBe(0);
@@ -35,7 +36,7 @@ it('stores a bare address as a single host and applies it on the nodes straight 
         ->cidr->toBe('203.0.113.7/32')
         ->label->toBe('office')
         ->and($ssh->scriptAt(0))->toContain("elements = { %s } }\\n' '203.0.113.7/32'")->toContain("tcp dport { %s } drop\\n' '25060, 25061'")
-        ->and($database->fresh()->operation)->toBeNull()
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
         ->and($database->serverLogs()->sole())
         ->name->toBe("{$database->seed()->server->name}: applying trusted sources")
         ->status->toBe(ServerLogStatus::Succeeded);

@@ -32,7 +32,7 @@ class DatabaseListResource extends JsonResource
             'available_update_refreshes_image' => $this->availableUpdateRefreshesImage(),
             'mode' => $this->mode->value,
             'status' => $this->status->value,
-            'operation' => $this->operation,
+            'health' => $this->nodes->health(),
             'created_at' => $this->created_at?->toIso8601String(),
             'point_in_time_recovery' => PointInTimeRecoveryResource::make($this->pointInTimeRecovery),
             'nodes' => DatabaseNodeResource::collection($this->nodes),

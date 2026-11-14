@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Databases;
 
 use App\Actions\Databases\Pools\ApplyConnectionPools;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
@@ -26,5 +27,15 @@ final class ApplyConnectionPoolsJob implements ShouldQueue
     public function handle(ApplyConnectionPools $action): void
     {
         $action->handle($this->database);
+    }
+
+    protected function operatingStatus(): DatabaseStatus
+    {
+        return DatabaseStatus::Updating;
+    }
+
+    protected function operationName(): string
+    {
+        return 'Apply connection pools';
     }
 }

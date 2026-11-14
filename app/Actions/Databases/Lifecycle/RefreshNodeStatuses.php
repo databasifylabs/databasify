@@ -22,13 +22,13 @@ final readonly class RefreshNodeStatuses
         private ReadNodeStatus $readStatus,
     ) {}
 
-    public function handle(Database $database, DatabaseNodeCollection $nodes): DatabaseStatus
+    public function handle(Database $database, DatabaseNodeCollection $nodes): DatabaseNodeCollection
     {
-        $previous = $database->status;
-
-        if ($database->hasFailed()) {
-            return $previous;
+        if ($database->status === DatabaseStatus::Failed) {
+            return $database->nodesWithServers();
         }
+
+        $previous = $database->nodesWithServers()->health();
 
         $statuses = $this->nodeRunner->map(
             $nodes,
@@ -39,12 +39,10 @@ final readonly class RefreshNodeStatuses
         $nodes->values()->each(fn (DatabaseNode $node, int $index) => $this->recordStatusOn($node, $statuses[$index] ?? NodeStatus::unreachable(), $anotherAnswersAsPrimary));
 
         $all = $database->nodesWithServers();
-        $status = $all->healthStatus();
-        $database->recordStatus($status);
-        $this->announceChange($database, $all, $previous, $status);
+        $this->announceChange($database, $all, $previous, $all->health());
         rescue(fn () => $this->dns->handle($database));
 
-        return $status;
+        return $all;
     }
 
     private function recordStatusOn(DatabaseNode $node, NodeStatus $status, bool $anotherAnswersAsPrimary): void
@@ -58,18 +56,18 @@ final readonly class RefreshNodeStatuses
         $node->recordStatus($status);
     }
 
-    private function announceChange(Database $database, DatabaseNodeCollection $nodes, DatabaseStatus $previous, DatabaseStatus $status): void
+    private function announceChange(Database $database, DatabaseNodeCollection $nodes, string $previous, string $health): void
     {
-        if ($previous === $status || ! $previous->isServing()) {
+        if ($previous === $health || $database->status->isSettingUp()) {
             return;
         }
 
-        if ($status === DatabaseStatus::Ready) {
+        if ($health === 'healthy') {
             event(new DatabaseAlertRaised($database, "{$database->name} is healthy again", 'Every node is back and exactly one primary is serving writes.'));
 
             return;
         }
 
-        event(new DatabaseAlertRaised($database, "{$database->name} is {$status->value}", $nodes->problems()));
+        event(new DatabaseAlertRaised($database, "{$database->name} is {$health}", $nodes->problems()));
     }
 }

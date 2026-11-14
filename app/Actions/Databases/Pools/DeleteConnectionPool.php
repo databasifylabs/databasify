@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Pools;
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
 use App\Models\ConnectionPool;
-use Illuminate\Support\Facades\DB;
 
 final readonly class DeleteConnectionPool
 {
@@ -15,10 +15,7 @@ final readonly class DeleteConnectionPool
         $database = $pool->database;
         $database->ensureIdle();
 
-        DB::transaction(function () use ($pool, $database): void {
-            $pool->delete();
-            $database->startOperation("Remove connection pool {$pool->name}");
-        });
+        $database->markBusyWith(DatabaseStatus::Updating, fn () => $pool->delete());
         dispatch(new ApplyConnectionPoolsJob($database));
     }
 }

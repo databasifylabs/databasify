@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Nodes;
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
-use App\Engines\Flows\RebootNodeFlow;
-use App\Engines\Flows\RollingSteps;
 use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\RebootDatabaseJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Validation\ValidationException;
@@ -17,8 +15,6 @@ final readonly class RebootDatabase
 {
     public function __construct(
         private RefreshDatabaseStatus $refresh,
-        private StartFlow $startFlow,
-        private RebootNodeFlow $flow,
     ) {}
 
     public function handle(Database $database): void
@@ -27,7 +23,8 @@ final readonly class RebootDatabase
         $this->ensureServersReady($database);
         $this->ensureHealthy($database);
 
-        $this->startFlow->handle($database, $this->flow, RollingSteps::contextFor($database));
+        $database->markBusy(DatabaseStatus::Rebooting);
+        dispatch(new RebootDatabaseJob($database));
     }
 
     private function ensureServersReady(Database $database): void
@@ -54,14 +51,14 @@ final readonly class RebootDatabase
 
     private function ensureHealthy(Database $database): void
     {
-        $status = $this->refresh->handle($database);
+        $nodes = $this->refresh->handle($database);
 
         if (! $database->hasStandby()) {
             return;
         }
 
-        if ($status !== DatabaseStatus::Ready) {
-            throw ValidationException::withMessages(['database' => "{$database->name} is {$status->value}, bring every node back before rebooting its servers one by one."]);
+        if (! $nodes->isHealthy()) {
+            throw ValidationException::withMessages(['database' => "{$database->name} is degraded, bring every node back before rebooting its servers one by one."]);
         }
 
         $this->ensureEveryNodeAnswers($database);

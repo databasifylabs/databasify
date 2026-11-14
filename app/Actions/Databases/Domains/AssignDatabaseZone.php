@@ -34,7 +34,7 @@ final readonly class AssignDatabaseZone
             $database->moveToZone($zone);
         });
 
-        $this->redeploy->handle($database, $this->titleFor($database, $zone));
+        $this->redeploy->handle($database);
     }
 
     private function clearRecordsOf(Database $database): void
@@ -55,10 +55,5 @@ final readonly class AssignDatabaseZone
         $message = $zone === null ? "{$database->name} doesn't use a domain." : "{$database->name} already uses {$zone->name}.";
 
         throw ValidationException::withMessages(['dns_zone_id' => $message]);
-    }
-
-    private function titleFor(Database $database, ?DnsZone $zone): string
-    {
-        return $zone === null ? 'Stop using a domain' : 'Serve on '.$database->hostnamesUnder($zone)->primary->public;
     }
 }

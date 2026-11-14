@@ -1,6 +1,6 @@
 # 0028. The app drives engines through typed commands and flows
 
-- Status: Accepted; engine calls and capabilities superseded by [0035](0035-engine-api.md)
+- Status: Superseded by [0036](0036-operations-as-one-job.md); engine calls and capabilities superseded by [0035](0035-engine-api.md)
 - Date: 2026-11-10
 
 ## Context

@@ -1,4 +1,5 @@
 import { Head, Link, usePoll } from '@inertiajs/react';
+import { databaseOperation } from '@/lib/status';
 import {
     ChartLine,
     History,
@@ -140,7 +141,8 @@ export default function ShowNode({
         tabs.map((entry) => entry.value),
         'overview',
     );
-    const busy = database.operation !== null;
+    const operation = databaseOperation(database);
+    const busy = operation !== null;
     const role = roleOf(node);
 
     usePoll(5000, () => ({
@@ -171,9 +173,9 @@ export default function ShowNode({
                             >
                                 {capitalize(role)}
                             </Badge>
-                            {database.operation && (
+                            {operation && (
                                 <OperationLabel
-                                    operation={database.operation}
+                                    operation={operation}
                                     className="text-sm"
                                 />
                             )}

@@ -162,7 +162,25 @@ export type Database = {
     engine_label: string;
     engine_icon: string | null;
     mode: 'single' | 'ha';
-    status: string;
+    status:
+        | 'pending'
+        | 'creating'
+        | 'updating'
+        | 'upgrading'
+        | 'rebooting'
+        | 'redeploying'
+        | 'scaling'
+        | 'recovering'
+        | 'migrating'
+        | 'deleting'
+        | 'ready'
+        | 'failed';
+    health: 'healthy' | 'degraded' | 'offline';
+    last_failure: {
+        log_id: string;
+        name: string;
+        failed_at: string | null;
+    } | null;
     dns_zone_id: string | null;
     hostnames: {
         primary: string;
@@ -170,7 +188,6 @@ export type Database = {
         replica: string;
         private_replica: string;
     } | null;
-    operation: string | null;
     network: NetworkSummary | null;
     version_line: string;
     engine_community: boolean;
@@ -226,7 +243,7 @@ export type DatabaseSummary = Pick<
     | 'available_update_refreshes_image'
     | 'mode'
     | 'status'
-    | 'operation'
+    | 'health'
     | 'created_at'
     | 'point_in_time_recovery'
     | 'nodes'

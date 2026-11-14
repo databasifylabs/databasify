@@ -7,7 +7,6 @@ use App\Actions\Databases\Lifecycle\RefreshNodeStatuses;
 use App\Actions\Databases\Monitoring\ReadDatabaseMetrics;
 use App\Actions\Databases\Recovery\RefreshRecoveryStatus;
 use App\DTOs\Databases\EngineImage;
-use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Models\Database;
 use App\Support\Engines\SdkRange;
@@ -46,11 +45,11 @@ it('keeps the last known roles of a database on a dropped sdk without polling it
     fakeEngine();
     $database = onDroppedSdk('mysql', 2);
     markRoles($database, NodeRole::Primary, NodeRole::Replica);
-    $database->recordStatus(DatabaseStatus::Ready);
+    $database->markReady();
 
-    $status = resolve(RefreshNodeStatuses::class)->handle($database->fresh(), $database->nodesWithServers());
+    $nodes = resolve(RefreshNodeStatuses::class)->handle($database->fresh(), $database->nodesWithServers());
 
-    expect($status)->toBe(DatabaseStatus::Ready)
+    expect($nodes->isHealthy())->toBeTrue()
         ->and($database->nodes()->orderBy('position')->pluck('role')->all())->toBe([NodeRole::Primary, NodeRole::Replica])
         ->and(recordedCalls())->toBe([]);
 });

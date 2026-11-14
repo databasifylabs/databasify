@@ -48,7 +48,11 @@ const roleStyles: Record<string, string> = {
 };
 
 function isSetUp(database: Database): boolean {
-    return database.status !== 'creating' && database.status !== 'failed';
+    return (
+        database.status !== 'pending' &&
+        database.status !== 'creating' &&
+        database.status !== 'failed'
+    );
 }
 
 function isPlannedPrimary(database: Database, node: DatabaseNode): boolean {
@@ -97,7 +101,8 @@ function NodeCard({
     node: DatabaseNode;
     busy: boolean;
 }) {
-    const settingUp = database.status === 'creating';
+    const settingUp =
+        database.status === 'pending' || database.status === 'creating';
     const role = isSetUp(database)
         ? roleOf(node)
         : isPlannedPrimary(database, node)

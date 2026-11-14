@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Models\ServerLog;
 
 it('prunes finished logs older than the retention window and keeps running, busy and recent ones', function () {
     $database = idleDatabase('valkey', 1);
     $busy = idleDatabase('valkey', 1, name: 'busy');
-    $busy->startOperation('Upgrade');
+    $busy->update(['status' => DatabaseStatus::Upgrading]);
     $old = now()->subDays(ServerLog::RETENTION_DAYS + 1);
     $pruned = ServerLog::factory()->create(['database_id' => $database->id, 'created_at' => $old]);
     $failed = ServerLog::factory()->create(['status' => ServerLogStatus::Failed, 'exit_code' => 1, 'created_at' => $old]);

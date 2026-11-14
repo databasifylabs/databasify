@@ -16,6 +16,6 @@ final readonly class RemoveTrustedSource
         $database->ensureIdle();
         $source->delete();
 
-        $this->queue->handle($database, "Remove trusted source {$source->cidr}");
+        $this->queue->handle($database);
     }
 }

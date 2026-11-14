@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Storage;
 
-use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Storage\NewStorageProvider;
-use App\Engines\Flows\ArchiveFlow;
-use App\Engines\Flows\RollingSteps;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\ApplySettingsJob;
 use App\Models\Database;
 use App\Models\StorageProvider;
 
@@ -15,8 +14,6 @@ final readonly class UpdateStorageProvider
 {
     public function __construct(
         private CheckStorageAccess $access,
-        private StartFlow $startFlow,
-        private ArchiveFlow $archiveFlow,
     ) {}
 
     public function handle(StorageProvider $provider, NewStorageProvider $data): StorageProvider
@@ -34,8 +31,8 @@ final readonly class UpdateStorageProvider
 
         if ($rotated) {
             $archiving->each(function (Database $database): void {
-                $this->startFlow->handle($database, $this->archiveFlow, RollingSteps::contextFor($database));
-                $database->retitleOperation('Update archive credentials');
+                $database->markBusy(DatabaseStatus::Updating);
+                dispatch(new ApplySettingsJob($database, archiveChanged: true));
             });
         }
 

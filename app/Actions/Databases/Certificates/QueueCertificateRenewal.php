@@ -12,11 +12,11 @@ final readonly class QueueCertificateRenewal
 {
     public function handle(Database $database): bool
     {
-        if (! $database->isServing() || $database->status === DatabaseStatus::Offline || $database->isBusy() || $database->allCertificatesCurrent()) {
+        if ($database->status !== DatabaseStatus::Ready || ! $database->nodesWithServers()->anyServes() || $database->allCertificatesCurrent()) {
             return false;
         }
 
-        $database->startOperation('Renew certificates');
+        $database->markBusy(DatabaseStatus::Updating);
         dispatch(new RenewCertificatesJob($database));
 
         return true;

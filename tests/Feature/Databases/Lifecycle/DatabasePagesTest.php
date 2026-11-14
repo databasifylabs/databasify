@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\DTOs\Migrations\MigrationSource;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
+use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\AddNodeJob;
+use App\Jobs\Databases\CreateDatabaseJob;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\ServerLog;
@@ -17,7 +19,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([CreateDatabaseJob::class, AddNodeJob::class]);
     $this->actingAs(User::factory()->create());
 });
 
@@ -25,7 +27,7 @@ it('shows the laravel settings and adds a server', function () {
     $ids = Server::factory()->ready()->count(1)->create()->pluck('id')->all();
     $this->post(projectUrl('/databases'), ['name' => 'cache', 'engine' => 'valkey', 'primary_server_id' => $ids[0]]);
     $database = withEngineDetails(Database::query()->sole());
-    $database->finishOperation();
+    $database->markReady();
     $extra = Server::factory()->ready()->create();
 
     $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
@@ -34,7 +36,7 @@ it('shows the laravel settings and adds a server', function () {
         ->where('availableServers.data.0.id', $extra->id));
 
     $this->post(projectUrl("/databases/{$database->id}/nodes"), ['server_id' => $extra->id])->assertRedirect();
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+    Queue::assertPushed(AddNodeJob::class);
 });
 
 it('lists every database with its nodes', function () {
@@ -70,22 +72,40 @@ it('shows a database with its connection settings and newest server logs first',
     $this->get(projectUrl('/databases/999'))->assertNotFound();
 });
 
-it('shows the operation a database is busy with in the list', function () {
+it('shows the status and the health of each database in the list', function () {
     newDatabase('valkey', 2);
     $idle = idleDatabase('valkey', 1, DatabaseMode::Single, 'cache');
+    markRoles($idle, NodeRole::Primary);
 
     $this->get(projectUrl('/databases'))->assertInertia(fn (AssertableInertia $page) => $page
         ->component('databases/index')
         ->where('databases.data.0.id', $idle->id)
-        ->where('databases.data.0.operation', null)
-        ->where('databases.data.1.operation', 'Create Valkey database'));
+        ->where('databases.data.0.status', 'ready')
+        ->where('databases.data.0.health', 'healthy')
+        ->where('databases.data.1.status', 'pending')
+        ->where('databases.data.1.health', 'offline'));
+});
+
+it('shows the newest failed log of a database until a newer log succeeds', function () {
+    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
+    $failed = $database->seed()->openLog('db-1: upgrade');
+    $failed->fail('the image did not start');
+
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('database.data.last_failure.log_id', $failed->id)
+        ->where('database.data.last_failure.name', 'db-1: upgrade'));
+
+    $database->seed()->openLog('db-1: upgrade again')->finish(0);
+
+    $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('database.data.last_failure', null));
 });
 
 it('marks the node that becomes primary while the database is created', function () {
     $database = newDatabase('valkey', 2);
 
     $this->get(projectUrl("/databases/{$database->id}"))->assertInertia(fn (AssertableInertia $page) => $page
-        ->where('database.data.status', 'creating')
+        ->where('database.data.status', 'pending')
         ->where('database.data.nodes.0.is_seed', true)
         ->where('database.data.nodes.1.is_seed', false));
 });

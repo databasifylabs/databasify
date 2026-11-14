@@ -6,6 +6,7 @@ use App\Actions\Databases\Certificates\RenewCertificates;
 use App\Actions\Databases\Configuration\RetuneDatabase;
 use App\Actions\Databases\Configuration\UpdateDatabaseConfig;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Models\Server;
 use App\Models\User;
@@ -51,12 +52,11 @@ it('applies settings with config sync once and config apply on every node', func
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->map->server->all();
 
     resolve(UpdateDatabaseConfig::class)->handle($database, ['max_connections' => '200']);
-    advanceFlows();
 
     expect(commandsSentTo($primary, $ssh))->toBe(['nodes.configure', 'config.sync', 'config.apply', 'config.pendingRestart', 'nodes.status'])
         ->and(commandsSentTo($standby, $ssh))->toBe(['nodes.configure', 'config.apply', 'nodes.status'])
         ->and($database->fresh()->settings->config)->toBe(['max_connections' => '200'])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('rolls a restart through read-only, standbys, failover, then the former primary', function () {
@@ -68,7 +68,6 @@ it('rolls a restart through read-only, standbys, failover, then the former prima
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->map->server->all();
 
     resolve(UpdateDatabaseConfig::class)->handle($database->fresh(), ['max_connections' => '300']);
-    advanceFlows(40);
     $commands = engineCommandsIn($ssh);
     $at = fn (Server $server, string $command): int|false => array_search("{$server->name}: {$command}", $commands, true);
 
@@ -76,7 +75,7 @@ it('rolls a restart through read-only, standbys, failover, then the former prima
         ->and($at($standby, 'nodes.restart'))->toBeLessThan($at($primary, 'cluster.failover'))
         ->and($at($primary, 'cluster.failover'))->toBeLessThan($at($primary, 'nodes.restart'))
         ->and(commandsSentTo($primary, $ssh))->toContain('cluster.rejoin')
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('validates settings against the stored config fields', function () {
@@ -92,7 +91,6 @@ it('retunes every node and restarts only when the engine asks for it', function 
     $ssh = fakeEngine(fakeSsh()->respondWhen(fn (string $server, string $script): bool => str_contains($script, '/etc/os-release'), '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":4096,"disk_gb":80}'."\n"));
 
     resolve(RetuneDatabase::class)->handle($database);
-    advanceFlows();
 
     expect(commandsSentTo($database->seed()->server, $ssh))->toBe(['nodes.configure', 'config.tune', 'config.apply', 'nodes.status'])
         ->and($database->fresh()->retune_needed_at)->toBeNull();

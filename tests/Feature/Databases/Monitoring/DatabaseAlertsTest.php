@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Enums\Databases\DatabaseMode;
-use App\Enums\Databases\DatabaseStatus;
 use App\Events\DatabaseAlertRaised;
 use App\Models\User;
 use App\Notifications\DatabaseAlert;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Notification;
 
 it('raises an alert when a database degrades and when it recovers', function () {
     $database = idleDatabase('valkey', 2);
-    $database->update(['status' => DatabaseStatus::Ready]);
     Event::fake([DatabaseAlertRaised::class]);
     [$primary, $replica] = $database->nodes()->orderBy('position')->get()->map->server;
 

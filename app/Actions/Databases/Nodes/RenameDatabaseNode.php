@@ -6,10 +6,9 @@ namespace App\Actions\Databases\Nodes;
 
 use App\Actions\Databases\Domains\ClearNodeDns;
 use App\Actions\Databases\Domains\EnsureHostnamesFree;
-use App\Actions\Databases\Flows\StartFlow;
 use App\DTOs\Dns\HostPair;
-use App\Engines\Flows\RedeployNodeFlow;
-use App\Engines\Flows\RollingSteps;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\RedeployNodeJob;
 use App\Models\DatabaseNode;
 
 final readonly class RenameDatabaseNode
@@ -17,8 +16,6 @@ final readonly class RenameDatabaseNode
     public function __construct(
         private EnsureHostnamesFree $free,
         private ClearNodeDns $clear,
-        private StartFlow $startFlow,
-        private RedeployNodeFlow $flow,
     ) {}
 
     public function handle(DatabaseNode $node, string $name): void
@@ -34,8 +31,9 @@ final readonly class RenameDatabaseNode
 
         $database->ensureIdle();
         $this->free->handle($zone, HostPair::under($zone, $name)->all(), 'name');
+        $database->markBusy(DatabaseStatus::Scaling);
         rescue(fn () => $this->clear->handle($node), report: false);
         $node->rename($name);
-        $this->startFlow->handle($database, $this->flow, RollingSteps::contextFor($database, only: $node));
+        dispatch(new RedeployNodeJob($database, $node));
     }
 }

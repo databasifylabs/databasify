@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Recovery;
 
 use App\DTOs\Recovery\StoredArchive;
+use App\Enums\Databases\DatabaseStatus;
 use App\Models\Database;
 
 final readonly class DeleteRecoveryBackups
@@ -13,12 +14,12 @@ final readonly class DeleteRecoveryBackups
 
     public function handle(Database $database, StoredArchive $archive): void
     {
-        $database->startOperation('Delete backups from the bucket');
+        $database->markBusy(DatabaseStatus::Updating);
 
         try {
             $this->archive->handle($archive);
         } finally {
-            $database->finishOperation();
+            $database->markReady();
         }
     }
 }

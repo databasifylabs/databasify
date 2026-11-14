@@ -10,7 +10,7 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Recovery\ArchiveHealth;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\ApplySettingsJob;
 use App\Jobs\Databases\RefreshRecoveryStatusJob;
 use App\Models\PointInTimeRecovery;
 use App\Models\StorageProvider;
@@ -28,7 +28,7 @@ it('turns on point-in-time recovery and redeploys every node to start archiving'
     $this->freezeSecond();
     $database = idleDatabase($engine, 1, DatabaseMode::Single, 'orders');
     $provider = StorageProvider::factory()->create(['path_prefix' => 'team']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([ApplySettingsJob::class]);
 
     $this->post(projectUrl("/databases/{$database->id}/recovery"), ['storage_provider_id' => $provider->id, 'retention_days' => 14, 'backup_hour' => 2])->assertSessionHasNoErrors();
 
@@ -39,8 +39,8 @@ it('turns on point-in-time recovery and redeploys every node to start archiving'
         ->retention_days->toBe(14)
         ->backup_hour->toBe(2)
         ->health->toBe(ArchiveHealth::Pending)
-        ->and($database->fresh()->operation)->toBe('Turn on point-in-time recovery');
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Updating);
+    Queue::assertPushed(ApplySettingsJob::class);
 })->with(['postgres', 'mysql', 'mariadb']);
 
 it('refuses point-in-time recovery where it cannot work', function () {
@@ -71,33 +71,33 @@ it('validates the recovery settings', function (array $input, string $field) {
 
 it('refuses to turn it on while another operation runs', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single, 'orders');
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
     $this->post(projectUrl("/databases/{$database->id}/recovery"), ['storage_provider_id' => StorageProvider::factory()->create()->id, 'retention_days' => 7, 'backup_hour' => 3])
-        ->assertSessionHasErrors(['database' => 'orders is busy with Upgrade, try again when it finishes.']);
+        ->assertSessionHasErrors(['database' => 'orders is busy upgrading, try again when it finishes.']);
 });
 
 it('turns it off, keeping the archive in the bucket', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([ApplySettingsJob::class]);
 
     $this->delete(projectUrl("/databases/{$database->id}/recovery"))->assertSessionHasNoErrors();
 
     expect(PointInTimeRecovery::query()->count())->toBe(0)
         ->and(StorageProvider::query()->count())->toBe(1)
-        ->and($database->fresh()->operation)->toBe('Turn off point-in-time recovery');
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Updating);
+    Queue::assertPushed(ApplySettingsJob::class);
 });
 
 it('changes the schedule without a restart', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([ApplySettingsJob::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/recovery"), ['retention_days' => 30, 'backup_hour' => 5])->assertSessionHasNoErrors();
 
     expect($database->pointInTimeRecovery?->fresh())->retention_days->toBe(30)->backup_hour->toBe(5)
-        ->and($database->fresh()->operation)->toBe('Update point-in-time recovery');
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Updating);
+    Queue::assertPushed(ApplySettingsJob::class);
 });
 
 it('asks for point-in-time recovery before backing up or checking', function () {
@@ -180,7 +180,7 @@ it('keeps the backups page for a version whose archive tool is not ready yet and
 
 it('holds a requested backup until the running operation finishes', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
-    $database->startOperation('Retune');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $ssh = fakeSsh();
     $job = (new RefreshRecoveryStatusJob($database->pointInTimeRecovery, backUpNow: true))->withFakeQueueInteractions();
 
@@ -192,7 +192,7 @@ it('holds a requested backup until the running operation finishes', function () 
 
 it('skips a routine archive check while an operation runs', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
-    $database->startOperation('Retune');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $job = (new RefreshRecoveryStatusJob($database->pointInTimeRecovery))->withFakeQueueInteractions();
 
     $job->handle(resolve(RefreshRecoveryStatus::class));
@@ -232,7 +232,7 @@ it('records a problem when the primary cannot be reached', function () {
 it('leaves the archive alone while the database is busy', function () {
     $database = withRecovery(idleDatabase('postgres', 1, DatabaseMode::Single, 'orders'));
     markRoles($database, NodeRole::Primary);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
     $ssh = fakeSsh();
 
     (new RefreshRecoveryStatusJob($database->pointInTimeRecovery))->handle(resolve(RefreshRecoveryStatus::class));
@@ -259,11 +259,10 @@ it('configures every node with the archive when point-in-time recovery is turned
     $database = withRecovery(idleDatabase('mysql', 2));
 
     resolve(UpdateRecoverySchedule::class)->handle($database->fresh(), new RecoverySchedule(7, 3));
-    advanceFlows();
 
     expect(recordedArgs('nodes.configure'))->toHaveCount(2)
         ->and(recordedArgs('nodes.configure')[0]['args'][0]->archive)->retentionDays->toBe(7)->backupHour->toBe(3)
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('applies the archive settings and restarts the nodes when the engine waits on a restart', function () {
@@ -274,10 +273,9 @@ it('applies the archive settings and restarts the nodes when the engine waits on
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->map->server->all();
 
     resolve(UpdateRecoverySchedule::class)->handle($database->fresh(), new RecoverySchedule(7, 3));
-    advanceFlows(40);
 
     expect(engineCommandsIn($ssh))
         ->toContain("{$primary->name}: config.sync", "{$primary->name}: config.apply", "{$primary->name}: nodes.restart")
         ->toContain("{$standby->name}: config.apply", "{$standby->name}: nodes.restart")
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });

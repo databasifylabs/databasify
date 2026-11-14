@@ -3,64 +3,44 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Middleware\ReleasesDatabaseOperation;
+use App\Jobs\Middleware\RunsDatabaseOperation;
+use App\Models\Database;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-it('allows only one operation per database even when two requests race', function () {
+it('reads the current status under the row lock even from a stale copy', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $stale = $database->fresh();
-    $database->startOperation('First');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
-    expect(fn () => $stale->startOperation('Second'))->toThrow(ValidationException::class, 'main is busy with')
-        ->and($database->fresh()->operation)->toBe('First');
-
-    $database->finishOperation();
-    $database->startOperation('Third');
-
-    expect($database->fresh()->operation)->toBe('Third');
+    expect(fn () => DB::transaction(fn () => $stale->refreshForUpdate()->ensureIdle()))
+        ->toThrow(ValidationException::class, 'main is busy upgrading, try again when it finishes.');
 });
 
-it('frees the database and its stop request once the job finishes', function () {
+it('frees the database once the job finishes', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->startOperation('Upgrade');
-    $database->requestStop();
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
-    $result = (new ReleasesDatabaseOperation($database))->handle(new stdClass, fn (object $job): string => 'done');
+    $result = (new RunsDatabaseOperation($database, DatabaseStatus::Upgrading, fn (Database $database) => $database->abandonOperation()))->handle(new stdClass, fn (object $job): string => 'done');
 
     expect($result)->toBe('done')
-        ->and($database->fresh())->operation->toBeNull()->isStopRequested()->toBeFalse();
+        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
 });
 
-it('honours stop again once a new operation starts after a cleanup that never finished', function () {
+it('drops a leftover cleanup flag when an operation ends, so stop works again', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     Cache::put("databases.{$database->id}.cleanup", true, 86400);
 
-    $database->startOperation('Next');
+    $database->markReady();
     $database->requestStop();
 
-    expect($database->isStopRequested())->toBeTrue();
-});
-
-it('drops a leftover cleanup flag when an operation finishes', function () {
-    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->startOperation('Add');
-    Cache::put("databases.{$database->id}.cleanup", true, 86400);
-
-    $database->finishOperation();
-
-    expect(Cache::has("databases.{$database->id}.cleanup"))->toBeFalse();
-});
-
-it('frees the database when the job throws', function () {
-    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->startOperation('Upgrade');
-
-    expect(fn () => (new ReleasesDatabaseOperation($database))->handle(new stdClass, fn () => throw new RuntimeException('boom')))->toThrow(RuntimeException::class, 'boom')
-        ->and($database->fresh()->operation)->toBeNull();
+    expect(Cache::has("databases.{$database->id}.cleanup"))->toBeFalse()
+        ->and($database->isStopRequested())->toBeTrue();
 });
 
 it('refuses new work while data is migrating in', function () {
@@ -77,7 +57,7 @@ it('refuses new work while data is migrating in', function () {
 it('asks a busy database to stop from its page', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('postgres', 1);
-    $database->startOperation('Upgrade');
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
     $this->post(projectUrl("/databases/{$database->id}/stop"))->assertSessionHasNoErrors();
 

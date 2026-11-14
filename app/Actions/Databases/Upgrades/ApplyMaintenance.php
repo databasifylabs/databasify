@@ -18,7 +18,7 @@ final readonly class ApplyMaintenance
 
     public function handle(Database $database): void
     {
-        if ($database->status !== DatabaseStatus::Ready) {
+        if ($database->status->isSettingUp() || $database->status === DatabaseStatus::Failed || ! $database->nodesWithServers()->isHealthy()) {
             return;
         }
 

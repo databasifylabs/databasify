@@ -21,7 +21,6 @@ final readonly class DatabaseObserver
             $database->trustedSources(),
             $database->connectionPools(),
             $database->pointInTimeRecovery(),
-            $database->flows(),
         );
         $database->serverLogs()->update(['database_id' => null]);
     }

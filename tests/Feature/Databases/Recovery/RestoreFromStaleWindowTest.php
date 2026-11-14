@@ -6,7 +6,7 @@ use App\DTOs\Databases\EngineImage;
 use App\DTOs\Recovery\ArchiveStatus;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\CreateDatabaseJob;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
@@ -18,7 +18,7 @@ use Illuminate\Testing\TestResponse;
 beforeEach(function () {
     $this->freezeSecond();
     $this->actingAs(User::factory()->create());
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([CreateDatabaseJob::class]);
 });
 
 function staleWindowDatabase(): Database

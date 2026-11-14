@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationStatus;
 use App\Jobs\Databases\StopMigrationJob;
 use App\Models\DatabaseMigration;
@@ -21,7 +22,7 @@ final readonly class StopMigration
             throw ValidationException::withMessages(['migration' => 'The initial copy is still running, wait until the migration is syncing.']);
         }
 
-        $migration->database->startOperation($cutover ? 'Finish migration' : 'Stop migration');
+        $migration->database->markBusy(DatabaseStatus::Migrating);
         dispatch(new StopMigrationJob($migration, $cutover, $force));
     }
 

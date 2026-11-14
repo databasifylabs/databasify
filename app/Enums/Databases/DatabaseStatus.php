@@ -6,14 +6,26 @@ namespace App\Enums\Databases;
 
 enum DatabaseStatus: string
 {
+    case Pending = 'pending';
     case Creating = 'creating';
+    case Updating = 'updating';
+    case Upgrading = 'upgrading';
+    case Rebooting = 'rebooting';
+    case Redeploying = 'redeploying';
+    case Scaling = 'scaling';
+    case Recovering = 'recovering';
+    case Migrating = 'migrating';
+    case Deleting = 'deleting';
     case Ready = 'ready';
-    case Degraded = 'degraded';
-    case Offline = 'offline';
     case Failed = 'failed';
 
-    public function isServing(): bool
+    public function isBusy(): bool
     {
-        return $this === self::Ready || $this === self::Degraded || $this === self::Offline;
+        return $this !== self::Ready && $this !== self::Failed;
+    }
+
+    public function isSettingUp(): bool
+    {
+        return $this === self::Pending || $this === self::Creating;
     }
 }

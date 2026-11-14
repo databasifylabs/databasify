@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\DTOs\Migrations\MigrationSource;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Jobs\Databases\RunMigrationJob;
@@ -27,7 +28,7 @@ it('starts a continuous migration with tls on by default', function () {
     $migration = $database->migrations()->sole();
     expect($migration)->mode->toBe(MigrationMode::Continuous)->status->toBe(MigrationStatus::Copying)->database_node_id->toBe($database->seed()->id)
         ->and($migration->source)->toEqual(new MigrationSource('db.example.com', 3306, 'migrator', 'secret', true, ['shop']))
-        ->and($database->fresh()->operation)->toBe('Migrate from db.example.com:3306');
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Migrating);
     Queue::assertPushed(RunMigrationJob::class, fn (RunMigrationJob $job): bool => $job->migration->is($migration));
 });
 
@@ -64,7 +65,7 @@ it('finishes a migration only once it is syncing', function () {
 
     $this->from(projectUrl("/databases/{$database->id}"))->post(projectUrl("/databases/{$database->id}/migrations/{$copying->id}/finish"))->assertRedirect(projectUrl("/databases/{$database->id}"))->assertSessionHasNoErrors();
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => $job->cutover && ! $job->force);
-    expect($database->fresh()->operation)->toBe('Finish migration');
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Migrating);
 });
 
 it('stops or force stops an active migration', function () {
@@ -73,8 +74,8 @@ it('stops or force stops an active migration', function () {
     $migration = migrationOf($database, MigrationMode::OneTime);
 
     $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"))->assertSessionHasNoErrors();
-    expect($database->fresh()->operation)->toBe('Stop migration');
-    $database->finishOperation();
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Migrating);
+    $database->markReady();
     $this->delete(projectUrl("/databases/{$database->id}/migrations/{$migration->id}"), ['force' => true])->assertSessionHasNoErrors();
 
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => ! $job->cutover && ! $job->force);
@@ -102,7 +103,7 @@ it('force stops a migration that already ended to clean it up again', function (
         ->assertSessionHasNoErrors();
 
     Queue::assertPushed(StopMigrationJob::class, fn (StopMigrationJob $job): bool => $job->migration->is($migration) && ! $job->cutover && $job->force);
-    expect($database->fresh()->operation)->toBe('Stop migration');
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Migrating);
 });
 
 it('does not find a migration through another database', function () {

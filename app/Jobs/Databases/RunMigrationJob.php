@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Databases;
 
 use App\Actions\Databases\Migrations\RunMigration;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
@@ -33,5 +34,15 @@ final class RunMigrationJob implements ShouldBeEncrypted, ShouldQueue
     protected function operatedDatabase(): Database
     {
         return $this->migration->database;
+    }
+
+    protected function operatingStatus(): DatabaseStatus
+    {
+        return DatabaseStatus::Migrating;
+    }
+
+    protected function operationName(): string
+    {
+        return "Migrate from {$this->migration->source->address()}";
     }
 }

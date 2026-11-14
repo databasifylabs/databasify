@@ -5,7 +5,7 @@
 
 ## Context
 
-[0034](0034-a-frozen-engine-runtime.md) froze a generic runtime in the engine images so engine behaviour could move into the app. Until now the app still reached engines through `EngineClient`, which sent typed Go commands (`app/Engines/Requests`, `app/Engines/Responses`) and only routed some of them to PHP drivers behind the `php_engines` switch. Two paths for every call made changes slow and hid which code really ran. The owner chose to rebuild the engine half on `0.x`: the app talks to an engine through its PHP driver alone, and the Go command paths go. Operations (flows, `database_flows`, the `operation` lock) stay as [0028](0028-engine-commands-and-flows.md) describes and get their own design later.
+[0034](0034-a-frozen-engine-runtime.md) froze a generic runtime in the engine images so engine behaviour could move into the app. Until now the app still reached engines through `EngineClient`, which sent typed Go commands (`app/Engines/Requests`, `app/Engines/Responses`) and only routed some of them to PHP drivers behind the `php_engines` switch. Two paths for every call made changes slow and hid which code really ran. The owner chose to rebuild the engine half on `0.x`: the app talks to an engine through its PHP driver alone, and the Go command paths go. Operations got their own design in [0036](0036-operations-as-one-job.md).
 
 ## Decision
 

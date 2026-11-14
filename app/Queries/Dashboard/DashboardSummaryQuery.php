@@ -23,7 +23,7 @@ final readonly class DashboardSummaryQuery
     {
         return new DashboardSummary(
             databases: Database::query()->count(),
-            onlineDatabases: Database::query()->ready()->count(),
+            onlineDatabases: Database::query()->operational()->count(),
             servers: ServerSummaryQuery::current()->get(),
             nodes: DatabaseNode::query()->inCurrentProject()->count(),
             readOnlyNodes: DatabaseNode::query()->inCurrentProject()->readOnly()->count(),

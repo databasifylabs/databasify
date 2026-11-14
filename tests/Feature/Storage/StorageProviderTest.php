@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\ApplySettingsJob;
 use App\Models\StorageProvider;
 use App\Models\User;
 use Illuminate\Http\Client\Request;
@@ -159,7 +160,7 @@ it('keeps the bucket of storage a database archives to', function () {
 
 it('sends rotated keys to every database archiving to the storage', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([ApplySettingsJob::class]);
     $provider = $database->pointInTimeRecovery?->storageProvider;
     fakeBucket();
 
@@ -167,13 +168,13 @@ it('sends rotated keys to every database archiving to the storage', function () 
         ->assertSessionHasNoErrors();
 
     expect($provider?->fresh()?->credentials)->toBe(['access_key_id' => 'NEWKEY', 'secret_access_key' => 'newsecret'])
-        ->and($database->fresh()->operation)->toBe('Update archive credentials');
-    Queue::assertPushed(AdvanceDatabaseFlow::class, fn (AdvanceDatabaseFlow $job): bool => $job->flow->database->is($database));
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Updating);
+    Queue::assertPushed(ApplySettingsJob::class, fn (ApplySettingsJob $job): bool => $job->database->is($database));
 });
 
 it('renames storage in use without touching its databases', function () {
     $database = withRecovery(idleDatabase('mysql', 1, DatabaseMode::Single, 'orders'));
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([ApplySettingsJob::class]);
     $provider = $database->pointInTimeRecovery?->storageProvider;
     fakeBucket();
 
@@ -181,7 +182,7 @@ it('renames storage in use without touching its databases', function () {
         ->assertSessionHasNoErrors();
 
     expect($provider?->fresh()?->name)->toBe('renamed');
-    Queue::assertNotPushed(AdvanceDatabaseFlow::class);
+    Queue::assertNotPushed(ApplySettingsJob::class);
 });
 
 it('refuses to remove storage while a database archives to it', function () {

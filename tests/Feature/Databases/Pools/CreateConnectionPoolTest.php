@@ -6,6 +6,7 @@ use App\Actions\Databases\Pools\CreateConnectionPool;
 use App\DTOs\Databases\NewConnectionPool;
 use App\Engines\EngineCatalog;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\PoolMode;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
 use Illuminate\Support\Facades\Queue;
@@ -22,7 +23,7 @@ it('records the pool and queues it onto the nodes under a new operation', functi
         ->schema->toBe('app')
         ->mode->toBe(PoolMode::Statement)
         ->size->toBe(15)
-        ->and($database->fresh()->operation)->toBe('Add connection pool reports');
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Updating);
     Queue::assertPushed(ApplyConnectionPoolsJob::class, fn (ApplyConnectionPoolsJob $job): bool => $job->database->is($database));
 });
 
@@ -41,7 +42,7 @@ it('refuses pools while the database is busy', function () {
     Queue::fake([ApplyConnectionPoolsJob::class]);
 
     expect(fn () => resolve(CreateConnectionPool::class)->handle($database, new NewConnectionPool('reports', 'app', PoolMode::Transaction, 15)))
-        ->toThrow(ValidationException::class, 'busy with Create PostgreSQL database')
+        ->toThrow(ValidationException::class, 'busy pending')
         ->and($database->connectionPools()->count())->toBe(0);
     Queue::assertNothingPushed();
 });

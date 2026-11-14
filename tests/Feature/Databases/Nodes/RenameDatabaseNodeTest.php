@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\Databases\DatabaseMode;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\RedeployNodeJob;
 use App\Models\User;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -29,7 +30,7 @@ it('moves a renamed read-only node to its new names and gives it a new certifica
     fakeCloudflare();
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single));
     $reader = withReadOnlyNode($database, ['name' => 'reports']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RedeployNodeJob::class]);
     $database->update(['settings' => $database->settings->withNodeCertificates($reader->id, ['server.pem' => 'pem'])]);
 
     $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'analytics'])->assertSessionHasNoErrors();
@@ -38,15 +39,15 @@ it('moves a renamed read-only node to its new names and gives it a new certifica
     expect($reader->fresh()->name)->toBe('analytics')
         ->and($looked)->toBe(['analytics.db.example.com', 'private-analytics.db.example.com', 'private-reports.db.example.com', 'reports.db.example.com'])
         ->and($database->fresh()->settings->nodeCertificate($reader->id, 'server.pem'))->toBeNull()
-        ->and($database->fresh()->operation)->toBe('Redeploy analytics');
-    Queue::assertPushed(AdvanceDatabaseFlow::class);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Scaling);
+    Queue::assertPushed(RedeployNodeJob::class);
 });
 
 it('refuses a new name whose hostnames hold records databasify did not create', function () {
     fakeCloudflare([['id' => 'theirs', 'content' => '192.0.2.1']]);
     $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single));
     $reader = withReadOnlyNode($database, ['name' => 'reports']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RedeployNodeJob::class]);
 
     $this->put(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['name' => 'analytics'])->assertSessionHasErrors('name');
 

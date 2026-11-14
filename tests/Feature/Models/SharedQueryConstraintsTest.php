@@ -45,7 +45,7 @@ it('lists the databases archiving to a storage provider', function () {
 it('scopes ready databases, primary nodes, enabled plugins and old samples', function () {
     $ready = idleDatabase('valkey', 1);
     $ready->update(['status' => DatabaseStatus::Ready]);
-    idleDatabase('valkey', 1, name: 'decoy')->update(['status' => DatabaseStatus::Degraded]);
+    idleDatabase('valkey', 1, name: 'decoy')->update(['status' => DatabaseStatus::Upgrading]);
     $primary = $ready->seed();
     $primary->update(['role' => NodeRole::Primary]);
     $old = NodeMetricSample::query()->create(['database_node_id' => $primary->id, 'sampled_at' => now()->subDays(2), 'cpu_percent' => 1, 'memory_percent' => 1, 'disk_percent' => 1]);

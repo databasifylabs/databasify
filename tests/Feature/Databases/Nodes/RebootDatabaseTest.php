@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Engines\Flows\RebootNodeFlow;
 use App\Enums\Databases\DatabaseMode;
-use App\Enums\Databases\FlowState;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerStatus;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Events\DatabaseAlertRaised;
+use App\Jobs\Databases\RebootDatabaseJob;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeServerConnection;
 
@@ -28,12 +29,11 @@ it('reboots a single node database in place and waits for it to serve as the pri
     $ssh = fakeEngine()->bootIdChangesAfterReboot();
 
     $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasNoErrors();
-    advanceFlows();
 
     expect(rebootsIn($ssh))->toBe([$database->seed()->server->name])
         ->and(recordedCalls())->not->toContain('cluster.rejoin')
         ->and(recordedArgs('nodes.ready')[0]['args'][1])->toBeTrue()
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('reboots nothing while a clustered database is degraded', function () {
@@ -44,32 +44,28 @@ it('reboots nothing while a clustered database is degraded', function () {
     $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasErrors(['database' => 'main is degraded, bring every node back before rebooting its servers one by one.']);
 
     expect(rebootsIn($ssh))->toBe([])
-        ->and($database->fresh()->operation)->toBeNull();
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('fails the reboot when a server does not come back within 15 minutes', function () {
+    Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     fakeEngine();
 
-    $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasNoErrors();
-    advanceFlows(3);
-    $this->travel(16)->minutes();
-    advanceFlows(1);
+    runOperation(fn () => $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasNoErrors());
 
-    expect($database->flows()->latest('id')->where('flow', RebootNodeFlow::class)->sole())
-        ->state->toBe(FlowState::Failed)
-        ->error->toContain('did not come back within 15 minutes')
-        ->and($database->fresh()->operation)->toBeNull();
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Ready);
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => str_contains($alert->message, 'did not come back within 15 minutes'));
 });
 
 it('refuses to reboot while another operation runs or a server is not ready', function () {
     $database = idleDatabase('valkey', 2);
-    Queue::fake([AdvanceDatabaseFlow::class]);
-    $database->startOperation('Upgrade');
+    Queue::fake([RebootDatabaseJob::class]);
+    $database->update(['status' => DatabaseStatus::Upgrading]);
 
     $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasErrors('database');
 
-    $database->finishOperation();
+    $database->markReady();
     $database->nodes()->with('server')->get()[1]->server->update(['status' => ServerStatus::Provisioning]);
 
     $this->post(projectUrl("/databases/{$database->id}/reboot"))->assertSessionHasErrors('database');

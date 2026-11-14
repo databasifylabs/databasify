@@ -26,15 +26,13 @@ use App\Engines\Drivers\Redis\RedisDriver;
 use App\Engines\Drivers\Valkey\ValkeyDriver;
 use App\Engines\Payload;
 use App\Enums\Databases\DatabaseMode;
-use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Exceptions\Engines\EngineUnavailable;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\CreateDatabaseJob;
 use App\Models\Database;
-use App\Models\DatabaseFlow;
 use App\Models\DatabaseMigration;
 use App\Models\DatabaseNode;
 use App\Models\DnsZone;
@@ -56,6 +54,7 @@ use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Tests\Support\DriverRecorder;
 use Tests\Support\FakeCertificateAuthority;
 use Tests\Support\FakeImageRegistry;
@@ -71,6 +70,7 @@ pest()->extend(TestCase::class)
         fakeCertificateAuthority();
         fakeSsh();
         fakeImageRegistry();
+        Sleep::fake();
         config()->set('inertia.ssr.enabled', false);
     })
     ->in('Feature');
@@ -293,16 +293,35 @@ function engineCommandsIn(FakeServerConnection $ssh): array
     return array_column($timeline, 'command');
 }
 
-function advanceFlows(int $ticks = 20): void
+/**
+ * @template TResult
+ *
+ * @param  Closure(): TResult  $start
+ * @return TResult
+ */
+function runOperation(Closure $start): mixed
 {
-    foreach (range(1, $ticks) as $tick) {
-        DatabaseFlow::query()->running()->get()->each(fn (DatabaseFlow $flow) => runJob(new AdvanceDatabaseFlow($flow)));
-    }
+    $queue = Queue::getFacadeRoot();
+    $fake = Queue::fake();
+    $result = $start();
+    Queue::swap($queue);
+
+    collect($fake->pushedJobs())->flatten(1)->each(fn (array $pushed) => rescue(fn () => $queue->connection('sync')->push($pushed['job']), report: false));
+
+    return $result;
 }
 
 function runJob(ShouldQueue $job): void
 {
-    resolve(Pipeline::class)->send($job)->through($job->middleware())->then(fn (ShouldQueue $job) => app()->call([$job, 'handle']));
+    try {
+        resolve(Pipeline::class)->send($job)->through($job->middleware())->then(fn (ShouldQueue $job) => app()->call([$job, 'handle']));
+    } catch (Throwable $exception) {
+        if (method_exists($job, 'failed')) {
+            $job->failed($exception);
+        }
+
+        throw $exception;
+    }
 }
 
 function fakeImageRegistry(): FakeImageRegistry
@@ -407,7 +426,7 @@ function newDatabase(string $engine, int $servers, DatabaseMode $mode = Database
 {
     $ids = Server::factory()->ready()->count($servers)->create()->pluck('id')->all();
     $queue = Queue::getFacadeRoot();
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([CreateDatabaseJob::class]);
 
     $database = inProjectDuring(fn (): Database => resolve(CreateDatabase::class)->handle(new NewDatabase($name, $engine, $ids[0], array_slice($ids, 1), versionLine: $versionLine)));
     Queue::swap($queue);
@@ -425,8 +444,7 @@ function withImage(string $engine, string $release, ?string $digest = null, ?str
 function idleDatabase(string $engine, int $servers, DatabaseMode $mode = DatabaseMode::HighAvailability, string $name = 'main', ?string $versionLine = null): Database
 {
     $database = newDatabase($engine, $servers, $mode, $name, $versionLine);
-    $database->flows()->update(['state' => FlowState::Succeeded]);
-    $database->finishOperation();
+    $database->markReady();
 
     return $database;
 }

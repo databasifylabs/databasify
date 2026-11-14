@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
-use App\Engines\Flows\RemoveNodeFlow;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
-use App\Jobs\Databases\AdvanceDatabaseFlow;
+use App\Jobs\Databases\RemoveNodeJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +23,7 @@ it('refuses to remove the last member', function () {
 
 it('plans a failover to a standby before removing the primary', function () {
     $database = idleDatabase('valkey', 3);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RemoveNodeJob::class]);
     markRoles($database, NodeRole::Primary, NodeRole::Replica, NodeRole::Replica);
     [$primary, $standby] = $database->nodes()->orderBy('position')->get()->all();
     $ssh = fakeSsh();
@@ -31,34 +31,33 @@ it('plans a failover to a standby before removing the primary', function () {
 
     resolve(RemoveDatabaseNode::class)->handle($primary->fresh());
 
-    expect($database->flows()->running()->sole()->context)->targetNodeId->toBe($primary->id)->failoverTo->toBe($standby->id);
+    Queue::assertPushed(RemoveNodeJob::class, fn (RemoveNodeJob $job): bool => $job->node->is($primary) && $job->standby?->is($standby) === true);
 });
 
 it('lets standby and read-only nodes be removed', function () {
     $database = idleDatabase('valkey', 3);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RemoveNodeJob::class]);
     [$primary, $standby, $reader] = $database->nodes()->get()->all();
     $primary->update(['role' => NodeRole::Primary]);
     $reader->update(['kind' => NodeKind::ReadOnly]);
 
     resolve(RemoveDatabaseNode::class)->handle($standby->fresh());
-    $database->fresh()->finishOperation();
+    $database->fresh()->markReady();
     resolve(RemoveDatabaseNode::class)->handle($reader->fresh());
 
-    expect($database->flows()->where('flow', RemoveNodeFlow::class)->count())->toBe(2);
-    Queue::assertPushed(AdvanceDatabaseFlow::class, 2);
+    Queue::assertPushed(RemoveNodeJob::class, 2);
 });
 
 it('removes a node from its page and returns to the database', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $reader = withReadOnlyNode($database, ['name' => 'main-ro-1']);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RemoveNodeJob::class]);
 
     $this->delete(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"), ['force' => true])->assertRedirect(projectUrl("/databases/{$database->id}"));
 
-    expect($database->fresh()->operation)->toBe('Remove main-ro-1');
-    expect($database->flows()->running()->sole()->context)->targetNodeId->toBe($reader->id)->force->toBeTrue();
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Scaling);
+    Queue::assertPushed(RemoveNodeJob::class, fn (RemoveNodeJob $job): bool => $job->node->is($reader) && $job->force);
 });
 
 it('only removes nodes of the database in the address', function () {
@@ -66,7 +65,7 @@ it('only removes nodes of the database in the address', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $other = idleDatabase('valkey', 1, DatabaseMode::Single, 'other');
     $foreign = withReadOnlyNode($other);
-    Queue::fake([AdvanceDatabaseFlow::class]);
+    Queue::fake([RemoveNodeJob::class]);
 
     $this->delete(projectUrl("/databases/{$database->id}/nodes/{$foreign->id}"))->assertNotFound();
 

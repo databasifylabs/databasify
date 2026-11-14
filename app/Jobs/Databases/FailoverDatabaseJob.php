@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Databases;
 
 use App\Actions\Databases\Failover\SwitchPrimary;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
@@ -26,5 +27,15 @@ final class FailoverDatabaseJob implements ShouldQueue
     public function handle(SwitchPrimary $action): void
     {
         $action->handle($this->database);
+    }
+
+    protected function operatingStatus(): DatabaseStatus
+    {
+        return DatabaseStatus::Recovering;
+    }
+
+    protected function operationName(): string
+    {
+        return 'Fail over';
     }
 }
