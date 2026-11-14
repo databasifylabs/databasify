@@ -70,30 +70,17 @@ final readonly class SentinelFiles
     public static function shakeConfigOf(MigrationStart $request, string $dir, string $password): string
     {
         $source = $request->source;
-        $reader = $request->continuous ? ['[sync_reader]', 'sync_rdb = true', 'sync_aof = true'] : ['[scan_reader]', 'scan = true', 'ksn = false', 'count = 100'];
 
-        return implode("\n", [
-            ...$reader,
-            'cluster = false',
-            'address = '.self::quoted(self::joinHostPort($source->host, $source->port)),
-            'username = '.self::quoted($source->username),
-            'password = '.self::quoted($source->password),
-            'tls = '.($source->tls ? 'true' : 'false'),
-            '',
-            '[redis_writer]',
-            'cluster = false',
-            'address = '.self::quoted('127.0.0.1:'.self::DATA_PORT),
-            'password = '.self::quoted(trim($password)),
-            'tls = false',
-            '',
-            '[advanced]',
-            'dir = '.self::quoted($dir),
-            'status_port = 0',
-            'log_file = "shake.log"',
-            'log_level = "info"',
-            'log_interval = 5',
-            'rdb_restore_command_behavior = "rewrite"',
-        ])."\n";
+        return ConfigView::render('engines.sentinel.files.shake-toml', [
+            'continuous' => $request->continuous,
+            'sourceAddress' => self::quoted(self::joinHostPort($source->host, $source->port)),
+            'sourceUser' => self::quoted($source->username),
+            'sourcePassword' => self::quoted($source->password),
+            'sourceTls' => $source->tls ? 'true' : 'false',
+            'targetAddress' => self::quoted('127.0.0.1:'.self::DATA_PORT),
+            'targetPassword' => self::quoted(trim($password)),
+            'dir' => self::quoted($dir),
+        ]);
     }
 
     public static function directiveOf(string $key, string $value): string
