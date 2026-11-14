@@ -33,7 +33,15 @@ final readonly class UndoNodeJoin
         $joiner->delete();
         $database->forgetNodeCertificates($joiner);
 
-        $remaining = $database->nodes()->get()->each(fn (DatabaseNode $peer) => rescue(fn () => $peer->driver()->nodes()->configure($this->nodeConfig->handle($database, $peer))));
+        $remaining = $database->nodes()->get();
+
+        if ($remaining->hasSole() && $database->facts()->seedClustersFirst) {
+            rescue(fn () => $remaining->sole()->driver()->cluster()->disable());
+
+            return;
+        }
+
+        $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $peer->driver()->nodes()->configure($this->nodeConfig->handle($database, $peer))));
 
         if ($remaining->hasMany()) {
             $members = $this->nodeConfig->membersOf($database);

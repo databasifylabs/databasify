@@ -89,14 +89,34 @@ it('opens the firewall of every member before configuring the new node', functio
     expect($existing->map($firewallOn)->all())->each->toBeLessThan($configure);
 });
 
-it('enables the cluster on the seed first when a single node gets its first peer', function () {
+it('turns a single postgresql node into a cluster before its first peer starts', function () {
     $ssh = fakeEngine();
-    $database = idleDatabase('postgres', 1);
+    $database = idleDatabase('postgres', 1, DatabaseMode::Single);
+    markRoles($database, NodeRole::Primary);
+    $seed = $database->seed()->server;
+    $server = Server::factory()->ready()->create();
+
+    addThroughFlow($database, $server);
+    $commands = engineCommandsIn($ssh);
+
+    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.configure', 'nodes.status'])
+        ->and(array_search("{$seed->name}: cluster.enable", $commands, true))->toBeLessThan(array_search("{$server->name}: nodes.configure", $commands, true))
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($database->nodes()->count())->toBe(2);
+});
+
+it('takes a single postgresql node back out of the cluster when its first peer fails to join', function () {
+    $server = Server::factory()->ready()->create();
+    $ssh = fakeEngine();
+    failingTaskOn($server, 2);
+    $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $seed = $database->seed()->server;
 
-    addThroughFlow($database, Server::factory()->ready()->create());
+    addThroughFlow($database, $server);
 
-    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.status']);
+    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.configure', 'cluster.disable', 'nodes.status'])
+        ->and($database->nodes()->count())->toBe(1)
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('removes the new node and puts the old members back when the copy fails', function () {

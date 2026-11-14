@@ -3,7 +3,7 @@
 unit=$(main_unit)
 if clustered && [ -e /srv/postgres/conf/etcd.env ]; then
     echo 'Joining etcd…'
-    promote_own_learner
+    promote_own_learner || listed_in_etcd || fail_task "no etcd member lists $(own_ip), so it cannot join the cluster; check that etcd runs on the other members"
 fi
 echo 'Waiting for PostgreSQL…'
 baseline=$(restarts_of "$unit")

@@ -81,7 +81,18 @@ promote_own_learner() {
         done
         return 1
     }
-    wait_until 300 3 promoted || true
+    wait_until 300 3 promoted
+}
+
+listed_in_etcd() {
+    local ip endpoint
+    ip=$(own_ip)
+    for endpoint in "$LOCAL_ETCD" $(peer_etcd_endpoints "$ip"); do
+        if [ -n "$(member_with_peer "$endpoint" "$ip")" ]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 etcd_healthy() {

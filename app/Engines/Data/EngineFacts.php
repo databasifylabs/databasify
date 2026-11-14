@@ -24,6 +24,7 @@ final readonly class EngineFacts
         public Ports $ports,
         public HostProfile $hostProfile,
         public array $primaryControlledSettings = [],
+        public bool $seedClustersFirst = false,
     ) {}
 
     public function offers(Feature $feature): bool

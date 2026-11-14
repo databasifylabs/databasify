@@ -6,7 +6,7 @@ if [ -e /srv/postgres/conf/etcd.env ]; then
     unit_do enable databasify-etcd
     unit_do start databasify-etcd
     echo 'Joining etcd…'
-    promote_own_learner
+    promote_own_learner || true
     wait_until 120 3 etcd_healthy || fail_task 'etcd did not become healthy'
 fi
 echo 'Starting Patroni…'

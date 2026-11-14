@@ -24,6 +24,7 @@ Clients reach the primary through a DNS name that follows it ([0012](0012-dns-ho
 ## Consequences
 
 - New read-only nodes copy their data from a replica when one is healthy, to spare the primary: PostgreSQL through Patroni's `clonefrom` tag on read-only nodes, MySQL through MySQL Shell's `cloneDonor` (a healthy standby), MariaDB through a `mariadb-backup` stream from a healthy standby (safe because `wsrep_gtid_mode` and `log_slave_updates` keep GTIDs aligned). MongoDB already chains initial sync from secondaries (`chainingAllowed` default). Valkey and Redis keep replicating from the primary, because Sentinel points every replica back at the primary on failover. PostgreSQL and MariaDB skip the membership pass for a read-only join (`membershipChangesFor()`), since their member lists only hold members.
+- Growing a single node into a cluster follows each engine's order. By default the joiner starts and gets ready first and the seed enables its cluster afterwards. Engines whose joiner needs the seed's group to exist before it can start set `EngineFacts::$seedClustersFirst`, and `JoinNode` then configures and enables the seed before it deploys the joiner: PostgreSQL, because a new etcd member must be added to a running cluster before it starts with `initial-cluster-state=existing` and Patroni needs etcd. When such a join fails, `UndoNodeJoin` runs `cluster disable` on the sole node so it serves on its own again.
 - Failover keeps working while the Databasify app is down.
 - A database has a primary and at most 2 standbys (`Engine::MAX_STANDBYS`). Read-only nodes are counted separately and capped at 47 for every engine (`Engine::MAX_READ_ONLY_NODES`, MongoDB's 50-member replica set less the voting members); the engine checks sizes and limits again in `node configure`.
 - MongoDB members past the 7th join with 0 votes. Sentinel counts read-only nodes toward its 3 sentinels.
@@ -47,4 +48,7 @@ Clients reach the primary through a DNS name that follows it ([0012](0012-dns-ho
 - `app/Actions/Databases/Failover/DetectQuorum.php`
 - `app/Actions/Databases/Failover/RecoverCluster.php`
 - `app/Engines/Engine.php`
+- `app/Engines/Data/EngineFacts.php`
+- `app/Actions/Databases/Nodes/JoinNode.php`
+- `app/Actions/Databases/Nodes/UndoNodeJoin.php`
 - `app/Providers/EngineServiceProvider.php`
