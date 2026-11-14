@@ -25,10 +25,9 @@ copy_from() {
     loaded=$(mktemp)
     found=$(mktemp)
     set +o pipefail
-    mariadb-dump "${args[@]}" 2> "$errors" | tee >(grep -ao "gtid_slave_pos='[^']*'" > "$found") | mariadb --defaults-extra-file="$MY_CNF" 2> "$loaded"
+    mariadb-dump "${args[@]}" 2> "$errors" | LC_ALL=C sed -e "/gtid_slave_pos='/w $found" | mariadb --defaults-extra-file="$MY_CNF" 2> "$loaded"
     statuses=("${PIPESTATUS[@]}")
     set -o pipefail
-    wait $! 2> /dev/null || true
     rm -f "$ROOT/conf/source.cnf"
     COPIED_GTID=''
     if [ "${statuses[0]}" -ne 0 ]; then
@@ -37,7 +36,7 @@ copy_from() {
         ATTEMPT_ERROR="mariadb: exit status ${statuses[2]}: $(tr -s '[:space:]' ' ' < "$loaded")"
     else
         ATTEMPT_ERROR=''
-        COPIED_GTID=$(head -n 1 "$found" | sed -n "s/^gtid_slave_pos='\(.*\)'$/\1/p")
+        COPIED_GTID=$(head -n 1 "$found" | sed -n "s/.*gtid_slave_pos='\([^']*\)'.*/\1/p")
     fi
     rm -f "$errors" "$loaded" "$found"
     [ -z "$ATTEMPT_ERROR" ]

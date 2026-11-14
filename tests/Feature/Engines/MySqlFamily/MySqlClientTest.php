@@ -112,3 +112,25 @@ it('stops the script when a piped file write fails', function () {
         ->and($run->output())->toContain('DATABASIFY_ERROR internal')
         ->and($run->output())->not->toContain('unnoticed');
 })->skip(fn (): bool => ! Process::run(['bash', '-c', 'shopt -s lastpipe'])->successful(), 'needs bash 4.2 or newer, as the engine images ship');
+
+it('copies a dump under set -u and keeps the GTID position it carried', function () {
+    $root = sys_get_temp_dir().'/my-copy-'.uniqid();
+    mkdir("{$root}/bin", recursive: true);
+    mkdir("{$root}/conf");
+    $dump = "-- MariaDB dump\n-- SET GLOBAL gtid_slave_pos='1-42-7,10-9-3';\nINSERT INTO t VALUES ('gtid_slave_pos=''9-9-9''');\n";
+    file_put_contents("{$root}/dump.sql", $dump);
+    file_put_contents("{$root}/bin/mariadb-dump", "#!/bin/bash\ncat \"\$DUMP_FILE\"\n");
+    file_put_contents("{$root}/bin/mariadb", "#!/bin/bash\ncat > \"\$LOADED_FILE\"\n");
+    chmod("{$root}/bin/mariadb-dump", 0755);
+    chmod("{$root}/bin/mariadb", 0755);
+    $node = idleDatabase('mariadb', 1)->nodes()->sole();
+    $script = resolve(ScriptView::class)->render($node, 'engines.testing.my-copy', ['engine' => MySqlFamilyEngine::of('mariadb')]);
+
+    $run = Process::input($script)->env(['PATH' => "{$root}/bin:".getenv('PATH'), 'COPY_ROOT' => $root, 'DUMP_FILE' => "{$root}/dump.sql", 'LOADED_FILE' => "{$root}/loaded.sql"])->run(['bash', '-euo', 'pipefail', '-s']);
+    $loaded = file_get_contents("{$root}/loaded.sql");
+    Process::run(['rm', '-rf', $root]);
+
+    expect($run->successful())->toBeTrue($run->errorOutput())
+        ->and($run->output())->toBe("1-42-7,10-9-3\n")
+        ->and($loaded)->toBe($dump);
+});
