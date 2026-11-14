@@ -29,7 +29,7 @@ it('starts a one-time copy in its own unit with the copy script attached', funct
     $this->scripts->assertRan('postgres/migration/start', function (string $script, array $env): bool {
         $copy = base64_decode($env['COPY_SCRIPT']);
 
-        return $env['MIGRATION_DATABASES'] === 'shop blog' && $env['MIGRATION_OWNER'] === 'databasify' && $env['MIGRATION_CONTINUOUS'] === 'false'
+        return $env['MIGRATION_DATABASES'] === "shop\nblog" && $env['MIGRATION_OWNER'] === 'databasify' && $env['MIGRATION_CONTINUOUS'] === 'false'
             && str_contains($script, 'ctl run -u databasify-postgres-migration -r')
             && str_contains($copy, 'pg_restore -h /srv/postgres/run') && str_contains($copy, 'CREATE SUBSCRIPTION');
     });

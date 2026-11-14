@@ -66,19 +66,19 @@ final readonly class Setting
     public static function allows(EngineField $field, string $value): bool
     {
         return match ($field->kind) {
-            self::INTEGER => preg_match('/^[+-]?\d+$/', $value) === 1 && self::within($field, (float) $value),
+            self::INTEGER => preg_match('/^[+-]?\d+$/D', $value) === 1 && self::within($field, (float) $value),
             self::DECIMAL => is_numeric($value) && self::within($field, (float) $value),
             self::SIZE => self::sizeAllowed($field, $value),
             self::BYTES => self::bytesAllowed($field, $value),
             self::CHOICE => in_array($value, $field->options, true),
             self::FLAGS => $value === '' || array_diff(explode(',', $value), $field->options) === [],
-            default => $field->pattern !== null && preg_match('/^(?:'.str_replace('/', '\/', $field->pattern).')$/', $value) === 1,
+            default => $field->pattern !== null && preg_match('/^(?:'.str_replace('/', '\/', $field->pattern).')$/D', $value) === 1,
         };
     }
 
     public static function bytesOf(string $value): ?float
     {
-        if (preg_match('/^([0-9]{1,20})([KMGkmg]?)$/', $value, $match) !== 1) {
+        if (preg_match('/^([0-9]{1,20})([KMGkmg]?)$/D', $value, $match) !== 1) {
             return null;
         }
 
@@ -87,7 +87,7 @@ final readonly class Setting
 
     private static function sizeAllowed(EngineField $field, string $value): bool
     {
-        if (preg_match('/^([0-9]{1,15})(kB|MB|GB|TB)$/', $value, $match) !== 1) {
+        if (preg_match('/^([0-9]{1,15})(kB|MB|GB|TB)$/D', $value, $match) !== 1) {
             return false;
         }
 

@@ -15,7 +15,7 @@ use Throwable;
 
 final readonly class ReadNodeStatus
 {
-    public function handle(Database $database, DatabaseNode $node, ?string $log = null): NodeStatus
+    public function handle(Database $database, DatabaseNode $node): NodeStatus
     {
         if (! $database->runsSupportedSdk()) {
             return NodeStatus::reported($node->role, $node->engine_version);
