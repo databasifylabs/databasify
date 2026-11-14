@@ -25,7 +25,7 @@ final readonly class ScriptFailure
         $code = trim($code);
 
         if ($code === self::SQL) {
-            return new EngineError('internal', self::serverMessageOf($message));
+            return new EngineError(self::serverMessageOf($message));
         }
 
         return EngineError::fromReply($code, trim($message));

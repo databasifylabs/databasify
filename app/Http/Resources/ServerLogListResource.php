@@ -25,7 +25,6 @@ class ServerLogListResource extends JsonResource
             'exit_code' => $this->exit_code,
             'server' => ['id' => $this->server->id, 'name' => $this->server->name],
             'database' => $this->database === null ? null : ['id' => $this->database->id, 'name' => $this->database->name],
-            'group' => $this->group_id === null ? null : ['id' => $this->group_id, 'name' => $this->group_name],
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

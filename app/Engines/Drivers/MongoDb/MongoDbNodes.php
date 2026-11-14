@@ -56,7 +56,7 @@ final readonly class MongoDbNodes implements Nodes
     public function bootstrap(Secrets $secrets, ?DefaultAccount $account): void
     {
         if ($secrets->admin === null || $secrets->agent === null) {
-            throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin and agent secrets');
+            throw new InvalidEngineRequest('MongoDB needs the admin and agent secrets');
         }
 
         $saved = $this->configuration->savedRequestOf();

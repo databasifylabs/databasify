@@ -20,16 +20,16 @@ final readonly class RollOutSettings
         private RefreshRecoveryStatus $recovery,
     ) {}
 
-    public function handle(Database $database, bool $archiveChanged): void
+    public function handle(Database $database, bool $archiveChanged, string $run): void
     {
         $primary = $database->primaryOrSeed();
 
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), failover: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false);
         $primary->driver()->config()->sync();
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->config()->apply(), failover: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->config()->apply(), $run, failover: false, resumable: false);
 
-        if ($primary->driver()->config()->pendingRestart() !== []) {
-            $this->rolling->restart($database);
+        if ($primary->driver()->config()->pendingRestart() !== [] || $this->rolling->begun($database, $run)) {
+            $this->rolling->restart($database, $run);
         }
 
         $this->refresh->handle($database);

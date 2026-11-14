@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import { ArrowUp, History, Layers } from 'lucide-react';
+import { ArrowUp, History } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import CursorPagination from '@/components/cursor-pagination';
 import EmptyState from '@/components/empty-state';
@@ -7,78 +7,25 @@ import LiveDuration from '@/components/server-logs/live-duration';
 import ServerLogOutput from '@/components/server-logs/server-log-output';
 import StatusDot from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
-import { dayLabel, pluralize, timeAgo } from '@/lib/format';
+import { dayLabel, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type {
-    CursorPaginated,
-    ServerLog,
-    ServerLogStatus,
-    ServerLogWithOutput,
-} from '@/types';
+import type { CursorPaginated, ServerLog, ServerLogWithOutput } from '@/types';
 
-type Entry =
-    | { kind: 'log'; log: ServerLog }
-    | { kind: 'group'; id: string; name: string; logs: ServerLog[] };
-
-type Day = { label: string; entries: Entry[] };
-
-function entriesOf(logs: ServerLog[]): Entry[] {
-    return logs.reduce<Entry[]>((entries, log) => {
-        const last = entries.at(-1);
-
-        if (log.group === null) {
-            return [...entries, { kind: 'log', log }];
-        }
-
-        if (last?.kind === 'group' && last.id === log.group.id) {
-            last.logs.push(log);
-
-            return entries;
-        }
-
-        return [
-            ...entries,
-            {
-                kind: 'group',
-                id: log.group.id,
-                name: log.group.name ?? 'Parallel step',
-                logs: [log],
-            },
-        ];
-    }, []);
-}
+type Day = { label: string; logs: ServerLog[] };
 
 function daysOf(logs: ServerLog[]): Day[] {
-    const days = logs.reduce<{ label: string; logs: ServerLog[] }[]>(
-        (days, log) => {
-            const label = dayLabel(log.created_at);
-            const last = days.at(-1);
+    return logs.reduce<Day[]>((days, log) => {
+        const label = dayLabel(log.created_at);
+        const last = days.at(-1);
 
-            if (last?.label === label) {
-                last.logs.push(log);
+        if (last?.label === label) {
+            last.logs.push(log);
 
-                return days;
-            }
+            return days;
+        }
 
-            return [...days, { label, logs: [log] }];
-        },
-        [],
-    );
-
-    return days.map((day) => ({
-        label: day.label,
-        entries: entriesOf(day.logs),
-    }));
-}
-
-function statusOfGroup(logs: ServerLog[]): ServerLogStatus {
-    if (logs.some((log) => log.status === 'failed')) {
-        return 'failed';
-    }
-
-    return logs.some((log) => log.status === 'running')
-        ? 'running'
-        : 'succeeded';
+        return [...days, { label, logs: [log] }];
+    }, []);
 }
 
 export function liveLogProps(
@@ -153,12 +100,10 @@ function NewerLogsNotice() {
 function LogRow({
     log,
     selected,
-    nested = false,
     onSelect,
 }: {
     log: ServerLog;
     selected: boolean;
-    nested?: boolean;
     onSelect: (id: string) => void;
 }) {
     return (
@@ -168,7 +113,6 @@ function LogRow({
             aria-current={selected}
             className={cn(
                 'flex w-full items-start gap-3 border-b px-3 py-2.5 text-left last:border-b-0 hover:bg-muted/50',
-                nested && 'pl-7',
                 selected && 'bg-muted hover:bg-muted',
             )}
         >
@@ -193,21 +137,6 @@ function LogRow({
                 </p>
             </div>
         </button>
-    );
-}
-
-function GroupHeader({ name, logs }: { name: string; logs: ServerLog[] }) {
-    return (
-        <div className="flex items-center gap-3 border-b bg-muted/30 px-3 py-2">
-            <Layers className="size-3.5 shrink-0 text-muted-foreground" />
-            <p className="min-w-0 flex-1 truncate text-xs font-medium">
-                {name}
-            </p>
-            <span className="shrink-0 text-xs text-muted-foreground">
-                {pluralize(logs.length, 'server')}
-            </span>
-            <StatusDot status={statusOfGroup(logs)} />
-        </div>
     );
 }
 
@@ -265,34 +194,14 @@ export default function ServerLogList({
                             <h3 className="sticky top-0 z-10 border-b bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
                                 {day.label}
                             </h3>
-                            {day.entries.map((entry) =>
-                                entry.kind === 'log' ? (
-                                    <LogRow
-                                        key={entry.log.id}
-                                        log={entry.log}
-                                        selected={entry.log.id === selectedId}
-                                        onSelect={select}
-                                    />
-                                ) : (
-                                    <div key={entry.id}>
-                                        <GroupHeader
-                                            name={entry.name}
-                                            logs={entry.logs}
-                                        />
-                                        {entry.logs.map((member) => (
-                                            <LogRow
-                                                key={member.id}
-                                                log={member}
-                                                nested
-                                                selected={
-                                                    member.id === selectedId
-                                                }
-                                                onSelect={select}
-                                            />
-                                        ))}
-                                    </div>
-                                ),
-                            )}
+                            {day.logs.map((entry) => (
+                                <LogRow
+                                    key={entry.id}
+                                    log={entry}
+                                    selected={entry.id === selectedId}
+                                    onSelect={select}
+                                />
+                            ))}
                         </section>
                     ))}
                 </nav>

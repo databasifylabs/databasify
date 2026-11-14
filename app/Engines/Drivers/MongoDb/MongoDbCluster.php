@@ -38,7 +38,7 @@ final readonly class MongoDbCluster implements Cluster
     public function forceQuorum(bool $othersDown): void
     {
         if (! $othersDown) {
-            throw new EngineBusy('busy', 'forcing the replica set while other members may be alive would roll back writes; confirm the others are down');
+            throw new EngineBusy('forcing the replica set while other members may be alive would roll back writes; confirm the others are down');
         }
 
         $this->driver->run('engines.mongodb.cluster.force-quorum');

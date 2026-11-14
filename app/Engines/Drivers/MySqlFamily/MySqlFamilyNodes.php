@@ -62,7 +62,7 @@ final readonly class MySqlFamilyNodes implements Nodes
     public function bootstrap(Secrets $secrets, ?DefaultAccount $account): void
     {
         if ($secrets->replication === null || $secrets->agent === null) {
-            throw new InvalidEngineRequest('invalid_request', $this->driver->engine()->label.' needs the replication and agent secrets');
+            throw new InvalidEngineRequest($this->driver->engine()->label.' needs the replication and agent secrets');
         }
 
         $seed = $this->scripts->read($this->driver, 'engines.{engine}.nodes.bootstrap', ['REPLICATION_PASSWORD' => $secrets->replication, 'AGENT_PASSWORD' => $secrets->agent])->bool('seed');

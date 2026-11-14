@@ -22,9 +22,9 @@ final readonly class RebootServers
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database): void
+    public function handle(Database $database, string $run): void
     {
-        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary): void {
+        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($run): void {
             $server = $node->server;
             $bootId = $server->bootId();
             $server->ssh($node->database)->exec('ssh.servers.os.reboot', log: "{$server->name}: rebooting");
@@ -38,8 +38,8 @@ final readonly class RebootServers
                 Sleep::for(self::POLL_SECONDS)->seconds();
             }
 
-            $this->rolling->backOnline($node, $expectPrimary);
-        });
+            $this->rolling->backOnline($node, $run, $expectPrimary);
+        }, $run);
 
         $this->refresh->handle($database);
         $database->markReady();

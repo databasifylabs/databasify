@@ -28,7 +28,7 @@ final readonly class SentinelConfiguration
         $engine = $this->driver::flavor();
 
         if ($request->secrets->admin === null) {
-            throw new InvalidEngineRequest('invalid_request', "{$engine->id} needs the admin secret");
+            throw new InvalidEngineRequest("{$engine->id} needs the admin secret");
         }
 
         $catalog = $this->catalog();
@@ -58,7 +58,7 @@ final readonly class SentinelConfiguration
 
     public function savedRequestOf(): NodeConfig
     {
-        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
+        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('run node configure first');
     }
 
     /**

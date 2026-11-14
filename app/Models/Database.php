@@ -449,6 +449,9 @@ class Database extends Model implements Movable
         Cache::put($this->stopKey(), true, self::STOP_TTL_SECONDS);
     }
 
+    /**
+     * @phpstan-impure
+     */
     public function isStopRequested(): bool
     {
         return Cache::has($this->stopKey()) && ! Cache::has($this->cleanupKey());
@@ -592,18 +595,20 @@ class Database extends Model implements Movable
     public function markReady(): void
     {
         $this->recordStatusAs(DatabaseStatus::Ready);
+        $this->failInterruptedLogs();
         $this->forgetStopFlags();
-    }
-
-    public function abandonOperation(): void
-    {
-        $this->status->isSettingUp() ? $this->markFailed() : $this->markReady();
     }
 
     public function markFailed(): void
     {
         $this->recordStatusAs(DatabaseStatus::Failed);
+        $this->failInterruptedLogs();
         $this->forgetStopFlags();
+    }
+
+    private function failInterruptedLogs(): void
+    {
+        $this->serverLogs()->running()->lazyById()->each(fn (ServerLog $log) => $log->fail('Interrupted.'));
     }
 
     private function recordStatusAs(DatabaseStatus $status): void
@@ -802,11 +807,6 @@ class Database extends Model implements Movable
     public function primaryServer(): Server
     {
         return $this->primaryOrSeed()->server;
-    }
-
-    public function container(): string
-    {
-        return "databasify-{$this->engine}";
     }
 
     public function image(): EngineImage

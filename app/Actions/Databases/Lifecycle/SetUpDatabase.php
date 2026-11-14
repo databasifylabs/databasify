@@ -33,44 +33,53 @@ final readonly class SetUpDatabase
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database): void
+    public function handle(Database $database, string $run): void
     {
         $database->markCreating();
         $nodes = $database->orderedNodesWithout();
 
         foreach ($nodes as $node) {
-            $this->deploy->handle($database, $node);
+            if (! $this->tasks->started($node, $run, 'ready')) {
+                $this->deploy->handle($database, $node);
 
-            if ($node->isSeed()) {
-                $this->learn->handle($database, $node);
+                if ($node->isSeed()) {
+                    $this->learn->handle($database, $node);
+                }
+
+                $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
+                $this->firewall->handle($database, $node, $database->trustedCidrs());
+                $node->driver()->nodes()->start();
             }
 
-            $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
-            $this->firewall->handle($database, $node, $database->trustedCidrs());
-            $node->driver()->nodes()->start();
-            $this->tasks->await($node, 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, expectPrimary: $node->isSeed()));
+            $this->tasks->await($node, $run, 'ready', 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, expectPrimary: $node->isSeed()));
         }
 
         $settings = $database->settings;
+        $source = $settings->restore;
+        $seed = $database->seed();
+        $clustered = $nodes->count() > 1;
+        $joining = $clustered && $this->tasks->started($nodes->firstOrFail(), $run, 'join');
 
-        foreach ($nodes as $node) {
-            try {
-                $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
-            } catch (EngineUnsupported) {
+        if (! $joining && ($source === null || ! $this->tasks->started($seed, $run, 'restore'))) {
+            foreach ($nodes as $node) {
+                try {
+                    $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
+                } catch (EngineUnsupported) {
+                }
             }
         }
 
-        $source = $settings->restore;
-
         if ($source !== null) {
-            $seed = $database->seed();
             $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
-            $this->tasks->await($seed, 'restoring the archive', fn (string $key): Operation => $seed->driver()->archive()->restore($key, $storage, $source->target));
-            $this->restoredAccounts->handle($database);
+            $this->tasks->await($seed, $run, 'restore', 'restoring the archive', fn (string $key): Operation => $seed->driver()->archive()->restore($key, $storage, $source->target));
+
+            if (! $joining) {
+                $this->restoredAccounts->handle($database);
+            }
         }
 
-        if ($nodes->count() > 1) {
-            $nodes->each(fn (DatabaseNode $node) => $this->tasks->await($node, 'joining the cluster', fn (string $key): Operation => $node->driver()->cluster()->enable($key)));
+        if ($clustered) {
+            $nodes->each(fn (DatabaseNode $node) => $this->tasks->await($node, $run, 'join', 'joining the cluster', fn (string $key): Operation => $node->driver()->cluster()->enable($key)));
         }
 
         rescue(fn () => $this->logUnits->handle($database, $database->seed()));

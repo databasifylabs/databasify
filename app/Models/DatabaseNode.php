@@ -10,7 +10,6 @@ use App\DTOs\Databases\EndpointPair;
 use App\DTOs\Databases\NodeResources;
 use App\DTOs\Databases\NodeStatus;
 use App\DTOs\Dns\HostPair;
-use App\DTOs\Ssh\LogGroup;
 use App\Engines\Data\Member;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Enums\Databases\NodeKind;
@@ -43,13 +42,14 @@ use LogicException;
  * @property string|null $engine_version
  * @property string|null $certificate_fingerprint
  * @property int $missed_status_reads
+ * @property string|null $task_key
  * @property-read Database $database
  * @property-read Server $server
  * @property-read Collection<int, NodeAlert> $openAlerts
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads'])]
+#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
@@ -185,6 +185,15 @@ class DatabaseNode extends Model
      * @param  Builder<self>  $query
      */
     #[Scope]
+    protected function runningTask(Builder $query): void
+    {
+        $query->whereNotNull('task_key');
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
     protected function members(Builder $query): void
     {
         $query->where('kind', NodeKind::Member);
@@ -308,10 +317,8 @@ class DatabaseNode extends Model
 
     public function openLog(string $name): ServerLog
     {
-        $group = LogGroup::fromContext();
-
         return $this->server->serverLogs()->running()->where('name', $name)->where('database_id', $this->database_id)->first()
-            ?? $this->server->serverLogs()->create(['name' => $name, 'database_id' => $this->database_id, 'group_id' => $group?->id, 'group_name' => $group?->name]);
+            ?? $this->server->serverLogs()->create(['name' => $name, 'database_id' => $this->database_id]);
     }
 
     public function ssh(): Ssh

@@ -12,13 +12,11 @@ use App\Events\DatabaseAlertRaised;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use App\Services\Databases\NodeRunner;
 
 final readonly class RefreshNodeStatuses
 {
     public function __construct(
         private SyncDatabaseDns $dns,
-        private NodeRunner $nodeRunner,
         private ReadNodeStatus $readStatus,
     ) {}
 
@@ -29,12 +27,8 @@ final readonly class RefreshNodeStatuses
         }
 
         $previous = $database->nodesWithServers()->health();
-        $statuses = $this->nodeRunner->map(
-            $nodes,
-            fn (DatabaseNode $node): NodeStatus => $this->readStatus->handle($database, $node),
-            NodeStatus::class,
-        );
-        $anotherAnswersAsPrimary = collect($statuses)->contains(fn (NodeStatus $status): bool => $status->role === NodeRole::Primary);
+        $statuses = $nodes->values()->map(fn (DatabaseNode $node): NodeStatus => $this->readStatus->handle($database, $node));
+        $anotherAnswersAsPrimary = $statuses->contains(fn (NodeStatus $status): bool => $status->role === NodeRole::Primary);
 
         $nodes->values()->each(function (DatabaseNode $node, int $index) use ($statuses, $anotherAnswersAsPrimary): void {
             $status = $statuses[$index] ?? NodeStatus::unreachable();

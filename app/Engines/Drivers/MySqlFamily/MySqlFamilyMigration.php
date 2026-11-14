@@ -76,7 +76,7 @@ final readonly class MySqlFamilyMigration implements Migration
         $databases = $start->databases === [] ? $this->check($start->source, [])->databases : $start->databases;
 
         if ($databases === []) {
-            throw new InvalidEngineRequest('invalid_request', 'the source has no databases to copy');
+            throw new InvalidEngineRequest('the source has no databases to copy');
         }
 
         $this->scripts->run($this->driver, 'engines.mysql-family.migration.start', [

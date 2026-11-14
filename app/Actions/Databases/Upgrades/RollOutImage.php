@@ -24,14 +24,14 @@ final readonly class RollOutImage
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database): void
+    public function handle(Database $database, string $run): void
     {
 
-        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($database): void {
+        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($database, $run): void {
             $this->deploy->handle($database, $node);
             $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
-            $this->rolling->backOnline($node, $expectPrimary);
-        });
+            $this->rolling->backOnline($node, $run, $expectPrimary);
+        }, $run);
 
         $this->refresh->handle($database);
         $this->learn->handle($database, $database->primaryOrSeed());

@@ -19,7 +19,7 @@ use Throwable;
 
 #[Queue(QueueGroup::Databases)]
 #[Tries(1)]
-#[Timeout(7200)]
+#[Timeout(3600)]
 #[DeleteWhenMissingModels]
 final class RemoveNodeJob implements ShouldQueue
 {

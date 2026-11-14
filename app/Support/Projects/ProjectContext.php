@@ -25,11 +25,6 @@ final class ProjectContext
         $this->project = null;
     }
 
-    public function isInitialized(): bool
-    {
-        return $this->project !== null;
-    }
-
     public function project(): ?Project
     {
         return $this->project;

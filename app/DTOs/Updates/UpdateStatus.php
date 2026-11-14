@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\DTOs\Updates;
 
 use App\Enums\Updates\UpdateState;
-use App\Enums\Updates\UpdateStepState;
 use App\Services\Http\Payload;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
@@ -82,11 +81,6 @@ final readonly class UpdateStatus
     public function isRunning(): bool
     {
         return $this->state === UpdateState::Running;
-    }
-
-    public function failedStep(): ?UpdateStep
-    {
-        return array_find($this->steps, fn (UpdateStep $step): bool => $step->state === UpdateStepState::Failed);
     }
 
     /**

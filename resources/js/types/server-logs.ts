@@ -7,7 +7,6 @@ export type ServerLog = {
     exit_code: number | null;
     server: { id: string; name: string };
     database: { id: string; name: string } | null;
-    group: { id: string; name: string | null } | null;
     created_at: string | null;
     updated_at: string | null;
 };

@@ -24,7 +24,7 @@ it('applies the trusted ranges on every node including read-only ones', function
         ->each(fn ($log) => $log->status->toBe(ServerLogStatus::Succeeded)->name->toEndWith(': applying trusted sources'));
 });
 
-it('fails the log of the node that rejects the rules, still applies them on the others and finishes the operation', function () {
+it('fails the log of the node that rejects the rules, stops there and finishes the operation', function () {
     $database = idleDatabase('postgres', 2);
     $database->update(['status' => DatabaseStatus::Updating]);
     fakeSsh()->respond('nft: syntax error', 1);
@@ -32,7 +32,7 @@ it('fails the log of the node that rejects the rules, still applies them on the 
     expect(fn () => runJob(new ApplyTrustedSourcesJob($database)))->toThrow(RuntimeException::class)
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
         ->and($database->serverLogs()->where('status', ServerLogStatus::Failed)->sole()->output)->toContain('nft: syntax error')
-        ->and($database->serverLogs()->where('status', ServerLogStatus::Succeeded)->count())->toBe(1);
+        ->and($database->serverLogs()->count())->toBe(1);
 });
 
 it('finishes the operation its queued job never finished', function () {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Ssh;
 
 use App\Contracts\Ssh\ServerConnection;
-use App\DTOs\Ssh\LogGroup;
 use App\Exceptions\Databases\OperationStopped;
 use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Models\Database;
@@ -74,9 +73,7 @@ final readonly class Ssh
 
     private function logNamed(string $name): ServerLog
     {
-        $group = LogGroup::fromContext();
-
-        return $this->server->serverLogs()->create(['name' => $name, 'database_id' => $this->database?->id, 'group_id' => $group?->id, 'group_name' => $group?->name]);
+        return $this->server->serverLogs()->create(['name' => $name, 'database_id' => $this->database?->id]);
     }
 
     /**

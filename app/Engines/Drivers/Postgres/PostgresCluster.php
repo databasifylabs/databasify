@@ -27,7 +27,7 @@ final readonly class PostgresCluster implements Cluster
     public function disable(): void
     {
         $this->driver->run('engines.postgres.cluster.disable-stop', $this->driver->data());
-        $config = $this->configuration->savedConfig() ?? throw new EngineBusy('busy', 'run node configure first');
+        $config = $this->configuration->savedConfig() ?? throw new EngineBusy('run node configure first');
         $this->configuration->configure(new NodeConfig(false, false, $config->ip, $config->databaseId, $config->members, $config->settings, $config->secrets, $config->archive, $config->primary));
         $this->driver->run('engines.postgres.cluster.disable-finish', $this->driver->data(), timeout: 420);
     }

@@ -216,7 +216,7 @@ return [
 
         'ssh' => [
             'connection' => 'redis',
-            'queue' => ['databases', 'migrations', 'provisioning', 'terminals'],
+            'queue' => ['databases', 'migrations', 'provisioning'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'minProcesses' => (int) env('HORIZON_SSH_MIN_PROCESSES', 1),
@@ -225,7 +225,22 @@ return [
             'maxJobs' => 0,
             'memory' => (int) env('HORIZON_SSH_MEMORY', 128),
             'tries' => 1,
-            'timeout' => (int) env('HORIZON_SSH_TIMEOUT', 7300),
+            'timeout' => (int) env('HORIZON_SSH_TIMEOUT', 3700),
+            'nice' => 0,
+        ],
+
+        'terminals' => [
+            'connection' => 'terminals',
+            'queue' => ['terminals'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => (int) env('HORIZON_TERMINALS_MIN_PROCESSES', 1),
+            'maxProcesses' => (int) env('HORIZON_TERMINALS_MAX_PROCESSES', 2),
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => (int) env('HORIZON_TERMINALS_TIMEOUT', 7300),
             'nice' => 0,
         ],
     ],
@@ -234,6 +249,7 @@ return [
         '*' => [
             'default' => [],
             'ssh' => [],
+            'terminals' => [],
         ],
     ],
 

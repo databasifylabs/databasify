@@ -149,7 +149,7 @@ final readonly class PostgresFiles
     public static function passwordsOf(Secrets $secrets): array
     {
         if ($secrets->admin === null || $secrets->replication === null || $secrets->agent === null) {
-            throw new InvalidEngineRequest('invalid_request', 'PostgreSQL needs the admin, replication and agent secrets');
+            throw new InvalidEngineRequest('PostgreSQL needs the admin, replication and agent secrets');
         }
 
         return ['admin' => $secrets->admin, 'replication' => $secrets->replication, 'agent' => $secrets->agent, 'pooler' => hash_hmac('sha256', 'pgbouncer', $secrets->agent)];

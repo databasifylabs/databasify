@@ -8,11 +8,15 @@ use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
 use App\Models\ServerLog;
+use App\Services\Databases\EngineTasks;
 use Throwable;
 
 final readonly class EndFailedOperation
 {
-    public function __construct(private RefreshDatabaseStatus $refresh) {}
+    public function __construct(
+        private RefreshDatabaseStatus $refresh,
+        private EngineTasks $tasks,
+    ) {}
 
     public function handle(Database $database, string $operation, ?Throwable $exception, bool $markFailed = false): void
     {
@@ -21,6 +25,8 @@ final readonly class EndFailedOperation
         if ($database === null || ! $database->isBusy()) {
             return;
         }
+
+        $this->tasks->stopRunning($database);
 
         $database->serverLogs()->running()->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
 

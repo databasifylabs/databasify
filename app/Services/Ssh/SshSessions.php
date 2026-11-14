@@ -39,11 +39,6 @@ final class SshSessions
         unset($this->sessions[$key]);
     }
 
-    public function abandon(): void
-    {
-        $this->sessions = [];
-    }
-
     public function closeAll(): void
     {
         foreach ($this->sessions as $session) {

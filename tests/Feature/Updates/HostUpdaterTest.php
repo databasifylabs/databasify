@@ -55,7 +55,6 @@ it('reads the status the update writes', function () {
     expect($status?->state)->toBe(UpdateState::Failed)
         ->and($status?->rolledBack)->toBeTrue()
         ->and($status?->to)->toBe('0.2.0')
-        ->and($status?->failedStep()?->title)->toBe('Waiting until healthy')
         ->and($status?->steps[0]->state)->toBe(UpdateStepState::Done);
 });
 

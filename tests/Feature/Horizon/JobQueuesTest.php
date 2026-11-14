@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Queues\QueueGroup;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Attributes\Connection;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\File;
@@ -27,7 +28,7 @@ function attributeOf(ReflectionClass $job, string $attribute): ?object
 }
 
 /**
- * @return array<string, array{queue: list<string>, timeout: int, balance: string}>
+ * @return array<string, array{connection: string, queue: list<string>, timeout: int, balance: string}>
  */
 function horizonSupervisors(): array
 {
@@ -39,13 +40,14 @@ function supervisorOf(string $queue): string
     return (string) collect(horizonSupervisors())->search(fn (array $supervisor): bool => in_array($queue, $supervisor['queue'], true));
 }
 
-it('runs quick work and long server work in two auto-balanced supervisors', function () {
+it('runs quick work, server work and terminals in their own supervisors', function () {
     expect(collect(horizonSupervisors())->map(fn (array $supervisor): array => $supervisor['queue'])->all())->toBe([
         'default' => ['monitoring', 'default'],
-        'ssh' => ['databases', 'migrations', 'provisioning', 'terminals'],
+        'ssh' => ['databases', 'migrations', 'provisioning'],
+        'terminals' => ['terminals'],
     ])
         ->and(collect(horizonSupervisors())->pluck('balance')->unique()->all())->toBe(['auto'])
-        ->and(array_keys(config('horizon.environments.*')))->toBe(['default', 'ssh']);
+        ->and(array_keys(config('horizon.environments.*')))->toBe(['default', 'ssh', 'terminals']);
 });
 
 it('serves every queue group from exactly one supervisor', function () {
@@ -63,12 +65,13 @@ it('runs every job on a supervisor that outlasts it', function () {
 
         expect(QueueGroup::tryFrom($queue))->not->toBeNull("{$job->getShortName()} has no queue group")
             ->and(supervisorOf($queue))->not->toBe('', "{$job->getShortName()} runs on a queue no supervisor serves")
-            ->and(attributeOf($job, Timeout::class)?->timeout ?? $supervisorTimeout)->toBeLessThanOrEqual($supervisorTimeout, "{$job->getShortName()} outlasts its supervisor");
+            ->and(attributeOf($job, Timeout::class)?->timeout ?? $supervisorTimeout)->toBeLessThanOrEqual($supervisorTimeout, "{$job->getShortName()} outlasts its supervisor")
+            ->and(attributeOf($job, Connection::class)?->connection ?? 'redis')->toBe(config('horizon.defaults.'.supervisorOf($queue).'.connection'), "{$job->getShortName()} runs on another connection than its supervisor");
     }
 });
 
 it('never hands a job to a second worker while its supervisor may still run it', function () {
-    $longest = collect(horizonSupervisors())->max(fn (array $supervisor): int => (int) $supervisor['timeout']);
-
-    expect((int) config('queue.connections.redis.retry_after'))->toBeGreaterThan($longest);
+    foreach (horizonSupervisors() as $name => $supervisor) {
+        expect((int) config("queue.connections.{$supervisor['connection']}.retry_after"))->toBeGreaterThan((int) $supervisor['timeout'], "{$name} outlasts its connection's retry_after");
+    }
 });

@@ -53,7 +53,7 @@ final readonly class MySqlFamilyCluster implements Cluster
         $mysql = $this->driver->engine()->id === 'mysql';
 
         if (! $othersDown) {
-            throw new EngineBusy('busy', $mysql
+            throw new EngineBusy($mysql
                 ? 'forcing the group while other members may be alive would split it; confirm the others are down'
                 : 'forcing the cluster while other nodes may be alive would split it; confirm the others are down');
         }

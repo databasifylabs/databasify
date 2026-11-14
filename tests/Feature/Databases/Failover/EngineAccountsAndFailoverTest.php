@@ -109,7 +109,7 @@ it('refuses users and databases on engines without accounts', function (string $
 
 it('records no user when the engine refuses it', function () {
     fakeEngine();
-    answerRead('accounts.createUser', fn () => throw new InvalidEngineRequest('invalid_request', 'the name is reserved'));
+    answerRead('accounts.createUser', fn () => throw new InvalidEngineRequest('the name is reserved'));
     $database = idleDatabase('mysql', 1);
 
     expect(fn () => resolve(CreateDatabaseUser::class)->handle($database, 'reporting'))->toThrow(InvalidEngineRequest::class, 'the name is reserved')
@@ -187,7 +187,7 @@ it('starts a member whose container stopped before it rejoins the group', functi
     $database = idleDatabase('mysql', 3);
     [$primary, $replica, $stopped] = $database->nodes()->orderBy('position')->get()->map->server->all();
     $ssh = fakeEngine(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary, 'primary'), $replica, 'replica'));
-    answerRead('nodes.status', fn () => throw new EngineNotRunning('not_running', "No engine container is running on {$stopped->name}."), $stopped);
+    answerRead('nodes.status', fn () => throw new EngineNotRunning("No engine container is running on {$stopped->name}."), $stopped);
     answerRead('cluster.quorum', new QuorumCount(3, 2));
 
     runOperation(fn () => resolve(RecoverDatabase::class)->handle($database));

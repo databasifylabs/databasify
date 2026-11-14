@@ -79,11 +79,11 @@ final readonly class MongoDbAccounts implements Accounts
         $encryption = $requested ?? self::SCRAM_SHA_256;
 
         if (! in_array($encryption, self::ENCRYPTIONS, true)) {
-            throw new InvalidEngineRequest('invalid_request', 'password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
+            throw new InvalidEngineRequest('password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
         }
 
         if ($encryption === self::SCRAM_SHA_256 && preg_match('/\p{Cc}/u', $password) === 1) {
-            throw new InvalidEngineRequest('invalid_request', 'a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab');
+            throw new InvalidEngineRequest('a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab');
         }
 
         return ['PASSWORD' => Shell::withoutNul($password), 'ENCRYPTION' => $encryption];
@@ -107,7 +107,7 @@ final readonly class MongoDbAccounts implements Accounts
     {
         foreach ($names as $name) {
             if (in_array($name, $reserved, true)) {
-                throw new InvalidEngineRequest('invalid_request', "{$name} is reserved");
+                throw new InvalidEngineRequest("{$name} is reserved");
             }
         }
     }

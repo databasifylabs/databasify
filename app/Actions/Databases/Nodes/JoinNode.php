@@ -21,16 +21,25 @@ final readonly class JoinNode
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database, DatabaseNode $node): void
+    public function handle(Database $database, DatabaseNode $node, string $run): void
     {
         $joiner = $node->load('server');
         $existing = $database->nodesOtherThan($joiner)->load('server')->sortBy('position')->values();
 
-        $this->deploy->handle($database, $joiner);
+        $readied = $this->tasks->started($joiner, $run, 'ready');
+
+        if (! $readied) {
+            $this->deploy->handle($database, $joiner);
+        }
+
         $database->nodes()->with('server')->get()->each(fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $database->trustedCidrs()));
-        $joiner->driver()->nodes()->configure($this->nodeConfig->handle($database, $joiner));
-        $joiner->driver()->nodes()->start();
-        $this->tasks->await($joiner, 'waiting for the node', fn (string $key): Operation => $joiner->driver()->nodes()->ready($key, expectPrimary: false));
+
+        if (! $readied) {
+            $joiner->driver()->nodes()->configure($this->nodeConfig->handle($database, $joiner));
+            $joiner->driver()->nodes()->start();
+        }
+
+        $this->tasks->await($joiner, $run, 'ready', 'waiting for the node', fn (string $key): Operation => $joiner->driver()->nodes()->ready($key, expectPrimary: false));
 
         $existing->each(function (DatabaseNode $node) use ($database): void {
             $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
@@ -39,10 +48,10 @@ final readonly class JoinNode
 
         if ($existing->count() === 1) {
             $peer = $existing->sole();
-            $this->tasks->await($peer, 'enabling the cluster', fn (string $key): Operation => $peer->driver()->cluster()->enable($key));
+            $this->tasks->await($peer, $run, 'enable', 'enabling the cluster', fn (string $key): Operation => $peer->driver()->cluster()->enable($key));
         }
 
-        $this->tasks->await($joiner, 'copying the data', fn (string $key): Operation => $joiner->driver()->cluster()->enable($key));
+        $this->tasks->await($joiner, $run, 'copy', 'copying the data', fn (string $key): Operation => $joiner->driver()->cluster()->enable($key));
         $database->matchModeToMembers();
         $this->refresh->handle($database);
         $database->markReady();

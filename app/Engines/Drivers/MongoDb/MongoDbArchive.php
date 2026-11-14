@@ -24,7 +24,7 @@ final readonly class MongoDbArchive implements Archive
         $saved = $this->configuration->savedRequestOf();
 
         if ($saved->archive === null || $saved->secrets->agent === null) {
-            throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
+            throw new EngineUnsupported('this engine does not implement "archive status"');
         }
 
         $reply = $this->driver->read('engines.mongodb.archive.status', timeout: 900, env: [
@@ -54,7 +54,7 @@ final readonly class MongoDbArchive implements Archive
         $saved = $this->configuration->savedRequestOf();
 
         if ($saved->archive === null || $saved->secrets->agent === null) {
-            throw new EngineBusy('busy', 'configure archive on this database before restoring into it');
+            throw new EngineBusy('configure archive on this database before restoring into it');
         }
 
         return $this->driver->task($key, 'engines.mongodb.restore.start', env: [

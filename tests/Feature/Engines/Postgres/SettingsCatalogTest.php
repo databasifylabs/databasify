@@ -40,14 +40,11 @@ it('accepts valid values of every kind', function () {
     PostgresSettings::catalogFor('18')->check(['work_mem' => '8MB', 'random_page_cost' => '1.1', 'jit' => 'off', 'timezone' => 'Asia/Dhaka', 'max_slot_wal_keep_size' => '-1', 'statement_timeout' => '5000']);
 })->throwsNoExceptions();
 
-it('lets user settings win over tuned ones and reports where each came from', function () {
+it('lets user settings win over tuned ones', function () {
     $catalog = PostgresSettings::catalogFor('18');
     $tuned = ['work_mem' => '8MB', 'shared_buffers' => '1024MB'];
     $user = ['work_mem' => '16MB'];
 
     expect($catalog->effective($tuned, $user))->toBe(['work_mem' => '16MB', 'shared_buffers' => '1024MB'])
-        ->and($catalog->sourceOf('work_mem', $tuned, $user))->toBe('user')
-        ->and($catalog->sourceOf('shared_buffers', $tuned, $user))->toBe('tuned')
-        ->and($catalog->sourceOf('jit', $tuned, $user))->toBe('default')
         ->and($catalog->restartChanged(['shared_buffers' => '512MB'], $tuned, $user))->toBe(['shared_buffers']);
 });

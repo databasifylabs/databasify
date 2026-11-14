@@ -127,7 +127,7 @@ it('sizes the Horizon workers with the overrides set in .env', function () {
     $output = installerScript('horizon_step', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(2, 4096), 'DATABASIFY_YES' => 'true'])->output();
 
     expect($output)->toBe("    ✓ Horizon workers updated for 4 CPUs and 4096 MB\n")
-        ->and(file_get_contents("$dir/.env"))->toContain('HORIZON_DEFAULT_MAX_PROCESSES=11', 'HORIZON_SSH_MAX_PROCESSES=24');
+        ->and(file_get_contents("$dir/.env"))->toContain('HORIZON_DEFAULT_MAX_PROCESSES=10', 'HORIZON_SSH_MAX_PROCESSES=23');
 });
 
 it('keeps reading the piped script after asking Docker about the storage volume', function () {
@@ -190,17 +190,17 @@ it('gives a 1 GB server one worker per queue', function () {
 
     installerScript('horizon_step', ['DATABASIFY_DIR' => $dir, 'HOST_ROOT' => fakeHost(1, 1024)]);
 
-    expect(file_get_contents("$dir/.env"))->toBe("HORIZON_DEFAULT_MAX_PROCESSES=2\nHORIZON_SSH_MAX_PROCESSES=4\n");
+    expect(file_get_contents("$dir/.env"))->toBe("HORIZON_DEFAULT_MAX_PROCESSES=2\nHORIZON_SSH_MAX_PROCESSES=3\n");
 });
 
-it('removes the worker settings of the retired queue groups', function () {
-    $retired = "HORIZON_MONITORING_MAX_PROCESSES=4\nHORIZON_PROVISIONING_MAX_PROCESSES=4\nHORIZON_DATABASES_MAX_PROCESSES=6\nHORIZON_MIGRATIONS_MAX_PROCESSES=4\nHORIZON_TERMINALS_MAX_PROCESSES=3\nHORIZON_DATABASES_MIN_PROCESSES=2\n";
-    $dir = updateDirectory("APP_NAME=Databasify\n{$retired}HORIZON_DEFAULT_MAX_PROCESSES=6\n", '');
+it('removes the worker settings of the retired queue groups and keeps the terminals supervisor', function () {
+    $retired = "HORIZON_MONITORING_MAX_PROCESSES=4\nHORIZON_PROVISIONING_MAX_PROCESSES=4\nHORIZON_DATABASES_MAX_PROCESSES=6\nHORIZON_MIGRATIONS_MAX_PROCESSES=4\nHORIZON_DATABASES_MIN_PROCESSES=2\n";
+    $dir = updateDirectory("APP_NAME=Databasify\n{$retired}HORIZON_TERMINALS_MAX_PROCESSES=3\nHORIZON_DEFAULT_MAX_PROCESSES=6\n", '');
 
     $output = installerScript('. "$SOURCE/update.sh" --functions-only; LOG=/dev/null; retired_workers_step', ['DATABASIFY_DIR' => $dir])->output();
 
     expect($output)->toContain('✓ Old Horizon worker settings removed')
-        ->and(file_get_contents("$dir/.env"))->toBe("APP_NAME=Databasify\nHORIZON_DEFAULT_MAX_PROCESSES=6\n");
+        ->and(file_get_contents("$dir/.env"))->toBe("APP_NAME=Databasify\nHORIZON_TERMINALS_MAX_PROCESSES=3\nHORIZON_DEFAULT_MAX_PROCESSES=6\n");
 });
 
 it('prints nothing when no retired worker setting is left', function () {

@@ -53,8 +53,8 @@ it('applies settings with config sync once and config apply on every node', func
 
     resolve(UpdateDatabaseConfig::class)->handle($database, ['max_connections' => '200']);
 
-    expect(commandsSentTo($primary, $ssh))->toBe(['nodes.configure', 'config.sync', 'config.apply', 'config.pendingRestart', 'nodes.status'])
-        ->and(commandsSentTo($standby, $ssh))->toBe(['nodes.configure', 'config.apply', 'nodes.status'])
+    expect(commandsSentTo($primary, $ssh))->toBe(['nodes.configure', 'config.sync', 'config.apply', 'config.pendingRestart', 'task.status', 'nodes.status'])
+        ->and(commandsSentTo($standby, $ssh))->toBe(['nodes.configure', 'config.apply', 'task.status', 'nodes.status'])
         ->and($database->fresh()->settings->config)->toBe(['max_connections' => '200'])
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
@@ -92,6 +92,6 @@ it('retunes every node and restarts only when the engine asks for it', function 
 
     resolve(RetuneDatabase::class)->handle($database);
 
-    expect(commandsSentTo($database->seed()->server, $ssh))->toBe(['nodes.configure', 'config.tune', 'config.apply', 'nodes.status'])
+    expect(commandsSentTo($database->seed()->server, $ssh))->toBe(['nodes.configure', 'config.tune', 'config.apply', 'task.status', 'nodes.status'])
         ->and($database->fresh()->retune_needed_at)->toBeNull();
 });

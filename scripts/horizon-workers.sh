@@ -77,9 +77,9 @@ horizon_workers() {
     stack_mb=${DATABASIFY_STACK_MB:-200}
     process_mb=${DATABASIFY_PHP_PROCESS_MB:-45}
     worker_mb=${DATABASIFY_WORKER_RSS_MB:-90}
-    groups="DEFAULT:35:3:40:2 SSH:75:9:112:4"
+    groups="DEFAULT:35:3:40:2 SSH:75:9:112:3"
 
-    horizon_mb=$(( (1 + 2) * process_mb ))
+    horizon_mb=$(( (1 + 3) * process_mb ))
     headroom_mb=$(( memory_mb * 15 / 100 ))
     available_mb=$(( memory_mb - reserve_mb - stack_mb - headroom_mb - horizon_mb ))
     [ "$available_mb" -lt 0 ] && available_mb=0

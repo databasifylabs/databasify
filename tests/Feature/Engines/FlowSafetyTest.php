@@ -19,7 +19,7 @@ it('never confirms the other nodes are down on the owner behalf and refuses an u
     $ssh = fakeSsh();
     $database->nodes->each(fn ($node) => answerNodeStatus($ssh, $node->server, 'offline'));
     fakeEngine($ssh);
-    answerRead('cluster.quorum', fn () => throw new EngineUnavailable('unavailable', 'not yet'));
+    answerRead('cluster.quorum', fn () => throw new EngineUnavailable('not yet'));
 
     expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'could not read');
 });

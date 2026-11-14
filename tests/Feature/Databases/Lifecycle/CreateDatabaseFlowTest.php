@@ -56,7 +56,7 @@ it('creates a single node through the create flow', function () {
     $database = createThroughFlow('postgres', 1);
 
     expect(commandsOn($database->seed()->server, engineCommandsIn($ssh)))->toBe([
-        'host deploy', 'engine info', 'nodes.installTls', 'config.fields', 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', 'nodes.bootstrap', 'logs read', 'nodes.status',
+        'task.status', 'host deploy', 'engine info', 'nodes.installTls', 'config.fields', 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', 'nodes.bootstrap', 'logs read', 'nodes.status',
     ])
         ->and($database->status)->toBe(DatabaseStatus::Ready);
 });
@@ -68,7 +68,7 @@ it('creates a three node cluster and enables every member', function () {
     $commands = engineCommandsIn($ssh);
 
     $database->nodes->each(fn (DatabaseNode $node) => expect(commandsOn($node->server, $commands))->toBe([
-        'host deploy', 'engine info', 'nodes.installTls', ...($node->isSeed() ? ['config.fields'] : []), 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', 'nodes.bootstrap', 'cluster.enable', 'task.status', ...($node->isSeed() ? ['logs read'] : []), 'nodes.status',
+        'task.status', 'host deploy', 'engine info', 'nodes.installTls', ...($node->isSeed() ? ['config.fields'] : []), 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', ...($node->isSeed() ? ['task.status'] : []), 'nodes.bootstrap', 'cluster.enable', 'task.status', ...($node->isSeed() ? ['logs read'] : []), 'nodes.status',
     ]));
     expect(array_search("{$database->nodes[2]->server->name}: nodes.ready", $commands, true))->toBeLessThan(array_search("{$database->nodes[0]->server->name}: nodes.bootstrap", $commands, true))
         ->and($database->status)->toBe(DatabaseStatus::Ready);
@@ -125,7 +125,7 @@ it('treats node bootstrap as done on an engine without accounts', function () {
 it('cleans up every node when a prepare step fails', function () {
     $servers = Server::factory()->ready()->count(2)->create();
     $ssh = fakeEngine();
-    answerRead('nodes.start', fn () => throw new EngineError('internal', 'the engine did not start'), $servers[1]);
+    answerRead('nodes.start', fn () => throw new EngineError('the engine did not start'), $servers[1]);
 
     $database = runOperation(fn (): Database => inProjectDuring(fn (): Database => resolve(CreateDatabase::class)->handle(new NewDatabase('main', 'postgres', $servers[0]->id, [$servers[1]->id]))))->fresh();
 
@@ -160,8 +160,8 @@ it('maps node status roles', function (Closure $reply, NodeRole $role) {
     'primary' => [fn (): NodeStatus => NodeStatus::reported(NodeRole::Primary, '18.6'), NodeRole::Primary],
     'replica' => [fn (): NodeStatus => NodeStatus::reported(NodeRole::Replica, '18.6'), NodeRole::Replica],
     'offline' => [fn (): NodeStatus => NodeStatus::reported(NodeRole::Offline, null), NodeRole::Offline],
-    'container stopped' => [fn () => throw new EngineNotRunning('not_running', 'stopped'), NodeRole::Offline],
-    'unreachable' => [fn () => throw new EngineUnavailable('unavailable', 'not yet'), NodeRole::Unknown],
+    'container stopped' => [fn () => throw new EngineNotRunning('stopped'), NodeRole::Offline],
+    'unreachable' => [fn () => throw new EngineUnavailable('not yet'), NodeRole::Unknown],
 ]);
 
 it('restores to a point in time through the create flow before checking the accounts', function () {

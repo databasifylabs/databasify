@@ -65,7 +65,7 @@ it('adds a node in the documented order', function () {
     addThroughFlow($database, $server);
     $commands = engineCommandsIn($ssh);
 
-    expect(sentTo($server, $ssh))->toBe(['host deploy', 'engine info', 'nodes.installTls', 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', 'cluster.enable', 'task.status', 'nodes.status'])
+    expect(sentTo($server, $ssh))->toBe(['task.status', 'host deploy', 'engine info', 'nodes.installTls', 'nodes.configure', 'nodes.start', 'nodes.ready', 'task.status', 'cluster.enable', 'task.status', 'nodes.status'])
         ->and($existing->map(fn (Server $peer): array => sentTo($peer, $ssh))->all())->each->toBe(['nodes.configure', 'cluster.membership', 'nodes.status'])
         ->and(array_search("{$existing[0]->name}: cluster.membership", $commands, true))->toBeGreaterThan(array_search("{$server->name}: nodes.ready", $commands, true))
         ->and(argsOn($existing[0], 'cluster.membership')[0])->toHaveCount(3)
@@ -167,7 +167,7 @@ it('redeploys a cluster member and rejoins it', function () {
     $database->markBusy(DatabaseStatus::Scaling);
     runOperation(fn () => dispatch(new RedeployNodeJob($database, $standby)));
 
-    expect(sentTo($standby->server, $ssh))->toBe(['host deploy', 'engine info', 'nodes.installTls', 'nodes.ready', 'task.status', 'cluster.rejoin', 'task.status', 'nodes.status']);
+    expect(sentTo($standby->server, $ssh))->toBe(['task.status', 'host deploy', 'engine info', 'nodes.installTls', 'nodes.ready', 'task.status', 'cluster.rejoin', 'task.status', 'nodes.status']);
 });
 
 it('reboots standbys first, fails over, then reboots the former primary', function () {

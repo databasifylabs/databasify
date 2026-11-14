@@ -27,7 +27,7 @@ final readonly class MySqlFamilyArchive implements Archive
     public function status(bool $backUpNow): ArchiveStatus
     {
         $engine = $this->driver->engine();
-        $archive = $this->configuration->savedRequestOf()->archive ?? throw new EngineUnsupported('unsupported', 'this engine does not implement "archive status"');
+        $archive = $this->configuration->savedRequestOf()->archive ?? throw new EngineUnsupported('this engine does not implement "archive status"');
         $backupUnit = $engine->archiveUnits()['backup'];
 
         $reply = $this->scripts->read($this->driver, 'engines.mysql-family.archive.status', [

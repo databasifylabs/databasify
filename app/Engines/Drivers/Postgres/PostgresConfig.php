@@ -51,7 +51,7 @@ final readonly class PostgresConfig implements Config
 
     public function tune(): array
     {
-        $config = $this->configuration->savedConfig() ?? throw new EngineBusy('busy', 'run node configure first');
+        $config = $this->configuration->savedConfig() ?? throw new EngineBusy('run node configure first');
         $catalog = $this->configuration->catalog();
         $previous = $this->tunedOf($config);
         $tuned = $catalog->tuned(NodeState::selfOf($config));

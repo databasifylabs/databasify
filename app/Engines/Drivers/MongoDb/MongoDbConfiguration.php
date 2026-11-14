@@ -28,11 +28,11 @@ final readonly class MongoDbConfiguration
     public function configure(NodeConfig $request): void
     {
         if ($request->secrets->admin === null || $request->secrets->replication === null) {
-            throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin and replication secrets');
+            throw new InvalidEngineRequest('MongoDB needs the admin and replication secrets');
         }
 
         if (count($request->members) > self::MAX_REPLICA_SET) {
-            throw new InvalidEngineRequest('invalid_request', sprintf('a MongoDB replica set has at most %d members; got %d', self::MAX_REPLICA_SET, count($request->members)));
+            throw new InvalidEngineRequest(sprintf('a MongoDB replica set has at most %d members; got %d', self::MAX_REPLICA_SET, count($request->members)));
         }
 
         $catalog = MongoDbSettings::catalog();
@@ -57,7 +57,7 @@ final readonly class MongoDbConfiguration
 
     public function savedRequestOf(): NodeConfig
     {
-        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
+        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('run node configure first');
     }
 
     /**

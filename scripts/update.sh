@@ -49,7 +49,7 @@ use_bundled_services() {
     step_result 'Redis and Reverb now run inside the app container'
 }
 
-RETIRED_WORKERS='^HORIZON_(MONITORING|PROVISIONING|DATABASES|MIGRATIONS|TERMINALS)_(MAX|MIN)_PROCESSES='
+RETIRED_WORKERS='^HORIZON_(MONITORING|PROVISIONING|DATABASES|MIGRATIONS)_(MAX|MIN)_PROCESSES='
 
 remove_retired_workers() {
     local file

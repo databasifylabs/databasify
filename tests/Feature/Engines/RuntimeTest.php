@@ -87,8 +87,8 @@ it('maps every engine error code to its exception', function (string $code, stri
     fakeSsh()->respondToEngine('engine info', ['error' => ['code' => $code, 'message' => 'refused', 'details' => (object) []]], exit: 1);
 
     expect(fn () => resolve(Runtime::class)->engineInfo(engineNode()))
-        ->toThrow(function (EngineError $error) use ($code, $exception): void {
-            expect($error)->toBeInstanceOf($exception)->errorCode->toBe($code)->getMessage()->toBe('refused');
+        ->toThrow(function (EngineError $error) use ($exception): void {
+            expect($error)->toBeInstanceOf($exception)->getMessage()->toBe('refused');
         });
 })->with([
     ['invalid_request', InvalidEngineRequest::class],

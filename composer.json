@@ -31,8 +31,7 @@
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
         "nunomaduro/essentials": "^1.2",
-        "phpseclib/phpseclib": "^3.0",
-        "spatie/fork": "^1.2"
+        "phpseclib/phpseclib": "^3.0"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.7",

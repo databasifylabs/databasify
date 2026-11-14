@@ -8,13 +8,6 @@ use RuntimeException;
 
 class EngineError extends RuntimeException
 {
-    final public function __construct(
-        public readonly string $errorCode,
-        string $message,
-    ) {
-        parent::__construct($message);
-    }
-
     public static function fromReply(string $errorCode, string $message): self
     {
         $exception = match ($errorCode) {
@@ -28,6 +21,6 @@ class EngineError extends RuntimeException
             default => self::class,
         };
 
-        return new $exception($errorCode, $message);
+        return new $exception($message);
     }
 }

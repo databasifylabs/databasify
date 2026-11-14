@@ -17,12 +17,12 @@ final readonly class RedeployNode
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database, DatabaseNode $node): void
+    public function handle(Database $database, DatabaseNode $node, string $run): void
     {
-        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary): void {
+        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($run): void {
             $this->deploy->handle($node->database, $node);
-            $this->rolling->backOnline($node, $expectPrimary);
-        }, only: $node);
+            $this->rolling->backOnline($node, $run, $expectPrimary);
+        }, $run, only: $node);
 
         $this->refresh->handle($database);
         $database->markReady();

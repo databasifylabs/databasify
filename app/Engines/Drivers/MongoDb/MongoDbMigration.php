@@ -57,7 +57,7 @@ final readonly class MongoDbMigration implements Migration
     {
         $databases = $start->databases === [] ? $this->check($start->source, [])->databases : $start->databases;
         $sourceUri = MongoDbFiles::sourceUriOf($start->source);
-        $admin = Secrets::of($this->driver->node->database->settings)->admin ?? throw new InvalidEngineRequest('invalid_request', 'MongoDB needs the admin secret');
+        $admin = Secrets::of($this->driver->node->database->settings)->admin ?? throw new InvalidEngineRequest('MongoDB needs the admin secret');
         $targetUri = MongoDbFiles::localUriOf($admin);
 
         $this->driver->run('engines.mongodb.migration.start', env: [

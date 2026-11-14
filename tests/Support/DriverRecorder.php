@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Contracts\Ssh\ServerConnection;
+use App\Engines\Data\Operation;
+use App\Exceptions\Engines\EngineNotFound;
 use App\Models\DatabaseNode;
 use Closure;
 
@@ -14,6 +16,11 @@ final class DriverRecorder
      * @var list<array{call: string, server: string, args: list<mixed>, at: int}>
      */
     public array $calls = [];
+
+    /**
+     * @var list<string>
+     */
+    public array $started = [];
 
     /**
      * @var array<string, mixed>
@@ -34,9 +41,19 @@ final class DriverRecorder
     {
         $server = $node->server->name;
         $this->calls[] = ['call' => $call, 'server' => $server, 'args' => $args, 'at' => $this->sshRuns()];
-        $answer = $this->answers[$this->keyOf($call, $server)] ?? $this->answers[$this->keyOf($call, null)] ?? $default;
 
-        return $answer instanceof Closure ? $answer(...$args) : $answer;
+        if ($call === 'task.status' && ! in_array($args[0], $this->started, true)) {
+            throw new EngineNotFound("no task with key {$args[0]}");
+        }
+
+        $answer = $this->answers[$this->keyOf($call, $server)] ?? $this->answers[$this->keyOf($call, null)] ?? $default;
+        $result = $answer instanceof Closure ? $answer(...$args) : $answer;
+
+        if ($result instanceof Operation && ! str_starts_with($call, 'task.') && $result->key === ($args[0] ?? null)) {
+            $this->started[] = $result->key;
+        }
+
+        return $result;
     }
 
     /**

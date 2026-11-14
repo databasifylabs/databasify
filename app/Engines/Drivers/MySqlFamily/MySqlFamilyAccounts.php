@@ -71,7 +71,7 @@ final readonly class MySqlFamilyAccounts implements Accounts
         $encryption = $requested ?? $engine->defaultEncryption;
 
         if (! in_array($encryption, $engine->encryptionsOn($this->driver->node->database->version_line), true)) {
-            throw new InvalidEngineRequest('invalid_request', 'password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
+            throw new InvalidEngineRequest('password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
         }
 
         [$by, $close] = $engine->identifiedWith($encryption);
@@ -103,7 +103,7 @@ final readonly class MySqlFamilyAccounts implements Accounts
     {
         foreach ($names as $name) {
             if (in_array($name, $reserved, true)) {
-                throw new InvalidEngineRequest('invalid_request', "{$name} is reserved");
+                throw new InvalidEngineRequest("{$name} is reserved");
             }
         }
     }

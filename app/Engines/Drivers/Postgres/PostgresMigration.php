@@ -33,11 +33,11 @@ final readonly class PostgresMigration implements Migration
     public function start(MigrationStart $start): void
     {
         if ($start->owner === null) {
-            throw new InvalidEngineRequest('invalid_request', 'PostgreSQL migrations need an owner');
+            throw new InvalidEngineRequest('PostgreSQL migrations need an owner');
         }
 
         if ($start->continuous) {
-            throw new InvalidEngineRequest('invalid_request', 'continuous PostgreSQL migrations need a publication');
+            throw new InvalidEngineRequest('continuous PostgreSQL migrations need a publication');
         }
 
         $this->driver->run('engines.postgres.migration.start', $this->driver->data(), env: [

@@ -19,11 +19,11 @@ final readonly class Payload
         try {
             $values = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            throw new EngineError('internal', 'The engine replied with something that is not JSON.');
+            throw new EngineError('The engine replied with something that is not JSON.');
         }
 
         if (! is_array($values)) {
-            throw new EngineError('internal', 'The engine replied with something that is not a JSON object.');
+            throw new EngineError('The engine replied with something that is not a JSON object.');
         }
 
         return new self($values);
@@ -158,6 +158,6 @@ final readonly class Payload
 
     private function unexpected(string $key): EngineError
     {
-        return new EngineError('internal', "The engine replied without a valid {$key}.");
+        return new EngineError("The engine replied without a valid {$key}.");
     }
 }

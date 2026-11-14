@@ -17,7 +17,7 @@ final class ServerLogQuery extends Query
 {
     public const int PER_PAGE = 30;
 
-    private const array LIST_COLUMNS = ['id', 'server_id', 'database_id', 'group_id', 'group_name', 'name', 'status', 'exit_code', 'created_at', 'updated_at'];
+    private const array LIST_COLUMNS = ['id', 'server_id', 'database_id', 'name', 'status', 'exit_code', 'created_at', 'updated_at'];
 
     private function __construct(private readonly Server|Database|null $owner) {}
 

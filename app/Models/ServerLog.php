@@ -25,8 +25,6 @@ use Throwable;
  * @property string $id
  * @property string $server_id
  * @property string|null $database_id
- * @property string|null $group_id
- * @property string|null $group_name
  * @property string $name
  * @property ServerLogStatus $status
  * @property string|null $output
@@ -36,7 +34,7 @@ use Throwable;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'database_id', 'group_id', 'group_name', 'name', 'status', 'output', 'exit_code'])]
+#[Fillable(['server_id', 'database_id', 'name', 'status', 'output', 'exit_code'])]
 #[UseFactory(ServerLogFactory::class)]
 class ServerLog extends Model
 {
@@ -98,12 +96,6 @@ class ServerLog extends Model
     {
         $this->buffer(self::noteOf($message));
         $this->saveOutput(['status' => ServerLogStatus::Failed]);
-    }
-
-    public function skip(string $reason): void
-    {
-        $this->buffer(self::noteOf("Skipped: {$reason}"));
-        $this->saveOutput(['status' => ServerLogStatus::Succeeded]);
     }
 
     public function failBecauseOf(?Throwable $exception): void

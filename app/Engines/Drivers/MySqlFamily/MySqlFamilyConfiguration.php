@@ -96,7 +96,7 @@ final readonly class MySqlFamilyConfiguration
 
     public function savedRequestOf(): NodeConfig
     {
-        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('busy', 'run node configure first');
+        return $this->state->requestOf($this->driver, self::REQUEST_STATE) ?? throw new EngineBusy('run node configure first');
     }
 
     /**
@@ -133,7 +133,7 @@ final readonly class MySqlFamilyConfiguration
         };
 
         if ($missing !== null) {
-            throw new InvalidEngineRequest('invalid_request', $missing);
+            throw new InvalidEngineRequest($missing);
         }
     }
 

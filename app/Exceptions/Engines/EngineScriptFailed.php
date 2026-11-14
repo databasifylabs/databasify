@@ -10,6 +10,6 @@ final class EngineScriptFailed extends EngineError
     {
         $lines = array_values(array_filter(explode("\n", $stderr), fn (string $line): bool => trim($line) !== ''));
 
-        return new self('script_failed', "{$script} exited {$exit}: ".(end($lines) ?: 'no error output'));
+        return new self("{$script} exited {$exit}: ".(end($lines) ?: 'no error output'));
     }
 }

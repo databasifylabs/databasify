@@ -10,7 +10,6 @@ use App\Actions\Databases\Recovery\DeleteArchive;
 use App\Engines\Runtime\Runtime;
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use App\Services\Databases\NodeRunner;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -22,15 +21,13 @@ final readonly class TearDownDatabase
         private RemoveNodeFirewall $firewall,
         private ClearDatabaseDns $dns,
         private DeleteArchive $archive,
-        private NodeRunner $nodeRunner,
         private Runtime $runtime,
     ) {}
 
     public function handle(Database $database, bool $eraseData, bool $force, bool $deleteBackups = false): void
     {
         $nodes = $database->nodesWithServers();
-        $this->nodeRunner->each(
-            $nodes,
+        $nodes->each(
             function (DatabaseNode $node) use ($database, $eraseData, $force): void {
                 try {
                     $this->runtime->remove($node, $eraseData);
@@ -40,7 +37,6 @@ final readonly class TearDownDatabase
                     report($exception);
                 }
             },
-            "tearing down {$nodes->count()} nodes",
         );
 
         $recovery = $database->pointInTimeRecovery;

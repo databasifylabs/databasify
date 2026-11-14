@@ -10,10 +10,12 @@ use App\Models\Server;
 use App\Services\Ssh\TerminalSession;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Connection;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 
+#[Connection('terminals')]
 #[Queue(QueueGroup::Terminals)]
 #[Tries(1)]
 #[Timeout(7260)]

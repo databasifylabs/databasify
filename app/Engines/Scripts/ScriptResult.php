@@ -30,7 +30,7 @@ final readonly class ScriptResult
     private function wholeOutput(): Payload
     {
         if (trim($this->stdout) === '') {
-            throw new EngineScriptFailed('script_failed', "{$this->script} printed nothing to read.");
+            throw new EngineScriptFailed("{$this->script} printed nothing to read.");
         }
 
         return Payload::decode($this->stdout);

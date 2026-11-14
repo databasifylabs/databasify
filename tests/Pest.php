@@ -97,7 +97,7 @@ function inProject(): Project
 function inProjectDuring(Closure $callback): mixed
 {
     $context = resolve(ProjectContext::class);
-    $wasInitialized = $context->isInitialized();
+    $wasInitialized = $context->project() !== null;
     inProject();
 
     try {
@@ -239,6 +239,11 @@ function useRecordingDrivers(): DriverRecorder
     return $recorder;
 }
 
+function startedTask(string $key): void
+{
+    useRecordingDrivers()->started[] = $key;
+}
+
 /**
  * @return list<string>
  */
@@ -264,7 +269,7 @@ function answerRead(string $call, mixed $answer, ?Server $server = null): Driver
 
 function answerNodeStatus(FakeServerConnection $ssh, Server $server, ?string $role, ?string $version = null): FakeServerConnection
 {
-    answerRead('nodes.status', fn (): NodeStatus => $role === null ? throw new EngineUnavailable('unavailable', 'unreachable') : NodeStatus::reported(NodeRole::from($role), $version), $server);
+    answerRead('nodes.status', fn (): NodeStatus => $role === null ? throw new EngineUnavailable('unreachable') : NodeStatus::reported(NodeRole::from($role), $version), $server);
 
     return $ssh;
 }

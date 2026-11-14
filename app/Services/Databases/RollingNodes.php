@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Databases;
 
 use App\Engines\Data\Operation;
+use App\Enums\Databases\NodeRole;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Closure;
@@ -16,7 +17,7 @@ final readonly class RollingNodes
     /**
      * @param  Closure(DatabaseNode, bool): mixed  $work
      */
-    public function each(Database $database, Closure $work, bool $failover = true, ?DatabaseNode $only = null): void
+    public function each(Database $database, Closure $work, string $run, bool $failover = true, ?DatabaseNode $only = null, bool $resumable = true): void
     {
         $nodes = $database->nodesWithServers();
         $primary = $database->primaryOrSeed();
@@ -30,31 +31,43 @@ final readonly class RollingNodes
             }
 
             $isPrimary = $node->is($primary);
+            $expectPrimary = $isPrimary && $standby === null;
 
-            if ($isPrimary && $standby !== null) {
+            if ($resumable && $this->tasks->started($node, $run, 'ready')) {
+                $this->backOnline($node, $run, $expectPrimary);
+
+                continue;
+            }
+
+            if ($isPrimary && $standby !== null && $node->driver()->nodes()->status()->role === NodeRole::Primary) {
                 $node->driver()->cluster()->failover($standby->privateIp());
             }
 
-            $work($node, $isPrimary && $standby === null);
+            $work($node, $expectPrimary);
         }
     }
 
-    public function restart(Database $database): void
+    public function begun(Database $database, string $run): bool
     {
-        $this->each($database, function (DatabaseNode $node, bool $expectPrimary): void {
-            $node->driver()->nodes()->restart();
-            $this->backOnline($node, $expectPrimary);
-        });
+        return $database->nodesWithServers()->contains(fn (DatabaseNode $node): bool => $this->tasks->started($node, $run, 'ready'));
     }
 
-    public function backOnline(DatabaseNode $node, bool $expectPrimary): void
+    public function restart(Database $database, string $run): void
     {
-        $this->tasks->await($node, 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, $expectPrimary));
+        $this->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($run): void {
+            $node->driver()->nodes()->restart();
+            $this->backOnline($node, $run, $expectPrimary);
+        }, $run);
+    }
+
+    public function backOnline(DatabaseNode $node, string $run, bool $expectPrimary): void
+    {
+        $this->tasks->await($node, $run, 'ready', 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, $expectPrimary));
 
         if (! $node->database->isClustered()) {
             return;
         }
 
-        $this->tasks->await($node, 'rejoining the cluster', fn (string $key): Operation => $node->driver()->cluster()->rejoin($key, $node->isReadOnly()));
+        $this->tasks->await($node, $run, 'rejoin', 'rejoining the cluster', fn (string $key): Operation => $node->driver()->cluster()->rejoin($key, $node->isReadOnly()));
     }
 }

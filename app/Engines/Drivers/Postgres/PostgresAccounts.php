@@ -83,7 +83,7 @@ final readonly class PostgresAccounts implements Accounts
     private function refuseReservedAccount(string $name, array $grants): void
     {
         if (str_starts_with($name, self::RESERVED_ROLE_PREFIX)) {
-            throw new InvalidEngineRequest('invalid_request', "{$name} is reserved");
+            throw new InvalidEngineRequest("{$name} is reserved");
         }
 
         $this->refuseReserved(self::RESERVED_USERS, $name);
@@ -97,7 +97,7 @@ final readonly class PostgresAccounts implements Accounts
     {
         foreach ($names as $name) {
             if (in_array($name, $reserved, true)) {
-                throw new InvalidEngineRequest('invalid_request', "{$name} is reserved");
+                throw new InvalidEngineRequest("{$name} is reserved");
             }
         }
     }
@@ -105,7 +105,7 @@ final readonly class PostgresAccounts implements Accounts
     private function rejectEncryption(?string $encryption): void
     {
         if ($encryption !== null) {
-            throw new InvalidEngineRequest('invalid_request', 'PostgreSQL has no password encryption choice');
+            throw new InvalidEngineRequest('PostgreSQL has no password encryption choice');
         }
     }
 

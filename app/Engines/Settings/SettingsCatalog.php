@@ -11,12 +11,6 @@ use Closure;
 
 final readonly class SettingsCatalog
 {
-    public const string SOURCE_USER = 'user';
-
-    public const string SOURCE_TUNED = 'tuned';
-
-    public const string SOURCE_DEFAULT = 'default';
-
     /**
      * @param  list<EngineField>  $fields
      * @param  Closure(Member): array<string, string>  $tune
@@ -37,11 +31,11 @@ final readonly class SettingsCatalog
             $field = $this->field($key);
 
             if ($field === null) {
-                throw new InvalidEngineRequest('invalid_request', "setting \"{$key}\" is not offered; config fields lists the settings");
+                throw new InvalidEngineRequest("setting \"{$key}\" is not offered; config fields lists the settings");
             }
 
             if (! Setting::allows($field, $value)) {
-                throw new InvalidEngineRequest('invalid_request', "setting \"{$key}\" does not accept \"{$value}\"");
+                throw new InvalidEngineRequest("setting \"{$key}\" does not accept \"{$value}\"");
             }
         }
     }
@@ -71,19 +65,6 @@ final readonly class SettingsCatalog
     public function fieldsWith(array $tuned): array
     {
         return array_map(fn (EngineField $field): EngineField => array_key_exists($field->key, $tuned) ? $this->withDefault($field, $tuned[$field->key]) : $field, $this->fields);
-    }
-
-    /**
-     * @param  array<string, string>  $tuned
-     * @param  array<string, string>  $user
-     */
-    public function sourceOf(string $key, array $tuned, array $user): string
-    {
-        return match (true) {
-            array_key_exists($key, $user) => self::SOURCE_USER,
-            array_key_exists($key, $tuned) => self::SOURCE_TUNED,
-            default => self::SOURCE_DEFAULT,
-        };
     }
 
     /**

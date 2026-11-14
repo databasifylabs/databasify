@@ -8,6 +8,6 @@ final class EngineUnsupported extends EngineError
 {
     public static function command(string $command): self
     {
-        return new self('unsupported', "this engine does not implement \"{$command}\"");
+        return new self("this engine does not implement \"{$command}\"");
     }
 }

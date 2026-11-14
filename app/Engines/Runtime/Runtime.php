@@ -20,11 +20,15 @@ final readonly class Runtime
 
     private const int REMOVE_TIMEOUT = 1200;
 
+    private const int TASK_TIMEOUT = 60;
+
     private const int TRANSPORT_GRACE = 30;
 
     private const int INVALID_REQUEST = 64;
 
     private const int NOT_RUNNING = 69;
+
+    private const int BINARY_MISSING = 127;
 
     public function __construct(private ServerConnection $ssh) {}
 
@@ -46,17 +50,17 @@ final readonly class Runtime
 
     public function taskStatus(DatabaseNode $node, string $key): Operation
     {
-        return Operation::fromPayload($this->send($node, 'task status', ['key' => $key]));
+        return Operation::fromPayload($this->send($node, 'task status', ['key' => $key], self::TASK_TIMEOUT));
     }
 
     public function taskLog(DatabaseNode $node, string $key): string
     {
-        return $this->send($node, 'task log', ['key' => $key])->string('lines');
+        return $this->send($node, 'task log', ['key' => $key], self::TASK_TIMEOUT)->string('lines');
     }
 
     public function stopTask(DatabaseNode $node, string $key): Operation
     {
-        return Operation::fromPayload($this->send($node, 'task stop', ['key' => $key]));
+        return Operation::fromPayload($this->send($node, 'task stop', ['key' => $key], self::TASK_TIMEOUT));
     }
 
     public function getFile(DatabaseNode $node, string $path): ?string
@@ -111,8 +115,8 @@ final readonly class Runtime
 
     private function payloadOf(string $output, int $exitCode, Server $server): Payload
     {
-        if ($exitCode === self::NOT_RUNNING) {
-            throw new EngineNotRunning('not_running', "No engine container is running on {$server->name}.");
+        if ($exitCode === self::NOT_RUNNING || $exitCode === self::BINARY_MISSING) {
+            throw new EngineNotRunning("No engine container is running on {$server->name}.");
         }
 
         $payload = Payload::decode($output);
@@ -128,9 +132,9 @@ final readonly class Runtime
         }
 
         if ($exitCode === self::INVALID_REQUEST) {
-            throw new InvalidEngineRequest('invalid_request', "The engine on {$server->name} refused the request.");
+            throw new InvalidEngineRequest("The engine on {$server->name} refused the request.");
         }
 
-        throw new EngineError('internal', "The engine on {$server->name} failed with exit code {$exitCode}.");
+        throw new EngineError("The engine on {$server->name} failed with exit code {$exitCode}.");
     }
 }

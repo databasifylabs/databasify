@@ -7,24 +7,18 @@ namespace App\Actions\Databases\Monitoring;
 use App\DTOs\Metrics\NodeMetrics;
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use App\Services\Databases\NodeRunner;
 use App\Support\Ssh\KeyValueOutput;
 use Illuminate\Support\Collection;
 use Throwable;
 
 final readonly class ReadDatabaseMetrics
 {
-    public function __construct(
-        private NodeRunner $nodeRunner,
-    ) {}
-
     /**
      * @return Collection<int, NodeMetrics>
      */
     public function handle(Database $database): Collection
     {
-        return $this->nodeRunner->map(
-            $database->nodesWithServers(),
+        return $database->nodesWithServers()->map(
             function (DatabaseNode $node) use ($database): NodeMetrics {
                 try {
                     $engine = $database->runsSupportedSdk() ? $node->driver()->nodes()->metrics()->toValues() : [];
@@ -35,7 +29,6 @@ final readonly class ReadDatabaseMetrics
                     return NodeMetrics::unreachable($node);
                 }
             },
-            NodeMetrics::class,
         );
     }
 }

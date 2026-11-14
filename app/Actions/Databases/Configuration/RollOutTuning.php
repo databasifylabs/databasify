@@ -20,19 +20,19 @@ final readonly class RollOutTuning
         private RefreshDatabaseStatus $refresh,
     ) {}
 
-    public function handle(Database $database): void
+    public function handle(Database $database, string $run): void
     {
         $needsRestart = false;
 
-        $this->rolling->each($database, fn (DatabaseNode $node) => $this->facts->handle($node->server), failover: false);
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), failover: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $this->facts->handle($node->server), $run, failover: false, resumable: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false);
         $this->rolling->each($database, function (DatabaseNode $node) use (&$needsRestart): void {
             $needsRestart = $node->driver()->config()->tune() !== [] || $needsRestart;
             $node->driver()->config()->apply();
-        }, failover: false);
+        }, $run, failover: false, resumable: false);
 
-        if ($needsRestart) {
-            $this->rolling->restart($database);
+        if ($needsRestart || $this->rolling->begun($database, $run)) {
+            $this->rolling->restart($database, $run);
         }
 
         $database->markRetuned();
