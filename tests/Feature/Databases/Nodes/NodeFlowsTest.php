@@ -145,6 +145,20 @@ it('falls back to node reset when member forget is unsupported', function () {
         ->and(argsOn($staying->server, 'nodes.reset'))->toBe([1, [$primary->privateIp(), $staying->privateIp()]]);
 });
 
+it('leaves the cluster instead of resetting it when one member remains', function () {
+    $ssh = fakeEngine();
+    answerRead('cluster.forget', fn () => throw EngineUnsupported::command('member forget'));
+    $database = idleDatabase('valkey', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
+
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
+
+    expect(sentTo($staying->server, $ssh))->toBe(['nodes.status', 'nodes.configure', 'cluster.forget', 'cluster.disable', 'cluster.membership', 'nodes.status'])
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
+});
+
 it('fails over before removing the primary', function () {
     $ssh = fakeEngine();
     $database = idleDatabase('postgres', 3);

@@ -113,16 +113,6 @@ it('runs start, restart, reset and ready like Go', function () {
         ->assertRan('engines.sentinel.nodes.ready', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true' && str_contains($script, "echo 'Following the primary…'") && str_contains($script, "echo 'Waiting for TLS…'"));
 });
 
-it('turns the last node into a plain primary instead of waiting on a sentinel', function () {
-    $node = sentinelNode('valkey', 'valkey-standalone');
-
-    $node->driver()->nodes()->reset(0, ['10.0.0.1']);
-
-    expect($this->scripts->ran())->toBe(['engines.sentinel.cluster.disable']);
-    $this->scripts->assertRan('engines.sentinel.cluster.disable', fn (string $script): bool => str_contains($script, 'REPLICAOF NO ONE')
-        && str_contains($script, 'min-replicas-to-write 0'));
-});
-
 it('runs the cluster commands', function () {
     $node = sentinelNode('redis', 'redis-primary');
     $this->scripts->respond('engines.sentinel.cluster.quorum', ['total' => 3, 'online' => 3]);

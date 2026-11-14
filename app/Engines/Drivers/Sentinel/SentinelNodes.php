@@ -52,12 +52,6 @@ final readonly class SentinelNodes implements Nodes
 
     public function reset(int $peers, array $hosts): void
     {
-        if ($peers === 0) {
-            $this->scripts->run($this->driver, 'cluster.disable');
-
-            return;
-        }
-
         $this->scripts->run($this->driver, 'nodes.reset', ['PEERS' => (string) $peers, 'KEEP' => implode(' ', ['127.0.0.1', ...$hosts])], 180);
     }
 

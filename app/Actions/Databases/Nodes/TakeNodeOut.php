@@ -55,7 +55,11 @@ final readonly class TakeNodeOut
             try {
                 $node->driver()->cluster()->forget($leaving->privateIp());
             } catch (EngineUnsupported) {
-                $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
+                if ($remaining->hasSole()) {
+                    $node->driver()->cluster()->disable();
+                } else {
+                    $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
+                }
             }
 
             $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
