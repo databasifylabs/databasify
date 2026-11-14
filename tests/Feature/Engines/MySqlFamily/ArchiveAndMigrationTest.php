@@ -163,6 +163,14 @@ it('reads the migration progress and stops the copy', function (string $engine, 
     'mariadb' => ['mariadb', "'Error 1617 '"],
 ]);
 
+it('resets the migration channel on every member when it stops', function (string $engine) {
+    $nodes = idleDatabase($engine, 3, name: uniqid('db'))->nodes()->orderBy('position')->get();
+
+    $nodes->first()->driver()->migration()->stop('run.migration-stop', true);
+
+    expect(array_count_values($this->scripts->ran())['engines.mysql-family.migration.stop'])->toBe(3);
+})->with(['mysql', 'mariadb']);
+
 it('collects the source facts by running the real check script', function () {
     $local = localScripts()
         ->reply('SELECT @@version', '9.7.1')

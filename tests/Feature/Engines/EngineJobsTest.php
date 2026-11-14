@@ -150,7 +150,7 @@ it('skips the postgres backup on a standby', function () {
  * @param  array<string, string>  $stubs
  * @param  array<string, string>  $env
  * @param  array<string, int>  $modifiedAt
- * @return array{sql: string, commands: string, root: string}
+ * @return array{sql: string, commands: string, root: string, output: string}
  */
 function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = [], array $modifiedAt = [], bool $succeeds = true): array
 {
@@ -197,6 +197,7 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
         'sql' => File::exists("{$directory}/sql.log") ? File::get("{$directory}/sql.log") : '',
         'commands' => File::exists("{$directory}/commands.log") ? File::get("{$directory}/commands.log") : '',
         'root' => collect(File::allFiles($root))->map(fn (SplFileInfo $file): string => str($file->getPathname())->after("{$root}/")->value())->sort()->values()->implode("\n"),
+        'output' => $run->output(),
     ];
     File::deleteDirectory($directory);
 
@@ -250,12 +251,32 @@ it('follows the mysql source from the binlog position MySQL Shell copied at', fu
         ->toContain("REPLICATE_WILD_DO_TABLE = ('app.%', 'shop.%')");
 });
 
-it('creates no migration channel when MySQL Shell reports no binlog position', function () {
+it('creates no migration channel when MySQL Shell reports no usable binlog position', function (string $file) {
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.migration-copy', [], ['conf/admin.cnf' => "[client]\npassword=secret\n"], [
-        'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf -- \"---\\nDump_metadata:\\n  Binlog_file: ''\\n  Binlog_position: 0\\n\"\n",
+        'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf -- \"---\\nDump_metadata:\\n  Binlog_file: {$file}\\n  Binlog_position: 0\\n\"\n",
     ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'false', 'MIGRATION_DATABASES' => 'app', 'MIGRATION_CONTINUOUS' => 'true', 'MYSQLSH_URI' => 'm@10.0.0.9:3306'], succeeds: false);
 
     expect($run['sql'])->not->toContain('CHANGE REPLICATION SOURCE');
+})->with(['no file' => "''", 'position below the first event' => 'binlog.000001']);
+
+it('reports a stopped migration channel as a failed copy', function (string $engine, string $query, string $status, string $expected) {
+    $run = runFamilyJobLocally($engine, 'engines.mysql-family.migration.progress', [$query => $status], ['logs/.keep' => ''], [
+        'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
+    ], env: ['MIGRATION_UNIT' => "{$engine}-migration"]);
+
+    expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true))->toBe(['copy' => 'failed', 'log' => "the migration channel stopped: {$expected}", 'lagSeconds' => null]);
+})->with([
+    'mysql receiver' => ['mysql', 'replication_connection_status', "OFF\tON\t0\t0\tError 13114: Got fatal error 1236 from source", 'Error 13114: Got fatal error 1236 from source'],
+    'mysql applier' => ['mysql', 'replication_connection_status', "ON\tOFF\t0\t5\tError 3101: Plugin instructed the server to rollback", 'Error 3101: Plugin instructed the server to rollback'],
+    'mariadb' => ['mariadb', 'SHOW SLAVE', "Slave_IO_Running\tSlave_SQL_Running\tSeconds_Behind_Master\tLast_IO_Errno\tLast_IO_Error\tLast_SQL_Errno\tLast_SQL_Error\nNo\tYes\tNULL\t1236\tbinlog purged\t0\t", 'Error 1236: binlog purged'],
+]);
+
+it('reports a running migration channel as caught up', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.migration.progress', ['replication_connection_status' => "ON\tON\t1\t0\t"], ['logs/.keep' => ''], [
+        'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
+    ], env: ['MIGRATION_UNIT' => 'mysql-migration']);
+
+    expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true))->toBe(['copy' => 'succeeded', 'log' => '', 'lagSeconds' => 0]);
 });
 
 it('ships only closed binlogs', function () {

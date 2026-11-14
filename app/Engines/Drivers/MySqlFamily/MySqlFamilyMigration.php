@@ -12,6 +12,7 @@ use App\Engines\Data\MigrationStart;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Exceptions\Engines\InvalidEngineRequest;
+use App\Models\DatabaseNode;
 
 final readonly class MySqlFamilyMigration implements Migration
 {
@@ -97,7 +98,12 @@ final readonly class MySqlFamilyMigration implements Migration
 
     public function stop(string $key, bool $cutover): Operation
     {
-        return $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()]);
+        $env = ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()];
+        $operation = $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop', $env);
+        $this->driver->node->database->membersOtherThan($this->driver->node)
+            ->each(fn (DatabaseNode $member) => $member->driver()->run('engines.mysql-family.migration.stop', ['engine' => $this->driver->engine()], $env, timeout: 600));
+
+        return $operation;
     }
 
     /**

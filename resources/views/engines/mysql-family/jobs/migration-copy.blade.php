@@ -22,7 +22,7 @@ printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysql
 [ "$MIGRATION_CONTINUOUS" = true ] || exit 0
 binlog_file=$(sed -n "s/^[[:space:]]*Binlog_file:[[:space:]]*'\{0,1\}\([^']*\)'\{0,1\}[[:space:]]*$/\1/p" "$copy_log" | tail -n 1)
 binlog_position=$(sed -n 's/^[[:space:]]*Binlog_position:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$copy_log" | tail -n 1)
-if [ -z "$binlog_file" ] || [ -z "$binlog_position" ]; then
+if [ -z "$binlog_file" ] || [ -z "$binlog_position" ] || [ "$binlog_position" -lt 4 ]; then
     fail_task 'MySQL Shell reported no source binlog position to follow, grant the source user REPLICATION CLIENT'
 fi
 wild=''
