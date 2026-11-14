@@ -20,28 +20,15 @@ final readonly class ImportDnsZones
             throw ValidationException::withMessages(['provider' => "Could not list the domains: {$exception->getMessage()}"]);
         }
 
-        collect($zones)->each(fn (DnsZoneData $zone) => $this->keep($provider, $zone));
-        $this->forgetMissing($provider, $zones);
+        foreach ($zones as $zone) {
+            DnsZone::query()->updateOrCreate(['dns_provider_id' => $provider->id, 'name' => $zone->name], ['external_id' => $zone->externalId]);
+        }
 
-        return count($zones);
-    }
-
-    private function keep(DnsProvider $provider, DnsZoneData $zone): void
-    {
-        DnsZone::query()->updateOrCreate(
-            ['dns_provider_id' => $provider->id, 'name' => $zone->name],
-            ['external_id' => $zone->externalId],
-        );
-    }
-
-    /**
-     * @param  list<DnsZoneData>  $zones
-     */
-    private function forgetMissing(DnsProvider $provider, array $zones): void
-    {
         $provider->zones()
             ->whereNotIn('name', array_map(fn (DnsZoneData $zone): string => $zone->name, $zones))
             ->doesntHave('databases')
             ->delete();
+
+        return count($zones);
     }
 }

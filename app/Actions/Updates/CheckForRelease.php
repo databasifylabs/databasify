@@ -24,15 +24,8 @@ final readonly class CheckForRelease
             throw ValidationException::withMessages(['check' => 'Could not reach get.databasify.io to check for a new release. Try again later.']);
         }
 
-        $this->store($release);
+        Setting::query()->updateOrCreate(['name' => 'latest_release'], ['value' => $release->toJson()])->touch();
 
         return $release;
-    }
-
-    private function store(Release $release): void
-    {
-        Setting::query()
-            ->updateOrCreate(['name' => 'latest_release'], ['value' => $release->toJson()])
-            ->touch();
     }
 }

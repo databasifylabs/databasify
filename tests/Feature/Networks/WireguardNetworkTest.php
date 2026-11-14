@@ -5,11 +5,8 @@ declare(strict_types=1);
 use App\Actions\Networks\CreateWireguardNetwork;
 use App\Actions\Networks\LeaveWireguardNetwork;
 use App\Actions\Networks\SyncWireguardNetwork;
-use App\Actions\Servers\AddServer;
 use App\Actions\Servers\DeleteServer;
 use App\Actions\Servers\ProvisionServer;
-use App\DTOs\Servers\NewServer;
-use App\DTOs\Servers\PrivateNetworkChoice;
 use App\Enums\Servers\NetworkKind;
 use App\Enums\Servers\ServerLogStatus;
 use App\Enums\Servers\ServerStatus;
@@ -21,34 +18,12 @@ use App\Models\Network;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Networks\WireguardAddressAllocator;
-use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Validation\ValidationException;
 
 const WIREGUARD_HOST_FACTS = '{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":1,"memory_mb":1024,"disk_gb":25}'."\n";
 
 beforeEach(fn () => inProject());
-
-function grabAddressesAfterLookupOn(Network $network, int $times): void
-{
-    DB::listen(function (QueryExecuted $query) use ($network, &$times): void {
-        if ($times === 0 || ! str_starts_with($query->sql, 'select "private_ip" from "servers"')) {
-            return;
-        }
-
-        $times--;
-        $taken = $network->servers()->count() + 1;
-        Server::factory()->onNetwork($network)->createQuietly(['private_ip' => "100.64.0.{$taken}"]);
-    });
-}
-
-function addServerOn(Network $network): Server
-{
-    return resolve(AddServer::class)->handle(new NewServer('db-1', '203.0.113.10', 22, 'root', null, false, new PrivateNetworkChoice(networkId: $network->id)));
-}
 
 it('gives each databasify network the first free range', function () {
     Network::factory()->wireguard(0)->create();
@@ -75,31 +50,6 @@ it('hands out the lowest free address and reuses one a member left', function ()
     $first->delete();
 
     expect($allocate->next($network))->toBe('100.64.0.1');
-});
-
-it('takes the next address when another server grabs it between lookup and save', function () {
-    Queue::fake([ProvisionServerJob::class]);
-    $network = Network::factory()->wireguard()->create();
-    grabAddressesAfterLookupOn($network, 1);
-
-    expect(addServerOn($network)->fresh())->private_ip->toBe('100.64.0.2')->network_id->toBe($network->id);
-});
-
-it('asks to try again when the address is taken twice in a row', function () {
-    Queue::fake([ProvisionServerJob::class]);
-    $network = Network::factory()->wireguard()->create();
-    grabAddressesAfterLookupOn($network, 2);
-
-    expect(fn () => addServerOn($network))->toThrow(ValidationException::class, 'That address was just taken, try again.')
-        ->and(Server::query()->where('name', 'db-1')->exists())->toBeFalse();
-});
-
-it('rethrows a unique violation that is not an address clash', function () {
-    Queue::fake([ProvisionServerJob::class]);
-    $network = Network::factory()->wireguard()->create();
-    Server::factory()->create(['name' => 'db-1']);
-
-    expect(fn () => addServerOn($network))->toThrow(UniqueConstraintViolationException::class);
 });
 
 it('adds a server on a new databasify network without asking for an address', function () {

@@ -54,7 +54,7 @@ it('sends every nested database list as plain arrays with fixed keys', function 
 
 it('shares the list fields with the database page', function () {
     $database = databaseWithEveryRelation();
-    $fields = ['id', 'name', 'engine_label', 'engine_icon', 'engine_version', 'available_version', 'available_update_refreshes_image', 'mode', 'status', 'operation', 'created_at', 'point_in_time_recovery', 'nodes'];
+    $fields = ['id', 'name', 'engine_label', 'engine_icon', 'engine_version', 'available_version', 'available_update_refreshes_image', 'mode', 'status', 'health', 'created_at', 'point_in_time_recovery', 'nodes'];
 
     $list = $this->get(projectUrl('/databases'))->inertiaProps('databases.data.0');
     $show = $this->get(projectUrl("/databases/{$database->id}"))->inertiaProps('database.data');

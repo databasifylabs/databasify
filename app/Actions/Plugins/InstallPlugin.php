@@ -27,35 +27,37 @@ final readonly class InstallPlugin
         $download = $this->downloader->download($source->label, $source->archivePath);
 
         try {
-            $plugin = $this->stage($source, $this->downloader->packageIn($download));
+            $staging = $this->downloader->packageIn($download);
+            $package = PluginPackage::read($staging);
+            $incompatibility = Plugin::incompatibilityWith($package->requires);
+
+            if ($incompatibility !== null) {
+                throw ValidationException::withMessages(['source' => $incompatibility]);
+            }
+
+            if (preg_match('/^[a-z0-9][a-z0-9-]{0,39}$/', $package->id) !== 1 || $package->id === 'core' || Plugin::query()->whereKey($package->id)->exists()) {
+                throw ValidationException::withMessages(['source' => "A plugin called \"{$package->id}\" is already installed or the name is not allowed."]);
+            }
+
+            $this->confirmCommunityEngines->handle($package->engines, $package->author, $source);
+            $plugin = new Plugin($package->toInstallRow($source->label));
+            File::ensureDirectoryExists(Plugin::root());
+            File::copyDirectory($staging, $plugin->directory());
         } finally {
             File::deleteDirectory($download);
         }
 
-        $this->ensureLoads($plugin);
-        $plugin->save();
-        Artisan::call('migrate', ['--force' => true]);
-        $this->runInstallHookOf($plugin);
-        Artisan::call('queue:restart');
-
-        return $plugin;
-    }
-
-    private function ensureLoads(Plugin $plugin): void
-    {
         $error = $this->loader->load($plugin);
 
-        if ($error === null) {
-            return;
+        if ($error !== null) {
+            File::deleteDirectory($plugin->directory());
+
+            throw ValidationException::withMessages(['source' => "The plugin failed to load: {$error}"]);
         }
 
-        File::deleteDirectory($plugin->directory());
+        $plugin->save();
+        Artisan::call('migrate', ['--force' => true]);
 
-        throw ValidationException::withMessages(['source' => "The plugin failed to load: {$error}"]);
-    }
-
-    private function runInstallHookOf(Plugin $plugin): void
-    {
         try {
             $this->loader->call($plugin, 'install');
         } catch (Throwable $exception) {
@@ -65,31 +67,9 @@ final readonly class InstallPlugin
 
             throw ValidationException::withMessages(['source' => "The plugin failed to install: {$exception->getMessage()}"]);
         }
-    }
 
-    private function stage(PluginSource $source, string $staging): Plugin
-    {
-        $package = PluginPackage::read($staging);
-        $incompatibility = Plugin::incompatibilityWith($package->requires);
-
-        if ($incompatibility !== null) {
-            throw ValidationException::withMessages(['source' => $incompatibility]);
-        }
-
-        if ($this->isUnavailable($package->id)) {
-            throw ValidationException::withMessages(['source' => "A plugin called \"{$package->id}\" is already installed or the name is not allowed."]);
-        }
-
-        $this->confirmCommunityEngines->handle($package->engines, $package->author, $source);
-        $plugin = new Plugin($package->toInstallRow($source->label));
-        File::ensureDirectoryExists(Plugin::root());
-        File::copyDirectory($staging, $plugin->directory());
+        Artisan::call('queue:restart');
 
         return $plugin;
-    }
-
-    private function isUnavailable(string $id): bool
-    {
-        return preg_match('/^[a-z0-9][a-z0-9-]{0,39}$/', $id) !== 1 || $id === 'core' || Plugin::query()->whereKey($id)->exists();
     }
 }

@@ -6,7 +6,6 @@ namespace App\Actions\Networks;
 
 use App\Enums\Servers\NetworkMemberStatus;
 use App\Models\Network;
-use App\Models\Server;
 use Throwable;
 
 final readonly class SyncWireguardNetwork
@@ -17,20 +16,13 @@ final readonly class SyncWireguardNetwork
 
     public function handle(Network $network): void
     {
-        $network->wireguardMembers()->get()
-            ->each(fn (Server $member) => $this->updatePeersOn($member, $network));
-    }
-
-    private function updatePeersOn(Server $member, Network $network): void
-    {
-        try {
-            $member->ssh()->exec('ssh.servers.wireguard.peers', $this->data->handle($member, $network), self::LOG_NAME);
-        } catch (Throwable $exception) {
-            $member->recordNetworkHealth(NetworkMemberStatus::Unreachable, $exception->getMessage());
-
-            return;
+        foreach ($network->wireguardMembers()->get() as $member) {
+            try {
+                $member->ssh()->exec('ssh.servers.wireguard.peers', $this->data->handle($member, $network), self::LOG_NAME);
+                $member->recordNetworkHealth(NetworkMemberStatus::Connected);
+            } catch (Throwable $exception) {
+                $member->recordNetworkHealth(NetworkMemberStatus::Unreachable, $exception->getMessage());
+            }
         }
-
-        $member->recordNetworkHealth(NetworkMemberStatus::Connected);
     }
 }

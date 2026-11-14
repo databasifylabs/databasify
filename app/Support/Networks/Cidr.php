@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Networks;
 
+use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -65,6 +66,17 @@ final class Cidr
     public static function canonical(string $cidr): string
     {
         return self::network($cidr).'/'.self::prefix($cidr);
+    }
+
+    /**
+     * @return LazyCollection<int, non-falsy-string>
+     */
+    public static function blocksIn(string $pool, int $prefix): LazyCollection
+    {
+        $base = self::start($pool);
+        $size = self::size($prefix);
+
+        return LazyCollection::range(0, intdiv(self::length($pool), $size) - 1)->map(fn (int $block): string => long2ip($base + $block * $size)."/{$prefix}");
     }
 
     public static function overlaps(string $first, string $second): bool

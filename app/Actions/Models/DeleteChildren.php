@@ -14,14 +14,8 @@ final readonly class DeleteChildren
      */
     public function handle(HasOneOrMany ...$relations): void
     {
-        collect($relations)->each($this->deleteEachOf(...));
-    }
-
-    /**
-     * @param  HasOneOrMany<covariant Model, covariant Model, covariant mixed>  $relation
-     */
-    private function deleteEachOf(HasOneOrMany $relation): void
-    {
-        $relation->reorder()->lazyById()->each(fn (Model $child): ?bool => $child->delete());
+        foreach ($relations as $relation) {
+            $relation->reorder()->lazyById()->each(fn (Model $child): ?bool => $child->delete());
+        }
     }
 }

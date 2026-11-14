@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Actions\Networks\JoinWireguardNetwork;
-use App\DTOs\Servers\ServerFacts;
 use App\Enums\Servers\OsFamily;
-use App\Models\Network;
 use App\Models\Server;
 use App\Services\Ssh\AppSshKey;
 use Throwable;
@@ -33,7 +31,23 @@ final readonly class ProvisionServer
         $server->markProvisioning();
 
         try {
-            $this->provision($server, $this->facts->handle($server), $disablePasswordLogin);
+            $facts = $this->facts->handle($server);
+            $network = $server->wireguardNetwork();
+            $family = $facts->supportedSystem()->family();
+            $data = [
+                'user' => $server->ssh_user,
+                'publicKey' => $this->appKey->get()->public_key,
+                'privateIp' => $network === null ? $server->private_ip : null,
+                'family' => $family,
+                'dockerVersion' => config()->string('databasify.docker.version'),
+                'containerdVersion' => config()->string('databasify.docker.containerd'),
+            ];
+
+            collect(self::stepsFor($family, $disablePasswordLogin))->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
+
+            if ($network !== null) {
+                $this->wireguard->handle($server, $network);
+            }
         } catch (Throwable $exception) {
             $server->markFailed();
 
@@ -41,37 +55,6 @@ final readonly class ProvisionServer
         }
 
         $server->markProvisioned();
-    }
-
-    private function provision(Server $server, ServerFacts $facts, bool $disablePasswordLogin): void
-    {
-        $network = $server->wireguardNetwork();
-        $family = $facts->supportedSystem()->family();
-        $data = $this->scriptDataFor($server, $network, $family);
-
-        collect(self::stepsFor($family, $disablePasswordLogin))
-            ->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
-
-        if ($network === null) {
-            return;
-        }
-
-        $this->wireguard->handle($server, $network);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function scriptDataFor(Server $server, ?Network $network, OsFamily $family): array
-    {
-        return [
-            'user' => $server->ssh_user,
-            'publicKey' => $this->appKey->get()->public_key,
-            'privateIp' => $network === null ? $server->private_ip : null,
-            'family' => $family,
-            'dockerVersion' => config()->string('databasify.docker.version'),
-            'containerdVersion' => config()->string('databasify.docker.containerd'),
-        ];
     }
 
     /**

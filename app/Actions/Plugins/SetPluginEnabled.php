@@ -16,26 +16,19 @@ final readonly class SetPluginEnabled
 
     public function handle(Plugin $plugin, bool $enabled): void
     {
-        $this->callHookOf($plugin, $enabled ? 'enable' : 'disable');
+        $hook = $enabled ? 'enable' : 'disable';
+
+        if (is_dir($plugin->directory())) {
+            try {
+                $this->loader->call($plugin, $hook);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                throw ValidationException::withMessages(['plugin' => "{$plugin->name} failed to {$hook}: {$exception->getMessage()}"]);
+            }
+        }
+
         $plugin->setEnabled($enabled);
         Artisan::call('queue:restart');
-    }
-
-    /**
-     * @param  'enable'|'disable'  $hook
-     */
-    private function callHookOf(Plugin $plugin, string $hook): void
-    {
-        if (! is_dir($plugin->directory())) {
-            return;
-        }
-
-        try {
-            $this->loader->call($plugin, $hook);
-        } catch (Throwable $exception) {
-            report($exception);
-
-            throw ValidationException::withMessages(['plugin' => "{$plugin->name} failed to {$hook}: {$exception->getMessage()}"]);
-        }
     }
 }

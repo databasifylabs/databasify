@@ -18,17 +18,7 @@ final readonly class AddServer
 
     public function handle(NewServer $data): Server
     {
-        $server = $this->unsavedServerFor($data);
-        $this->addresses->handle($server, $data->privateNetwork);
-
-        $this->provisioning->handle($server, $data->disablePasswordLogin);
-
-        return $server;
-    }
-
-    private function unsavedServerFor(NewServer $data): Server
-    {
-        return new Server([
+        $server = new Server([
             'name' => $data->name,
             'public_ip' => $data->publicIp,
             'ssh_port' => $data->sshPort,
@@ -36,5 +26,9 @@ final readonly class AddServer
             'ssh_password' => $data->sshPassword,
             'status' => ServerStatus::Pending,
         ]);
+        $this->addresses->handle($server, $data->privateNetwork);
+        $this->provisioning->handle($server, $data->disablePasswordLogin);
+
+        return $server;
     }
 }

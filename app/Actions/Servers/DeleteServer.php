@@ -20,8 +20,14 @@ final readonly class DeleteServer
             throw ValidationException::withMessages(['server' => "{$server->name} is still being created, wait until it finishes."]);
         }
 
-        if ($destroyAtProvider) {
-            $this->destroyAtProvider($server);
+        $provider = $server->serverProvider;
+
+        if ($destroyAtProvider && $provider !== null && $server->provider_server_id !== null) {
+            try {
+                $provider->provider()->deleteServer($server->provider_server_id);
+            } catch (ProviderRequestFailed $exception) {
+                throw ValidationException::withMessages(['server' => "Could not destroy {$server->name} at {$provider->label()}: {$exception->getMessage()}"]);
+            }
         }
 
         $network = $server->wireguardNetwork();
@@ -29,21 +35,6 @@ final readonly class DeleteServer
 
         if ($network !== null) {
             dispatch(new SyncWireguardNetworkJob($network));
-        }
-    }
-
-    private function destroyAtProvider(Server $server): void
-    {
-        $provider = $server->serverProvider;
-
-        if ($provider === null || $server->provider_server_id === null) {
-            return;
-        }
-
-        try {
-            $provider->provider()->deleteServer($server->provider_server_id);
-        } catch (ProviderRequestFailed $exception) {
-            throw ValidationException::withMessages(['server' => "Could not destroy {$server->name} at {$provider->label()}: {$exception->getMessage()}"]);
         }
     }
 }

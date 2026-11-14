@@ -14,24 +14,18 @@ final readonly class StartUpdate
 
     public function handle(): void
     {
-        $reason = $this->reasonToRefuse();
+        $pinned = $this->updater->pinnedVersion();
+        $reason = match (true) {
+            $pinned !== null => "This install is pinned to {$pinned} in /opt/databasify/.env.",
+            $this->updater->isRequested(), $this->updater->status()?->isRunning() === true => 'An update is already running.',
+            ! $this->latestRelease->hasNewerRelease() => 'Databasify is already up to date.',
+            default => null,
+        };
 
         if ($reason !== null) {
             throw ValidationException::withMessages(['update' => $reason]);
         }
 
         $this->updater->requestUpdate();
-    }
-
-    private function reasonToRefuse(): ?string
-    {
-        $pinned = $this->updater->pinnedVersion();
-
-        return match (true) {
-            $pinned !== null => "This install is pinned to {$pinned} in /opt/databasify/.env.",
-            $this->updater->isRequested(), $this->updater->status()?->isRunning() === true => 'An update is already running.',
-            ! $this->latestRelease->hasNewerRelease() => 'Databasify is already up to date.',
-            default => null,
-        };
     }
 }

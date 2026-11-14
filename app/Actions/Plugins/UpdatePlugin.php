@@ -32,10 +32,35 @@ final readonly class UpdatePlugin
         try {
             $files = $this->downloader->packageIn($download);
             $package = PluginPackage::read($files);
-            $this->ensureReplaces($plugin, $package);
-            $this->ensureKeepsEnginesInUse($plugin, $package);
+
+            if ($package->id !== $plugin->id) {
+                throw ValidationException::withMessages(['source' => "This zip is the {$package->id} plugin, not {$plugin->id}."]);
+            }
+
+            $incompatibility = Plugin::incompatibilityWith($package->requires);
+
+            if ($incompatibility !== null) {
+                throw ValidationException::withMessages(['source' => $incompatibility]);
+            }
+
+            foreach (array_diff($plugin->engines, $package->engines) as $engine) {
+                $databases = Database::query()->withoutProject()->where('engine', $engine)->count();
+
+                if ($databases > 0) {
+                    throw ValidationException::withMessages(['source' => "This update removes the {$engine} engine, still used by {$databases} ".Str::plural('database', $databases).'.']);
+                }
+            }
+
             $this->confirmCommunityEngines->handle(array_values(array_diff($package->engines, $plugin->engines)), $package->author, $source);
-            $this->swap($plugin, $files);
+
+            $new = Plugin::root()."/.{$plugin->id}-new";
+            $old = Plugin::root()."/.{$plugin->id}-old";
+            File::deleteDirectory($new);
+            File::deleteDirectory($old);
+            File::copyDirectory($files, $new);
+            File::moveDirectory($plugin->directory(), $old);
+            File::moveDirectory($new, $plugin->directory());
+            File::deleteDirectory($old);
         } finally {
             File::deleteDirectory($download);
         }
@@ -45,41 +70,5 @@ final readonly class UpdatePlugin
         Artisan::call('queue:restart');
 
         return $plugin;
-    }
-
-    private function ensureReplaces(Plugin $plugin, PluginPackage $package): void
-    {
-        if ($package->id !== $plugin->id) {
-            throw ValidationException::withMessages(['source' => "This zip is the {$package->id} plugin, not {$plugin->id}."]);
-        }
-
-        $incompatibility = Plugin::incompatibilityWith($package->requires);
-
-        if ($incompatibility !== null) {
-            throw ValidationException::withMessages(['source' => $incompatibility]);
-        }
-    }
-
-    private function ensureKeepsEnginesInUse(Plugin $plugin, PluginPackage $package): void
-    {
-        foreach (array_diff($plugin->engines, $package->engines) as $engine) {
-            $databases = Database::query()->withoutProject()->where('engine', $engine)->count();
-
-            if ($databases > 0) {
-                throw ValidationException::withMessages(['source' => "This update removes the {$engine} engine, still used by {$databases} ".Str::plural('database', $databases).'.']);
-            }
-        }
-    }
-
-    private function swap(Plugin $plugin, string $files): void
-    {
-        $new = Plugin::root()."/.{$plugin->id}-new";
-        $old = Plugin::root()."/.{$plugin->id}-old";
-        File::deleteDirectory($new);
-        File::deleteDirectory($old);
-        File::copyDirectory($files, $new);
-        File::moveDirectory($plugin->directory(), $old);
-        File::moveDirectory($new, $plugin->directory());
-        File::deleteDirectory($old);
     }
 }

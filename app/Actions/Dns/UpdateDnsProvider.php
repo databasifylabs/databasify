@@ -19,7 +19,15 @@ final readonly class UpdateDnsProvider
         $rotated = $data->credentials !== $provider->credentials;
 
         if ($rotated) {
-            $provider->ensureZonesInUseAmong($this->zoneNamesSeenWith($data));
+            try {
+                $driver = (new DnsProvider($data->toRow()))->provider();
+                $driver->verify();
+                $names = array_map(fn (DnsZoneData $zone): string => $zone->name, $driver->zones());
+            } catch (ProviderRequestFailed $exception) {
+                throw ValidationException::withMessages(['credentials' => $exception->getMessage()]);
+            }
+
+            $provider->ensureZonesInUseAmong($names);
         }
 
         $provider->update($data->toRow());
@@ -29,20 +37,5 @@ final readonly class UpdateDnsProvider
         }
 
         return $provider;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function zoneNamesSeenWith(NewDnsProvider $data): array
-    {
-        try {
-            $driver = (new DnsProvider($data->toRow()))->provider();
-            $driver->verify();
-
-            return array_map(fn (DnsZoneData $zone): string => $zone->name, $driver->zones());
-        } catch (ProviderRequestFailed $exception) {
-            throw ValidationException::withMessages(['credentials' => $exception->getMessage()]);
-        }
     }
 }

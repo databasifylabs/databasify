@@ -24,77 +24,50 @@ final readonly class OrderProviderServer
     public function handle(ProviderServerOrder $order): Server
     {
         $provider = ServerProvider::query()->findOrFail($order->serverProviderId);
-        $this->ensureOffered($provider, $order);
-        $network = $order->databasifyNetwork === null ? $this->networkFor($provider, $order) : null;
+        $driver = $provider->provider();
 
-        $server = $this->unsavedServerFor($order, $provider);
-        $this->saveOnNetwork($server, $order, $network);
+        if ($driver->image($order->os) === null) {
+            throw ValidationException::withMessages(['os' => "{$provider->label()} does not offer {$order->os->label()}."]);
+        }
 
-        dispatch(new LaunchProviderServerJob($server));
-
-        return $server;
-    }
-
-    private function unsavedServerFor(ProviderServerOrder $order, ServerProvider $provider): Server
-    {
-        return new Server([
+        $server = new Server([
             'name' => $order->name,
             'server_provider_id' => $provider->id,
             'region' => $order->region,
             'plan' => $order->plan,
             'image' => $order->os,
-            'ssh_user' => $provider->provider()->sshUser(),
+            'ssh_user' => $driver->sshUser(),
             'status' => ServerStatus::Creating,
         ]);
-    }
 
-    private function ensureOffered(ServerProvider $provider, ProviderServerOrder $order): void
-    {
-        if ($provider->provider()->image($order->os) !== null) {
-            return;
-        }
-
-        throw ValidationException::withMessages(['os' => "{$provider->label()} does not offer {$order->os->label()}."]);
-    }
-
-    private function saveOnNetwork(Server $server, ProviderServerOrder $order, ?Network $network): void
-    {
         if ($order->databasifyNetwork !== null) {
             $this->addresses->handle($server, $order->databasifyNetwork);
+            dispatch(new LaunchProviderServerJob($server));
 
-            return;
+            return $server;
+        }
+
+        $network = null;
+
+        if ($order->newNetwork) {
+            try {
+                $created = $driver->createNetwork($order->region, 'databasify-'.$order->region.'-'.Str::lower(Str::random(4)));
+            } catch (ProviderRequestFailed $exception) {
+                throw ValidationException::withMessages(['network' => "{$provider->label()} could not create a private network: {$exception->getMessage()}"]);
+            }
+
+            $network = Network::recordFromProvider($provider, $created);
+        }
+
+        if (! $order->newNetwork && $order->networkExternalId !== null) {
+            $chosen = collect($driver->networks($order->region))->first(fn (ProviderNetwork $candidate): bool => $candidate->externalId === $order->networkExternalId)
+                ?? throw ValidationException::withMessages(['network' => "That private network is not in {$order->region} anymore."]);
+            $network = Network::recordFromProvider($provider, $chosen);
         }
 
         $server->fill((new NetworkAssignment($network))->toRow())->save();
-    }
+        dispatch(new LaunchProviderServerJob($server));
 
-    private function networkFor(ServerProvider $provider, ProviderServerOrder $order): ?Network
-    {
-        if ($order->newNetwork) {
-            return Network::recordFromProvider($provider, $this->createdNetworkFor($provider, $order));
-        }
-
-        if ($order->networkExternalId === null) {
-            return null;
-        }
-
-        return Network::recordFromProvider($provider, $this->chosenNetworkFor($provider, $order));
-    }
-
-    private function createdNetworkFor(ServerProvider $provider, ProviderServerOrder $order): ProviderNetwork
-    {
-        try {
-            return $provider->provider()->createNetwork($order->region, 'databasify-'.$order->region.'-'.Str::lower(Str::random(4)));
-        } catch (ProviderRequestFailed $exception) {
-            throw ValidationException::withMessages(['network' => "{$provider->label()} could not create a private network: {$exception->getMessage()}"]);
-        }
-    }
-
-    private function chosenNetworkFor(ServerProvider $provider, ProviderServerOrder $order): ProviderNetwork
-    {
-        $chosen = collect($provider->provider()->networks($order->region))
-            ->first(fn (ProviderNetwork $network): bool => $network->externalId === $order->networkExternalId);
-
-        return $chosen ?? throw ValidationException::withMessages(['network' => "That private network is not in {$order->region} anymore."]);
+        return $server;
     }
 }
