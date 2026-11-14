@@ -206,6 +206,21 @@ it('leaves the cluster instead of resetting it when one member remains', functio
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
+it('restarts the remaining node on its own when a cluster shrinks to one member', function (string $engine) {
+    $ssh = fakeEngine();
+    $database = idleDatabase($engine, 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
+
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
+
+    expect(sentTo($staying->server, $ssh))->toBe(['nodes.status', 'nodes.configure', 'cluster.disable', 'nodes.status'])
+        ->and(argsOn($staying->server, 'nodes.configure')[0]->clustered)->toBeFalse()
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($database->nodes()->count())->toBe(1);
+})->with(['postgres', 'mariadb']);
+
 it('fails over before removing the primary', function () {
     $ssh = fakeEngine();
     $database = idleDatabase('postgres', 3);

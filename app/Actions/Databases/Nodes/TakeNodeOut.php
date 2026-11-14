@@ -52,6 +52,12 @@ final readonly class TakeNodeOut
         foreach ($remaining as $node) {
             $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node, without: $leaving));
 
+            if ($remaining->hasSole() && $database->facts()->seedClustersFirst) {
+                $node->driver()->cluster()->disable();
+
+                continue;
+            }
+
             try {
                 $node->driver()->cluster()->forget($leaving->privateIp());
             } catch (EngineUnsupported) {
