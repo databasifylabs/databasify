@@ -8,7 +8,9 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\DnsZone;
 use App\Models\User;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
@@ -105,4 +107,18 @@ it('keeps the database in its domain when its records cannot be removed', functi
     expect($database->fresh()->dns_zone_id)->toBe($database->dns_zone_id)
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
     Queue::assertNothingPushed();
+});
+
+it('says what went wrong when the domain provider token can no longer be read', function () {
+    fakeCloudflare([]);
+    $database = idleDatabase('mysql', 1, DatabaseMode::Single, 'app-db');
+    $zone = DnsZone::factory()->create(['name' => 'example.com']);
+    $foreign = new Encrypter(random_bytes(32), 'aes-256-cbc');
+    DB::table('dns_providers')->where('id', $zone->dns_provider_id)->update(['credentials' => $foreign->encryptString(json_encode(['token' => 'old']))]);
+
+    $this->put(projectUrl("/databases/{$database->id}/domain"), ['dns_zone_id' => $zone->id])
+        ->assertRedirect()
+        ->assertSessionHasErrors(['dns_zone_id' => 'Could not read example.com: Cloudflare has no credentials Databasify can use. Enter them again in its settings.']);
+
+    expect($database->fresh()->dns_zone_id)->toBeNull();
 });

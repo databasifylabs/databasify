@@ -6,7 +6,9 @@ use App\Enums\Databases\DatabaseMode;
 use App\Models\DnsProvider;
 use App\Models\DnsZone;
 use App\Models\User;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 
@@ -148,4 +150,16 @@ it('refuses a new token that cannot see a domain a database uses, then imports t
     $this->put(projectUrl("/dns/{$provider->id}"), ['name' => 'Cloudflare', 'credentials' => ['token' => 'wide']])->assertSessionHasNoErrors();
     expect($provider->fresh()?->credentials)->toBe(['token' => 'wide'])
         ->and($provider->zones()->orderBy('name')->pluck('name')->all())->toBe(['example.com', 'example.net']);
+});
+
+it('saves a new token over credentials it can no longer read', function () {
+    $provider = DnsProvider::factory()->create(['name' => 'Cloudflare main']);
+    $foreign = new Encrypter(random_bytes(32), 'aes-256-cbc');
+    DB::table('dns_providers')->where('id', $provider->id)->update(['credentials' => $foreign->encryptString(json_encode(['token' => 'old']))]);
+    fakeCloudflareAccount(['example.com']);
+
+    $this->put(projectUrl("/dns/{$provider->id}"), ['name' => 'Cloudflare main', 'credentials' => ['token' => 'new-token']])
+        ->assertSessionHasNoErrors();
+
+    expect($provider->fresh()?->credentials)->toBe(['token' => 'new-token']);
 });

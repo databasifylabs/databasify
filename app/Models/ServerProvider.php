@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCredentials;
 use App\Contracts\Projects\Movable;
 use App\Exceptions\Providers\UnknownProvider;
 use App\Models\Concerns\BelongsToProject;
@@ -109,7 +110,7 @@ class ServerProvider extends Model implements Movable
     protected function casts(): array
     {
         return [
-            'credentials' => 'encrypted:array',
+            'credentials' => AsCredentials::class,
         ];
     }
 }

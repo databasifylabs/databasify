@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCredentials;
 use App\Contracts\Projects\Movable;
 use App\DnsProviders\Contracts\DnsDriver;
 use App\DnsProviders\Drivers\AbstractDnsDriver;
@@ -120,7 +121,7 @@ class DnsProvider extends Model implements Movable
     protected function casts(): array
     {
         return [
-            'credentials' => 'encrypted:array',
+            'credentials' => AsCredentials::class,
         ];
     }
 }

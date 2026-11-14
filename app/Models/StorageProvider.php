@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCredentials;
 use App\Contracts\Projects\Movable;
 use App\DTOs\Storage\S3Bucket;
 use App\Models\Concerns\BelongsToProject;
@@ -114,7 +115,7 @@ class StorageProvider extends Model implements Movable
     {
         return [
             'path_style' => 'boolean',
-            'credentials' => 'encrypted:array',
+            'credentials' => AsCredentials::class,
             'verified_at' => 'datetime',
         ];
     }

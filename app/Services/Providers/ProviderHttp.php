@@ -24,6 +24,10 @@ final readonly class ProviderHttp
      */
     public static function for(string $provider, string $baseUrl, string $token, Closure $errorMessage, bool $allowMissing = false): PendingRequest
     {
+        if ($token === '') {
+            throw ProviderRequestFailed::missingCredentials($provider);
+        }
+
         return Http::baseUrl($baseUrl)
             ->withToken($token)
             ->acceptJson()

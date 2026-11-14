@@ -16,6 +16,11 @@ final class ProviderRequestFailed extends RuntimeException
         return new self(trim("{$provider} answered {$status}. ".($reason ?? '')));
     }
 
+    public static function missingCredentials(string $provider): self
+    {
+        return new self("{$provider} has no credentials Databasify can use. Enter them again in its settings.");
+    }
+
     public static function unreachable(string $provider): self
     {
         return new self("{$provider} could not be reached.");
