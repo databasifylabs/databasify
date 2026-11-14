@@ -19,8 +19,16 @@ DROP SUBSCRIPTION :"name"
 SQL
     if [ -n "$PG_ERROR" ]; then
         DATABASIFY_VAR_name="$subscription" pg_try "$database" <<'SQL'
+SELECT subslotname FROM pg_subscription WHERE subname = :'name'
+SQL
+        slot=$PG_OUTPUT
+        DATABASIFY_VAR_name="$subscription" pg_try "$database" <<'SQL'
 ALTER SUBSCRIPTION :"name" DISABLE; ALTER SUBSCRIPTION :"name" SET (slot_name = NONE); DROP SUBSCRIPTION :"name";
 SQL
+        if [ -z "$PG_ERROR" ] && [[ $slot =~ ^[a-z0-9_]+$ ]]; then
+            on_conninfo "$conninfo" "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = '$slot'" > /dev/null \
+                || echo "$database: could not drop the $slot replication slot on the source, drop it there"
+        fi
     fi
     on_conninfo "$conninfo" "DROP PUBLICATION IF EXISTS \"$publication\"" > /dev/null || true
 done <<< "$PG_OUTPUT"

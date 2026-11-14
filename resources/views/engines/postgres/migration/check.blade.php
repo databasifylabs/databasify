@@ -48,4 +48,4 @@ lines() {
 }
 result "$(jq -cn --arg version "${version%% *}" --arg wal "$wal_level" --arg replicates "$replicates" --arg size "$size" \
     --argjson databases "$(lines "$listed")" --argjson unreadable "$(lines "$unreadable")" --argjson unowned "$(lines "$unowned")" --argjson occupied "$(lines "$occupied")" \
-    '{reachable: true, error: null, version: $version, walLevel: $wal, canReplicate: ($replicates == "t"), sizeMb: (($size | tonumber?) // 0), databases: $databases, unreadable: $unreadable, unowned: $unowned, occupied: $occupied, warnings: [], problems: []}')"
+    '{reachable: true, error: null, version: $version, walLevel: $wal, canReplicate: ($replicates == "t" and $wal == "logical"), sizeMb: (($size | tonumber?) // 0), databases: $databases, unreadable: $unreadable, unowned: $unowned, occupied: $occupied, warnings: [], problems: []}')"

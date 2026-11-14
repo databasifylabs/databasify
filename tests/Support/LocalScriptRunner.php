@@ -16,9 +16,23 @@ use LogicException;
 
 final class LocalScriptRunner implements EngineScripts
 {
-    private const string CLIENT = <<<'SH'
+    private const string STDIN_SQL = "#!/bin/bash\nsql=$(cat)\n";
+
+    private const string ARGUMENT_SQL = <<<'SH'
         #!/bin/bash
-        sql=$(cat)
+        sql=''
+        while [ $# -gt 0 ]; do
+            if [ "$1" = -c ]; then
+                sql=$2
+                break
+            fi
+            shift
+        done
+        [ -n "$sql" ] || sql=$(cat)
+
+        SH;
+
+    private const string CLIENT = <<<'SH'
         printf '%s\n-- end --\n' "$sql" >> "$STUB_DIR/sql.log"
         for rule in "$STUB_DIR"/rules/*; do
             [ -e "$rule" ] || continue
@@ -35,6 +49,8 @@ final class LocalScriptRunner implements EngineScripts
         SH;
 
     private const string PASS_THROUGH = "#!/bin/bash\nshift\nexec \"\$@\"\n";
+
+    private const string AS_USER = "#!/bin/bash\nwhile [[ \$1 == --* ]]; do shift; done\nexec \"\$@\"\n";
 
     private const string RECORDER = "#!/bin/bash\nprintf '%s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\n";
 
@@ -102,10 +118,12 @@ final class LocalScriptRunner implements EngineScripts
     private function writeStubs(string $directory): void
     {
         foreach (['mysql', 'mariadb'] as $client) {
-            File::put("{$directory}/bin/{$client}", self::CLIENT."\n");
+            File::put("{$directory}/bin/{$client}", self::STDIN_SQL.self::CLIENT."\n");
         }
 
+        File::put("{$directory}/bin/psql", self::ARGUMENT_SQL.self::CLIENT."\n");
         File::put("{$directory}/bin/timeout", self::PASS_THROUGH);
+        File::put("{$directory}/bin/setpriv", self::AS_USER);
         File::put("{$directory}/bin/databasify", self::RECORDER);
 
         foreach (File::files("{$directory}/bin") as $stub) {
