@@ -19,6 +19,6 @@ final readonly class EraseDatabaseSetup
     public function handle(Database $database): void
     {
         $this->tasks->stopRunning($database);
-        $database->ignoringStop(fn () => $database->orderedNodesWithout()->each(fn (DatabaseNode $node) => rescue(fn () => $this->runtime->remove($node, erase: true))));
+        $database->orderedNodesWithout()->each(fn (DatabaseNode $node) => rescue(fn () => $this->runtime->remove($node, erase: true)));
     }
 }

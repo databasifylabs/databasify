@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
 use App\Models\DatabaseUser;
 use RuntimeException;
@@ -31,8 +30,6 @@ final readonly class ReconcileRestoredAccounts
             $database->users()->whereIn('name', $listed->users)->get()
                 ->each(fn (DatabaseUser $user) => $database->driver()->accounts()->setPassword($user->name, $user->password, $user->password_encryption));
             $database->forgetAccountsMissingFrom($listed);
-        } catch (OperationStopped $stopped) {
-            throw $stopped;
         } catch (Throwable $exception) {
             $database->primaryServer()->logFailure(
                 'Verify restored accounts',

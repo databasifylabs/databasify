@@ -36,12 +36,10 @@ it('refuses work while the database is busy', function () {
 it('ends an operation as ready or failed', function () {
     $database = idleDatabase('postgres', 1);
     $database->update(['status' => DatabaseStatus::Upgrading]);
-    $database->requestStop();
 
     $database->markReady();
 
-    expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready)
-        ->and($database->isStopRequested())->toBeFalse();
+    expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
 
     $database->markFailed();
 

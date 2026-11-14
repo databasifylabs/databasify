@@ -10,9 +10,7 @@ use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\OperationState;
 use App\Enums\Servers\ServerLogStatus;
 use App\Events\DatabaseAlertRaised;
-use App\Exceptions\Databases\OperationStopped;
 use App\Jobs\Databases\RefreshDatabaseStatusJob;
-use App\Models\User;
 use App\Services\Databases\EngineTasks;
 use Illuminate\Support\Facades\Event;
 
@@ -47,20 +45,6 @@ it('stops only the read-only node own engine task when its operation fails', fun
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === "main: Apply settings on {$reader->displayName()} failed");
 });
 
-it('stops a read-only node operation without touching the main', function () {
-    useRecordingDrivers();
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-    $reader->update(['task_key' => "run1.{$reader->id}.copy"]);
-    startedTask("run1.{$reader->id}.copy");
-    $reader->markBusy(DatabaseStatus::Rebooting);
-
-    $this->actingAs(User::factory()->create())->post(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/stop"))->assertSessionHasNoErrors();
-
-    expect(fn () => resolve(EngineTasks::class)->stillRunning($reader->fresh()))->toThrow(OperationStopped::class);
-    expect($database->isStopRequested())->toBeFalse();
-});
-
 it('waits only on its own node while a read-only node operation runs', function () {
     useRecordingDrivers();
     $database = idleDatabase('postgres', 1);
@@ -84,43 +68,6 @@ it('does not fail a read-only node running log when a main operation fails', fun
     resolve(EndFailedOperation::class)->handle($database, 'Apply settings', new RuntimeException('broke'));
 
     expect($log->fresh()?->status)->toBe(ServerLogStatus::Running);
-});
-
-it('keeps a read-only node own engine task running when the main is stopped', function () {
-    useRecordingDrivers();
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-    $reader->markBusy(DatabaseStatus::Updating);
-    $database->markBusy(DatabaseStatus::Updating);
-    $database->requestStop();
-
-    resolve(EngineTasks::class)->await($reader->fresh(), 'run1', 'ready', 'waiting for the node', fn (string $key) => $reader->driver()->nodes()->ready($key, false));
-
-    expect(recordedCalls())->not->toContain('task.stop');
-});
-
-it('refuses to stop a read-only node that runs nothing or runs the main operation', function () {
-    $user = User::factory()->create();
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-
-    $this->actingAs($user)->post(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/stop"))->assertSessionHasErrors('database');
-
-    $database->markBusyWithReadOnly(DatabaseStatus::Upgrading, fn (): null => null);
-
-    $this->actingAs($user)->post(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/stop"))->assertSessionHasErrors('database');
-    expect($reader->fresh()?->isStopRequested())->toBeFalse();
-});
-
-it('clears a read-only node stop request when the main operation that claimed it ends', function () {
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-    $database->markBusyWithReadOnly(DatabaseStatus::Upgrading, fn (): null => null);
-    $reader->requestStop();
-
-    $database->markReady();
-
-    expect($reader->fresh()?->isStopRequested())->toBeFalse();
 });
 
 it('does not read or alert on a read-only node while it runs its own operation', function () {

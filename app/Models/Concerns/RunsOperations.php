@@ -6,19 +6,14 @@ namespace App\Models\Concerns;
 
 use App\Enums\Databases\DatabaseStatus;
 use Closure;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 trait RunsOperations
 {
-    private const int STOP_TTL_SECONDS = 86400;
-
     abstract public function operationStatus(): ?DatabaseStatus;
 
     abstract public function operationLabel(): string;
-
-    abstract protected function operationKey(): string;
 
     abstract protected function refusalFor(DatabaseStatus $status): ?ValidationException;
 
@@ -75,36 +70,6 @@ trait RunsOperations
         $this->finishOperationAs(DatabaseStatus::Failed);
     }
 
-    public function requestStop(): void
-    {
-        Cache::put($this->stopKey(), true, self::STOP_TTL_SECONDS);
-    }
-
-    /**
-     * @phpstan-impure
-     */
-    public function isStopRequested(): bool
-    {
-        return Cache::has($this->stopKey()) && ! Cache::has($this->cleanupKey());
-    }
-
-    /**
-     * @template TResult
-     *
-     * @param  Closure(): TResult  $cleanup
-     * @return TResult
-     */
-    public function ignoringStop(Closure $cleanup): mixed
-    {
-        Cache::put($this->cleanupKey(), true, self::STOP_TTL_SECONDS);
-
-        try {
-            return $cleanup();
-        } finally {
-            Cache::forget($this->cleanupKey());
-        }
-    }
-
     private function finishOperationAs(DatabaseStatus $status): void
     {
         $ended = $this->operationStatus();
@@ -114,23 +79,5 @@ trait RunsOperations
         if ($ended !== null) {
             $this->endOperation($ended);
         }
-
-        $this->clearStopRequest();
-    }
-
-    public function clearStopRequest(): void
-    {
-        Cache::forget($this->stopKey());
-        Cache::forget($this->cleanupKey());
-    }
-
-    private function stopKey(): string
-    {
-        return "{$this->operationKey()}.stop";
-    }
-
-    private function cleanupKey(): string
-    {
-        return "{$this->operationKey()}.cleanup";
     }
 }

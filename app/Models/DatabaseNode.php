@@ -236,11 +236,6 @@ class DatabaseNode extends Model
         return $this->displayName();
     }
 
-    protected function operationKey(): string
-    {
-        return "nodes.{$this->id}";
-    }
-
     protected function refusalFor(DatabaseStatus $status): ?ValidationException
     {
         $database = $this->database;

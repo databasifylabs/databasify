@@ -10,7 +10,6 @@ use App\Actions\Databases\Nodes\AddDatabaseNode;
 use App\Actions\Databases\Nodes\RebootNode;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
 use App\Actions\Databases\Nodes\RenameDatabaseNode;
-use App\Actions\Databases\Nodes\StopNodeOperation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Databases\AddDatabaseNodeRequest;
 use App\Http\Requests\Databases\UpdateDatabaseConfigRequest;
@@ -73,13 +72,6 @@ class DatabaseNodeController extends Controller
     public function retune(Database $database, DatabaseNode $node, RetuneNode $retuneNode): RedirectResponse
     {
         $retuneNode->handle($node);
-
-        return back();
-    }
-
-    public function stop(Database $database, DatabaseNode $node, StopNodeOperation $stopOperation): RedirectResponse
-    {
-        $stopOperation->handle($node);
 
         return back();
     }

@@ -538,7 +538,7 @@ class Database extends Model implements Movable
             }
 
             $result = $changes($locked);
-            $locked->nodes()->readOnly()->update(['status' => $status]);
+            $locked->nodes()->readOnly()->get()->each(fn (DatabaseNode $node): bool => $node->update(['status' => $status]));
 
             return $result;
         });
@@ -552,11 +552,6 @@ class Database extends Model implements Movable
     public function operationLabel(): string
     {
         return $this->name;
-    }
-
-    protected function operationKey(): string
-    {
-        return "databases.{$this->id}";
     }
 
     protected function refusalFor(DatabaseStatus $status): ?ValidationException
@@ -579,9 +574,7 @@ class Database extends Model implements Movable
     protected function endOperation(DatabaseStatus $ended): void
     {
         if ($ended->claimsReadOnlyNodes()) {
-            $released = $this->nodes()->readOnly()->where('status', $ended)->get();
             $this->nodes()->readOnly()->where('status', $ended)->update(['status' => DatabaseStatus::Ready]);
-            $released->each(fn (DatabaseNode $node) => $node->clearStopRequest());
         }
 
         $this->runningLogsOfItsOwnOperation()->lazyById()->each(fn (ServerLog $log) => $log->fail('Interrupted.'));

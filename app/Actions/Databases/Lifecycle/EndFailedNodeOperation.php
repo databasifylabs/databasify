@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Lifecycle;
 
 use App\Events\DatabaseAlertRaised;
-use App\Exceptions\Databases\OperationStopped;
 use App\Models\DatabaseNode;
 use App\Models\ServerLog;
 use App\Services\Databases\EngineTasks;
@@ -26,9 +25,7 @@ final readonly class EndFailedNodeOperation
         $this->tasks->stopRunning($node);
         $node->server->serverLogs()->running()->where('database_id', $node->database_id)->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
 
-        if (! $exception instanceof OperationStopped) {
-            event(new DatabaseAlertRaised($node->database, "{$node->database->name}: {$operation} on {$node->displayName()} failed", $exception?->getMessage() ?? 'The job stopped unexpectedly.'));
-        }
+        event(new DatabaseAlertRaised($node->database, "{$node->database->name}: {$operation} on {$node->displayName()} failed", $exception?->getMessage() ?? 'The job stopped unexpectedly.'));
 
         $node->markReady();
     }

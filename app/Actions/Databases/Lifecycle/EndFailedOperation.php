@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Lifecycle;
 
 use App\Events\DatabaseAlertRaised;
-use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
 use App\Models\ServerLog;
 use App\Services\Databases\EngineTasks;
@@ -30,9 +29,7 @@ final readonly class EndFailedOperation
 
         $database->runningLogsOfItsOwnOperation()->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
 
-        if (! $exception instanceof OperationStopped) {
-            event(new DatabaseAlertRaised($database, "{$database->name}: {$operation} failed", $exception?->getMessage() ?? 'The job stopped unexpectedly.'));
-        }
+        event(new DatabaseAlertRaised($database, "{$database->name}: {$operation} failed", $exception?->getMessage() ?? 'The job stopped unexpectedly.'));
 
         if ($markFailed) {
             $database->markFailed();

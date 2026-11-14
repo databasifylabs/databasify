@@ -47,34 +47,32 @@ final readonly class TakeNodeOut
             report($exception);
         }
 
-        $database->ignoringStop(function () use ($database, $leaving, $remaining): void {
-            $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
+        $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
 
-            foreach ($remaining as $node) {
-                $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node, without: $leaving));
-
-                try {
-                    $node->driver()->cluster()->forget($leaving->privateIp());
-                } catch (EngineUnsupported) {
-                    $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
-                }
-
-                $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
-            }
+        foreach ($remaining as $node) {
+            $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node, without: $leaving));
 
             try {
-                $this->runtime->remove($leaving, erase: true);
-                $this->removeFirewall->handle($database, $leaving);
-            } catch (Throwable $exception) {
-                $leaving->server->logFailure("{$leaving->server->name}: removing it from {$database->name}", "{$leaving->server->name} was removed; its server could not be reached, so its data was not erased: {$exception->getMessage()} Wipe or destroy {$leaving->server->name}.", $database);
+                $node->driver()->cluster()->forget($leaving->privateIp());
+            } catch (EngineUnsupported) {
+                $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
             }
 
-            $leaving->delete();
-            $database->forgetNodeCertificates($leaving);
-            $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $this->firewall->handle($database, $peer, $peer->trustedCidrs())));
-            $database->matchModeToMembers();
-            $this->refresh->handle($database);
-        });
+            $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
+        }
+
+        try {
+            $this->runtime->remove($leaving, erase: true);
+            $this->removeFirewall->handle($database, $leaving);
+        } catch (Throwable $exception) {
+            $leaving->server->logFailure("{$leaving->server->name}: removing it from {$database->name}", "{$leaving->server->name} was removed; its server could not be reached, so its data was not erased: {$exception->getMessage()} Wipe or destroy {$leaving->server->name}.", $database);
+        }
+
+        $leaving->delete();
+        $database->forgetNodeCertificates($leaving);
+        $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $this->firewall->handle($database, $peer, $peer->trustedCidrs())));
+        $database->matchModeToMembers();
+        $this->refresh->handle($database);
         $database->markReady();
     }
 }

@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Events\ServerLogOutputReceived;
-use App\Exceptions\Databases\OperationStopped;
 use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Models\Server;
@@ -112,20 +110,6 @@ it('records a secret call without its output', function () {
 
     expect($output)->toBe("CERT server.pem cGVt\n")
         ->and($server->serverLogs()->sole())->name->toBe('Issuing certificates')->status->toBe(ServerLogStatus::Succeeded)->output->toBeNull();
-});
-
-it('refuses the next step of a database once it is asked to stop', function () {
-    $ssh = fakeSsh();
-    $database = idleDatabase('postgres', 1);
-    $node = $database->nodes()->with('server')->sole();
-    $database->update(['status' => DatabaseStatus::Rebooting]);
-
-    $database->requestStop();
-
-    expect(fn () => $node->ssh()->exec('ssh.databases.noop', [], 'db-1: rebooting'))
-        ->toThrow(OperationStopped::class)
-        ->and($ssh->runs)->toBeEmpty()
-        ->and($database->serverLogs()->sole())->name->toBe('db-1: rebooting')->status->toBe(ServerLogStatus::Failed)->output->toBe("▸ Stopped by you before this ran.\n");
 });
 
 it('generates the app key pair once', function () {

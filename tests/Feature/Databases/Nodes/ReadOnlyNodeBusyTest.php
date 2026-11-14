@@ -13,7 +13,6 @@ use App\DTOs\Databases\NewConnectionPool;
 use App\DTOs\Databases\NewTrustedSource;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\PoolMode;
-use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 
@@ -71,16 +70,6 @@ it('refuses a read-only node operation while the database is being deleted', fun
     expect(fn () => $reader->fresh()?->markBusy(DatabaseStatus::Updating))->toThrow(ValidationException::class, 'main is deleting, wait until it is ready.');
 });
 
-it('keeps stop requests apart between the main and a read-only node', function () {
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-
-    $reader->requestStop();
-
-    expect($reader->isStopRequested())->toBeTrue()
-        ->and($database->isStopRequested())->toBeFalse();
-});
-
 it('refuses read-only node changes on a dropped SDK but still reboots the node', function (Closure $change) {
     $database = idleDatabase('postgres', 1);
     $reader = withReadOnlyNode($database);
@@ -109,17 +98,4 @@ it('fails over while a read-only node runs its own operation', function () {
 
     expect($database->fresh()?->status)->toBe(DatabaseStatus::Recovering)
         ->and($reader->fresh()?->status)->toBe(DatabaseStatus::Rebooting);
-});
-
-it('releases a read-only node when stop is pressed again after its job is gone', function () {
-    useRecordingDrivers();
-    $database = idleDatabase('postgres', 1);
-    $reader = withReadOnlyNode($database);
-    $reader->markBusy(DatabaseStatus::Rebooting);
-    $reader->requestStop();
-
-    $this->actingAs(User::factory()->create())->post(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/stop"))->assertSessionHasNoErrors();
-
-    expect($reader->fresh()?->status)->toBe(DatabaseStatus::Ready)
-        ->and($reader->fresh()?->isStopRequested())->toBeFalse();
 });

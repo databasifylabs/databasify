@@ -6,8 +6,6 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Models\User;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,17 +18,6 @@ it('reads the current status under the row lock even from a stale copy', functio
         ->toThrow(ValidationException::class, 'main is busy upgrading, try again when it finishes.');
 });
 
-it('drops a leftover cleanup flag when an operation ends, so stop works again', function () {
-    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    Cache::put("databases.{$database->id}.cleanup", true, 86400);
-
-    $database->markReady();
-    $database->requestStop();
-
-    expect(Cache::has("databases.{$database->id}.cleanup"))->toBeFalse()
-        ->and($database->isStopRequested())->toBeTrue();
-});
-
 it('refuses new work while data is migrating in', function () {
     $database = migratingDatabase('mysql');
     migrationOf($database, MigrationMode::Continuous, MigrationStatus::Syncing);
@@ -40,21 +27,4 @@ it('refuses new work while data is migrating in', function () {
     $database->migrations()->update(['status' => MigrationStatus::Completed]);
 
     expect(fn () => $database->ensureIdle())->not->toThrow(ValidationException::class);
-});
-
-it('asks a busy database to stop from its page', function () {
-    $this->actingAs(User::factory()->create());
-    $database = idleDatabase('postgres', 1);
-    $database->update(['status' => DatabaseStatus::Upgrading]);
-
-    $this->post(projectUrl("/databases/{$database->id}/stop"))->assertSessionHasNoErrors();
-
-    expect($database->fresh()->isStopRequested())->toBeTrue();
-});
-
-it('has nothing to stop on an idle database', function () {
-    $this->actingAs(User::factory()->create());
-    $database = idleDatabase('postgres', 1);
-
-    $this->post(projectUrl("/databases/{$database->id}/stop"))->assertSessionHasErrors(['database' => 'main is not running anything.']);
 });

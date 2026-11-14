@@ -6,7 +6,6 @@ namespace App\Services\Databases;
 
 use App\Engines\Data\Operation;
 use App\Enums\Databases\OperationState;
-use App\Exceptions\Databases\OperationStopped;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineNotFound;
 use App\Exceptions\Engines\EngineNotRunning;
@@ -30,24 +29,12 @@ final readonly class EngineTasks
      */
     public function await(DatabaseNode $node, string $run, string $step, string $log, Closure $start): void
     {
-        if ($this->stopRequestedFor($node)) {
-            throw new OperationStopped('Stopped by you.');
-        }
-
         $serverLog = $node->openLog("{$node->server->name}: {$log}");
         $key = $this->keyFor($node, $run, $step);
         $start($key);
         $node->update(['task_key' => $key]);
 
         for ($waited = 0; ; $waited += self::POLL_SECONDS) {
-            if ($this->stopRequestedFor($node)) {
-                rescue(fn () => $node->driver()->stopTask($key), report: false);
-                $node->update(['task_key' => null]);
-                $serverLog->fail('Stopped by you.');
-
-                throw new OperationStopped('Stopped by you.');
-            }
-
             $operation = $this->statusOf($node, $key);
 
             if ($operation?->state === OperationState::Succeeded) {
@@ -91,12 +78,6 @@ final readonly class EngineTasks
 
     public function stillRunning(Database|DatabaseNode $scope): bool
     {
-        if ($scope->isStopRequested()) {
-            $this->stopRunning($scope);
-
-            throw new OperationStopped('Stopped by you.');
-        }
-
         return $this->nodesWithTasksIn($scope)
             ->filter(function (DatabaseNode $node): bool {
                 if ($node->task_key === null) {
@@ -149,11 +130,6 @@ final readonly class EngineTasks
         return $scope->nodes()->runningTask()->with('server', 'database')->get()
             ->filter(fn (DatabaseNode $node): bool => ! $node->isReadOnly() || $node->isClaimedByDatabase())
             ->values();
-    }
-
-    private function stopRequestedFor(DatabaseNode $node): bool
-    {
-        return $node->isStopRequested() || ($node->database->isStopRequested() && (! $node->isReadOnly() || $node->isClaimedByDatabase()));
     }
 
     private function keyFor(DatabaseNode $node, string $run, string $step): string

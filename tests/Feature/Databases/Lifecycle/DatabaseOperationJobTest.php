@@ -9,7 +9,6 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\OperationState;
 use App\Enums\Servers\ServerLogStatus;
 use App\Events\DatabaseAlertRaised;
-use App\Exceptions\Databases\OperationStopped;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineTaskRunning;
 use App\Exceptions\Engines\EngineUnavailable;
@@ -113,20 +112,6 @@ it('forgets an engine task that ended while the job waited in the queue', functi
         ->and($node->fresh()?->task_key)->toBeNull();
 });
 
-it('stops the running engine task when stop is pressed while the job waits in the queue', function () {
-    useRecordingDrivers();
-    $database = upgradingDatabase();
-    $node = $database->seed();
-    $node->update(['task_key' => "run1.{$node->id}.copy"]);
-    startedTask("run1.{$node->id}.copy");
-    $database->requestStop();
-
-    expect(fn () => resolve(EngineTasks::class)->stillRunning($database))->toThrow(OperationStopped::class);
-
-    expect(collect(recordedCalls())->filter(fn (string $call): bool => $call === 'task.stop'))->toHaveCount(1)
-        ->and($node->fresh()?->task_key)->toBeNull();
-});
-
 it('puts an operation job back on the queue while its engine task runs', function () {
     Queue::fake();
     $database = upgradingDatabase();
@@ -151,33 +136,11 @@ it('fails when the engine task fails', function () {
     expect($node->server->serverLogs()->latest()->first()?->status)->toBe(ServerLogStatus::Failed);
 });
 
-it('stops the engine task when stop is requested', function () {
-    Sleep::fake();
-    $database = upgradingDatabase();
-    $node = $database->seed();
-    taskStates(OperationState::Running, OperationState::Running);
-    Sleep::whenFakingSleep(fn () => $database->requestStop());
-
-    expect(fn () => startTaskOn($node))->toThrow(OperationStopped::class);
-
-    expect(collect(recordedCalls())->filter(fn (string $call): bool => $call === 'task.stop'))->toHaveCount(1);
-});
-
 it('leaves a database that is no longer busy alone when an old job fails late', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = idleDatabase('postgres', 1);
 
     resolve(EndFailedOperation::class)->handle($database, 'Upgrade', new RuntimeException('redelivered after a restart'));
-
-    expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
-    Event::assertNotDispatched(DatabaseAlertRaised::class);
-});
-
-it('does not report a stop as a failure', function () {
-    Event::fake([DatabaseAlertRaised::class]);
-    $database = upgradingDatabase();
-
-    resolve(EndFailedOperation::class)->handle($database, 'Upgrade', new OperationStopped('Stopped by you.'));
 
     expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
     Event::assertNotDispatched(DatabaseAlertRaised::class);
@@ -257,15 +220,4 @@ it('saves the key of every started task before it waits on any of them', functio
         ->toThrow(EngineError::class);
 
     expect($second->fresh()?->task_key)->toBe("run1.{$second->id}.rejoin");
-});
-
-it('does not start an engine task once stop was pressed', function () {
-    useRecordingDrivers();
-    $database = upgradingDatabase();
-    $node = $database->seed();
-    $database->requestStop();
-
-    expect(fn () => startTaskOn($node))->toThrow(OperationStopped::class);
-
-    expect(recordedCalls())->not->toContain('nodes.ready');
 });

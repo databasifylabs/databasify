@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Ssh;
 
 use App\Contracts\Ssh\ServerConnection;
-use App\Exceptions\Databases\OperationStopped;
 use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Models\Database;
 use App\Models\Server;
@@ -32,7 +31,6 @@ final readonly class Ssh
      */
     public function exec(string $view, array $data = [], ?string $log = null, ?int $timeout = null, bool $secret = false): string
     {
-        $this->ensureNotStopped($log);
         $serverLog = $log === null ? null : $this->logNamed($log);
         $timeout ??= $serverLog === null ? self::PROBE_TIMEOUT : self::TIMEOUT;
         $output = '';
@@ -58,17 +56,6 @@ final readonly class Ssh
         }
 
         return $output;
-    }
-
-    private function ensureNotStopped(?string $log): void
-    {
-        if ($log === null || $this->database?->isStopRequested() !== true) {
-            return;
-        }
-
-        $this->server->logFailure($log, 'Stopped by you before this ran.', $this->database);
-
-        throw new OperationStopped("{$this->database->name} was stopped by you.");
     }
 
     private function logNamed(string $name): ServerLog

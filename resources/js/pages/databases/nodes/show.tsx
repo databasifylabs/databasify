@@ -24,7 +24,6 @@ import InsightsTab from '@/components/databases/tabs/insights-tab';
 import LogsTab from '@/components/databases/tabs/logs-tab';
 import NetworkTab from '@/components/databases/tabs/network-tab';
 import PoolsTab from '@/components/databases/tabs/pools-tab';
-import StopOperationButton from '@/components/databases/stop-operation-button';
 import { ServerSpecItems } from '@/components/servers/server-specs';
 import TabNav from '@/components/tab-nav';
 import type { TabSpec } from '@/components/tab-nav';
@@ -190,15 +189,6 @@ export default function ShowNode({
                                         operation={operation}
                                         className="text-sm"
                                     />
-                                    {node.status !== database.status && (
-                                        <StopOperationButton
-                                            stop={DatabaseNodeController.stop({
-                                                database: database.id,
-                                                node: node.id,
-                                            })}
-                                            operation={operation}
-                                        />
-                                    )}
                                 </>
                             )}
                         </div>
