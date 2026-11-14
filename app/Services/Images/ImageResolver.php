@@ -9,7 +9,6 @@ use App\DTOs\Databases\EngineImage;
 use App\DTOs\Images\LineImages;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
-use App\Support\Engines\SdkRange;
 use Illuminate\Support\LazyCollection;
 
 final readonly class ImageResolver
@@ -29,7 +28,7 @@ final readonly class ImageResolver
         $images = $this->releasesIn($engine->imageRepository, $line)->remember();
         $newest = $images->first() ?? throw ImageUnavailable::noReleaseOf("{$engine->label} {$line}", $engine->imageRepository);
 
-        return new LineImages($newest, $images->first(fn (EngineImage $image): bool => SdkRange::supports($image)));
+        return new LineImages($newest, $images->first(fn (EngineImage $image): bool => $image->hasSupportedSdk()));
     }
 
     /**

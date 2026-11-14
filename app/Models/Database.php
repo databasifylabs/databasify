@@ -492,7 +492,7 @@ class Database extends Model implements Movable
 
     public function runsSupportedSdk(?string $constraint = null): bool
     {
-        return SdkRange::supports($this->image, $constraint);
+        return $this->image->hasSupportedSdk($constraint);
     }
 
     public function ensureRunsSupportedSdk(): void

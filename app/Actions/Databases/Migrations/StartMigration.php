@@ -10,7 +10,6 @@ use App\Enums\Migrations\MigrationMode;
 use App\Jobs\Databases\RunMigrationJob;
 use App\Models\Database;
 use App\Models\DatabaseMigration;
-use App\Support\Migrations\NameList;
 use Illuminate\Validation\ValidationException;
 
 final readonly class StartMigration
@@ -28,7 +27,7 @@ final readonly class StartMigration
         }
 
         if ($report->occupied !== []) {
-            $occupied = NameList::of($report->occupied);
+            $occupied = $report->occupiedNames();
 
             throw ValidationException::withMessages(['source' => "These databases already hold rows here, from an earlier copy or your own data: {$occupied}. Delete them on the Users & Databases tab, or drop them on the server yourself, or pick other databases."]);
         }

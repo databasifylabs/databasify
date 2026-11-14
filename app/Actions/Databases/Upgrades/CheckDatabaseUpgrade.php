@@ -9,7 +9,6 @@ use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
-use App\Support\Engines\SdkRange;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
@@ -30,12 +29,12 @@ final readonly class CheckDatabaseUpgrade
         $newest = $images->newest;
         $refusalKey = "sdk-refused:{$database->id}";
 
-        if (SdkRange::supports($newest)) {
+        if ($newest->hasSupportedSdk()) {
             Cache::forget($refusalKey);
         } elseif (Cache::get($refusalKey) !== $newest->digest) {
             Cache::put($refusalKey, $newest->digest, now()->addDays(self::REFUSAL_TTL_DAYS));
             $label = $database->engine()->label;
-            event(new DatabaseAlertRaised($database, "{$database->name} stays on {$label} {$database->image->release}", SdkRange::refusalFor($label, $newest)));
+            event(new DatabaseAlertRaised($database, "{$database->name} stays on {$label} {$database->image->release}", $newest->sdkRefusalFor($label)));
         }
 
         if ($images->supported === null) {

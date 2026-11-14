@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs\Databases;
 
 use App\Engines\Payload;
+use App\Support\Engines\SdkRange;
 
 final readonly class EngineImage
 {
@@ -30,6 +31,16 @@ final readonly class EngineImage
         $comparison = version_compare($this->release, $current->release);
 
         return $comparison > 0 || ($comparison === 0 && $this->reference() !== $current->reference());
+    }
+
+    public function hasSupportedSdk(?string $constraint = null): bool
+    {
+        return SdkRange::supports($this, $constraint);
+    }
+
+    public function sdkRefusalFor(string $engineLabel): string
+    {
+        return SdkRange::refusalFor($engineLabel, $this);
     }
 
     public function refreshes(self $current): bool

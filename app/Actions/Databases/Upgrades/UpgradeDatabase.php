@@ -7,7 +7,6 @@ namespace App\Actions\Databases\Upgrades;
 use App\Enums\Databases\DatabaseStatus;
 use App\Jobs\Databases\UpgradeDatabaseJob;
 use App\Models\Database;
-use App\Support\Engines\SdkRange;
 use Illuminate\Validation\ValidationException;
 
 final readonly class UpgradeDatabase
@@ -20,8 +19,8 @@ final readonly class UpgradeDatabase
 
         $label = $database->engine()->label;
 
-        if (! SdkRange::supports($image)) {
-            throw ValidationException::withMessages(['version' => SdkRange::refusalFor($label, $image)]);
+        if (! $image->hasSupportedSdk()) {
+            throw ValidationException::withMessages(['version' => $image->sdkRefusalFor($label)]);
         }
 
         $database->markBusyWith(DatabaseStatus::Upgrading, fn (Database $locked) => $locked->recordInstalledImage($image));

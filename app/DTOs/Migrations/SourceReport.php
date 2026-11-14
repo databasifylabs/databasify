@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs\Migrations;
 
 use App\Engines\Payload;
+use App\Support\Migrations\NameList;
 
 final readonly class SourceReport
 {
@@ -70,6 +71,11 @@ final readonly class SourceReport
             warnings: $warnings,
             databases: $databases,
         );
+    }
+
+    public function occupiedNames(): string
+    {
+        return NameList::of($this->occupied);
     }
 
     public static function unreachable(string $error): self

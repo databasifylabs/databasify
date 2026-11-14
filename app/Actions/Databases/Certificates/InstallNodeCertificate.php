@@ -6,7 +6,6 @@ namespace App\Actions\Databases\Certificates;
 
 use App\Models\Database;
 use App\Models\DatabaseNode;
-use App\Support\Tls\CertificateFingerprint;
 
 final readonly class InstallNodeCertificate
 {
@@ -15,6 +14,6 @@ final readonly class InstallNodeCertificate
         $certificate = $database->certificateFor($node);
 
         $node->driver()->nodes()->installTls($certificate->certificate, $certificate->key, $certificate->ca);
-        $node->update(['certificate_fingerprint' => CertificateFingerprint::of($certificate->certificate)]);
+        $node->update(['certificate_fingerprint' => $certificate->fingerprint()]);
     }
 }
