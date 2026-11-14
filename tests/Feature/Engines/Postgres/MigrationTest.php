@@ -35,12 +35,19 @@ it('starts a one-time copy in its own unit with the copy script attached', funct
     });
 });
 
-it('refuses what the Go engine refuses', function (bool $continuous, ?string $owner, string $message) {
-    expect(fn () => $this->node->driver()->migration()->start(new MigrationStartData($this->source, [], $continuous, $owner)))->toThrow(InvalidEngineRequest::class, $message);
-})->with([
-    'no owner' => [false, null, 'PostgreSQL migrations need an owner'],
-    'continuous without a publication' => [true, 'databasify', 'continuous PostgreSQL migrations need a publication'],
-]);
+it('starts a continuous migration with a publication tagged by the target database', function () {
+    $tag = substr(str_replace('-', '', $this->node->database->id), -12);
+
+    $this->node->driver()->migration()->start(new MigrationStartData($this->source, ['shop'], true, 'databasify'));
+
+    $this->scripts->assertRan('engines.postgres.migration.start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true'
+        && $env['MIGRATION_PUBLICATION'] === "databasify_migration_{$tag}" && strlen($tag) === 12
+        && str_contains(base64_decode($env['COPY_SCRIPT']), 'CREATE PUBLICATION'));
+});
+
+it('refuses a migration without an owner', function () {
+    expect(fn () => $this->node->driver()->migration()->start(new MigrationStartData($this->source, [], false, null)))->toThrow(InvalidEngineRequest::class, 'PostgreSQL migrations need an owner');
+});
 
 it('reads progress and stops the migration', function () {
     $this->scripts->respond('engines.postgres.migration.progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => null]);

@@ -18,6 +18,10 @@ final readonly class PostgresMigration implements Migration
 
     private const int STOP_TIMEOUT = 600;
 
+    private const string PUBLICATION_PREFIX = 'databasify_migration_';
+
+    private const int TARGET_TAG_LENGTH = 12;
+
     public function __construct(
         private PostgresDriver $driver,
         private ScriptView $views,
@@ -36,16 +40,12 @@ final readonly class PostgresMigration implements Migration
             throw new InvalidEngineRequest('PostgreSQL migrations need an owner');
         }
 
-        if ($start->continuous) {
-            throw new InvalidEngineRequest('continuous PostgreSQL migrations need a publication');
-        }
-
         $this->driver->run('engines.postgres.migration.start', $this->driver->data(), env: [
             ...$this->sourceEnv($start->source),
             'MIGRATION_DATABASES' => implode("\n", $start->databases),
             'MIGRATION_OWNER' => $start->owner,
-            'MIGRATION_CONTINUOUS' => 'false',
-            'MIGRATION_PUBLICATION' => '',
+            'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
+            'MIGRATION_PUBLICATION' => $this->publicationName(),
             'COPY_SCRIPT' => base64_encode($this->views->render($this->driver->node, 'engines.postgres.migration.copy', $this->driver->data())),
         ]);
     }
@@ -58,6 +58,11 @@ final readonly class PostgresMigration implements Migration
     public function stop(): void
     {
         $this->driver->run('engines.postgres.migration.stop', $this->driver->data(), timeout: self::STOP_TIMEOUT);
+    }
+
+    private function publicationName(): string
+    {
+        return self::PUBLICATION_PREFIX.substr(str_replace('-', '', $this->driver->node->database->id), -self::TARGET_TAG_LENGTH);
     }
 
     /**
