@@ -16,6 +16,7 @@ final readonly class Operation
         public string $phase,
         public ?Progress $progress,
         public ?string $error,
+        public string $output = '',
     ) {}
 
     public static function fromPayload(Payload $payload): self

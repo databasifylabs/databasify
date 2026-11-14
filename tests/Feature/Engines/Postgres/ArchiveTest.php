@@ -34,5 +34,5 @@ it('restores to a point in time as a task with the storage keys only in a file',
         && str_contains($env['RESTORE_CONFIG'], "repo1-s3-key-secret=S'ECRET\n")
         && ! str_contains($env['RESTORE_CONFIG'], 'repo1-retention-full')
         && ! str_contains($script, 'ECRET')
-        && str_contains($script, "phase 'replaying'") === false && str_contains($script, 'phase replaying'));
+        && str_contains($script, "echo 'Replaying…'"));
 });

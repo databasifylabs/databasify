@@ -51,10 +51,10 @@ follow_group() {
         fail_task 'a read-only node needs the primary to follow'
     fi
     if [ -z "$(gtid_executed)" ]; then
-        phase 'cloning'
+        echo 'Cloning…'
         retry_or_fail 1800 30m0s clone_attempt
     fi
-    phase 'following'
+    echo 'Following…'
     my '' > /dev/null <<SQL
 CHANGE REPLICATION SOURCE TO SOURCE_HOST = $(my_string "$PRIMARY"), SOURCE_PORT = 25060, SOURCE_USER = 'databasify_repl', SOURCE_PASSWORD = $(my_string "$REPLICATION_SECRET"), SOURCE_AUTO_POSITION = 1, SOURCE_SSL = 1, SOURCE_CONNECT_RETRY = 5, SOURCE_RETRY_COUNT = 3, SOURCE_CONNECTION_AUTO_FAILOVER = 1 FOR CHANNEL 'group';
 SELECT asynchronous_connection_failover_add_managed('group', 'GroupReplication', $(my_string "$GROUP_NAME"), $(my_string "$PRIMARY"), 25060, '', 80, 60);
@@ -68,20 +68,24 @@ require_saved
 replication_password
 if saved_is '.readOnly'; then
     follow_group
+    echo 'Following the primary as a read-only node.'
     exit 0
 fi
 require_primary_keys
 if ! group_plugin_loaded; then
-    phase 'restarting into the new config'
+    echo 'Restarting into the new config…'
     unit_do restart "$SERVER_UNIT"
     wait_ready 'MySQL with Group Replication'
 fi
 if saved_is '.primary == null or .primary == .ip'; then
-    phase 'bootstrapping'
+    echo 'Bootstrapping…'
     bootstrap_group "$REPLICATION_SECRET"
+    JOINED='Started the group as its primary.'
 else
-    phase 'joining'
+    echo 'Joining…'
     retry_or_fail 1800 30m0s join_attempt
+    JOINED='Joined the group as a standby.'
 fi
-phase 'recovering'
+echo 'Recovering…'
 online_and_joined "$REPLICATION_SECRET"
+echo "$JOINED"

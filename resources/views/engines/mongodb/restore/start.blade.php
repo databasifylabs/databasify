@@ -34,9 +34,9 @@ sync_storage() {
     wait_until 600 2 resynced || fail_task 'the server was not ready within 10m0s'
 }
 
-phase 'stopping oplog slicing'
+echo 'Stopping oplog slicing…'
 sync_storage "$RESTORE_CONFIG"
-phase 'restoring'
+echo 'Restoring…'
 pbm_locked restore "--time=$TARGET" --yes --wait || fail_task "$PBM_ERROR"
 if [ -n "$ADMIN_PASSWORD" ]; then
     mongo_try member <<'JS'
@@ -65,7 +65,7 @@ main(() => {
 });
 JS
 fi
-phase 'backing up'
+echo 'Backing up…'
 sync_storage "$SAVED_CONFIG"
 pbm_locked backup --compression=zstd --wait || fail_task "$PBM_ERROR"
 pbm_locked config --set pitr.enabled=true || fail_task "$PBM_ERROR"

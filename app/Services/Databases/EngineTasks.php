@@ -39,6 +39,7 @@ final readonly class EngineTasks
 
             if ($operation?->state === OperationState::Succeeded) {
                 $node->update(['task_key' => null]);
+                $serverLog->write($operation->output);
                 $serverLog->finish(0);
 
                 return;
@@ -56,6 +57,7 @@ final readonly class EngineTasks
 
             $failure = $this->failureOf($operation);
             $node->update(['task_key' => null]);
+            $serverLog->write($operation->output);
             $serverLog->fail($failure->getMessage());
 
             throw $failure;

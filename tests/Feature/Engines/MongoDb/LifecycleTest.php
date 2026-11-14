@@ -60,5 +60,5 @@ it('installs a combined TLS pem and rotates certificates', function () {
 it('waits for MongoDB as a task', function () {
     $this->node->driver()->nodes()->ready('ready.1', true);
 
-    $this->scripts->assertRan('engines.mongodb.nodes.ready', fn (string $script): bool => str_contains($script, "phase 'waiting for MongoDB'") && str_contains($script, 'MongoDB keeps stopping while it starts, see its log'));
+    $this->scripts->assertRan('engines.mongodb.nodes.ready', fn (string $script): bool => str_contains($script, "echo 'Waiting for MongoDB…'") && str_contains($script, 'MongoDB keeps stopping while it starts, see its log'));
 });

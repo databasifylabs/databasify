@@ -10,7 +10,7 @@ piped() {
     output=$("$@" 2>&1) || fail_task "$label: $(tail -n 3 <<< "$output" | tr '\n' ' ')"
 }
 
-phase 'downloading'
+echo 'Downloading…'
 entries=$(rclone_list base) || fail_task "$RCLONE_ERROR"
 chosen=$(jq -r --arg suffix "$SUFFIX" --arg target "$TARGET_STAMP" '[.[].Path] as $paths | [$paths[] | select(endswith($suffix)) | rtrimstr($suffix) | select(. as $name | $paths | index($name + ".binlog-info")) | select(test("^[0-9]{8}T[0-9]{6}Z$")) | select(. <= $target)] | sort | last // empty' <<< "$entries")
 if [ -z "$chosen" ]; then
@@ -30,12 +30,12 @@ if [ -z "$gtids" ]; then
     fail_task 'the base backup records no GTID position'
 fi
 
-phase 'preparing'
+echo 'Preparing…'
 @if ($engine->id === 'mysql')
 piped /usr/bin/xtrabackup /usr/bin/xtrabackup --prepare "--target-dir=$RESTORE/data"
 @else
 piped /usr/bin/mariadb-backup /usr/bin/mariadb-backup --prepare "--target-dir=$RESTORE/data"
-phase 'starting'
+echo 'Starting…'
 @endif
 
 unit_do stop "$SERVER_UNIT"
@@ -53,4 +53,4 @@ rm -f "$ROOT/state/archive-id"
 unit_do start "$SERVER_UNIT"
 wait_until 21600 2 serving || fail_task 'the server was not ready within 6h0m0s'
 
-phase 'replaying'
+echo 'Replaying…'

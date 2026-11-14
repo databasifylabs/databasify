@@ -55,8 +55,8 @@ it('waits for readiness and enables the cluster as tasks under their keys', func
     $enable = $this->node->driver()->cluster()->enable('flow.4.1');
 
     expect($ready->key)->toBe('flow.3.1')->and($enable->key)->toBe('flow.4.1');
-    $this->scripts->assertRan('engines.postgres.nodes.ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "phase 'waiting for PostgreSQL'") && str_contains($script, 'PostgreSQL was not ready in time'))
-        ->assertRan('engines.postgres.cluster.enable', fn (string $script): bool => str_contains($script, "phase 'starting Patroni'") && str_contains($script, 'Patroni did not lead or follow the cluster in time'));
+    $this->scripts->assertRan('engines.postgres.nodes.ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "echo 'Waiting for PostgreSQL…'") && str_contains($script, 'PostgreSQL was not ready in time'))
+        ->assertRan('engines.postgres.cluster.enable', fn (string $script): bool => str_contains($script, "echo 'Starting Patroni…'") && str_contains($script, 'Patroni did not lead or follow the cluster in time'));
 });
 
 it('does not reset PostgreSQL nodes', function () {

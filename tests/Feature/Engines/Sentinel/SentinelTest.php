@@ -110,7 +110,7 @@ it('runs start, restart, reset and ready like Go', function () {
     $this->scripts->assertRan('engines.sentinel.nodes.start', fn (string $script, array $env): bool => $env['HOLDS'] === 'false' && str_contains($script, 'start-refused'))
         ->assertRan('engines.sentinel.nodes.restart', fn (string $script, array $env): bool => collect(json_decode($env['DIRECTIVES'], true))->firstWhere('name', 'databases') === ['name' => 'databases', 'line' => null])
         ->assertRan('engines.sentinel.nodes.reset', fn (string $script, array $env): bool => $env['KEEP'] === '127.0.0.1 10.0.0.1 10.0.0.2' && $env['PEERS'] === '2')
-        ->assertRan('engines.sentinel.nodes.ready', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true' && str_contains($script, "phase 'following the primary'") && str_contains($script, "phase 'waiting for TLS'"));
+        ->assertRan('engines.sentinel.nodes.ready', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true' && str_contains($script, "echo 'Following the primary…'") && str_contains($script, "echo 'Waiting for TLS…'"));
 });
 
 it('runs the cluster commands', function () {
@@ -128,7 +128,7 @@ it('runs the cluster commands', function () {
         ->assertRan('engines.sentinel.cluster.failover', fn (string $script, array $env): bool => str_contains($script, 'is a read-only replica and cannot become the primary') && str_contains($script, 'SENTINEL FAILOVER main') && str_contains($script, 'if info=$(replication_info); then'))
         ->assertRan('engines.sentinel.cluster.force-quorum', fn (string $script): bool => str_contains($script, 'sentinel config-epoch main %d'))
         ->assertRan('engines.sentinel.cluster.membership', fn (string $script, array $env): bool => $env['QUORUM'] === '2' && $env['REQUIRED'] === '0')
-        ->assertRan('engines.sentinel.cluster.rejoin', fn (string $script): bool => str_contains($script, "phase 'finding the primary'"));
+        ->assertRan('engines.sentinel.cluster.rejoin', fn (string $script): bool => str_contains($script, "echo 'Finding the primary…'"));
 });
 
 it('checks and starts a redis-shake migration', function () {

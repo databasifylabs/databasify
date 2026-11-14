@@ -48,7 +48,7 @@ main(() => {
   result({});
 });
 JS
-    phase 'syncing'
+    echo 'Syncing…'
     synced=$(MONGO_TIMEOUT=21660 mongo_js peers <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
@@ -75,7 +75,7 @@ JS
     if [ "$READ_ONLY" = true ]; then
         return 0
     fi
-    phase 'voting'
+    echo 'Voting…'
     MONGO_TIMEOUT=660 mongo_js peers > /dev/null <<'JS'
 @include('engines.mongodb._replset')
 main(() => {

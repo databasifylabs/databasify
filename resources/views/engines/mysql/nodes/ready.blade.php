@@ -6,7 +6,7 @@
 wait_ready MySQL
 if [ -e "$ROOT/state/grouped" ]; then
     replication_password
-    phase 'joining the group'
+    echo 'Joining the group…'
     start_group "$REPLICATION_SECRET" || fail_task "could not rejoin the group: $MY_ERROR_TEXT"
     online_and_joined "$REPLICATION_SECRET"
 fi

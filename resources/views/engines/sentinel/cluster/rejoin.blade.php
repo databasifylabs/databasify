@@ -2,7 +2,7 @@
 @include('engines.sentinel._node')
 databasify ctl reset-failed "$FLAVOR-server" "$FLAVOR-sentinel" > /dev/null 2>&1 || true
 databasify ctl start "$FLAVOR-sentinel" > /dev/null 2>&1 || true
-phase 'finding the primary'
+echo 'Finding the primary…'
 found() {
     newest_primary
     [ -n "$NEWEST_PRIMARY" ]
@@ -16,7 +16,7 @@ set_replica_of "$replicate"
 if [ "$READ_ONLY" != true ] && restart_loses_data "$PERSISTENT"; then
     hold
 fi
-phase 'replicating from the primary'
+echo 'Replicating from the primary…'
 if ! unit_active "$FLAVOR-server"; then
     unit_do start "$FLAVOR-server"
 elif [ -z "$replicate" ]; then

@@ -36,10 +36,10 @@ SELECT @@gtid_slave_pos
 SQL
 )
     if [ -z "$position" ]; then
-        phase 'copying'
+        echo 'Copying…'
         retry_or_fail 600 10m0s seed_attempt
     fi
-    phase 'following'
+    echo 'Following…'
     follow_writer "$WRITER" "$REPLICATION_SECRET"
     : | write_file "$ROOT/state/replica" 600 false || true
     exit 0
@@ -59,13 +59,13 @@ if read_state && [ "$STATE_GALERA" = 1 ] && state_synced; then
 fi
 require_primary_keys
 if [ "$seed" = true ]; then
-    phase 'bootstrapping'
+    echo 'Bootstrapping…'
     mark_new_cluster
 else
-    phase 'joining'
+    echo 'Joining…'
 fi
 restart_server
-phase 'syncing'
+echo 'Syncing…'
 wait_until 21600 2 synced_now || fail_task 'the server was not ready within 6h0m0s'
 clear_new_cluster
 if [ "$seed" = true ]; then

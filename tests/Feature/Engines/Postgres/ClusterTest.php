@@ -59,6 +59,6 @@ it('rejoins as a task and forgets an etcd member', function () {
     $this->node->driver()->cluster()->forget('10.0.0.3');
 
     expect($operation->key)->toBe('flow.9.1');
-    $this->scripts->assertRan('engines.postgres.cluster.rejoin', fn (string $script): bool => str_contains($script, "phase 'starting Patroni'"))
+    $this->scripts->assertRan('engines.postgres.cluster.rejoin', fn (string $script): bool => str_contains($script, "echo 'Starting Patroni…'"))
         ->assertRan('engines.postgres.members.forget', fn (string $script, array $env): bool => $env === ['IP' => '10.0.0.3'] && str_contains($script, 'member remove'));
 });

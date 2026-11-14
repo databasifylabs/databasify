@@ -19,7 +19,7 @@ it('enables Galera as a task with both manifests', function () {
     $this->scripts->assertRan('engines.mariadb.cluster.enable', fn (string $script, array $env): bool => base64_decode($env['MANIFEST']) === $this->fixture['manifest']
         && str_contains(base64_decode($env['MANIFEST_NEW_CLUSTER']), '--wsrep-new-cluster')
         && str_contains($script, 'run node configure with clustered on first')
-        && str_contains($script, "phase 'bootstrapping'")
+        && str_contains($script, "echo 'Bootstrapping…'")
         && str_contains($script, 'a cluster needs a primary key on every table; add one to ')
         && str_contains($script, 'the copy from the writer carried no GTID position')
         && str_contains($script, 'MASTER_USE_GTID = slave_pos'));
@@ -92,6 +92,6 @@ it('rejoins as a task', function () {
     $this->node->driver()->cluster()->rejoin('rejoin.1', true);
 
     $this->scripts->assertRan('engines.mariadb.cluster.rejoin', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true'
-        && str_contains($script, "phase 'pointing replication at a synced member'")
-        && str_contains($script, "phase 'waiting for Galera to sync'"));
+        && str_contains($script, "echo 'Pointing replication at a synced member…'")
+        && str_contains($script, "echo 'Waiting for Galera to sync…'"));
 });

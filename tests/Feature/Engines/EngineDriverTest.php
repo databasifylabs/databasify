@@ -121,15 +121,14 @@ it('reuses a running log with the same name', function () {
     expect($node->openLog('server: joining the cluster')->id)->toBe($node->openLog('server: joining the cluster')->id);
 });
 
-it('reports a task with the phase from its log', function () {
+it('reports a finished task with what its script printed', function () {
     fakeSsh()
-        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'running', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
-        ->respondToEngine('task log', ['lines' => "DATABASIFY_PHASE copying\n"]);
+        ->respondToEngine('task status', ['key' => 'copy.1', 'kind' => 'task', 'state' => 'succeeded', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => '2026-11-12T00:01:00Z', 'error' => null])
+        ->respondToEngine('task log', ['lines' => "2026-11-14T17:21:28Z databasify: started /usr/local/bin/databasify (pid 336)\n2026-11-14T17:21:28Z Joining…\n2026-11-14T17:21:31Z Joined the group as a standby.\n2026-11-14T17:21:31Z DATABASIFY_RESULT {}\n2026-11-14T17:21:31Z databasify: exited successfully\n"]);
 
-    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
+    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('copy.1');
 
-    expect($operation->state)->toBe(OperationState::Running)
-        ->and($operation->phase)->toBe('copying');
+    expect($operation->output)->toBe("Joining…\nJoined the group as a standby.\n");
 });
 
 it('stops a task', function () {
@@ -139,23 +138,4 @@ it('stops a task', function () {
 
     expect($operation->state)->toBe(OperationState::Interrupted)
         ->and($ssh->scriptAt(0))->toContain('databasify task stop');
-});
-
-it('reads no task log once a task has finished', function () {
-    $ssh = fakeSsh()->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'succeeded', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => '2026-11-12T00:01:00Z', 'error' => null]);
-
-    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
-
-    expect($operation->state)->toBe(OperationState::Succeeded)
-        ->and(collect($ssh->runs)->filter(fn (array $run): bool => str_contains($run['script'], '| databasify task log ')))->toBeEmpty();
-});
-
-it('keeps the reported phase of a running task when its log cannot be read', function () {
-    fakeSsh()
-        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'running', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
-        ->respondToEngine('task log', ['error' => ['code' => 'not_found', 'message' => 'no log', 'details' => (object) []]], exit: 1);
-
-    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
-
-    expect($operation->state)->toBe(OperationState::Running)->and($operation->phase)->toBe('starting');
 });

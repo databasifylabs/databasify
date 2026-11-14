@@ -10,7 +10,7 @@ restarts() {
 }
 
 wait_ready() {
-    phase "waiting for $1"
+    echo "Waiting for $1…"
     READY_LABEL=$1
     READY_BASELINE=$(restarts)
     wait_until 21600 2 ready_check || fail_task 'the server was not ready within 6h0m0s'

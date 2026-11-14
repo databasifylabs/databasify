@@ -24,8 +24,6 @@ use Illuminate\Support\Str;
 
 abstract readonly class AbstractEngineDriver implements EngineDriver
 {
-    private const string PHASE = 'DATABASIFY_PHASE ';
-
     final public function __construct(
         public DatabaseNode $node,
         public bool $followsPrimary = false,
@@ -62,18 +60,17 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     {
         $operation = $this->runtime()->taskStatus($this->node, $key);
 
-        if ($operation->state !== OperationState::Running) {
+        if ($operation->state === OperationState::Running) {
             return $operation;
         }
 
-        $log = rescue(fn (): string => $this->runtime()->taskLog($this->node, $key), '', report: false);
-        $phases = array_filter(explode("\n", $log), fn (string $line): bool => str_starts_with($line, self::PHASE));
+        $output = collect(explode("\n", rescue(fn (): string => $this->runtime()->taskLog($this->node, $key), '', report: false)))
+            ->map(fn (string $line): string => (string) preg_replace('/^\d{4}-\d{2}-\d{2}T\S+Z /', '', $line))
+            ->reject(fn (string $line): bool => $line === '' || str_starts_with($line, 'databasify: ') || str_starts_with($line, 'DATABASIFY_'))
+            ->map(fn (string $line): string => $line.PHP_EOL)
+            ->implode('');
 
-        if ($phases === []) {
-            return $operation;
-        }
-
-        return new Operation($operation->key, $operation->kind, $operation->state, substr((string) end($phases), strlen(self::PHASE)), $operation->progress, $operation->error);
+        return new Operation($operation->key, $operation->kind, $operation->state, $operation->phase, $operation->progress, $operation->error, $output);
     }
 
     public function stopTask(string $key): Operation

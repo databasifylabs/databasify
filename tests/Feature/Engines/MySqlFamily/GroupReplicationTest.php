@@ -18,14 +18,18 @@ it('enables Group Replication as a task with the group name from the saved reque
 
     $this->scripts->assertRan('engines.mysql.cluster.enable', fn (string $script, array $env): bool => $env['GROUP_NAME'] === json_decode(file_get_contents(base_path('tests/Fixtures/mysql/group-name.json')), true)[$fixture['request']['databaseId']]
         && json_decode($env['RESERVED_DATABASES'], true) === ['mysql', 'sys', 'performance_schema', 'information_schema']
-        && str_contains($script, "phase 'bootstrapping'")
+        && str_contains($script, "echo 'Bootstrapping…'")
         && str_contains($script, 'SET GLOBAL group_replication_bootstrap_group = ON')
         && str_contains($script, 'SET GLOBAL group_replication_clone_threshold = 1')
         && str_contains($script, 'a cluster needs a primary key on every table; add one to ')
         && str_contains($script, "SELECT asynchronous_connection_failover_add_managed('group', 'GroupReplication', ")
         && str_contains($script, 'CLONE INSTANCE FROM')
         && str_contains($script, 'MY_TIMEOUT=21600 my_try')
-        && str_contains($script, 'SELECT STATE, ERROR_MESSAGE FROM performance_schema.clone_status'));
+        && str_contains($script, 'SELECT STATE, ERROR_MESSAGE FROM performance_schema.clone_status')
+        && str_contains($script, "JOINED='Started the group as its primary.'")
+        && str_contains($script, "JOINED='Joined the group as a standby.'")
+        && str_contains($script, "echo 'Following the primary as a read-only node.'")
+        && str_contains($script, 'echo "$JOINED"'));
 });
 
 it('restarts a single server into its new config when Group Replication is not loaded yet', function () {
@@ -86,8 +90,8 @@ it('rejoins as a task, following the group on a read-only node', function (bool 
     $this->node->driver()->cluster()->rejoin('rejoin.1', $readOnly);
 
     $this->scripts->assertRan('engines.mysql.cluster.rejoin', fn (string $script, array $env): bool => $env['READ_ONLY'] === ($readOnly ? 'true' : 'false')
-        && str_contains($script, "phase 'starting replication'")
-        && str_contains($script, "phase 'waiting until the member is online'"));
+        && str_contains($script, "echo 'Starting replication…'")
+        && str_contains($script, "echo 'Waiting until the member is online…'"));
 })->with([true, false]);
 
 it('names the latest replication errors when the member left the group with an error', function () {

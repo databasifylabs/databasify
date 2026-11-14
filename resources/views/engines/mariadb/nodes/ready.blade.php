@@ -10,7 +10,7 @@ require_saved
 if ! saved_is '.clustered and (.readOnly | not)'; then
     exit 0
 fi
-phase 'syncing'
+echo 'Syncing…'
 wait_until 21600 2 synced_now || fail_task 'the server was not ready within 6h0m0s'
 keep_writer_role "$(saved .ip)"
 clear_new_cluster

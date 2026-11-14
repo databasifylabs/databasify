@@ -1,6 +1,6 @@
 @include('engines.mongodb._mongo')
 @include('engines.mongodb._units')
-phase 'waiting for MongoDB'
+echo 'Waiting for MongoDB…'
 baseline=$(restarts)
 serving() {
     if [ $(( $(restarts) - baseline )) -gt 3 ]; then

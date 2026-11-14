@@ -69,6 +69,16 @@ it('returns once the engine task succeeds within the short wait', function () {
         ->and($log?->status)->toBe(ServerLogStatus::Succeeded);
 });
 
+it('writes what the engine task printed into its log', function () {
+    Sleep::fake();
+    $node = upgradingDatabase()->seed();
+    answerRead('task.status', fn (string $key): Operation => new Operation($key, 'task', OperationState::Succeeded, '', null, null, "Joining…\nJoined the group.\n"));
+
+    startTaskOn($node);
+
+    expect($node->server->serverLogs()->latest()->first()?->output)->toBe("Joining…\nJoined the group.\n");
+});
+
 it('saves the task key and gives the worker back when the task outlives the short wait', function () {
     Sleep::fake();
     $node = upgradingDatabase()->seed();

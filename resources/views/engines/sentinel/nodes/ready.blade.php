@@ -1,6 +1,6 @@
 @include('engines.sentinel._cli')
 @include('engines.sentinel._node')
-phase "waiting for $FLAVOR"
+echo "Waiting for $FLAVOR…"
 baseline=$(restarts)
 serving() {
     if [ $(( $(restarts) - baseline )) -gt 3 ]; then
@@ -18,7 +18,7 @@ serving() {
             primary=$(sentinel_primary || true)
             current=$(info_field "$info" master_host)
             if [ -n "$primary" ] && [ "$primary" != "$SELF" ] && [ "$primary" != "$current" ]; then
-                phase 'following the primary'
+                echo 'Following the primary…'
                 local_cli REPLICAOF "$primary" 6379 > /dev/null || fail_task "could not follow $primary"
                 set_replica_of "$primary"
                 return 1
@@ -28,7 +28,7 @@ serving() {
     aof_written
 }
 until_ok 21600 6h0m0s serving
-phase 'waiting for TLS'
+echo 'Waiting for TLS…'
 tls_listening() {
     timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/25061' 2> /dev/null
 }

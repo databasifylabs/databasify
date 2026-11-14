@@ -75,7 +75,7 @@ it('restores with PBM as a task', function () {
 
     $this->scripts->assertRan('engines.mongodb.restore.start', fn (string $script, array $env): bool => $env['TARGET'] === '2026-11-12T04:00:00'
         && str_contains($env['RESTORE_CONFIG'], '"prefix": "/other"') && str_contains($env['RESTORE_CONFIG'], '"enabled": false')
-        && str_contains($script, "phase 'stopping oplog slicing'") && str_contains($script, 'PBM could not read the backup storage: ')
+        && str_contains($script, "echo 'Stopping oplog slicing…'") && str_contains($script, 'PBM could not read the backup storage: ')
         && str_contains($script, 'pitr.enabled=true'));
 });
 

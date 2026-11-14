@@ -6,13 +6,13 @@ RESTORE_CONF=/srv/postgres/conf/pgbackrest-restore.conf
 printf '%s' "$RESTORE_CONFIG" | write_file "$RESTORE_CONF" 600 || true
 trap 'rm -f "$RESTORE_CONF"' EXIT
 
-phase stopping
+echo 'Stopping…'
 for name in $(manifest_units 2> /dev/null || true); do
     databasify ctl stop "$name" > /dev/null 2>&1 || true
 done
 find /srv/postgres/data -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
-phase restoring
+echo 'Restoring…'
 output=$(backrest "$RESTORE_CONF" --type=time "--target=$TARGET+00" --target-action=promote "--recovery-option=restore_command=pgbackrest --config=$RESTORE_CONF --stanza=main archive-get %f \"%p\"" restore 2>&1) \
     || fail_task "pgbackrest --config=$RESTORE_CONF: $(tail -n 5 <<< "$output")"
 
@@ -43,7 +43,7 @@ if [ -n "$extra" ]; then
     chmod 600 /srv/postgres/data/postgresql.auto.conf
 fi
 
-phase replaying
+echo 'Replaying…'
 databasify ctl reset-failed databasify-postgres > /dev/null 2>&1 || true
 databasify ctl start databasify-postgres > /dev/null 2>&1 || fail_task 'could not start databasify-postgres'
 promoted() {
@@ -54,7 +54,7 @@ SQL
 }
 wait_until 21000 5 promoted || fail_task "recovery did not reach $TARGET UTC"
 
-phase resetting
+echo 'Resetting…'
 for setting in restore_command recovery_target_time recovery_target_action recovery_target_timeline "${raised[@]}"; do
     DATABASIFY_VAR_setting="$setting" pg postgres > /dev/null <<'SQL'
 SELECT format('ALTER SYSTEM RESET %I', :'setting') \gexec

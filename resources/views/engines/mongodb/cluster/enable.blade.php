@@ -1,9 +1,9 @@
 @include('engines.mongodb._mongo')
 @include('engines.mongodb._join')
 if [ "$SEED" = true ]; then
-    phase 'bootstrapping'
+    echo 'Bootstrapping…'
     initiate_seed
     exit 0
 fi
-phase 'joining'
+echo 'Joining…'
 join_set

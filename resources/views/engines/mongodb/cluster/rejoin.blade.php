@@ -1,5 +1,5 @@
 @include('engines.mongodb._mongo')
 @include('engines.mongodb._join')
-phase 'starting MongoDB'
+echo 'Starting MongoDB…'
 unit_do start mongod
 join_set

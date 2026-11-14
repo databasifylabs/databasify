@@ -98,9 +98,9 @@ it('waits for MySQL and rejoins its group as a task', function () {
     lifecycleNode('mysql')->driver()->nodes()->ready('ready.1', true);
 
     $this->scripts->assertRan('engines.mysql.nodes.ready', fn (string $script): bool => str_contains($script, 'wait_ready MySQL')
-        && str_contains($script, 'phase "waiting for $1"')
+        && str_contains($script, 'echo "Waiting for $1…"')
         && str_contains($script, '$READY_LABEL keeps stopping while it starts, see its log')
-        && str_contains($script, "phase 'joining the group'")
+        && str_contains($script, "echo 'Joining the group…'")
         && str_contains($script, "START GROUP_REPLICATION USER = 'databasify_repl', PASSWORD = "));
 });
 
@@ -110,7 +110,7 @@ it('waits for MariaDB to sync and keeps the writer role as a task', function () 
 
     lifecycleNode('mariadb')->driver()->nodes()->ready('ready.1', false);
 
-    $this->scripts->assertRan('engines.mariadb.nodes.ready', fn (string $script, array $env): bool => str_contains($script, "phase 'syncing'")
+    $this->scripts->assertRan('engines.mariadb.nodes.ready', fn (string $script, array $env): bool => str_contains($script, "echo 'Syncing…'")
         && str_contains($script, 'SELECT ip FROM databasify.writer WHERE id = 1')
         && base64_decode($env['MANIFEST']) === $fixture['manifest']);
 });

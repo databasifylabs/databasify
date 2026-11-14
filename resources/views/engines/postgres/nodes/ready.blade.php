@@ -2,10 +2,10 @@
 @include('engines.postgres._cluster')
 unit=$(main_unit)
 if clustered && [ -e /srv/postgres/conf/etcd.env ]; then
-    phase 'joining etcd'
+    echo 'Joining etcd…'
     promote_own_learner
 fi
-phase 'waiting for PostgreSQL'
+echo 'Waiting for PostgreSQL…'
 baseline=$(restarts_of "$unit")
 serves() {
     if [ $(( $(restarts_of "$unit") - baseline )) -gt 3 ]; then
@@ -27,7 +27,7 @@ SQL
     [ "$(patroni_role)" != unknown ] && { [ "$state" = running ] || [ "$state" = streaming ]; }
 }
 wait_until 21000 5 serves || fail_task 'PostgreSQL was not ready in time'
-phase 'waiting for the pooler'
+echo 'Waiting for the pooler…'
 pooler_listening() {
     timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/25061' 2> /dev/null
 }
@@ -41,7 +41,7 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements
 SQL
 fi
 if [ "$EXPECT_PRIMARY" = true ] && [ -e /srv/postgres/conf/pgbackrest.conf ]; then
-    phase 'switching WAL'
+    echo 'Switching WAL…'
     pg postgres > /dev/null <<'SQL'
 SELECT pg_switch_wal(); CHECKPOINT;
 SQL

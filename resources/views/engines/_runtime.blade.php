@@ -7,10 +7,6 @@ databasify_fail() {
     exit 1
 }
 
-phase() {
-    printf 'DATABASIFY_PHASE %s\n' "$1"
-}
-
 fail_task() {
     printf '%s\n' "$1" >&2
     exit 1

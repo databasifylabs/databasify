@@ -16,11 +16,11 @@ it('joins the replica set as a task with the saved members', function () {
     $this->node->driver()->cluster()->rejoin('rejoin.1', false);
 
     $this->scripts->assertRan('engines.mongodb.cluster.enable', fn (string $script, array $env): bool => $env['HOSTS'] === '10.0.0.1:25060,10.0.0.2:25060' && $env['SELF'] === '10.0.0.2:25060' && $env['SEED'] === 'true'
-        && str_contains($script, "phase 'syncing'") && str_contains($script, "phase 'voting'") && str_contains($script, 'withMember(configOf(primary.admin), env.SELF)')
+        && str_contains($script, "echo 'Syncing…'") && str_contains($script, "echo 'Voting…'") && str_contains($script, 'withMember(configOf(primary.admin), env.SELF)')
         && str_contains($script, 'this member is too stale to catch up and no primary is reachable to copy from; its data stays untouched')
         && ! str_contains(substr($script, (int) strpos($script, 'join_set()')), 'mongo_js root')
         && str_contains($script, 'mongo_js peers'))
-        ->assertRan('engines.mongodb.cluster.rejoin', fn (string $script): bool => str_contains($script, "phase 'starting MongoDB'"));
+        ->assertRan('engines.mongodb.cluster.rejoin', fn (string $script): bool => str_contains($script, "echo 'Starting MongoDB…'"));
 });
 
 it('runs the replica set commands with the Go reconfig rules', function () {
