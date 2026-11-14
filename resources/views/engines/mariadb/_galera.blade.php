@@ -92,6 +92,17 @@ clear_new_cluster() {
     unit_do daemon-reload
 }
 
+allow_bootstrap() {
+    local grastate
+    if [ ! -f "$ROOT/data/grastate.dat" ]; then
+        return 0
+    fi
+    grastate=$(cat "$ROOT/data/grastate.dat"; printf x)
+    grastate=${grastate%x}
+    printf '%s' "${grastate/safe_to_bootstrap: 0/safe_to_bootstrap: 1}" > "$ROOT/data/grastate.dat"
+    chmod 660 "$ROOT/data/grastate.dat"
+}
+
 mark_new_cluster() {
     : | write_file "$ROOT/state/new-cluster" 600 false || true
     write_manifest || true

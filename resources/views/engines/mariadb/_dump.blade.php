@@ -32,6 +32,8 @@ copy_from() {
     COPIED_GTID=''
     if [ "${statuses[0]}" -ne 0 ]; then
         ATTEMPT_ERROR="mariadb-dump: exit status ${statuses[0]}: $(tr -s '[:space:]' ' ' < "$errors")"
+    elif [ "${statuses[1]}" -ne 0 ]; then
+        ATTEMPT_ERROR="sed: exit status ${statuses[1]}"
     elif [ "${statuses[2]}" -ne 0 ]; then
         ATTEMPT_ERROR="mariadb: exit status ${statuses[2]}: $(tr -s '[:space:]' ' ' < "$loaded")"
     else

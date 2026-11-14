@@ -25,6 +25,13 @@ SQL
     fi
 }
 
+bootstrapped() {
+    if [ "$(restarts)" != "$BOOT_BASELINE" ]; then
+        fail_task 'MariaDB stopped while it bootstrapped the cluster, see its log'
+    fi
+    synced_now
+}
+
 require_saved
 if saved_is '.readOnly'; then
     writer_to_follow
@@ -51,20 +58,23 @@ seed=false
 if saved_is '.primary == null or .primary == .ip'; then
     seed=true
 fi
-if read_state && [ "$STATE_GALERA" = 1 ] && state_synced; then
+if ! { read_state && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then
+    require_primary_keys
     if [ "$seed" = true ]; then
-        become_writer_if_recorded "$(saved .ip)"
+        if ! read_state || [ "$STATE_GALERA" = 1 ]; then
+            fail_task 'only a seed serving its data on its own bootstraps a new cluster'
+        fi
+        echo 'Bootstrapping…'
+        allow_bootstrap
+        mark_new_cluster
+        restart_server
+        BOOT_BASELINE=$(restarts)
+        wait_until 21600 2 bootstrapped || fail_task 'the server was not ready within 6h0m0s'
+    else
+        echo 'Joining…'
+        restart_server
     fi
-    exit 0
 fi
-require_primary_keys
-if [ "$seed" = true ]; then
-    echo 'Bootstrapping…'
-    mark_new_cluster
-else
-    echo 'Joining…'
-fi
-restart_server
 echo 'Syncing…'
 wait_until 21600 2 synced_now || fail_task 'the server was not ready within 6h0m0s'
 clear_new_cluster

@@ -4,5 +4,8 @@
 @include('engines.mariadb._dump')
 ROOT=$COPY_ROOT
 
-copy_from 10.0.0.1 25060 databasify_repl secret true true
-printf '%s\n' "$COPIED_GTID"
+if copy_from 10.0.0.1 25060 databasify_repl secret true true; then
+    printf 'copied %s\n' "$COPIED_GTID"
+else
+    printf 'failed: %s\n' "$ATTEMPT_ERROR"
+fi

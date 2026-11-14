@@ -10,6 +10,7 @@ if saved_is '.readOnly'; then
     echo "This node is not in a cluster."
     exit 0
 fi
+rm -f "$ROOT/state/new-cluster"
 write_config_files
 unit_do daemon-reload
 unit_do restart mariadb-server

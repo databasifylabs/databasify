@@ -113,24 +113,47 @@ it('stops the script when a piped file write fails', function () {
         ->and($run->output())->not->toContain('unnoticed');
 })->skip(fn (): bool => ! Process::run(['bash', '-c', 'shopt -s lastpipe'])->successful(), 'needs bash 4.2 or newer, as the engine images ship');
 
-it('copies a dump under set -u and keeps the GTID position it carried', function () {
+/**
+ * @return array{output: string, loaded: string}
+ */
+function copyDumpWith(string $dump, string $sed = ''): array
+{
     $root = sys_get_temp_dir().'/my-copy-'.uniqid();
     mkdir("{$root}/bin", recursive: true);
     mkdir("{$root}/conf");
-    $dump = "-- MariaDB dump\n-- SET GLOBAL gtid_slave_pos='1-42-7,10-9-3';\nINSERT INTO t VALUES ('gtid_slave_pos=''9-9-9''');\n";
     file_put_contents("{$root}/dump.sql", $dump);
     file_put_contents("{$root}/bin/mariadb-dump", "#!/bin/bash\ncat \"\$DUMP_FILE\"\n");
     file_put_contents("{$root}/bin/mariadb", "#!/bin/bash\ncat > \"\$LOADED_FILE\"\n");
     chmod("{$root}/bin/mariadb-dump", 0755);
     chmod("{$root}/bin/mariadb", 0755);
+
+    if ($sed !== '') {
+        file_put_contents("{$root}/bin/sed", $sed);
+        chmod("{$root}/bin/sed", 0755);
+    }
+
     $node = idleDatabase('mariadb', 1)->nodes()->sole();
     $script = resolve(ScriptView::class)->render($node, 'engines.testing.my-copy', ['engine' => MySqlFamilyEngine::of('mariadb')]);
-
-    $run = Process::input($script)->env(['PATH' => "{$root}/bin:".getenv('PATH'), 'COPY_ROOT' => $root, 'DUMP_FILE' => "{$root}/dump.sql", 'LOADED_FILE' => "{$root}/loaded.sql"])->run(['bash', '-euo', 'pipefail', '-s']);
-    $loaded = file_get_contents("{$root}/loaded.sql");
+    $run = Process::input($script)->env(['PATH' => "{$root}/bin:".getenv('PATH'), 'COPY_ROOT' => $root, 'DUMP_FILE' => "{$root}/dump.sql", 'LOADED_FILE' => "{$root}/loaded.sql"])->run(['bash', '-euo', 'pipefail', '-s'])->throw();
+    $loaded = (string) file_get_contents("{$root}/loaded.sql");
     Process::run(['rm', '-rf', $root]);
 
-    expect($run->successful())->toBeTrue($run->errorOutput())
-        ->and($run->output())->toBe("1-42-7,10-9-3\n")
-        ->and($loaded)->toBe($dump);
+    return ['output' => $run->output(), 'loaded' => $loaded];
+}
+
+it('copies a dump under set -u and keeps the GTID position it carried', function () {
+    $dump = "-- MariaDB dump\n-- SET GLOBAL gtid_slave_pos='1-42-7,10-9-3';\nINSERT INTO t VALUES ('gtid_slave_pos=''9-9-9''');\n";
+
+    $copy = copyDumpWith($dump);
+
+    expect($copy['output'])->toBe("copied 1-42-7,10-9-3\n")
+        ->and($copy['loaded'])->toBe($dump);
+});
+
+it('fails the copy when the GTID filter stops before the dump ends', function () {
+    $cutting = "#!/bin/bash\nfor arg in \"\$@\"; do case \$arg in *'/w '*) head -n 1; exit 4 ;; esac; done\nexec /usr/bin/sed \"\$@\"\n";
+
+    $copy = copyDumpWith("-- MariaDB dump\n-- SET GLOBAL gtid_slave_pos='1-42-7';\nINSERT INTO t VALUES (1);\n", $cutting);
+
+    expect($copy['output'])->toBe("failed: sed: exit status 4\n");
 });

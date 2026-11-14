@@ -25,6 +25,16 @@ it('enables Galera as a task with both manifests', function () {
         && str_contains($script, 'MASTER_USE_GTID = slave_pos'));
 });
 
+it('bootstraps only a seed that serves its data on its own and fails once the server stops', function () {
+    $this->node->driver()->cluster()->enable('enable.1');
+
+    $this->scripts->assertRan('engines.mariadb.cluster.enable', fn (string $script): bool => str_contains($script, 'if ! { read_state && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then')
+        && str_contains($script, "fail_task 'only a seed serving its data on its own bootstraps a new cluster'")
+        && str_contains($script, '"${grastate/safe_to_bootstrap: 0/safe_to_bootstrap: 1}"')
+        && strpos($script, "\n        allow_bootstrap\n") < strpos($script, "\n        restart_server\n        BOOT_BASELINE=\$(restarts)\n")
+        && str_contains($script, "fail_task 'MariaDB stopped while it bootstrapped the cluster, see its log'"));
+});
+
 it('leaves the cluster by rewriting the files without clustering', function () {
     $this->node->driver()->cluster()->disable();
 
@@ -33,6 +43,7 @@ it('leaves the cluster by rewriting the files without clustering', function () {
 
         return json_decode($env['REQUEST_JSON'], true)['clustered'] === false
             && ! str_contains($myCnf, 'wsrep_on=ON')
+            && str_contains($script, 'rm -f "$ROOT/state/new-cluster"')
             && str_contains($script, 'RESET SLAVE ALL')
             && str_contains($script, 'unit_do restart mariadb-server');
     });

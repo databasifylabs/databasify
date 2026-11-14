@@ -11,10 +11,7 @@ if read_state; then
     fi
     my '' > /dev/null <<< "SET GLOBAL wsrep_provider_options = 'pc.bootstrap=YES'"
 else
-    grastate=$(cat "$ROOT/data/grastate.dat" 2> /dev/null; printf x)
-    grastate=${grastate%x}
-    printf '%s' "${grastate/safe_to_bootstrap: 0/safe_to_bootstrap: 1}" > "$ROOT/data/grastate.dat"
-    chmod 660 "$ROOT/data/grastate.dat"
+    allow_bootstrap
     mark_new_cluster
     unit_do daemon-reload
     unit_do start mariadb-server
