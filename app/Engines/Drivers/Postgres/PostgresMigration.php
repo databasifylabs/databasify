@@ -42,7 +42,7 @@ final readonly class PostgresMigration implements Migration
 
         $this->driver->run('postgres/migration/start', $this->driver->data(), env: [
             ...$this->sourceEnv($start->source),
-            'MIGRATION_DATABASES' => implode(' ', $start->databases),
+            'MIGRATION_DATABASES' => implode("\n", $start->databases),
             'MIGRATION_OWNER' => $start->owner,
             'MIGRATION_CONTINUOUS' => 'false',
             'MIGRATION_PUBLICATION' => '',

@@ -6,7 +6,7 @@ ssl=0
 if [ "$MIGRATION_TLS" = true ]; then
     ssl=1
 fi
-read -ra databases <<< "$MIGRATION_DATABASES"
+IFS=$'\n' read -r -d '' -a databases <<< "$MIGRATION_DATABASES" || true
 @if ($engine->id === 'mysql')
 admin_password=$(sed -n 's/^[[:space:]]*password=//p' "$ROOT/conf/admin.cnf" | head -n 1)
 my '' <<< 'SET GLOBAL local_infile = ON' > /dev/null

@@ -40,7 +40,8 @@ trap 'rm -rf "$COPY_DIR"' EXIT
     printf '%s' "$SOURCE_TOOL_CONFIG" > "$COPY_DIR/source.yaml"
     printf '%s' "$TARGET_TOOL_CONFIG" > "$COPY_DIR/target.yaml"
 )
-for database in $MIGRATION_DATABASES; do
+IFS=$'\n' read -r -d '' -a databases <<< "$MIGRATION_DATABASES" || true
+for database in "${databases[@]}"; do
     set +e
     mongodump --config="$COPY_DIR/source.yaml" --archive --gzip --db="$database" \
         | mongorestore --config="$COPY_DIR/target.yaml" --archive --gzip --nsInclude="$database.*" --drop --numInsertionWorkersPerCollection=4

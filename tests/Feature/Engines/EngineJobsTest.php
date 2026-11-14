@@ -23,7 +23,8 @@ function runJobLocally(DatabaseNode $node, string $job, array $data, array $stub
         chmod("{$directory}/bin/{$name}", 0755);
     }
 
-    $run = Process::input(resolve(ScriptView::class)->render($node, $job, $data))
+    File::ensureDirectoryExists("{$directory}/root");
+    $run = Process::input(str_replace("/srv/{$node->database->engine}", "{$directory}/root", resolve(ScriptView::class)->render($node, $job, $data)))
         ->env([...$env, 'PATH' => "{$directory}/bin:".getenv('PATH'), 'STUB_DIR' => $directory])
         ->run(['bash', '-s']);
     $log = File::exists("{$directory}/commands.log") ? File::get("{$directory}/commands.log") : '';
@@ -107,6 +108,18 @@ it('renders every job script as valid bash', function (string $engine, string $j
     ['mongodb', 'mongodb/jobs/backup'],
     ['mongodb', 'mongodb/jobs/migration-copy'],
 ]);
+
+it('copies a mongodb database whose name has a space', function () {
+    $node = idleDatabase('mongodb', 1)->nodes()->sole();
+    $log = 'printf "%s\n" "$0 $*" >> "$STUB_DIR/commands.log"'.PHP_EOL;
+
+    $commands = runJobLocally($node, 'mongodb/jobs/migration-copy', [], [
+        'mongodump' => "#!/bin/bash\n".$log,
+        'mongorestore' => "#!/bin/bash\ncat > /dev/null\n".$log,
+    ], ['MIGRATION_DATABASES' => "my db\nshop", 'MIGRATION_CONTINUOUS' => 'false', 'SOURCE_TOOL_CONFIG' => 'uri: x', 'TARGET_TOOL_CONFIG' => 'uri: y']);
+
+    expect($commands)->toContain('--db=my db')->toContain('--nsInclude=my db.*')->toContain('--db=shop');
+});
 
 it('takes a diff backup when a recent full one exists and a full one otherwise', function (int $daysSinceFull, string $kind) {
     $node = idleDatabase('postgres', 1)->nodes()->sole();

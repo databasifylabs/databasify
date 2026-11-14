@@ -90,9 +90,10 @@ if [ -z "$databases" ]; then
         echo "$SOURCE_ERROR"
         exit 1
     fi
-    databases=$(copyable <<< "$listed" | tr '\n' ' ')
+    databases=$(copyable <<< "$listed")
 fi
-for database in $databases; do
+IFS=$'\n' read -r -d '' -a database_list <<< "$databases" || true
+for database in "${database_list[@]}"; do
     echo "copying $database"
     copy_database "$database"
     echo "$database done"

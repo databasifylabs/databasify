@@ -81,7 +81,7 @@ final readonly class MySqlFamilyMigration implements Migration
 
         $this->scripts->run($this->driver, 'mysql-family/migration/start', [
             ...$this->sourceEnvOf('MIGRATION', $start->source),
-            'MIGRATION_DATABASES' => implode(' ', $databases),
+            'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
             'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
             'MYSQLSH_URI' => rawurlencode($start->source->username)."@{$start->source->host}:{$start->source->port}",

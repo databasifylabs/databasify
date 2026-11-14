@@ -130,7 +130,7 @@ it('starts the copy job in its transient unit without the password on argv', fun
     idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole()->driver()->migration()->start(new MigrationStartData(new MigrationSource('10.0.0.9', 3306, 'm', "p'w", true), ['app', 'shop'], true, null));
 
     $this->scripts->assertRan('mysql-family/migration/start', fn (string $script, array $env): bool => $env['MIGRATION_PASSWORD'] === "p'w"
-        && $env['MIGRATION_DATABASES'] === 'app shop'
+        && $env['MIGRATION_DATABASES'] === "app\nshop"
         && $env['MIGRATION_CONTINUOUS'] === 'true'
         && $env['MIGRATION_TLS'] === 'true'
         && $env['MIGRATION_UNIT'] === "{$engine}-migration"
