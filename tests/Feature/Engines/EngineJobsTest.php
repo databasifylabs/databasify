@@ -152,7 +152,7 @@ it('skips the postgres backup on a standby', function () {
  * @param  array<string, int>  $modifiedAt
  * @return array{sql: string, commands: string, root: string}
  */
-function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = [], array $modifiedAt = []): array
+function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = [], array $modifiedAt = [], bool $succeeds = true): array
 {
     $node = idleDatabase($engine, 1)->nodes()->sole();
     $directory = sys_get_temp_dir().'/family-job-'.bin2hex(random_bytes(6));
@@ -200,7 +200,7 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
     ];
     File::deleteDirectory($directory);
 
-    expect($run->successful())->toBeTrue($run->errorOutput());
+    expect($run->successful())->toBe($succeeds, $run->errorOutput());
 
     return $result;
 }
@@ -238,6 +238,25 @@ it('renders every mysql family job as valid bash', function (string $engine, str
     ['mariadb', 'engines.mysql-family.jobs.backup'], ['mariadb', 'engines.mysql-family.jobs.binlog-ship'], ['mariadb', 'engines.mysql-family.jobs.binlog-stream'], ['mariadb', 'engines.mysql-family.jobs.migration-copy'],
     ['mariadb', 'engines.mariadb.jobs.cluster-watch'],
 ]);
+
+it('follows the mysql source from the binlog position MySQL Shell copied at', function () {
+    $metadata = "---\nDump_metadata:\n  Binlog_file: binlog.000042\n  Binlog_position: 1563\n  Executed_GTID_set: 'aaaa:1-90'\n";
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.migration-copy', [], ['conf/admin.cnf' => "[client]\npassword=secret\n"], [
+        'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf 'mysqlsh %s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\nprintf '%s' ".escapeshellarg($metadata)."\n",
+    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'true', 'MIGRATION_DATABASES' => "app\nshop", 'MIGRATION_CONTINUOUS' => 'true', 'MYSQLSH_URI' => 'm@10.0.0.9:3306']);
+
+    expect($run['commands'])->toContain('util copy-schemas app shop')->not->toContain('updateGtidSet')
+        ->and($run['sql'])->toContain("SOURCE_AUTO_POSITION = 0, SOURCE_LOG_FILE = 'binlog.000042', SOURCE_LOG_POS = 1563, SOURCE_SSL = 1 FOR CHANNEL 'migration'")
+        ->toContain("REPLICATE_WILD_DO_TABLE = ('app.%', 'shop.%')");
+});
+
+it('creates no migration channel when MySQL Shell reports no binlog position', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.migration-copy', [], ['conf/admin.cnf' => "[client]\npassword=secret\n"], [
+        'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf -- \"---\\nDump_metadata:\\n  Binlog_file: ''\\n  Binlog_position: 0\\n\"\n",
+    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'false', 'MIGRATION_DATABASES' => 'app', 'MIGRATION_CONTINUOUS' => 'true', 'MYSQLSH_URI' => 'm@10.0.0.9:3306'], succeeds: false);
+
+    expect($run['sql'])->not->toContain('CHANGE REPLICATION SOURCE');
+});
 
 it('ships only closed binlogs', function () {
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [

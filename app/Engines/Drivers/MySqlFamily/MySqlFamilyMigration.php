@@ -112,7 +112,7 @@ final readonly class MySqlFamilyMigration implements Migration
             $warnings[] = "the source runs {$release}, newer than this server; copying to an older version is not supported";
         }
 
-        return [$gtidMode === 'ON' && $this->grantsReplication($facts), $warnings];
+        return [$gtidMode === 'ON' && $this->grants($facts, 'REPLICATION SLAVE') && $this->grants($facts, 'REPLICATION CLIENT'), $warnings];
     }
 
     /**
@@ -140,14 +140,14 @@ final readonly class MySqlFamilyMigration implements Migration
             $warnings[] = "the source runs {$release}, newer than this server; copying to an older version is not supported";
         }
 
-        return [$logBin === '1' && $this->grantsReplication($facts), $warnings];
+        return [$logBin === '1' && $this->grants($facts, 'REPLICATION SLAVE'), $warnings];
     }
 
-    private function grantsReplication(Payload $facts): bool
+    private function grants(Payload $facts, string $privilege): bool
     {
         $granted = strtoupper(implode(' ', $facts->strings('grants')));
 
-        return str_contains($granted, 'REPLICATION SLAVE') || str_contains($granted, 'ALL PRIVILEGES ON *.*');
+        return str_contains($granted, $privilege) || str_contains($granted, 'ALL PRIVILEGES ON *.*');
     }
 
     private function newerThanLocal(string $release, Payload $facts): bool

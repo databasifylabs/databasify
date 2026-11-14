@@ -9,25 +9,28 @@ fi
 IFS=$'\n' read -r -d '' -a databases <<< "$MIGRATION_DATABASES" || true
 @if ($engine->id === 'mysql')
 admin_password=$(sed -n 's/^[[:space:]]*password=//p' "$ROOT/conf/admin.cnf" | head -n 1)
+copy_log=$(mktemp)
 my '' <<< 'SET GLOBAL local_infile = ON' > /dev/null
-trap 'my "" <<< "SET GLOBAL local_infile = OFF" > /dev/null 2>&1 || true' EXIT
+trap 'rm -f "$copy_log"; my "" <<< "SET GLOBAL local_infile = OFF" > /dev/null 2>&1 || true' EXIT
 ssl_mode=PREFERRED
 if [ "$ssl" = 1 ]; then
     ssl_mode=REQUIRED
 fi
 args=(--passwords-from-stdin --uri="$MYSQLSH_URI" --ssl-mode="$ssl_mode" -- util copy-schemas "${databases[@]}" --host=127.0.0.1 --port=25060 --user=root --threads=4)
-if [ "$MIGRATION_CONTINUOUS" = true ]; then
-    args+=(--updateGtidSet=append)
-fi
-printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysqlsh "${args[@]}" \
+printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysqlsh "${args[@]}" | tee "$copy_log" \
     || fail_task 'MySQL Shell could not copy the schemas'
 [ "$MIGRATION_CONTINUOUS" = true ] || exit 0
+binlog_file=$(sed -n "s/^[[:space:]]*Binlog_file:[[:space:]]*'\{0,1\}\([^']*\)'\{0,1\}[[:space:]]*$/\1/p" "$copy_log" | tail -n 1)
+binlog_position=$(sed -n 's/^[[:space:]]*Binlog_position:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$copy_log" | tail -n 1)
+if [ -z "$binlog_file" ] || [ -z "$binlog_position" ]; then
+    fail_task 'MySQL Shell reported no source binlog position to follow, grant the source user REPLICATION CLIENT'
+fi
 wild=''
 for database in "${databases[@]}"; do
     wild+="${wild:+, }$(my_string "$database.%")"
 done
 my '' > /dev/null <<SQL
-CHANGE REPLICATION SOURCE TO SOURCE_HOST = $(my_string "$MIGRATION_HOST"), SOURCE_PORT = $MIGRATION_PORT, SOURCE_USER = $(my_string "$MIGRATION_USER"), SOURCE_PASSWORD = $(my_string "$MIGRATION_PASSWORD"), SOURCE_AUTO_POSITION = 1, SOURCE_SSL = $ssl FOR CHANNEL 'migration';
+CHANGE REPLICATION SOURCE TO SOURCE_HOST = $(my_string "$MIGRATION_HOST"), SOURCE_PORT = $MIGRATION_PORT, SOURCE_USER = $(my_string "$MIGRATION_USER"), SOURCE_PASSWORD = $(my_string "$MIGRATION_PASSWORD"), SOURCE_AUTO_POSITION = 0, SOURCE_LOG_FILE = $(my_string "$binlog_file"), SOURCE_LOG_POS = $binlog_position, SOURCE_SSL = $ssl FOR CHANNEL 'migration';
 CHANGE REPLICATION FILTER REPLICATE_WILD_DO_TABLE = ($wild) FOR CHANNEL 'migration';
 START REPLICA FOR CHANNEL 'migration';
 SQL

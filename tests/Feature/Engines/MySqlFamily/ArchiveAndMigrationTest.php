@@ -105,6 +105,17 @@ it('checks a MySQL source with the Go readiness rules', function () {
     $this->scripts->assertRan('engines.mysql-family.migration.check', fn (string $script, array $env): bool => $env['SOURCE_PASSWORD'] === "p'w" && $env['SOURCE_TLS'] === 'true' && ! str_contains($script, "p'w"));
 });
 
+it('offers a MySQL source no continuous sync without REPLICATION CLIENT', function () {
+    $this->scripts->respond('engines.mysql-family.migration.check', [
+        'error' => null, 'version' => '8.4.6', 'visible' => ['app'], 'sizes' => ['app' => 0], 'localTables' => ['app' => 0], 'missingKeys' => ['app' => 0],
+        'gtidMode' => 'ON', 'grants' => ['GRANT REPLICATION SLAVE ON *.* TO `m`@`%`'], 'localVersion' => '8.4.6', 'roleEdgesReadable' => true,
+    ]);
+
+    $check = idleDatabase('mysql', 1, versionLine: '8.4')->nodes()->sole()->driver()->migration()->check(new MigrationSource('10.0.0.9', 3306, 'm', 'pw', false), []);
+
+    expect($check->blockers)->toBe(['The source cannot replicate continuously, so only a one-time copy is possible.']);
+});
+
 it('checks a MySQL source for MariaDB as a one-shot copy only', function () {
     $this->scripts->respond('engines.mysql-family.migration.check', [
         'error' => null, 'version' => '8.4.13', 'visible' => ['app'], 'sizes' => ['app' => 0], 'localTables' => ['app' => 0], 'missingKeys' => ['app' => 0],
@@ -159,7 +170,7 @@ it('collects the source facts by running the real check script', function () {
         ->reply('SUM(data_length + index_length)', '2097152')
         ->reply("constraint_type = 'PRIMARY KEY'", '1')
         ->reply('SELECT COUNT(*) FROM information_schema.tables WHERE', '3')
-        ->reply('SHOW GRANTS', 'GRANT REPLICATION SLAVE ON *.* TO `m`@`%`')
+        ->reply('SHOW GRANTS', 'GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO `m`@`%`')
         ->reply('SELECT @@gtid_mode', 'ON')
         ->reply('mysql.role_edges', '1');
 
