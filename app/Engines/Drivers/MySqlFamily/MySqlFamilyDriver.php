@@ -28,6 +28,7 @@ abstract readonly class MySqlFamilyDriver extends AbstractEngineDriver
             reservedDatabases: $engine->reservedDatabases,
             ports: new Ports(ClientPorts::CLIENT, null, $engine->peerPorts),
             hostProfile: new HostProfile(['fs.aio-max-nr' => '1048576', 'net.core.somaxconn' => '4096', 'net.ipv4.tcp_keepalive_intvl' => '10', 'net.ipv4.tcp_keepalive_probes' => '6', 'net.ipv4.tcp_keepalive_time' => '60', 'vm.swappiness' => '1']),
+            seedClustersFirst: $engine->id === 'mariadb',
         );
     }
 

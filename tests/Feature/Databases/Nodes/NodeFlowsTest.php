@@ -284,3 +284,19 @@ it('turns a single mysql node into a cluster without updating membership it does
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
         ->and($database->nodes()->count())->toBe(2);
 });
+
+it('bootstraps a single mariadb node into galera before its first peer starts', function () {
+    $ssh = fakeEngine();
+    $database = idleDatabase('mariadb', 1, DatabaseMode::Single);
+    markRoles($database, NodeRole::Primary);
+    $existing = $database->seed()->server;
+    $server = Server::factory()->ready()->create();
+
+    addThroughFlow($database, $server);
+    $commands = engineCommandsIn($ssh);
+
+    expect(sentTo($existing, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.configure', 'nodes.status'])
+        ->and(array_search("{$existing->name}: cluster.enable", $commands, true))->toBeLessThan(array_search("{$server->name}: nodes.start", $commands, true))
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($database->nodes()->count())->toBe(2);
+});
