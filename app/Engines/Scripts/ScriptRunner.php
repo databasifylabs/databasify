@@ -9,6 +9,7 @@ use App\Engines\Data\Operation;
 use App\Engines\Runtime\Runtime;
 use App\Models\DatabaseNode;
 use App\Models\ServerLog;
+use Throwable;
 
 final readonly class ScriptRunner implements EngineScripts
 {
@@ -22,7 +23,14 @@ final readonly class ScriptRunner implements EngineScripts
     public function run(DatabaseNode $node, string $script, array $data = [], ?string $user = null, int $timeout = 120, ?string $log = null, array $env = []): ScriptResult
     {
         $serverLog = $log === null ? null : $node->openLog($log);
-        $reply = $this->runtime->run($node, $this->views->render($node, $script, $data), ScriptEnvironment::of($node, $env), $user, $timeout);
+
+        try {
+            $reply = $this->runtime->run($node, $this->views->render($node, $script, $data), ScriptEnvironment::of($node, $env), $user, $timeout);
+        } catch (Throwable $exception) {
+            $serverLog?->fail($exception->getMessage());
+
+            throw $exception;
+        }
 
         if ($reply->exit !== 0) {
             $this->failLog($serverLog, $reply->stderr);

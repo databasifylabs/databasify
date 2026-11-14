@@ -17,6 +17,10 @@ final readonly class ReadNodeStatus
 {
     public function handle(Database $database, DatabaseNode $node, ?string $log = null): NodeStatus
     {
+        if (! $database->runsSupportedSdk()) {
+            return NodeStatus::reported($node->role, $node->engine_version);
+        }
+
         try {
             return $node->driver()->nodes()->status();
         } catch (EngineNotRunning) {

@@ -105,12 +105,12 @@ it('reuses a running log with the same name', function () {
 
 it('reports a task with the phase from its log', function () {
     fakeSsh()
-        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'interrupted', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
+        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'running', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
         ->respondToEngine('task log', ['lines' => "DATABASIFY_PHASE copying\n"]);
 
     $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
 
-    expect($operation->state)->toBe(OperationState::Interrupted)
+    expect($operation->state)->toBe(OperationState::Running)
         ->and($operation->phase)->toBe('copying');
 });
 
@@ -121,4 +121,23 @@ it('stops a task', function () {
 
     expect($operation->state)->toBe(OperationState::Interrupted)
         ->and($ssh->scriptAt(0))->toContain('databasify task stop');
+});
+
+it('reads no task log once a task has finished', function () {
+    $ssh = fakeSsh()->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'succeeded', 'phase' => '', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => '2026-11-12T00:01:00Z', 'error' => null]);
+
+    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
+
+    expect($operation->state)->toBe(OperationState::Succeeded)
+        ->and(collect($ssh->runs)->filter(fn (array $run): bool => str_contains($run['script'], '| databasify task log ')))->toBeEmpty();
+});
+
+it('keeps the reported phase of a running task when its log cannot be read', function () {
+    fakeSsh()
+        ->respondToEngine('task status', ['key' => 'ready.1', 'kind' => 'task', 'state' => 'running', 'phase' => 'starting', 'progress' => null, 'startedAt' => '2026-11-12T00:00:00Z', 'finishedAt' => null, 'error' => null])
+        ->respondToEngine('task log', ['error' => ['code' => 'not_found', 'message' => 'no log', 'details' => (object) []]], exit: 1);
+
+    $operation = idleDatabase('valkey', 1)->nodes()->sole()->driver()->taskStatus('ready.1');
+
+    expect($operation->state)->toBe(OperationState::Running)->and($operation->phase)->toBe('starting');
 });

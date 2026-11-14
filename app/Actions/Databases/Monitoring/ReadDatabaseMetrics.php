@@ -33,7 +33,8 @@ final readonly class ReadDatabaseMetrics
     private function metricsOf(Database $database, DatabaseNode $node): NodeMetrics
     {
         try {
-            $values = [...$this->hostMetricsOf($database, $node), ...$node->driver()->nodes()->metrics()->toValues()];
+            $engine = $database->runsSupportedSdk() ? $node->driver()->nodes()->metrics()->toValues() : [];
+            $values = [...$this->hostMetricsOf($database, $node), ...$engine];
 
             return new NodeMetrics($node->id, $node->server->name, true, $values);
         } catch (Throwable) {

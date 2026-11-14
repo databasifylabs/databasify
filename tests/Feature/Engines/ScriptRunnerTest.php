@@ -7,6 +7,7 @@ use App\Engines\Scripts\ScriptRunner;
 use App\Engines\Scripts\ScriptView;
 use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Engines\EngineError;
+use App\Exceptions\Engines\EngineNotRunning;
 use App\Exceptions\Engines\EngineScriptFailed;
 use App\Exceptions\Engines\NotPrimary;
 
@@ -30,6 +31,18 @@ it('decodes the one result line', function () {
     $result = resolve(ScriptRunner::class)->run(engineNode(), 'testing/echo', ['word' => 'x']);
 
     expect($result->json()->string('role'))->toBe('primary');
+});
+
+it('fails the server log when the engine cannot be reached', function () {
+    fakeSsh()->respond('', 69);
+    $node = engineNode();
+
+    expect(fn () => resolve(ScriptRunner::class)->run($node, 'testing/echo', ['word' => 'x'], log: 'Create user'))
+        ->toThrow(EngineNotRunning::class);
+
+    $log = $node->server->serverLogs()->sole();
+    expect($log->status)->toBe(ServerLogStatus::Failed)
+        ->and($log->output)->toContain('No engine container is running');
 });
 
 it('fails with the last stderr line and keeps the tail in the server log', function () {

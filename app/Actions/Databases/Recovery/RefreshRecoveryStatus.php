@@ -27,6 +27,10 @@ final readonly class RefreshRecoveryStatus
         $database = $recovery->database;
         $primary = $database->primary();
 
+        if (! $database->runsSupportedSdk()) {
+            return ArchiveStatus::unreadable("{$database->name} runs an engine image this Databasify no longer supports, so its archive is not read.");
+        }
+
         if ($primary === null) {
             return ArchiveStatus::unreadable("{$database->name} has no healthy primary to read the archive from.");
         }

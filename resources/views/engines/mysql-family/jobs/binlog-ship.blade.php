@@ -15,11 +15,21 @@ local_binlogs() {
     done | sort
 }
 
+writing_binlog() {
+    local file newest=''
+    for file in "$BINLOGS"/*; do
+        if [ -f "$file" ] && [[ $file != *.tmp ]] && { [ -z "$newest" ] || [ ! "$newest" -nt "$file" ]; }; then
+            newest=$file
+        fi
+    done
+    [ -n "$newest" ] || return 1
+    printf '%s' "${newest##*/}"
+}
+
 open_binlog() {
-    local last
-    last=$(local_binlogs | tail -n 1)
-    [ -n "$last" ] || return 1
-    printf '%s %s' "$last" "$(wc -c < "$BINLOGS/$last" | tr -d ' ')"
+    local name
+    name=$(writing_binlog) || return 1
+    printf '%s %s' "$name" "$(wc -c < "$BINLOGS/$name" | tr -d ' ')"
 }
 
 rotation_error=''
@@ -60,7 +70,8 @@ if [ -z "$source_id" ]; then
 fi
 @endif
 
-closed=$(local_binlogs | sed '$d')
+writing=$(writing_binlog || true)
+closed=$(local_binlogs | grep -vxF -- "$writing" || true)
 for name in $closed; do
     rclone copyto "$BINLOGS/$name" "$(remote_of "binlogs/$source_id/$name")"
     rm -f "$BINLOGS/$name"

@@ -136,9 +136,10 @@ it('skips the postgres backup on a standby', function () {
  * @param  array<string, string>  $files
  * @param  array<string, string>  $stubs
  * @param  array<string, string>  $env
+ * @param  array<string, int>  $modifiedAt
  * @return array{sql: string, commands: string, root: string}
  */
-function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = []): array
+function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = [], array $modifiedAt = []): array
 {
     $node = idleDatabase($engine, 1)->nodes()->sole();
     $directory = sys_get_temp_dir().'/family-job-'.bin2hex(random_bytes(6));
@@ -149,6 +150,10 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
     foreach ($files as $path => $content) {
         File::ensureDirectoryExists(dirname("{$root}/{$path}"));
         File::put("{$root}/{$path}", $content);
+    }
+
+    foreach ($modifiedAt as $path => $time) {
+        touch("{$root}/{$path}", $time);
     }
 
     $index = 0;
@@ -230,6 +235,17 @@ it('ships only closed binlogs', function () {
 
     expect($run['commands'])->toContain('rclone copyto')->toContain('bin.000001')->toContain('binlogs/uuid-1/bin.000001')->not->toContain('bin.000002')
         ->and($run['root'])->toContain('archive/binlogs/bin.000002')->not->toContain('archive/binlogs/bin.000001');
+});
+
+it('never ships the binlog the stream is still writing, even below a stale higher one', function () {
+    $run = runFamilyJobLocally('mysql', 'mysql-family/jobs/binlog-ship', ['FLUSH BINARY LOGS' => '', '@@server_uuid' => 'uuid-1'], [
+        'archive/binlogs/bin.000001' => 'being written',
+        'archive/binlogs/bin.000009' => 'stale',
+        'state/binlog-rotated' => 'bin.000001 13',
+    ], modifiedAt: ['archive/binlogs/bin.000009' => time() - 3600, 'archive/binlogs/bin.000001' => time()]);
+
+    expect($run['commands'])->toContain('binlogs/uuid-1/bin.000009')->not->toContain('bin.000001')
+        ->and($run['root'])->toContain('archive/binlogs/bin.000001');
 });
 
 it('expires bases older than the retention days', function () {

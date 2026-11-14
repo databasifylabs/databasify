@@ -15,6 +15,7 @@ use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Engines\Runtime\Runtime;
 use App\Engines\Scripts\ScriptView;
+use App\Enums\Databases\OperationState;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\NotPrimary;
 use App\Models\DatabaseNode;
@@ -59,7 +60,13 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     public function taskStatus(string $key): Operation
     {
         $operation = $this->runtime()->taskStatus($this->node, $key);
-        $phases = array_filter(explode("\n", $this->runtime()->taskLog($this->node, $key)), fn (string $line): bool => str_starts_with($line, self::PHASE));
+
+        if ($operation->state !== OperationState::Running) {
+            return $operation;
+        }
+
+        $log = rescue(fn (): string => $this->runtime()->taskLog($this->node, $key), '', report: false);
+        $phases = array_filter(explode("\n", $log), fn (string $line): bool => str_starts_with($line, self::PHASE));
 
         if ($phases === []) {
             return $operation;
