@@ -28,6 +28,16 @@ it('enables Group Replication as a task with the group name from the saved reque
         && str_contains($script, 'SELECT STATE, ERROR_MESSAGE FROM performance_schema.clone_status'));
 });
 
+it('restarts a single server into its new config when Group Replication is not loaded yet', function () {
+    respondToFileGet(fakeSsh(), 'state/node.json', json_encode(goFixture('configure-primary-9.7.json', 'mysql')['request']));
+
+    $this->node->driver()->cluster()->enable('enable.1');
+
+    $this->scripts->assertRan('engines.mysql.cluster.enable', fn (string $script): bool => str_contains($script, "SELECT PLUGIN_STATUS FROM information_schema.plugins WHERE PLUGIN_NAME = 'group_replication'")
+        && str_contains($script, 'unit_do restart "$SERVER_UNIT"')
+        && str_contains($script, "wait_ready 'MySQL with Group Replication'"));
+});
+
 it('disables, fails over and changes the seeds with the Go statements', function () {
     $this->node->driver()->cluster()->disable();
     $this->node->driver()->cluster()->failover('10.0.0.2');

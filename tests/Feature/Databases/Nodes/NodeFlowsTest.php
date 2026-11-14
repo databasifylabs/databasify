@@ -11,6 +11,7 @@ use App\DTOs\Databases\NewDatabaseNode;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
+use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
@@ -95,7 +96,7 @@ it('enables the cluster on the seed first when a single node gets its first peer
 
     addThroughFlow($database, Server::factory()->ready()->create());
 
-    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.membership', 'cluster.enable', 'task.status', 'nodes.status']);
+    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.status']);
 });
 
 it('removes the new node and puts the old members back when the copy fails', function () {
@@ -231,4 +232,21 @@ it('refuses to reboot while a node has just stopped answering', function () {
     answerNodeStatus(answerNodeStatus(answerNodeStatus(fakeSsh(), $primary->server, 'primary'), $standby->server, 'replica'), $silent->server, null);
 
     expect(fn () => resolve(RebootDatabase::class)->handle($database))->toThrow(ValidationException::class, "{$silent->server->name} does not answer");
+});
+
+it('turns a single mysql node into a cluster without updating membership it does not have yet', function () {
+    $ssh = fakeEngine();
+    $database = idleDatabase('mysql', 1, DatabaseMode::Single);
+    markRoles($database, NodeRole::Primary);
+    $existing = $database->seed()->server;
+    $server = Server::factory()->ready()->create();
+
+    addThroughFlow($database, $server);
+    $commands = engineCommandsIn($ssh);
+
+    expect(sentTo($existing, $ssh))->not->toContain('cluster.membership')
+        ->and(sentTo($existing, $ssh))->toContain('nodes.configure', 'cluster.enable')
+        ->and(array_search("{$existing->name}: cluster.enable", $commands, true))->toBeLessThan(array_search("{$server->name}: cluster.enable", $commands, true))
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($database->nodes()->count())->toBe(2);
 });

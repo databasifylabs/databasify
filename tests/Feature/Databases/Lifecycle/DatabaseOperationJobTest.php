@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Actions\Databases\Upgrades\RollOutImage;
 use App\Engines\Data\Operation;
+use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\OperationState;
 use App\Enums\Servers\ServerLogStatus;
@@ -173,6 +174,18 @@ it('stops the running engine task before it erases a node that failed to join', 
     $removedAt = collect($ssh->runs)->keys()->first(fn (int $index): bool => str_contains($ssh->scriptAt($index), '| databasify host remove '));
     expect($stoppedAt)->not->toBeNull()
         ->and($removedAt)->toBeGreaterThanOrEqual($stoppedAt);
+});
+
+it('leaves the seeds of the only node left alone when its first peer fails to join', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+    fakeEngine();
+    $database = idleDatabase('mysql', 1, DatabaseMode::Single);
+    $joiner = $database->addNode(Server::factory()->ready()->create()->id);
+    $database->update(['status' => DatabaseStatus::Scaling]);
+
+    (new AddNodeJob($database, $joiner))->failed(new RuntimeException('timed out'));
+
+    expect(collect(useRecordingDrivers()->calls)->pluck('call'))->toContain('nodes.configure')->not->toContain('cluster.membership');
 });
 
 it('fails logs an operation left running when the operation ends', function () {

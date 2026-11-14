@@ -40,6 +40,11 @@ clone_finished() {
     [ "$CLONE_STATE" = Completed ] || [ "$CLONE_STATE" = Failed ]
 }
 
+group_plugin_loaded() {
+    my_try '' <<< "SELECT PLUGIN_STATUS FROM information_schema.plugins WHERE PLUGIN_NAME = 'group_replication'"
+    [ "$MY_OUTPUT" = ACTIVE ]
+}
+
 follow_group() {
     PRIMARY=$(saved '.primary // empty')
     if [ -z "$PRIMARY" ]; then
@@ -66,6 +71,11 @@ if saved_is '.readOnly'; then
     exit 0
 fi
 require_primary_keys
+if ! group_plugin_loaded; then
+    phase 'restarting into the new config'
+    unit_do restart "$SERVER_UNIT"
+    wait_ready 'MySQL with Group Replication'
+fi
 if saved_is '.primary == null or .primary == .ip'; then
     phase 'bootstrapping'
     bootstrap_group "$REPLICATION_SECRET"

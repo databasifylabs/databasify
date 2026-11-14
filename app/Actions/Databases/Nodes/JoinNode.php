@@ -24,31 +24,32 @@ final readonly class JoinNode
     public function handle(Database $database, DatabaseNode $node, string $run): void
     {
         $joiner = $node->load('server');
-        $existing = $database->nodesOtherThan($joiner)->load('server')->sortBy('position')->values();
-
+        $configure = fn (DatabaseNode $member) => $member->driver()->nodes()->configure($this->nodeConfig->handle($database, $member));
         $readied = $this->tasks->started($joiner, $run, 'ready');
 
         if (! $readied) {
             $this->deploy->handle($database, $joiner);
         }
 
-        $database->nodes()->with('server')->get()->each(fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $node->trustedCidrs()));
+        $database->nodes()->get()->each(fn (DatabaseNode $member) => $this->firewall->handle($database, $member, $member->trustedCidrs()));
 
         if (! $readied) {
-            $joiner->driver()->nodes()->configure($this->nodeConfig->handle($database, $joiner));
+            $configure($joiner);
             $joiner->driver()->nodes()->start();
         }
 
         $this->tasks->await($joiner, $run, 'ready', 'waiting for the node', fn (string $key): Operation => $joiner->driver()->nodes()->ready($key, expectPrimary: false));
 
-        $existing->each(function (DatabaseNode $node) use ($database): void {
-            $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
-            $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database));
-        });
+        $existing = $database->nodesOtherThan($joiner)->each($configure);
 
-        if ($existing->count() === 1) {
-            $peer = $existing->sole();
-            $this->tasks->await($peer, $run, 'enable', 'enabling the cluster', fn (string $key): Operation => $peer->driver()->cluster()->enable($key));
+        if ($existing->hasMany()) {
+            $members = $this->nodeConfig->membersOf($database);
+            $existing->each(fn (DatabaseNode $member) => $member->driver()->cluster()->membership($members));
+        }
+
+        if ($existing->hasSole()) {
+            $seed = $existing->sole();
+            $this->tasks->await($seed, $run, 'enable', 'enabling the cluster', fn (string $key): Operation => $seed->driver()->cluster()->enable($key));
         }
 
         $this->tasks->await($joiner, $run, 'copy', 'copying the data', fn (string $key): Operation => $joiner->driver()->cluster()->enable($key));
