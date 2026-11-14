@@ -65,7 +65,16 @@ final class AddNodeJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(UndoNodeJoin::class)->handle($this->database, $this->node);
-        resolve(EndFailedOperation::class)->handle($this->database, "Add {$this->node->kind->label()} node {$this->node->displayName()}", $exception);
+        $operation = "Add {$this->node->kind->label()} node {$this->node->displayName()}";
+
+        try {
+            resolve(UndoNodeJoin::class)->handle($this->database, $this->node, $this->run);
+        } catch (Throwable $undoFailure) {
+            resolve(EndFailedOperation::class)->handle($this->database, $operation, $undoFailure, markFailed: true);
+
+            return;
+        }
+
+        resolve(EndFailedOperation::class)->handle($this->database, $operation, $exception);
     }
 }

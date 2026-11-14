@@ -16,6 +16,7 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\OperationState;
+use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Jobs\Databases\RedeployNodeJob;
 use App\Models\Database;
@@ -105,18 +106,44 @@ it('turns a single postgresql node into a cluster before its first peer starts',
         ->and($database->nodes()->count())->toBe(2);
 });
 
-it('takes a single postgresql node back out of the cluster when its first peer fails to join', function () {
+it('takes a single node back out of the cluster when its first peer fails to join', function (string $engine) {
     $server = Server::factory()->ready()->create();
     $ssh = fakeEngine();
     failingTaskOn($server, 2);
-    $database = idleDatabase('postgres', 1, DatabaseMode::Single);
+    $database = idleDatabase($engine, 1, DatabaseMode::Single);
     $seed = $database->seed()->server;
 
     addThroughFlow($database, $server);
 
-    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.configure', 'cluster.disable', 'nodes.status'])
+    expect(sentTo($seed, $ssh))->toBe(['nodes.configure', 'cluster.enable', 'task.status', 'nodes.configure', 'task.status', 'cluster.disable', 'nodes.status'])
         ->and($database->nodes()->count())->toBe(1)
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
+})->with(['postgres', 'mariadb']);
+
+it('leaves a single node standalone when its first peer fails before the node joined a cluster', function (string $engine) {
+    $ssh = fakeEngine();
+    $database = idleDatabase($engine, 1, DatabaseMode::Single);
+    $seed = $database->seed()->server;
+    answerRead('cluster.enable', fn (): never => throw new EngineError('the seed could not start its cluster'), $seed);
+
+    addThroughFlow($database, Server::factory()->ready()->create());
+
+    expect(sentTo($seed, $ssh))->not->toContain('cluster.disable')
+        ->and($database->nodes()->count())->toBe(1)
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
+})->with(['postgres', 'mariadb']);
+
+it('fails the database when a single node cannot leave the cluster after its first peer failed to join', function () {
+    $server = Server::factory()->ready()->create();
+    fakeEngine();
+    failingTaskOn($server, 2);
+    $database = idleDatabase('postgres', 1, DatabaseMode::Single);
+    answerRead('cluster.disable', fn (): never => throw new EngineError('PostgreSQL did not come back as a standalone primary'), $database->seed()->server);
+
+    addThroughFlow($database, $server);
+
+    expect($database->nodes()->count())->toBe(1)
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Failed);
 });
 
 it('removes the new node and puts the old members back when the copy fails', function () {

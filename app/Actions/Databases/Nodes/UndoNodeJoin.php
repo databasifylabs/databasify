@@ -19,7 +19,7 @@ final readonly class UndoNodeJoin
         private EngineTasks $tasks,
     ) {}
 
-    public function handle(Database $database, DatabaseNode $node): void
+    public function handle(Database $database, DatabaseNode $node, string $run): void
     {
         $this->tasks->stopRunning($database);
         $joiner = $database->nodes()->with('server')->find($node->id);
@@ -35,8 +35,8 @@ final readonly class UndoNodeJoin
 
         $remaining = $database->nodes()->get();
 
-        if ($remaining->hasSole() && $database->facts()->seedClustersFirst) {
-            rescue(fn () => $remaining->sole()->driver()->cluster()->disable());
+        if ($remaining->hasSole() && $database->facts()->seedClustersFirst && $this->tasks->started($remaining->sole(), $run, 'enable')) {
+            $remaining->sole()->driver()->cluster()->disable();
 
             return;
         }
