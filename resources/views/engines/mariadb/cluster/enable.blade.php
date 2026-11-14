@@ -17,6 +17,7 @@ seed_attempt() {
         return 1
     fi
     my_try '' <<SQL
+FLUSH LOCAL PRIVILEGES;
 SET GLOBAL gtid_slave_pos = $(my_string "$COPIED_GTID")
 SQL
     if [ -n "$MY_ERROR" ]; then

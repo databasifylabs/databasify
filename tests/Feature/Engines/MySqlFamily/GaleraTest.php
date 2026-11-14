@@ -22,6 +22,7 @@ it('enables Galera as a task with both manifests', function () {
         && str_contains($script, "echo 'Bootstrapping…'")
         && str_contains($script, 'a cluster needs a primary key on every table; add one to ')
         && str_contains($script, 'the copy from the writer carried no GTID position')
+        && str_contains($script, "FLUSH LOCAL PRIVILEGES;\nSET GLOBAL gtid_slave_pos = ")
         && str_contains($script, 'MASTER_USE_GTID = slave_pos'));
 });
 
