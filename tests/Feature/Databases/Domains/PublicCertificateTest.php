@@ -10,11 +10,22 @@ use App\Enums\Databases\NodeRole;
 use App\Jobs\Databases\RenewCertificatesJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
+use App\Models\DnsZone;
+use Illuminate\Encryption\Encrypter;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
 function installedCertificates(): array
 {
     return array_map(fn (array $call): string => $call['args'][0], recordedArgs('nodes.installTls'));
+}
+
+function withUnreadableZoneKey(DnsZone $zone): DnsZone
+{
+    withZoneCertificate($zone);
+    DB::table('dns_zones')->where('id', $zone->id)->update(['certificate_key' => new Encrypter(random_bytes(32), 'aes-256-cbc')->encryptString('old-key')]);
+
+    return $zone->fresh() ?? $zone;
 }
 
 function installEveryNodeCertificate(Database $database): void
@@ -97,4 +108,27 @@ it('queues a certificate renewal for the other databases on a zone once it gets 
     resolve(EnsureZoneCertificate::class)->handle($database->dnsZone);
 
     Queue::assertPushed(RenewCertificatesJob::class, fn (RenewCertificatesJob $job): bool => $job->database->is($other));
+});
+
+it('installs the private certificate when the zone certificate key can no longer be read', function () {
+    fakeEngine();
+    $database = withCurrentCertificates(withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache')));
+    withUnreadableZoneKey($database->dnsZone);
+
+    installEveryNodeCertificate($database->refresh());
+
+    expect(installedCertificates())->toBe([$database->settings->nodeCertificate($database->nodes()->sole()->id, 'server.crt')])
+        ->and($database->clientCaCertificate())->toBe($database->settings->certificate('ca.crt'));
+});
+
+it('issues a new zone certificate when the stored key can no longer be read', function () {
+    fakeCloudflare([['id' => 'txt-1', 'content' => '"challenge-token"', 'comment' => 'databasify']]);
+    $authority = fakeCertificateAuthority();
+    $database = withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache'));
+    $zone = withUnreadableZoneKey($database->dnsZone);
+
+    resolve(EnsureZoneCertificate::class)->handle($zone);
+
+    expect($authority->issued)->toBe(['*.db.example.com'])
+        ->and($zone->fresh()->hasCurrentCertificate())->toBeTrue();
 });

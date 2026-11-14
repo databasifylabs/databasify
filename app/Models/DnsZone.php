@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsSecret;
 use App\DTOs\Acme\AcmeCertificate;
 use App\DTOs\Databases\IssuedCertificate;
 use App\Models\Concerns\OrdersByName;
@@ -78,6 +79,10 @@ class DnsZone extends Model
 
     public function hasCurrentCertificate(): bool
     {
+        if ($this->certificate_key === null) {
+            return false;
+        }
+
         return IssuedCertificate::fromPem($this->certificate ?? '')?->isCurrentFor([$this->wildcardName()]) ?? false;
     }
 
@@ -121,6 +126,6 @@ class DnsZone extends Model
 
     protected function casts(): array
     {
-        return ['certificate_key' => 'encrypted'];
+        return ['certificate_key' => AsSecret::class];
     }
 }

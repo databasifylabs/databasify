@@ -12,8 +12,8 @@ Databasify holds root-level access to every server it manages, plus database pas
 - **Secrets at rest** are encrypted with the app key:
     - `Database.settings` uses the `AsDatabaseSettings` cast (JSON with secrets, certificates and config, encrypted as one string).
     - `DatabaseMigration.source` uses `AsMigrationSource`.
-    - `Server.ssh_password`, `SshKey.private_key`, `DatabaseUser.password` and `DnsZone.certificate_key` use the `encrypted` cast.
-    - `credentials` on `ServerProvider`, `DnsProvider` and `StorageProvider` use `encrypted:array`.
+    - `Server.ssh_password`, `SshKey.private_key` and `DatabaseUser.password` use the `encrypted` cast.
+    - `DnsZone.certificate_key` uses `AsSecret`, and `credentials` on `ServerProvider`, `DnsProvider` and `StorageProvider` use `AsCredentials`. Both read a value encrypted with another app key as missing instead of throwing, because the app can replace them: a new token is entered, and a missing wildcard key is issued again.
 - **SSH access** uses one app-wide Ed25519 key (`AppSshKey`, named `databasify`).
 - **Host keys** are trusted on first connect and pinned. The app refuses to connect if a host key changes (`Server::trustsHostKey`).
 - **Secrets reach nodes inside files**, not on command lines where process lists and server logs would show them: inside the uploaded script (in `~/.databasify`, mode 0700) and in engine files under `/srv/<engine>/conf`. One exception remains: migration copy units receive the source password as a `--setenv` argument to `databasify ctl run`.
@@ -37,6 +37,8 @@ Databasify holds root-level access to every server it manages, plus database pas
 
 - `app/Casts/AsDatabaseSettings.php`
 - `app/Casts/AsMigrationSource.php`
+- `app/Casts/AsSecret.php`
+- `app/Casts/AsCredentials.php`
 - `app/Services/Ssh/AppSshKey.php`
 - `app/Models/Server.php`
 - `app/Models/SshKey.php`
