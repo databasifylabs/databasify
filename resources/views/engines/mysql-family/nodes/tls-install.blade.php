@@ -13,4 +13,4 @@ if [ "$changed" = true ] && unit_active "$SERVER_UNIT"; then
     my '' > /dev/null <<< 'FLUSH SSL'
 @endif
 fi
-result '{}'
+echo "Installed the TLS certificate."

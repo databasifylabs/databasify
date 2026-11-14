@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Failover;
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterQuorum;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Validation\ValidationException;
@@ -13,8 +11,6 @@ use Throwable;
 
 final readonly class DetectQuorum
 {
-    public function __construct(private EngineClient $engine) {}
-
     public function handle(Database $database): bool
     {
         $readings = $database->reachableMembers()->map($this->majorityOf(...));
@@ -29,7 +25,7 @@ final readonly class DetectQuorum
     private function majorityOf(DatabaseNode $node): ?bool
     {
         try {
-            return $this->engine->send($node, new ClusterQuorum)->hasMajority();
+            return $node->driver()->cluster()->quorum()->hasMajority();
         } catch (Throwable) {
             return null;
         }

@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\NodeMetrics;
-use App\Engines\Requests\NodeStatus;
 use App\Enums\Databases\NodeRole;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts();
     $this->node = engineNode();
 });
@@ -16,7 +12,7 @@ beforeEach(function () {
 it('reads the node role and version from the status script', function () {
     $this->scripts->respond('postgres/nodes/status', ['role' => 'replica', 'version' => '18.6']);
 
-    $status = resolve(EngineClient::class)->send($this->node, new NodeStatus);
+    $status = $this->node->driver()->nodes()->status();
 
     expect($status->role)->toBe(NodeRole::Replica)->and($status->version)->toBe('18.6');
     $this->scripts->assertRan('postgres/nodes/status', fn (string $script): bool => str_contains($script, 'unit_active databasify-patroni')
@@ -27,7 +23,7 @@ it('reads the node role and version from the status script', function () {
 it('reads an offline node without a version', function () {
     $this->scripts->respond('postgres/nodes/status', ['role' => 'offline', 'version' => null]);
 
-    $status = resolve(EngineClient::class)->send($this->node, new NodeStatus);
+    $status = $this->node->driver()->nodes()->status();
 
     expect($status->role)->toBe(NodeRole::Offline)->and($status->version)->toBeNull();
 });
@@ -35,7 +31,7 @@ it('reads an offline node without a version', function () {
 it('reads connections, queries and data size', function () {
     $this->scripts->respond('postgres/nodes/metrics', ['connections' => 4, 'queries' => 1200, 'dataMb' => 38]);
 
-    $metrics = resolve(EngineClient::class)->send($this->node, new NodeMetrics);
+    $metrics = $this->node->driver()->nodes()->metrics();
 
     expect($metrics)->connections->toBe(4)->queries->toBe(1200)->dataMb->toBe(38);
     $this->scripts->assertRan('postgres/nodes/metrics', fn (string $script): bool => str_contains($script, "backend_type = 'client backend'"));

@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
-use App\Actions\Databases\RunOnPrimary;
-use App\Engines\Requests\AccountList;
 use App\Models\DatabaseMigration;
 
 final readonly class RecordLeftoverSchemas
 {
     public function __construct(
         private RecordSchemas $record,
-        private RunOnPrimary $primary,
     ) {}
 
     public function handle(DatabaseMigration $migration): void
@@ -24,7 +21,7 @@ final readonly class RecordLeftoverSchemas
             return;
         }
 
-        $present = rescue(fn (): array => $this->primary->handle($database, new AccountList)->databases, [], report: false);
+        $present = rescue(fn (): array => $database->driver()->accounts()->list()->databases, [], report: false);
 
         $this->record->handle($database, array_values(array_intersect($copied, $present)));
     }

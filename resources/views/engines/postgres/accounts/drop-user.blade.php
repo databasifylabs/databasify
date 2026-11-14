@@ -3,7 +3,7 @@
 @include('engines.postgres._primary')
 exists=$(role_exists)
 if [ "$exists" != t ]; then
-    result '{"dropped":false}'
+    echo "User $NAME was already gone."
     exit 0
 fi
 listing=$(listed_databases)
@@ -17,4 +17,4 @@ done <<< "$listing"
 DATABASIFY_VAR_name="$NAME" pg postgres > /dev/null <<'SQL'
 DROP ROLE :"name"
 SQL
-result '{"dropped":true}'
+echo "Dropped user $NAME."

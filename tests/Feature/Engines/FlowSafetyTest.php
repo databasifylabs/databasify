@@ -7,12 +7,14 @@ use App\Actions\Databases\Flows\StartFlow;
 use App\Actions\Databases\Lifecycle\CreateDatabase;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
 use App\DTOs\Databases\NewDatabase;
+use App\Engines\Data\Operation;
 use App\Engines\Flows\FlowContext;
 use App\Engines\Flows\FlowSteps;
 use App\Engines\Flows\Step;
-use App\Engines\Requests\NodeReady;
 use App\Enums\Databases\FlowState;
 use App\Enums\Databases\NodeRole;
+use App\Exceptions\Engines\EngineNotFound;
+use App\Exceptions\Engines\EngineUnavailable;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Jobs\Databases\CleanUpDatabaseFlow;
@@ -27,7 +29,7 @@ it('keeps a deterministic key when starting a long step breaks, so the next tick
     $database = idleDatabase('postgres', 1);
     $node = $database->seed();
     fakeSsh()->failWith(SshConnectionFailed::onServer($node->server, 'connection reset'));
-    $flow = ScriptedFlow::bind([Step::catchUp('copy', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false), 'waiting'))]);
+    $flow = ScriptedFlow::bind([Step::catchUp('copy', resolve(FlowSteps::class)->long($node, fn (string $key): Operation => $node->driver()->nodes()->ready($key, false), 'waiting'))]);
 
     $record = resolve(StartFlow::class)->handle($database, $flow, new FlowContext([$node->id]))->fresh();
 
@@ -44,12 +46,12 @@ it('starts a lost operation again under the next attempt key', function () {
     $database = idleDatabase('postgres', 1);
     $node = $database->seed();
     fakeEngine();
-    $flow = ScriptedFlow::bind([Step::prepare('wait', resolve(FlowSteps::class)->long($node, fn (string $key): NodeReady => new NodeReady($key, false), 'waiting'))]);
+    $flow = ScriptedFlow::bind([Step::prepare('wait', resolve(FlowSteps::class)->long($node, fn (string $key): Operation => $node->driver()->nodes()->ready($key, false), 'waiting'))]);
     Queue::fake([AdvanceDatabaseFlow::class]);
     $record = resolve(StartFlow::class)->handle($database, $flow, new FlowContext([$node->id]));
     runJob(new AdvanceDatabaseFlow($record));
 
-    fakeEngine(fakeSsh()->respondToEngine('operation status', ['error' => ['code' => 'not_found', 'message' => 'gone', 'details' => (object) []]], exit: 1));
+    answerRead('task.status', fn () => throw new EngineNotFound('not_found', 'gone'));
     runJob(new AdvanceDatabaseFlow($record->fresh()));
 
     expect($record->fresh()->operation_key)->toBe("{$record->id}.0.1");
@@ -86,7 +88,8 @@ it('never confirms the other nodes are down on the owner behalf and refuses an u
     $database = idleDatabase('mysql', 3);
     $ssh = fakeSsh();
     $database->nodes->each(fn ($node) => answerNodeStatus($ssh, $node->server, 'offline'));
-    fakeEngine($ssh)->respondToEngine('cluster quorum', ['error' => ['code' => 'unavailable', 'message' => 'not yet', 'details' => (object) []]], exit: 1);
+    fakeEngine($ssh);
+    answerRead('cluster.quorum', fn () => throw new EngineUnavailable('unavailable', 'not yet'));
 
     expect(fn () => resolve(RecoverDatabase::class)->handle($database))->toThrow(ValidationException::class, 'could not read');
 });

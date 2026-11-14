@@ -4,20 +4,11 @@ declare(strict_types=1);
 
 use App\Engines\Data\DefaultAccount;
 use App\Engines\Data\Secrets;
-use App\Engines\EngineClient;
-use App\Engines\Requests\NodeBootstrap;
-use App\Engines\Requests\NodeReady;
-use App\Engines\Requests\NodeReset;
-use App\Engines\Requests\NodeRestart;
-use App\Engines\Requests\NodeStart;
-use App\Engines\Requests\NodeWake;
-use App\Engines\Requests\TlsInstall;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Models\DatabaseNode;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mysql', 'mariadb']]);
     $this->scripts = fakeScripts();
 });
 
@@ -28,10 +19,9 @@ function lifecycleNode(string $engine): DatabaseNode
 
 it('starts, wakes and restarts a MySQL node the way the Go engine does', function () {
     $node = lifecycleNode('mysql');
-    $client = resolve(EngineClient::class);
-    $client->send($node, new NodeStart);
-    $client->send($node, new NodeWake(all: false));
-    $client->send($node, new NodeRestart);
+    $node->driver()->nodes()->start();
+    $node->driver()->nodes()->wake(all: false);
+    $node->driver()->nodes()->restart();
 
     $this->scripts->assertRan('mysql/nodes/start', fn (string $script): bool => str_contains($script, 'unit_do start mysql-server') && str_contains($script, 'mysql-binlog-stream'))
         ->assertRan('mysql/nodes/wake', fn (string $script): bool => str_contains($script, 'reset-failed mysql-server') && str_contains($script, 'wait_until 1800'))
@@ -39,19 +29,19 @@ it('starts, wakes and restarts a MySQL node the way the Go engine does', functio
 });
 
 it('wakes a MariaDB node by killing and stopping it, as the Go engine does', function () {
-    resolve(EngineClient::class)->send(lifecycleNode('mariadb'), new NodeWake(all: false));
+    lifecycleNode('mariadb')->driver()->nodes()->wake(all: false);
 
     $this->scripts->assertRan('mariadb/nodes/wake', fn (string $script): bool => str_contains($script, 'kill -s KILL mariadb-server') && str_contains($script, 'unit_do stop mariadb-server'));
 });
 
 it('starts the MariaDB helpers the saved request asks for', function () {
-    resolve(EngineClient::class)->send(lifecycleNode('mariadb'), new NodeStart);
+    lifecycleNode('mariadb')->driver()->nodes()->start();
 
     $this->scripts->assertRan('mariadb/nodes/start', fn (string $script): bool => str_contains($script, 'mariadb-cluster-watch') && str_contains($script, 'run node configure first'));
 });
 
 it('does not reset either engine, as the Go engines do not', function (string $engine) {
-    expect(fn () => resolve(EngineClient::class)->send(lifecycleNode($engine), new NodeReset(0, [])))
+    expect(fn () => lifecycleNode($engine)->driver()->nodes()->reset(0, []))
         ->toThrow(EngineUnsupported::class, 'this engine does not implement "node reset"');
 })->with(['mysql', 'mariadb']);
 
@@ -59,7 +49,7 @@ it('bootstraps the service users on the seed and then the default account', func
     $this->scripts->respond("{$engine}/nodes/bootstrap", ['seed' => true])
         ->respond('mysql-family/accounts/create-user', ['created' => true]);
 
-    resolve(EngineClient::class)->send(lifecycleNode($engine), new NodeBootstrap(new Secrets('adm', "re'p", 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw')));
+    lifecycleNode($engine)->driver()->nodes()->bootstrap(new Secrets('adm', "re'p", 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw'));
 
     $this->scripts->assertRan("{$engine}/nodes/bootstrap", fn (string $script, array $env): bool => $env['REPLICATION_PASSWORD'] === "re'p" && $env['AGENT_PASSWORD'] === 'agent' && str_contains($script, $fragment) && ! str_contains($script, "re'p"))
         ->assertRan('mysql-family/accounts/create-database', fn (string $script, array $env): bool => $env['NAME'] === 'defaultdb')
@@ -72,13 +62,13 @@ it('bootstraps the service users on the seed and then the default account', func
 it('skips the default account on a node that is not the seed', function () {
     $this->scripts->respond('mysql/nodes/bootstrap', ['seed' => false]);
 
-    resolve(EngineClient::class)->send(lifecycleNode('mysql'), new NodeBootstrap(new Secrets('adm', 'rep', 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw')));
+    lifecycleNode('mysql')->driver()->nodes()->bootstrap(new Secrets('adm', 'rep', 'agent'), new DefaultAccount('defaultdb', 'databasify', 'pw'));
 
     $this->scripts->assertNotRan('mysql-family/accounts/create-database');
 });
 
 it('refuses to bootstrap without the replication and agent secrets', function (string $engine, string $message) {
-    expect(fn () => resolve(EngineClient::class)->send(lifecycleNode($engine), new NodeBootstrap(new Secrets('adm', null, 'agent'), null)))
+    expect(fn () => lifecycleNode($engine)->driver()->nodes()->bootstrap(new Secrets('adm', null, 'agent'), null))
         ->toThrow(InvalidEngineRequest::class, $message);
 })->with([
     'mysql' => ['mysql', 'MySQL needs the replication and agent secrets'],
@@ -88,7 +78,7 @@ it('refuses to bootstrap without the replication and agent secrets', function (s
 it('installs TLS and reloads it with the engine statement', function (string $engine, string $reload) {
     [$certificate, $key] = selfSignedPair();
 
-    resolve(EngineClient::class)->send(lifecycleNode($engine), new TlsInstall($certificate, $key, $certificate));
+    lifecycleNode($engine)->driver()->nodes()->installTls($certificate, $key, $certificate);
 
     $this->scripts->assertRan('mysql-family/nodes/tls-install', fn (string $script, array $env): bool => $env['KEY'] === $key && str_contains($script, $reload) && str_contains($script, 'tls/server.key" 600 true'));
 })->with([
@@ -100,12 +90,12 @@ it('refuses a certificate that does not match its key', function () {
     [$certificate] = selfSignedPair();
     [, $otherKey] = selfSignedPair();
 
-    expect(fn () => resolve(EngineClient::class)->send(lifecycleNode('mysql'), new TlsInstall($certificate, $otherKey, $certificate)))
+    expect(fn () => lifecycleNode('mysql')->driver()->nodes()->installTls($certificate, $otherKey, $certificate))
         ->toThrow(InvalidEngineRequest::class, 'the certificate and key are not a matching PEM pair');
 });
 
 it('waits for MySQL and rejoins its group as a task', function () {
-    resolve(EngineClient::class)->send(lifecycleNode('mysql'), new NodeReady('ready.1', true));
+    lifecycleNode('mysql')->driver()->nodes()->ready('ready.1', true);
 
     $this->scripts->assertRan('mysql/nodes/ready', fn (string $script): bool => str_contains($script, 'wait_ready MySQL')
         && str_contains($script, 'phase "waiting for $1"')
@@ -118,7 +108,7 @@ it('waits for MariaDB to sync and keeps the writer role as a task', function () 
     $fixture = goFixture('configure-galera-11.8.json', 'mariadb');
     respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
 
-    resolve(EngineClient::class)->send(lifecycleNode('mariadb'), new NodeReady('ready.1', false));
+    lifecycleNode('mariadb')->driver()->nodes()->ready('ready.1', false);
 
     $this->scripts->assertRan('mariadb/nodes/ready', fn (string $script, array $env): bool => str_contains($script, "phase 'syncing'")
         && str_contains($script, 'SELECT ip FROM databasify.writer WHERE id = 1')

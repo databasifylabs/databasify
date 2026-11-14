@@ -28,10 +28,10 @@ The app holds only what it needs per engine (`App\Engines\EngineCatalog`, ADR 00
 
 Derived automatically, with no change:
 
-- Settings, password encryptions, reserved names, ports and the features shown (`engine capabilities`, `config fields`, stored by `LearnEngine`).
+- Password encryptions, reserved names, ports and the features shown (the driver's static `facts()`), and the settings (`config()->fields()`, stored by `LearnEngine`).
 - The database list filter and search (`DatabaseFilters`), the dashboard's system requirements, and the engines the create form offers and validates (`StoreDatabaseRequest`).
 - `tests/Support/FakeImageRegistry.php`, which publishes `<line>.0` for every registered line.
 
-## When the engine needs a new command or field
+## When the engine needs a new action
 
-Add the command to `engine-sdk` first and implement it in the engine (phase 1), then mirror it here name for name: a request in `app/Engines/Requests` with its `command()` and `toPayload()`, a reply in `app/Engines/Responses` with `fromPayload()`, and shared data in `app/Engines/Data`. Send it with `EngineClient::send()` from an action, or from a flow step through `FlowSteps` (`send()` for quick commands with a server log name, `long()` for operations). Never add an engine-specific branch to a flow: an engine difference belongs in the engine.
+Add a method to the right group contract in `app/Engines/Contracts/` only when every engine can answer it (others throw `EngineUnsupported`), implement it in each driver with a Blade script, and call it from an action as `$database->driver()->…` or from a flow step (`FlowSteps::quick()` for a change, `long()` for a task). Never add an engine-specific branch to a flow: an engine difference belongs in its driver.

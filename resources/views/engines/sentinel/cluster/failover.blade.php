@@ -11,7 +11,7 @@ prefer_target() {
 }
 previous=$(sentinel_primary || true)
 if [ "$previous" = "$TARGET" ]; then
-    result '{}'
+    echo "$TARGET is already the primary."
     exit 0
 fi
 prefer_target 1
@@ -32,4 +32,4 @@ wait_until 300 2 settled || true
 if info=$(replication_info); then
     set_replica_of "$(info_field "$info" master_host)"
 fi
-result '{}'
+echo "Promoted $TARGET to primary."

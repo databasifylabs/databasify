@@ -6,4 +6,4 @@ done
 for name in etcd conf/patroni.yml conf/etcd.env conf/etcd-initial.env conf/etcd-force.env conf/dcs.yml conf/pgpass data/standby.signal data/patroni.dynamic.json; do
     rm -rf "/srv/postgres/$name"
 done
-result '{}'
+echo "Stopped the cluster services."

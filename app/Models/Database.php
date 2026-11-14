@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsDatabaseSettings;
-use App\Casts\AsEngineCapabilities;
 use App\Casts\AsEngineFields;
 use App\Casts\AsEngineImage;
 use App\Contracts\Projects\Movable;
@@ -25,24 +24,25 @@ use App\DTOs\Dns\HostPair;
 use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Recovery\RecoverySettings;
 use App\DTOs\Recovery\StoredArchive;
+use App\Engines\Data\EngineFacts;
 use App\Engines\Data\EngineField;
 use App\Engines\Data\Grant;
+use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Engine;
 use App\Engines\EngineCatalog;
 use App\Engines\EngineSecrets;
-use App\Engines\Responses\EngineCapabilities;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\Persistence;
+use App\Enums\Engines\Feature;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Observers\DatabaseObserver;
-use App\Support\Databases\ClientPorts;
 use App\Support\Engines\SdkRange;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -81,7 +81,6 @@ use LogicException;
  * @property int $maintenance_day
  * @property int $maintenance_hour
  * @property DatabaseSettings $settings
- * @property EngineCapabilities|null $engine_capabilities
  * @property list<EngineField> $config_fields
  * @property list<string>|null $log_units
  * @property string|null $dns_zone_id
@@ -90,7 +89,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'engine_capabilities', 'config_fields', 'log_units'])]
+#[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'operation', 'operation_started_at', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
@@ -648,12 +647,12 @@ class Database extends Model implements Movable
      */
     public function passwordEncryptions(): array
     {
-        return $this->engine_capabilities->passwordEncryptions ?? [];
+        return $this->facts()->passwordEncryptions;
     }
 
     public function passwordEncryptionFor(?string $chosen): ?string
     {
-        $default = $this->engine_capabilities?->defaultPasswordEncryption;
+        $default = $this->facts()->defaultPasswordEncryption;
 
         if ($default === null) {
             return null;
@@ -662,14 +661,21 @@ class Database extends Model implements Movable
         return $chosen ?? $default;
     }
 
-    public function runsEngineRuntime(): bool
+    public function facts(): EngineFacts
     {
-        return $this->engine_capabilities?->offers('runtime run') === true;
+        $driver = $this->engine()->driver ?? throw new LogicException("The {$this->engine} engine has no PHP driver.");
+
+        return $driver::facts($this->version_line);
+    }
+
+    public function offers(Feature $feature): bool
+    {
+        return $this->facts()->offers($feature);
     }
 
     public function managesAccounts(): bool
     {
-        return $this->engine_capabilities?->offers('user create') === true;
+        return $this->offers(Feature::Accounts);
     }
 
     public function ensureManagesAccounts(): void
@@ -757,6 +763,11 @@ class Database extends Model implements Movable
     public function primary(): ?DatabaseNode
     {
         return $this->nodes()->primary()->first();
+    }
+
+    public function driver(): AbstractEngineDriver
+    {
+        return $this->primaryOrSeed()->driver(followsPrimary: true);
     }
 
     public function primaryOrSeed(): DatabaseNode
@@ -932,12 +943,7 @@ class Database extends Model implements Movable
 
     public function archivesForRecovery(): bool
     {
-        return $this->offersArchives() && ($this->versionLine()->archives ?? true);
-    }
-
-    private function offersArchives(): bool
-    {
-        return $this->engine_capabilities?->offers('archive status') === true;
+        return $this->offers(Feature::Archive) && ($this->versionLine()->archives ?? true);
     }
 
     public function missingRecoveryMessage(): string
@@ -947,7 +953,7 @@ class Database extends Model implements Movable
 
     public function recoveryUnavailableMessage(): ?string
     {
-        if (! $this->offersArchives() || $this->archivesForRecovery()) {
+        if (! $this->offers(Feature::Archive) || $this->archivesForRecovery()) {
             return null;
         }
 
@@ -1009,7 +1015,7 @@ class Database extends Model implements Movable
 
     public function clientPort(): int
     {
-        return $this->engine_capabilities->ports->client ?? ClientPorts::CLIENT;
+        return $this->facts()->ports->client;
     }
 
     public function connectionProfile(): ConnectionProfile
@@ -1054,11 +1060,6 @@ class Database extends Model implements Movable
         ];
     }
 
-    public function capabilities(): EngineCapabilities
-    {
-        return $this->engine_capabilities ?? throw new LogicException("{$this->name} has not read its engine capabilities yet.");
-    }
-
     /**
      * @return list<ConfigField>
      */
@@ -1088,7 +1089,6 @@ class Database extends Model implements Movable
         return [
             'image' => AsEngineImage::class,
             'available_image' => AsEngineImage::class,
-            'engine_capabilities' => AsEngineCapabilities::class,
             'config_fields' => AsEngineFields::class,
             'log_units' => 'array',
             'mode' => DatabaseMode::class,

@@ -19,7 +19,7 @@ it('offers a newer release of the line without asking the servers', function () 
 
     $offered = resolve(CheckDatabaseUpgrade::class)->handle($database);
 
-    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.2.0'))
+    expect($offered)->toEqual(new EngineImage('ghcr.io/databasifylabs/databasify-postgres', 'sha256:'.str_repeat('7', 64), '18.7', '0.2.2'))
         ->and($database->fresh()->availableImage())->toEqual($offered)
         ->and($database->fresh()->availableUpdateRefreshesImage())->toBeFalse()
         ->and($ssh->runs)->toBeEmpty();
@@ -89,7 +89,7 @@ it('keeps the current image when the newest one is outside the range', function 
         ->and($database->fresh()->image->release)->toBe('9.1.3');
     Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->database->is($database)
         && $alert->subject === 'main stays on Valkey 9.1.3'
-        && $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.');
+        && $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.');
 });
 
 it('offers the newest supported release and warns about a newer refused one', function () {
@@ -101,7 +101,7 @@ it('offers the newest supported release and warns about a newer refused one', fu
 
     expect(resolve(CheckDatabaseUpgrade::class)->handle($database)?->release)->toBe('9.1.3')
         ->and($database->fresh()->availableImage()?->release)->toBe('9.1.3');
-    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.');
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->message === 'Valkey 9.1.4 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.');
 });
 
 it('raises the refusal alert once per refused image', function () {

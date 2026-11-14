@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Recovery;
 
-use App\Engines\Responses\ArchiveStatus as EngineArchiveStatus;
+use App\Engines\Payload;
 use App\Enums\Recovery\ArchiveHealth;
 use App\Support\Ssh\KeyValueOutput;
 use Carbon\CarbonImmutable;
@@ -22,14 +22,14 @@ final readonly class ArchiveStatus
         public ?string $problem,
     ) {}
 
-    public static function fromEngine(EngineArchiveStatus $status): self
+    public static function fromPayload(Payload $payload): self
     {
         return new self(
-            backups: $status->backups,
-            earliest: self::timeOf($status->earliest),
-            latest: self::timeOf($status->latest),
-            lastBackup: self::timeOf($status->lastBackup),
-            problem: $status->problem,
+            backups: $payload->int('backups'),
+            earliest: self::timeOf($payload->nullableString('earliest')),
+            latest: self::timeOf($payload->nullableString('latest')),
+            lastBackup: self::timeOf($payload->nullableString('lastBackup')),
+            problem: $payload->nullableString('problem'),
         );
     }
 

@@ -6,10 +6,6 @@ namespace App\Engines\Flows;
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Contracts\Engines\Flow;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ConfigApply;
-use App\Engines\Requests\ConfigShow;
-use App\Engines\Requests\ConfigSync;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -19,7 +15,6 @@ final readonly class ApplySettingsFlow implements Flow
     public function __construct(
         private FlowSteps $steps,
         private RollingSteps $rolling,
-        private EngineClient $engine,
         private RefreshDatabaseStatus $refresh,
     ) {}
 
@@ -35,7 +30,7 @@ final readonly class ApplySettingsFlow implements Flow
 
         return [
             ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->steps->configure($database, $node)], failover: false),
-            Step::prepare('sync the settings', $this->steps->send($primary, new ConfigSync, 'syncing the settings')),
+            Step::prepare('sync the settings', $this->steps->quick(fn () => $primary->driver()->config()->sync())),
             ...$this->rolling->over($flow, fn (DatabaseNode $node): array => [$this->applyStepOn($node)], failover: false),
             Step::prepare('check for a restart', $this->steps->quick(fn (DatabaseFlow $flow) => $this->checkRestartOn($flow, $primary))),
             ...($flow->context->restart ? $this->rolling->restart($flow) : []),
@@ -50,12 +45,12 @@ final readonly class ApplySettingsFlow implements Flow
 
     private function applyStepOn(DatabaseNode $node): Step
     {
-        return Step::prepare("apply the settings on {$node->server->name}", $this->steps->send($node, new ConfigApply, 'applying the settings'));
+        return Step::prepare("apply the settings on {$node->server->name}", $this->steps->quick(fn () => $node->driver()->config()->apply()));
     }
 
     private function checkRestartOn(DatabaseFlow $flow, DatabaseNode $primary): void
     {
-        $pendingRestart = $this->engine->send($primary, new ConfigShow, "{$primary->server->name}: reading the live settings")->pendingRestart;
+        $pendingRestart = $primary->driver()->config()->pendingRestart();
 
         $flow->update(['context' => $flow->context->needingRestart($pendingRestart !== [])]);
     }

@@ -10,7 +10,7 @@ if [ -n "$NEWEST_PRIMARY" ] && [ "$NEWEST_EPOCH" -ge 0 ]; then
         set_replica_of "$NEWEST_PRIMARY"
         unit_do start "$FLAVOR-server"
     fi
-    result '{}'
+    echo "Rejoined the newest primary."
     exit 0
 fi
 highest=0
@@ -44,4 +44,4 @@ wait_until 600 2 is_master || databasify_fail internal "$FLAVOR did not become r
 require_replicas 0
 unit_do start "$FLAVOR-sentinel"
 wait_until 60 2 sentinel_answers || databasify_fail internal "$FLAVOR did not become ready within 1m0s"
-result '{}'
+echo "Forced a new quorum from the healthy members."

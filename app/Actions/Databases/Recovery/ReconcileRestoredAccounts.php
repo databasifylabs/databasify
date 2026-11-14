@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Recovery;
 
-use App\Actions\Databases\RunOnPrimary;
 use App\DTOs\Databases\ServerAccounts;
 use App\DTOs\Recovery\RecoverySource;
-use App\Engines\Requests\AccountList;
-use App\Engines\Requests\UserSetPassword;
 use App\Exceptions\Databases\OperationStopped;
 use App\Models\Database;
 use App\Models\DatabaseUser;
@@ -17,8 +14,6 @@ use Throwable;
 
 final readonly class ReconcileRestoredAccounts
 {
-    public function __construct(private RunOnPrimary $primary) {}
-
     public function handle(Database $database): void
     {
         $source = $database->settings->restore;
@@ -40,12 +35,12 @@ final readonly class ReconcileRestoredAccounts
 
     private function resetPasswordOf(Database $database, DatabaseUser $user): void
     {
-        $this->primary->handle($database, new UserSetPassword($user->name, $user->password, $user->password_encryption), "Reset the restored password of {$user->name}");
+        $database->driver()->accounts()->setPassword($user->name, $user->password, $user->password_encryption);
     }
 
     private function verifiedAccountsOf(Database $database): ServerAccounts
     {
-        $reply = $this->primary->handle($database, new AccountList, 'Listing the restored users and databases');
+        $reply = $database->driver()->accounts()->list();
         $listed = new ServerAccounts($reply->users, $reply->databases);
         $default = $database->settings->defaultUsername();
 

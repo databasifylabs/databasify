@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Pools;
 
 use App\DTOs\Databases\NewConnectionPool;
+use App\Enums\Engines\Feature;
 use App\Jobs\Databases\ApplyConnectionPoolsJob;
 use App\Models\ConnectionPool;
 use App\Models\Database;
@@ -17,7 +18,7 @@ final readonly class CreateConnectionPool
     {
         $database->ensureIdle();
 
-        if ($database->engine_capabilities?->ports->pool === null) {
+        if (! $database->offers(Feature::Pools)) {
             throw ValidationException::withMessages(['name' => "{$database->engine()->label} databases have no connection pools."]);
         }
 

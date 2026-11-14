@@ -7,6 +7,6 @@ main(() => {
   if (healthyVoters(config, status) * 2 > votersOf(config)) throw failure('busy', 'a majority of voting members is healthy; the replica set elects a primary on its own');
   const healthy = (status.members || []).filter((member) => numberOf(member.health) === 1).map((member) => memberOf(config, member.name)).filter(Boolean);
   reconfig(local(), withMembers(config, healthy), true);
-  result({});
+  emit('Forced a new quorum from the healthy members.');
 });
 JS

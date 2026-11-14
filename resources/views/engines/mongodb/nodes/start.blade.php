@@ -4,4 +4,4 @@ unit_do start mongod
 if archived; then
     unit_do start pbm-agent
 fi
-result '{}'
+echo 'Started MongoDB.'

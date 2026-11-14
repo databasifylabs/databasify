@@ -6,7 +6,7 @@ use App\Engines\Data\EngineField;
 use App\Engines\Data\Member;
 use App\Engines\Drivers\MongoDb\MongoDbFiles;
 use App\Engines\Drivers\MongoDb\MongoDbSettings;
-use App\Engines\Drivers\NodeState;
+use App\Engines\Drivers\Support\NodeState;
 
 it('offers exactly the fields the Go engine offers', function () {
     expect(array_map(fn (EngineField $field): array => $field->toArray(), MongoDbSettings::catalog()->fields))->toEqual(goFixture('catalog.json', 'mongodb'));
@@ -25,7 +25,7 @@ it('tunes the same values as the Go engine for each server size', function () {
 
 it('renders mongod.conf, the keyfile and the manifest byte for byte like the Go engine', function (string $case) {
     $fixture = goFixture("configure-{$case}.json", 'mongodb');
-    $request = configureFromFixture($fixture['request']);
+    $request = nodeConfigFromFixture($fixture['request']);
     $catalog = MongoDbSettings::catalog();
     $effective = $catalog->effective($catalog->tuned(NodeState::selfOf($request)), $request->settings);
 
@@ -36,7 +36,7 @@ it('renders mongod.conf, the keyfile and the manifest byte for byte like the Go 
 
 it('renders the PBM config and URI like the Go engine', function () {
     $fixture = goFixture('pbm-config.json', 'mongodb');
-    $storage = configureFromFixture(goFixture('configure-archived.json', 'mongodb')['request'])->archive->storage;
+    $storage = nodeConfigFromFixture(goFixture('configure-archived.json', 'mongodb')['request'])->archive->storage;
 
     expect(MongoDbFiles::pbmConfigOf($storage, true))->toBe($fixture['sliced'])
         ->and(MongoDbFiles::pbmConfigOf($storage, false))->toBe($fixture['plain'])

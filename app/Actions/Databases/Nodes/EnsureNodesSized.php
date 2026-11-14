@@ -11,12 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class EnsureNodesSized
 {
-    public function __construct(private BuildNodeRequest $nodeRequest) {}
+    public function __construct(private BuildNodeConfig $nodeConfig) {}
 
     public function handle(Database $database, ?DatabaseNode $without = null): void
     {
         try {
-            $this->nodeRequest->membersOf($database, $without);
+            $this->nodeConfig->membersOf($database, $without);
         } catch (ServerSizeUnknown $unknown) {
             throw ValidationException::withMessages(['server_id' => $unknown->getMessage()]);
         }

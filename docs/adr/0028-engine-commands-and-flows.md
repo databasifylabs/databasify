@@ -1,6 +1,6 @@
 # 0028. The app drives engines through typed commands and flows
 
-- Status: Accepted
+- Status: Accepted; engine calls and capabilities superseded by [0035](0035-engine-api.md)
 - Date: 2026-11-10
 
 ## Context
@@ -37,7 +37,6 @@ All database logic now lives in the engine images: the `databasify` binary answe
 
 ## Evidence
 
-- `app/Engines/EngineClient.php`
 - `app/Engines/EngineCatalog.php`
 - `app/Providers/EngineServiceProvider.php`
 - `app/Actions/Databases/Flows/AdvanceFlow.php`
@@ -46,5 +45,4 @@ All database logic now lives in the engine images: the `databasify` binary answe
 - `app/Engines/Flows/RollingSteps.php`
 - `app/Jobs/Databases/AdvanceDatabaseFlow.php`
 - `app/Jobs/Databases/CleanUpDatabaseFlow.php`
-- `app/Actions/Databases/RunOnPrimary.php`
 - `database/migrations/2026_11_10_030902_create_database_flows_table.php`

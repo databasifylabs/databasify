@@ -12,4 +12,4 @@ main(() => {
 });
 JS
 fi
-result '{}'
+echo 'Installed the TLS certificate.'

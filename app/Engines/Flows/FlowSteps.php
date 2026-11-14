@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Engines\Flows;
 
-use App\Actions\Databases\Nodes\BuildNodeRequest;
-use App\Contracts\Engines\EngineReply;
-use App\Contracts\Engines\EngineRequest;
-use App\Engines\EngineClient;
+use App\Actions\Databases\Nodes\BuildNodeConfig;
+use App\Engines\Data\Operation;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -15,10 +13,7 @@ use Closure;
 
 final readonly class FlowSteps
 {
-    public function __construct(
-        private EngineClient $engine,
-        private BuildNodeRequest $nodeRequest,
-    ) {}
+    public function __construct(private BuildNodeConfig $nodeConfig) {}
 
     /**
      * @param  Closure(DatabaseFlow): mixed  $work
@@ -33,33 +28,24 @@ final readonly class FlowSteps
         };
     }
 
-    /**
-     * @param  EngineRequest<EngineReply>  $request
-     * @return Closure(DatabaseFlow): null
-     */
-    public function send(DatabaseNode $node, EngineRequest $request, string $log): Closure
-    {
-        return $this->quick(fn () => $this->engine->send($node, $request, "{$node->server->name}: {$log}"));
-    }
-
     public function configure(Database $database, DatabaseNode $node): Step
     {
         return Step::prepare("configure {$node->server->name}", $this->quick(
-            fn () => $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node"),
+            fn () => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)),
         ));
     }
 
     /**
-     * @param  Closure(string): EngineRequest<EngineReply>  $request
+     * @param  Closure(string): Operation  $start
      * @return Closure(DatabaseFlow): StartedOperation
      */
-    public function long(DatabaseNode $node, Closure $request, string $log): Closure
+    public function long(DatabaseNode $node, Closure $start, string $log): Closure
     {
-        return function (DatabaseFlow $flow) use ($node, $request, $log): StartedOperation {
-            $serverLog = $this->engine->openLog($node, "{$node->server->name}: {$log}");
+        return function (DatabaseFlow $flow) use ($node, $start, $log): StartedOperation {
+            $serverLog = $node->openLog("{$node->server->name}: {$log}");
             $operation = new StartedOperation($node->id, $flow->newOperationKey(), $serverLog->id);
             $flow->waitFor($operation);
-            $this->engine->sendInto($node, $request($operation->key), $serverLog);
+            $start($operation->key);
 
             return $operation;
         };

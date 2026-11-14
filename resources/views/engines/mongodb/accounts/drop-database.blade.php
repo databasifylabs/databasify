@@ -6,6 +6,6 @@ main(() => {
     if (revoked.length > 0) run('admin', { revokeRolesFromUser: user.user, roles: revoked });
   }
   run(env.NAME, { dropDatabase: 1 });
-  result({});
+  emit('Dropped database ' + env.NAME + '.');
 });
 JS

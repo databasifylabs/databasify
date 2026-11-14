@@ -4,4 +4,4 @@ for name in $(manifest_units); do
     unit_do enable "$name"
     unit_do restart "$name"
 done
-result '{}'
+echo "Started PostgreSQL."

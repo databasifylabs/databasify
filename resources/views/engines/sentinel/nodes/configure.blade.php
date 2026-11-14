@@ -25,4 +25,8 @@ if [ "$GUARD_EMPTY_PRIMARY" = true ] && restart_loses_data "$PERSISTENT"; then
     done
 fi
 daemon_reload
-result "{\"changed\":$changed}"
+if [ "$changed" = true ]; then
+    echo "Wrote the $FLAVOR configuration."
+else
+    echo "The $FLAVOR configuration was already current."
+fi

@@ -11,4 +11,4 @@ if [ "$HOLDS" = true ] && [ -n "$(replica_of)" ] && restart_loses_data "$PERSIST
     hold
 fi
 unit_do start "$FLAVOR-server"
-result '{}'
+echo "Started $FLAVOR."

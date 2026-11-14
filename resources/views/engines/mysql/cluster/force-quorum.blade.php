@@ -12,7 +12,7 @@ if [ "$running" != ON ]; then
     replication_password
     bootstrap_group "$REPLICATION_SECRET"
     online_and_joined "$REPLICATION_SECRET"
-    result '{}'
+    echo "This node already has a working group."
     exit 0
 fi
 my '' > /dev/null <<SQL
@@ -20,4 +20,4 @@ SET GLOBAL group_replication_force_members = $(my_string "$(saved .ip):33061")
 SQL
 online_and_joined ''
 my '' > /dev/null <<< "SET GLOBAL group_replication_force_members = ''"
-result '{}'
+echo "Restarted the group on this node."

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Migrations;
 
-use App\Engines\Responses\MigrationCheck;
+use App\Engines\Payload;
 
 final readonly class SourceReport
 {
@@ -27,24 +27,48 @@ final readonly class SourceReport
         public array $databases = [],
     ) {}
 
-    public static function fromEngine(MigrationCheck $check): self
+    public static function fromPayload(Payload $payload): self
     {
-        if (! $check->reachable) {
-            return self::unreachable($check->error ?? 'The source did not answer.');
+        if (! $payload->bool('reachable')) {
+            return self::unreachable($payload->nullableString('error') ?? 'The source did not answer.');
         }
 
+        return self::checked(
+            version: $payload->nullableString('version'),
+            canReplicate: $payload->bool('canReplicate'),
+            sizeMb: $payload->nullableInt('sizeMb'),
+            databases: $payload->strings('databases'),
+            unreadable: $payload->strings('unreadable'),
+            unowned: $payload->strings('unowned'),
+            occupied: $payload->strings('occupied'),
+            warnings: $payload->strings('warnings'),
+            problems: $payload->strings('problems'),
+            walLevel: $payload->nullableString('walLevel'),
+        );
+    }
+
+    /**
+     * @param  list<string>  $databases
+     * @param  list<string>  $unreadable
+     * @param  list<string>  $unowned
+     * @param  list<string>  $occupied
+     * @param  list<string>  $warnings
+     * @param  list<string>  $problems
+     */
+    public static function checked(?string $version, bool $canReplicate, ?int $sizeMb, array $databases, array $unreadable = [], array $unowned = [], array $occupied = [], array $warnings = [], array $problems = [], ?string $walLevel = null): self
+    {
         return new self(
             reachable: true,
-            blockers: $check->canReplicate ? [] : ['The source cannot replicate continuously, so only a one-time copy is possible.'],
-            facts: array_filter(['version' => $check->version ?? '', 'size_mb' => (string) ($check->sizeMb ?? 0), 'wal_level' => $check->walLevel ?? ''], fn (string $fact): bool => $fact !== ''),
-            occupied: $check->occupied,
+            blockers: $canReplicate ? [] : ['The source cannot replicate continuously, so only a one-time copy is possible.'],
+            facts: array_filter(['version' => $version ?? '', 'size_mb' => (string) ($sizeMb ?? 0), 'wal_level' => $walLevel ?? ''], fn (string $fact): bool => $fact !== ''),
+            occupied: $occupied,
             problems: [
-                ...array_map(fn (string $database): string => "Databasify cannot read {$database} on the source.", $check->unreadable),
-                ...array_map(fn (string $database): string => "{$database} is not owned by the source user.", $check->unowned),
-                ...$check->problems,
+                ...array_map(fn (string $database): string => "Databasify cannot read {$database} on the source.", $unreadable),
+                ...array_map(fn (string $database): string => "{$database} is not owned by the source user.", $unowned),
+                ...$problems,
             ],
-            warnings: $check->warnings,
-            databases: $check->databases,
+            warnings: $warnings,
+            databases: $databases,
         );
     }
 

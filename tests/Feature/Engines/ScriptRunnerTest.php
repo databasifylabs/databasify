@@ -7,6 +7,7 @@ use App\Engines\Scripts\ScriptRunner;
 use App\Engines\Scripts\ScriptView;
 use App\Enums\Servers\ServerLogStatus;
 use App\Exceptions\Engines\EngineError;
+use App\Exceptions\Engines\EngineNotRunning;
 use App\Exceptions\Engines\EngineScriptFailed;
 use App\Exceptions\Engines\NotPrimary;
 
@@ -32,6 +33,18 @@ it('decodes the one result line', function () {
     expect($result->json()->string('role'))->toBe('primary');
 });
 
+it('fails the server log when the engine cannot be reached', function () {
+    fakeSsh()->respond('', 69);
+    $node = engineNode();
+
+    expect(fn () => resolve(ScriptRunner::class)->run($node, 'testing/echo', ['word' => 'x'], log: 'Create user'))
+        ->toThrow(EngineNotRunning::class);
+
+    $log = $node->server->serverLogs()->sole();
+    expect($log->status)->toBe(ServerLogStatus::Failed)
+        ->and($log->output)->toContain('No engine container is running');
+});
+
 it('fails with the last stderr line and keeps the tail in the server log', function () {
     fakeSsh()->respondToEngine('runtime run', runtimeReply(2, '', "a\nb\nboom\n"));
     $node = engineNode();
@@ -42,12 +55,6 @@ it('fails with the last stderr line and keeps the tail in the server log', funct
     $log = $node->server->serverLogs()->sole();
     expect($log->status)->toBe(ServerLogStatus::Failed)
         ->and($log->output)->toContain("a\nb\nboom");
-});
-
-it('reads the latest phase from a task log', function () {
-    fakeSsh()->respondToEngine('task log', ['lines' => "x\nDATABASIFY_PHASE starting\nDATABASIFY_PHASE waiting for the primary\ny\n"]);
-
-    expect(resolve(ScriptRunner::class)->phaseOf(engineNode(), 'ready.1'))->toBe('waiting for the primary');
 });
 
 it('renders the real view in the fake', function () {

@@ -78,5 +78,6 @@ Options that were tried or rejected, and why.
 | [0032](0032-databases-on-a-dropped-sdk-run-read-only.md)    | Databases on a dropped SDK run read-only                 | Accepted |
 | [0033](0033-self-update-through-a-host-helper.md)           | Self-update through a host helper                        | Accepted |
 | [0034](0034-a-frozen-engine-runtime.md)                     | A frozen engine runtime                                  | Accepted |
+| [0035](0035-engine-api.md)                                  | The app drives engines through PHP drivers               | Accepted |
 
 The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.

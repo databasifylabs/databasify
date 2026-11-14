@@ -14,14 +14,14 @@ it('creates and deletes databases over http', function () {
     $database = idleDatabase('postgres', 1, DatabaseMode::Single);
     $database->seed()->update(['role' => NodeRole::Primary]);
     idleDatabase('postgres', 1, DatabaseMode::Single, 'other')->schemas()->create(['name' => 'analytics']);
-    $ssh = fakeEngine();
+    fakeEngine();
 
     $this->post(projectUrl("/databases/{$database->id}/schemas"), ['name' => 'analytics'])->assertRedirect()->assertSessionHasNoErrors();
     $schema = $database->schemas()->where('name', 'analytics')->sole();
     $this->delete(projectUrl("/databases/{$database->id}/schemas/{$schema->id}"))->assertRedirect()->assertSessionHasNoErrors();
 
-    expect($ssh->scriptAt(0))->toContain('| databasify database create ')
-        ->and(json_decode($ssh->engineRequestAt(count($ssh->runs) - 1), true))->toBe(['name' => 'analytics'])
+    expect(recordedCalls())->toContain('accounts.createDatabase')
+        ->and(recordedArgs('accounts.dropDatabase')[0]['args'])->toBe(['analytics'])
         ->and($database->schemas()->pluck('name')->all())->toBe(['defaultdb']);
 });
 

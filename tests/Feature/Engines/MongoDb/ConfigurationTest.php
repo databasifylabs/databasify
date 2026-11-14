@@ -2,17 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\ConfigApply;
-use App\Engines\Requests\ConfigFields;
-use App\Engines\Requests\ConfigShow;
-use App\Engines\Requests\ConfigSync;
-use App\Engines\Requests\ConfigTune;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['mongodb']]);
     $this->scripts = fakeScripts()->respond('mongodb/nodes/configure', ['changed' => true]);
     $this->node = idleDatabase('mongodb', 1, versionLine: '8.0')->nodes()->sole();
 });
@@ -30,7 +23,7 @@ it('configures with the Go-identical files', function (string $case) {
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
     $fixture = goFixture("configure-{$case}.json", 'mongodb');
 
-    resolve(EngineClient::class)->send($this->node, configureFromFixture($fixture['request']));
+    $this->node->driver()->nodes()->configure(nodeConfigFromFixture($fixture['request']));
 
     $this->scripts->assertRan('mongodb/nodes/configure', function (string $script, array $env) use ($fixture): bool {
         $files = mongoFiles($env);
@@ -48,7 +41,7 @@ it('configures with the Go-identical files', function (string $case) {
 it('refuses what Go refuses before touching the node', function (Closure $change, string $message) {
     $request = goFixture('configure-standalone.json', 'mongodb')['request'];
 
-    expect(fn () => resolve(EngineClient::class)->send($this->node, configureFromFixture($change($request))))->toThrow(InvalidEngineRequest::class, $message);
+    expect(fn () => $this->node->driver()->nodes()->configure(nodeConfigFromFixture($change($request))))->toThrow(InvalidEngineRequest::class, $message);
     expect($this->scripts->ran())->toBe([]);
 })->with([
     'secrets' => [fn (array $request): array => [...$request, 'secrets' => [...$request['secrets'], 'replication' => null]], 'MongoDB needs the admin and replication secrets'],
@@ -61,7 +54,7 @@ it('applies the runtime settings like Go', function () {
     $ssh = respondToFileGet(fakeSsh(), 'state/node.json', json_encode($fixture['request']));
     respondToFileGet($ssh, 'state/tuned.json', '{"cacheSizeGB":"1.50","maxIncomingConnections":"2048"}');
 
-    resolve(EngineClient::class)->send($this->node, new ConfigApply);
+    $this->node->driver()->config()->apply();
 
     $this->scripts->assertRan('mongodb/config/apply', fn (string $script, array $env): bool => $env['VERBOSITY'] === '2' && $env['SLOW'] === '250' && $env['LIFETIME'] === '60' && $env['CACHE_MB'] === '1536'
         && $env['READ_CONCERN'] === 'local' && $env['WRITE_CONCERN'] === 'majority'
@@ -75,14 +68,14 @@ it('lists the restart settings whose live value differs', function () {
     respondToFileGet($ssh, 'state/tuned.json', '{"cacheSizeGB":"1.50","maxIncomingConnections":"2048"}');
     $this->scripts->respond('mongodb/config/show', ['values' => ['maxIncomingConnections' => '1000000', 'cacheSizeGB' => '0.25', 'verbosity' => '0']]);
 
-    expect(resolve(EngineClient::class)->send($this->node, new ConfigShow)->pendingRestart)->toBe(['maxIncomingConnections']);
+    expect($this->node->driver()->config()->pendingRestart())->toBe(['maxIncomingConnections']);
 });
 
 it('syncs nothing and needs a configured node to apply or tune', function () {
     respondToFileGet(fakeSsh(), 'state/node.json', null);
-    resolve(EngineClient::class)->send($this->node, new ConfigSync);
+    $this->node->driver()->config()->sync();
 
-    expect(fn () => resolve(EngineClient::class)->send($this->node, new ConfigApply))->toThrow(EngineBusy::class, 'run node configure first')
-        ->and(fn () => resolve(EngineClient::class)->send($this->node, new ConfigTune))->toThrow(EngineBusy::class, 'run node configure first')
-        ->and(resolve(EngineClient::class)->send($this->node, new ConfigFields)->fields)->toHaveCount(7);
+    expect(fn () => $this->node->driver()->config()->apply())->toThrow(EngineBusy::class, 'run node configure first')
+        ->and(fn () => $this->node->driver()->config()->tune())->toThrow(EngineBusy::class, 'run node configure first')
+        ->and($this->node->driver()->config()->fields())->toHaveCount(7);
 });

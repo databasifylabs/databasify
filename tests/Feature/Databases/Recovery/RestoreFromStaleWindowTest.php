@@ -3,16 +3,17 @@
 declare(strict_types=1);
 
 use App\DTOs\Databases\EngineImage;
+use App\DTOs\Recovery\ArchiveStatus;
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\NodeRole;
 use App\Jobs\Databases\AdvanceDatabaseFlow;
 use App\Models\Database;
 use App\Models\Server;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
-use Tests\Support\FakeServerConnection;
 
 beforeEach(function () {
     $this->freezeSecond();
@@ -32,9 +33,10 @@ function staleWindowDatabase(): Database
     ], restorable: true);
 }
 
-function archiveStatusUpTo(CarbonInterface $latest): FakeServerConnection
+function archiveStatusUpTo(CarbonInterface $latest): void
 {
-    return fakeEngine(fakeEngine()->respondToEngine('archive status', ['backups' => 2, 'earliest' => now()->subDay()->toIso8601ZuluString(), 'latest' => $latest->toIso8601ZuluString(), 'lastBackup' => now()->subHours(5)->toIso8601ZuluString(), 'problem' => null]));
+    fakeEngine();
+    answerRead('archive.status', new ArchiveStatus(2, CarbonImmutable::parse(now()->subDay()), CarbonImmutable::parse($latest), CarbonImmutable::parse(now()->subHours(5)), null));
 }
 
 function restoreTo(Database $source, CarbonInterface $target): TestResponse
@@ -44,12 +46,12 @@ function restoreTo(Database $source, CarbonInterface $target): TestResponse
 
 it('re-reads a stale archive window before refusing a target past it', function () {
     $source = staleWindowDatabase();
-    $ssh = archiveStatusUpTo(now()->subMinute());
+    archiveStatusUpTo(now()->subMinute());
 
     restoreTo($source, now()->subMinutes(5))->assertSessionHasNoErrors();
 
     expect(Database::query()->where('name', 'orders-restored')->exists())->toBeTrue()
-        ->and($ssh->runs)->toHaveCount(1)
+        ->and(recordedCalls())->toBe(['archive.status'])
         ->and($source->pointInTimeRecovery?->fresh()?->latest_restorable_at?->getTimestamp())->toBe(now()->subMinute()->getTimestamp());
 });
 
@@ -59,7 +61,7 @@ it('restores without reaching the server when the window already covers the targ
 
     restoreTo($source, now()->subHour())->assertSessionHasNoErrors();
 
-    expect($ssh->runs)->toBe([]);
+    expect($ssh->runs)->toBe([])->and(recordedCalls())->toBe([]);
 });
 
 it('refuses with the refreshed window when the archive still has not reached the target', function () {
@@ -106,7 +108,7 @@ it('refuses to restore when no image of the line is built on an SDK inside the r
     $ssh = fakeEngine();
 
     restoreTo($source, now()->subHour())
-        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.3.0; this Databasify supports ^0.2.']);
+        ->assertSessionHasErrors(['version_line' => 'MySQL 8.4.99 is built on SDK 0.3.0; this Databasify supports ^0.2.2 || ^1.0.']);
 
     expect(Database::query()->where('name', 'orders-restored')->exists())->toBeFalse()
         ->and($ssh->runs)->toBe([]);

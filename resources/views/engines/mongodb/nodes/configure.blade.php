@@ -25,4 +25,8 @@ unit_do daemon-reload
 if [ "$START_AGENT" = true ] && unit_active mongod; then
     unit_do start pbm-agent
 fi
-result "{\"changed\":$changed}"
+if [ "$changed" = true ]; then
+    echo 'Wrote the MongoDB configuration.'
+else
+    echo 'The MongoDB configuration was already current.'
+fi

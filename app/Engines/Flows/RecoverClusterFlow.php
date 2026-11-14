@@ -6,11 +6,7 @@ namespace App\Engines\Flows;
 
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Contracts\Engines\Flow;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterForceQuorum;
-use App\Engines\Requests\ClusterPosition;
-use App\Engines\Requests\ClusterRejoin;
-use App\Engines\Requests\NodeWake;
+use App\Engines\Data\Operation;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -21,7 +17,6 @@ final readonly class RecoverClusterFlow implements Flow
 {
     public function __construct(
         private FlowSteps $steps,
-        private EngineClient $engine,
         private RefreshDatabaseStatus $refresh,
     ) {}
 
@@ -49,7 +44,7 @@ final readonly class RecoverClusterFlow implements Flow
 
     private function wakeStepFor(DatabaseNode $node): Step
     {
-        return Step::prepare("wake {$node->server->name}", $this->steps->send($node, new NodeWake(all: false), 'preparing it for recovery'));
+        return Step::prepare("wake {$node->server->name}", $this->steps->quick(fn () => $node->driver()->nodes()->wake(all: false)));
     }
 
     /**
@@ -73,14 +68,14 @@ final readonly class RecoverClusterFlow implements Flow
         }
 
         return [
-            Step::prepare("make {$survivor->server->name} the primary", $this->steps->send($survivor, new ClusterForceQuorum($flow->context->force), 'taking over without a majority')),
+            Step::prepare("make {$survivor->server->name} the primary", $this->steps->quick(fn () => $survivor->driver()->cluster()->forceQuorum($flow->context->force))),
             ...$nodes->reject(fn (DatabaseNode $node): bool => $node->is($survivor))->map($this->rejoinStepFor(...))->all(),
         ];
     }
 
     private function rejoinStepFor(DatabaseNode $node): Step
     {
-        return Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): ClusterRejoin => new ClusterRejoin($key, readOnly: false), 'rejoining the cluster'));
+        return Step::prepare("rejoin {$node->server->name}", $this->steps->long($node, fn (string $key): Operation => $node->driver()->cluster()->rejoin($key, readOnly: false), 'rejoining the cluster'));
     }
 
     /**
@@ -88,7 +83,7 @@ final readonly class RecoverClusterFlow implements Flow
      */
     private function mostAdvancedOf(Collection $nodes): DatabaseNode
     {
-        $positions = $nodes->map(fn (DatabaseNode $node): ?int => $this->engine->send($node, new ClusterPosition, "{$node->server->name}: reading how far its data got")->position);
+        $positions = $nodes->map(fn (DatabaseNode $node): ?int => $node->driver()->cluster()->position());
 
         if ($positions->contains(null)) {
             throw new RuntimeException('A member could not say how far its data got, so Databasify will not pick a new primary. Check the members and recover again.');

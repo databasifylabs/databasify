@@ -24,4 +24,4 @@ while IFS=$'\t' read -r name value; do
     fi
 done < <(jq -r 'to_entries | sort_by(.key)[] | [.key, .value] | @tsv' <<< "$desired")
 printf '%s' "$SETTING_KEYS" | write_file "$ROOT/state/applied.json" 600 true || true
-result '{}'
+echo "Applied the online settings."

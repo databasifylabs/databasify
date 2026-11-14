@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Plugins;
 
-use App\Contracts\Engines\EngineDriver;
 use App\DTOs\Databases\ConnectionProfile;
 use App\DTOs\Databases\ServiceConnection;
+use App\Engines\Contracts\EngineDriver;
 
 final class RegisterEngine extends AbstractProviderRegistrar
 {

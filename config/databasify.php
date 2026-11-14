@@ -6,10 +6,8 @@ return [
     'registry' => env('DATABASIFY_REGISTRY', 'ghcr.io/databasifylabs'),
 
     'require' => [
-        'engine-sdk' => '^0.2',
+        'engine-sdk' => '^0.2.2 || ^1.0',
     ],
-
-    'php_engines' => array_values(array_filter(explode(',', (string) env('DATABASIFY_PHP_ENGINES', '')))),
 
     'docker' => [
         'version' => '29.9.2',

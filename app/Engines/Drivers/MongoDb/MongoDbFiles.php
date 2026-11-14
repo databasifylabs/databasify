@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\MongoDb;
 
+use App\Engines\Data\MigrationSource;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Storage;
-use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\NodeConfigure;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class MongoDbFiles
 {
@@ -19,6 +20,8 @@ final readonly class MongoDbFiles
     public const string AGENT_UNIT = 'pbm-agent';
 
     public const string BACKUP_UNIT = 'mongodb-backup';
+
+    public const string BACKUP_JOB = self::HOME.'/conf/backup.sh';
 
     private const string RAW_NUMBER = "\0number:";
 
@@ -48,7 +51,7 @@ final readonly class MongoDbFiles
             'replication' => ['replSetName' => 'databasify'],
         ];
 
-        return (string) preg_replace('/"\\\\u0000number:([^"]*)"/', '$1', GoJson::indented(self::sorted($conf)))."\n";
+        return (string) preg_replace('/"\\\\u0000number:([^"]*)"/', '$1', IndentedJson::of(self::sorted($conf)))."\n";
     }
 
     public static function keyfileOf(string $replication): string
@@ -56,7 +59,7 @@ final readonly class MongoDbFiles
         return base64_encode(hash_hmac('sha256', 'mongodb keyfile', $replication, true));
     }
 
-    public static function manifestOf(NodeConfigure $request): string
+    public static function manifestOf(NodeConfig $request): string
     {
         $processes = [[
             'name' => self::SERVER_UNIT, 'argv' => ['mongod', '--config', self::HOME.'/conf/mongod.conf'], 'user' => 'mongodb',
@@ -69,15 +72,36 @@ final readonly class MongoDbFiles
                 'name' => self::AGENT_UNIT, 'argv' => ['pbm-agent'], 'user' => 'mongodb', 'env' => ['PBM_MONGODB_URI' => self::pbmUriOf($request->secrets->agent)],
                 'after' => [self::SERVER_UNIT], 'restart' => 'always', 'restartSec' => '3s', 'stopSignal' => 'TERM', 'stopTimeout' => '1m0s', 'enabled' => true,
             ];
-            $schedules[] = ['name' => self::BACKUP_UNIT, 'onCalendar' => sprintf('%02d:00', $request->archive->backupHour), 'argv' => ['/usr/local/bin/databasify', 'engine-task', 'backup'], 'timeout' => '24h0m0s'];
+            $schedules[] = [
+                'name' => self::BACKUP_UNIT, 'onCalendar' => sprintf('%02d:00', $request->archive->backupHour), 'argv' => ['bash', self::BACKUP_JOB],
+                'env' => ['PBM_MONGODB_URI' => self::pbmUriOf($request->secrets->agent), 'PBM_CONFIG' => self::pbmConfigOf($request->archive->storage, true), 'RETENTION_DAYS' => (string) $request->archive->retentionDays],
+                'timeout' => '24h0m0s',
+            ];
         }
 
-        return GoJson::indented(['processes' => $processes, 'schedules' => $schedules]);
+        return IndentedJson::of(['processes' => $processes, 'schedules' => $schedules]);
     }
 
     public static function hostOf(string $ip): string
     {
         return $ip.':'.self::CLIENT_PORT;
+    }
+
+    public static function sourceUriOf(MigrationSource $source): string
+    {
+        $query = http_build_query(['authSource' => 'admin', 'tls' => $source->tls ? 'true' : 'false', ...($source->tls ? ['tlsInsecure' => 'true'] : [])]);
+
+        return 'mongodb://'.self::userinfoOf($source->username).':'.self::userinfoOf($source->password)."@{$source->host}:{$source->port}/?{$query}";
+    }
+
+    public static function localUriOf(string $password): string
+    {
+        return 'mongodb://root:'.self::userinfoOf($password).'@127.0.0.1:'.self::CLIENT_PORT.'/?authSource=admin&tls=true&tlsInsecure=true';
+    }
+
+    public static function toolConfigOf(string $uri): string
+    {
+        return 'uri: '.json_encode($uri, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).PHP_EOL;
     }
 
     public static function pbmUriOf(string $password): string
@@ -87,7 +111,7 @@ final readonly class MongoDbFiles
 
     public static function pbmConfigOf(Storage $storage, bool $slicing): string
     {
-        return GoJson::indented(self::sorted([
+        return IndentedJson::of(self::sorted([
             'storage' => [
                 'type' => 's3',
                 's3' => [

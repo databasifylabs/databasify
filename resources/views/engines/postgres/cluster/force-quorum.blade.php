@@ -10,7 +10,7 @@ SQL
 }
 if ! clustered; then
     wait_until 300 2 primary_up || databasify_fail unavailable 'PostgreSQL did not come up as primary'
-    result "$(jq -cn --arg leader "$self" '{leader: $leader}')"
+    echo "This node runs alone and serves as the primary."
     exit 0
 fi
 
@@ -46,4 +46,4 @@ if ! wait_until 90 3 leader_found && [ "$forced_alone" = true ]; then
     HOME=/var/lib/postgresql setpriv --reuid=64999 --regid=64999 --clear-groups timeout 300 patronictl -c /srv/postgres/conf/patroni.yml failover --candidate "$self" --force > /dev/null 2>&1 || true
 fi
 wait_until 300 3 leader_found || databasify_fail unavailable 'no PostgreSQL leader came up'
-result "$(jq -cn --arg leader "$leader" '{leader: $leader}')"
+echo "$leader leads the cluster."

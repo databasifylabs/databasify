@@ -12,15 +12,10 @@ use App\Actions\Databases\Nodes\LearnLogUnits;
 use App\Actions\Databases\Recovery\ReconcileRestoredAccounts;
 use App\Contracts\Engines\Flow;
 use App\Engines\Data\DefaultAccount;
+use App\Engines\Data\Operation;
 use App\Engines\Data\Secrets;
 use App\Engines\Data\Storage;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterEnable;
-use App\Engines\Requests\HostRemove;
-use App\Engines\Requests\NodeBootstrap;
-use App\Engines\Requests\NodeReady;
-use App\Engines\Requests\NodeStart;
-use App\Engines\Requests\RestoreStart;
+use App\Engines\Runtime\Runtime;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
@@ -33,7 +28,7 @@ final readonly class CreateDatabaseFlow implements Flow
 {
     public function __construct(
         private FlowSteps $steps,
-        private EngineClient $engine,
+        private Runtime $runtime,
         private DeployNode $deploy,
         private ApplyNodeFirewall $firewall,
         private RefreshDatabaseStatus $refresh,
@@ -79,7 +74,7 @@ final readonly class CreateDatabaseFlow implements Flow
         $storage = Storage::at(StorageProvider::query()->withoutProject()->findOrFail($source->storageProviderId), $source->path);
 
         return [
-            Step::catchUp('restore the archive', $this->steps->long($database->seed(), fn (string $key): RestoreStart => new RestoreStart($key, $storage, $source->target), 'restoring the archive')),
+            Step::catchUp('restore the archive', $this->steps->long($database->seed(), fn (string $key): Operation => $database->seed()->driver()->archive()->restore($key, $storage, $source->target), 'restoring the archive')),
             Step::finish('check the restored accounts', $this->steps->quick(fn () => $this->restoredAccounts->handle($database))),
         ];
     }
@@ -94,7 +89,7 @@ final readonly class CreateDatabaseFlow implements Flow
     private function eraseSetupOn(DatabaseNode $node): void
     {
         try {
-            $this->engine->send($node, new HostRemove($node->database_id, erase: true), "{$node->server->name}: removing the failed setup", EngineClient::REMOVE_TIMEOUT);
+            $this->runtime->remove($node, erase: true);
         } catch (Throwable $exception) {
             report($exception);
         }
@@ -113,8 +108,8 @@ final readonly class CreateDatabaseFlow implements Flow
             ...($node->isSeed() ? [Step::prepare('read what the engine offers', $this->steps->quick(fn () => $this->learn->handle($database, $node)))] : []),
             $this->steps->configure($database, $node),
             Step::prepare("open the firewall on {$server}", $this->steps->quick(fn () => $this->firewall->handle($database, $node, $database->trustedCidrs()))),
-            Step::prepare("start {$server}", $this->steps->send($node, new NodeStart, 'starting the engine')),
-            Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: $node->isSeed()), 'waiting for the node')),
+            Step::prepare("start {$server}", $this->steps->quick(fn () => $node->driver()->nodes()->start())),
+            Step::prepare("wait for {$server}", $this->steps->long($node, fn (string $key): Operation => $node->driver()->nodes()->ready($key, expectPrimary: $node->isSeed()), 'waiting for the node')),
         ];
     }
 
@@ -124,7 +119,7 @@ final readonly class CreateDatabaseFlow implements Flow
             $settings = $node->database->settings;
 
             try {
-                $this->engine->send($node, new NodeBootstrap(Secrets::of($settings), DefaultAccount::of($settings)), "{$node->server->name}: creating the users");
+                $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
             } catch (EngineUnsupported) {
             }
         }));
@@ -132,7 +127,7 @@ final readonly class CreateDatabaseFlow implements Flow
 
     private function joinStepFor(DatabaseNode $node): Step
     {
-        return Step::catchUp("join {$node->server->name} to the cluster", $this->steps->long($node, fn (string $key): ClusterEnable => new ClusterEnable($key), 'joining the cluster'));
+        return Step::catchUp("join {$node->server->name} to the cluster", $this->steps->long($node, fn (string $key): Operation => $node->driver()->cluster()->enable($key), 'joining the cluster'));
     }
 
     private function nodesOf(DatabaseFlow $flow): DatabaseNodeCollection

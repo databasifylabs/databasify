@@ -14,11 +14,11 @@ it('reads only the given nodes but judges health from every node', function () {
     $database = idleDatabase('mysql', 3);
     markRoles($database, NodeRole::Primary, NodeRole::Unknown, NodeRole::Replica);
     $primary = $database->nodes()->get()[0];
-    $ssh = answerNodeStatus(fakeSsh(), $database->nodes()->orderBy('position')->first()->server, 'primary');
+    answerNodeStatus(fakeSsh(), $database->nodes()->orderBy('position')->first()->server, 'primary');
 
     $status = resolve(RefreshNodeStatuses::class)->handle($database, $database->nodesWithServers()->filter(fn (DatabaseNode $node): bool => $node->is($primary)));
 
-    expect($ssh->runs)->toHaveCount(1)->and($status)->toBe(DatabaseStatus::Degraded);
+    expect(recordedCalls())->toHaveCount(1)->and($status)->toBe(DatabaseStatus::Degraded);
 });
 
 it('marks the database offline when every node is offline', function () {

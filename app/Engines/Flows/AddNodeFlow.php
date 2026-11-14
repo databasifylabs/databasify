@@ -7,15 +7,11 @@ namespace App\Engines\Flows;
 use App\Actions\Databases\Domains\ClearNodeDns;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
-use App\Actions\Databases\Nodes\BuildNodeRequest;
+use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Actions\Databases\Nodes\DeployNode;
 use App\Contracts\Engines\Flow;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterEnable;
-use App\Engines\Requests\ClusterMembership;
-use App\Engines\Requests\HostRemove;
-use App\Engines\Requests\NodeReady;
-use App\Engines\Requests\NodeStart;
+use App\Engines\Data\Operation;
+use App\Engines\Runtime\Runtime;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -25,9 +21,9 @@ final readonly class AddNodeFlow implements Flow
 {
     public function __construct(
         private FlowSteps $steps,
-        private EngineClient $engine,
+        private Runtime $runtime,
         private DeployNode $deploy,
-        private BuildNodeRequest $nodeRequest,
+        private BuildNodeConfig $nodeConfig,
         private ApplyNodeFirewall $firewall,
         private ClearNodeDns $dns,
         private RefreshDatabaseStatus $refresh,
@@ -50,11 +46,11 @@ final readonly class AddNodeFlow implements Flow
             Step::prepare('deploy the new node', $this->steps->quick(fn () => $this->deploy->handle($database, $joiner))),
             ...$database->nodes()->with('server')->get()->toBase()->map(fn (DatabaseNode $node): Step => $this->firewallStepOn($database, $node))->all(),
             Step::prepare('configure the new node', $this->steps->quick(fn () => $this->configure($database, $joiner))),
-            Step::prepare('start the new node', $this->steps->send($joiner, new NodeStart, 'starting the engine')),
-            Step::prepare('wait for the new node', $this->steps->long($joiner, fn (string $key): NodeReady => new NodeReady($key, expectPrimary: false), 'waiting for the node')),
+            Step::prepare('start the new node', $this->steps->quick(fn () => $joiner->driver()->nodes()->start())),
+            Step::prepare('wait for the new node', $this->steps->long($joiner, fn (string $key): Operation => $joiner->driver()->nodes()->ready($key, expectPrimary: false), 'waiting for the node')),
             ...$existing->flatMap(fn (DatabaseNode $node): array => $this->membershipStepsOn($database, $node))->all(),
             ...$this->clusterStepsOnLonePeerOf($existing),
-            Step::catchUp('copy the data to the new node', $this->steps->long($joiner, fn (string $key): ClusterEnable => new ClusterEnable($key), 'copying the data')),
+            Step::catchUp('copy the data to the new node', $this->steps->long($joiner, fn (string $key): Operation => $joiner->driver()->cluster()->enable($key), 'copying the data')),
             Step::finish('refresh the status', $this->steps->quick(function () use ($database): void {
                 $database->matchModeToMembers();
                 $this->refresh->handle($database);
@@ -71,7 +67,7 @@ final readonly class AddNodeFlow implements Flow
             return;
         }
 
-        rescue(fn () => $this->engine->send($joiner, new HostRemove($database->id, erase: true), "{$joiner->server->name}: removing the failed join", EngineClient::REMOVE_TIMEOUT));
+        rescue(fn () => $this->runtime->remove($joiner, erase: true));
         rescue(fn () => $this->dns->handle($joiner));
         $joiner->delete();
         $database->forgetNodeCertificates($joiner);
@@ -100,7 +96,7 @@ final readonly class AddNodeFlow implements Flow
 
         $peer = $existing->sole();
 
-        return [Step::finish("enable the cluster on {$peer->server->name}", $this->steps->long($peer, fn (string $key): ClusterEnable => new ClusterEnable($key), 'enabling the cluster'))];
+        return [Step::finish("enable the cluster on {$peer->server->name}", $this->steps->long($peer, fn (string $key): Operation => $peer->driver()->cluster()->enable($key), 'enabling the cluster'))];
     }
 
     /**
@@ -116,12 +112,12 @@ final readonly class AddNodeFlow implements Flow
 
     private function configure(Database $database, DatabaseNode $node): void
     {
-        $this->engine->send($node, $this->nodeRequest->handle($database, $node), "{$node->server->name}: configuring the node");
+        $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
     }
 
     private function updateMembersOn(Database $database, DatabaseNode $node): void
     {
-        $this->engine->send($node, new ClusterMembership($this->nodeRequest->membersOf($database)), "{$node->server->name}: updating the members");
+        $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database));
     }
 
     private function joinerOf(DatabaseFlow $flow): DatabaseNode

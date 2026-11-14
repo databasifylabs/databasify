@@ -8,6 +8,6 @@ main(() => {
   } catch (error) {
     notFoundAsUser(error);
   }
-  result({});
+  emit('Updated the grants of ' + env.NAME + '.');
 });
 JS

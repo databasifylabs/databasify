@@ -6,4 +6,4 @@ find "$ROOT/sentinel" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2> /dev/null || 
 local_cli REPLICAOF NO ONE > /dev/null
 local_cli CONFIG SET min-replicas-to-write 0 > /dev/null
 set_replica_of ''
-result '{}'
+echo "Left the Sentinel group."

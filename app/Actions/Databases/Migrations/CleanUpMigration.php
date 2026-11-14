@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
-use App\Engines\EngineClient;
-use App\Engines\Requests\MigrationStop;
 use App\Models\DatabaseMigration;
 use App\Support\Messages\Sentence;
 use Throwable;
 
 final readonly class CleanUpMigration
 {
-    public function __construct(private EngineClient $engine) {}
-
     public function handle(DatabaseMigration $migration): void
     {
         try {
-            $this->engine->send($migration->host(), new MigrationStop, 'Stop the migration');
+            $migration->host()->driver()->migration()->stop();
         } catch (Throwable $exception) {
             $this->logFailureOf($migration, $exception);
 

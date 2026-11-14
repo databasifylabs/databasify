@@ -2,4 +2,4 @@
 @include('engines.sentinel._node')
 cli_try sentinel_cli SENTINEL SET main quorum "$QUORUM"
 require_replicas "$REQUIRED"
-result '{}'
+echo "Updated the Sentinel quorum."

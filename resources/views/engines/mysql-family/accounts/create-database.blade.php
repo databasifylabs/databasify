@@ -2,4 +2,4 @@
 my '' > /dev/null <<SQL
 CREATE DATABASE IF NOT EXISTS $(my_name "$NAME")
 SQL
-result '{}'
+echo "Created database $NAME."

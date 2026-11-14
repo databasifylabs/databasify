@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Symfony\Component\Finder\Finder;
 
 it('escapes every value in engine scripts through the quoting helpers', function () {
-    $scripts = Finder::create()->files()->in(resource_path('views/engines'))->name('*.blade.php');
+    $scripts = Finder::create()->files()->in(resource_path('views/engines'))->name('*.blade.php')->notPath('#(^|/)files/#');
     $unsafe = [];
 
     foreach ($scripts as $script) {

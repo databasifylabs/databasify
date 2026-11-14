@@ -5,4 +5,4 @@ pools_ini | write_file /srv/postgres/conf/pgbouncer-pools.ini 640 || true
 if unit_active databasify-pgbouncer; then
     unit_do kill -s HUP databasify-pgbouncer
 fi
-result '{}'
+echo "Saved the connection pools."

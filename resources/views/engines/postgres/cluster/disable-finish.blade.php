@@ -13,4 +13,4 @@ dropped=$(pg postgres <<'SQL'
 SELECT count(pg_drop_replication_slot(slot_name)) FROM pg_replication_slots WHERE slot_type = 'physical' AND NOT active
 SQL
 )
-result "$(jq -cn --argjson dropped "${dropped:-0}" '{droppedSlots: $dropped}')"
+echo "Left the cluster and dropped ${dropped:-0} replication slots."

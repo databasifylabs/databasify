@@ -5,4 +5,4 @@ is_replica() {
     [ "$(patroni_role)" = replica ]
 }
 wait_until 120 2 is_replica || databasify_fail unavailable "this node is still primary after the switchover to $TARGET"
-result '{}'
+echo "Handed the primary over to $TARGET."

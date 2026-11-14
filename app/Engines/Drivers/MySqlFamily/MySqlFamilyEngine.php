@@ -13,6 +13,7 @@ final readonly class MySqlFamilyEngine
     /**
      * @param  list<string>  $reservedUsers
      * @param  list<string>  $reservedDatabases
+     * @param  list<int>  $peerPorts
      */
     private function __construct(
         public string $id,
@@ -23,6 +24,7 @@ final readonly class MySqlFamilyEngine
         public string $defaultEncryption,
         public array $reservedUsers,
         public array $reservedDatabases,
+        public array $peerPorts,
     ) {}
 
     public static function of(string $engine): self
@@ -30,10 +32,10 @@ final readonly class MySqlFamilyEngine
         return match ($engine) {
             'mysql' => new self('mysql', 'MySQL', '/srv/mysql', 'mysql', 'mysqld', 'caching_sha2_password',
                 ['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'databasify_repl', 'databasify_agent'],
-                ['mysql', 'sys', 'performance_schema', 'information_schema']),
+                ['mysql', 'sys', 'performance_schema', 'information_schema'], [33061]),
             'mariadb' => new self('mariadb', 'MariaDB', '/srv/mariadb', 'mariadb', 'mariadbd', 'mysql_native_password',
                 ['root', 'mysql', 'mariadb.sys', 'databasify_sst', 'databasify_repl', 'databasify_agent'],
-                ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify']),
+                ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify'], [4444, 4567, 4568]),
             default => throw new InvalidArgumentException("{$engine} is not a MySQL family engine."),
         };
     }

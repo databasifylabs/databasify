@@ -24,4 +24,4 @@ databasify ctl reset-failed mongodb-migration > /dev/null 2>&1 || true
 mongo_js root > /dev/null <<'JS'
 main(() => { run('percona_clustersync_mongodb', { dropDatabase: 1 }); result({}); });
 JS
-result '{}'
+echo 'Stopped the migration.'

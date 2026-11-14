@@ -7,6 +7,6 @@ main(() => {
   } catch (error) {
     notFoundAsUser(error);
   }
-  result({});
+  emit('Changed the password of ' + env.NAME + '.');
 });
 JS

@@ -95,4 +95,4 @@ elif [ "$READ_ONLY" != true ]; then
     repair_etcd_membership
 fi
 
-result "$(jq -cn --argjson changed "$changed" '{changed: $changed}')"
+[ "$changed" = true ] && echo "Wrote the new configuration." || echo "The configuration was already up to date."

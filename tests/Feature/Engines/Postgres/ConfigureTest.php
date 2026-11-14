@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Engines\EngineClient;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts()->respond('postgres/nodes/configure', ['changed' => true]);
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);
@@ -14,11 +12,10 @@ beforeEach(function () {
 
 it('configures with the saved tuning and the Go-identical files', function () {
     fakeSsh()->respondToEngine('file get', ['contentBase64' => base64_encode('{"work_mem":"8MB","shared_buffers":"1024MB"}'), 'exists' => true]);
-    $request = configureFromFixture(goFixture('configure-standalone.json')['request']);
+    $request = nodeConfigFromFixture(goFixture('configure-standalone.json')['request']);
 
-    $reply = resolve(EngineClient::class)->send($this->node->fresh(), $request);
+    $this->node->fresh()->driver()->nodes()->configure($request);
 
-    expect($reply->changed)->toBeTrue();
     $this->scripts->assertRan('postgres/nodes/configure', function (string $script, array $env): bool {
         $files = collect(json_decode($env['FILES'], true))->keyBy('path');
         $serverConf = base64_decode($files['/srv/postgres/conf/postgresql.conf']['content']);
@@ -39,9 +36,9 @@ it('configures with the saved tuning and the Go-identical files', function () {
 
 it('tunes from the node itself when nothing is saved yet', function () {
     fakeSsh()->respondToEngine('file get', ['contentBase64' => '', 'exists' => false]);
-    $request = configureFromFixture(goFixture('configure-primary.json')['request']);
+    $request = nodeConfigFromFixture(goFixture('configure-primary.json')['request']);
 
-    resolve(EngineClient::class)->send($this->node->fresh(), $request);
+    $this->node->fresh()->driver()->nodes()->configure($request);
 
     $this->scripts->assertRan('postgres/nodes/configure', fn (string $script, array $env): bool => json_decode($env['TUNED_JSON'], true)['shared_buffers'] === '1024MB'
         && $env['CLUSTERED'] === 'true' && $env['ARCHIVE'] === 'true' && $env['IP'] === '10.0.0.2');
@@ -51,7 +48,7 @@ it('refuses a setting the catalog does not accept before touching the node', fun
     $request = goFixture('configure-standalone.json')['request'];
     $request['settings'] = ['fsync' => 'off'];
 
-    expect(fn () => resolve(EngineClient::class)->send($this->node->fresh(), configureFromFixture($request)))
+    expect(fn () => $this->node->fresh()->driver()->nodes()->configure(nodeConfigFromFixture($request)))
         ->toThrow(InvalidEngineRequest::class, 'setting "fsync" is not offered');
     expect($this->scripts->ran())->toBe([]);
 });

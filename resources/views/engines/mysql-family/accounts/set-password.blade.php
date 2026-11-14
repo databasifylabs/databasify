@@ -4,4 +4,4 @@ require_user
 my '' > /dev/null <<SQL
 ALTER USER $quoted_name@'%' ${IDENTIFIED_BY}$(my_string "$PASSWORD")${IDENTIFIED_CLOSE}
 SQL
-result '{}'
+echo "Set a new password for $NAME."

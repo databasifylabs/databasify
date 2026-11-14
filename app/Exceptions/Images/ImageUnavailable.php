@@ -41,6 +41,11 @@ final class ImageUnavailable extends RuntimeException
         return new self("No engine-sdk release satisfies {$constraint}.");
     }
 
+    public static function builtForAnotherEngine(string $engine, EngineImage $image, string $builtFor): self
+    {
+        return new self("{$image->reference()} is built for {$builtFor}, not {$engine}.", refused: $image);
+    }
+
     public static function unsupportedSdk(string $engine, EngineImage $image, ?string $sdk): self
     {
         return new self(SdkRange::refusalOf("{$engine} {$image->release}", $sdk), refused: $image);

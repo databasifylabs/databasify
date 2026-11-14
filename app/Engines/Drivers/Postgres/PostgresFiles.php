@@ -7,10 +7,12 @@ namespace App\Engines\Drivers\Postgres;
 use App\Engines\Data\ConfigFile;
 use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\Member;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Secrets;
 use App\Engines\Data\Storage;
-use App\Engines\Requests\NodeConfigure;
 use App\Exceptions\Engines\InvalidEngineRequest;
+use Illuminate\Contracts\View\Factory;
+use LogicException;
 
 final readonly class PostgresFiles
 {
@@ -53,24 +55,76 @@ final readonly class PostgresFiles
         'archive_mode' => 'on', 'archive_command' => 'pgbackrest --config=/srv/postgres/conf/pgbackrest.conf --stanza=main archive-push %p', 'archive_timeout' => '60',
     ];
 
-    public static function of(NodeConfigure $request, string $line, string $defaultPoolSize): ConfigFiles
+    public function __construct(private Factory $views) {}
+
+    public function of(NodeConfig $config, string $line, string $defaultPoolSize): ConfigFiles
     {
-        $passwords = self::passwordsOf($request->secrets);
-        [$clusterWide, $local] = self::parametersOf($request);
-        $view = new PostgresFileView($request, $line, $clusterWide, $local, $passwords, $defaultPoolSize);
+        $data = self::viewDataOf($config, $line, $defaultPoolSize);
         $files = [];
 
-        foreach (self::modesOf($request) as $name => $mode) {
-            $files[] = new ConfigFile(self::CONF."/{$name}", $mode, $view->render($name));
+        foreach (self::modesOf($config) as $name => $mode) {
+            $files[] = new ConfigFile(self::CONF."/{$name}", $mode, $this->render($name, $data));
         }
 
-        return new ConfigFiles($files, PostgresManifest::of($request, $line));
+        return new ConfigFiles($files, PostgresManifest::of($config, $line));
+    }
+
+    /**
+     * @param  list<array{string, string}>  $repository
+     */
+    public function backrestConfig(array $repository, ?int $retentionDays): string
+    {
+        return $this->render('pgbackrest.conf', ['repository' => $repository, 'retentionDays' => $retentionDays, 'port' => self::CLIENT_PORT]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function viewDataOf(NodeConfig $config, string $line, string $defaultPoolSize): array
+    {
+        [$clusterWide, $local] = self::parametersOf($config);
+        [$initialCluster, $clusterState] = self::initialClusterOf($config);
+        $archive = $config->archive;
+
+        return [
+            'config' => $config,
+            'line' => $line,
+            'port' => self::CLIENT_PORT,
+            'poolPort' => self::POOL_PORT,
+            'clusterWide' => $clusterWide,
+            'local' => $local,
+            'passwords' => self::passwordsOf($config->secrets),
+            'hbaRules' => self::HBA_RULES,
+            'etcdHosts' => self::etcdHostsOf($config->members),
+            'initialCluster' => $initialCluster,
+            'clusterState' => $clusterState,
+            'readOnly' => $config->readOnly ? 'true' : 'false',
+            'maxClients' => max(5000, (int) ($config->settings['max_connections'] ?? 100) * 10),
+            'defaultPoolSize' => $defaultPoolSize,
+            'repository' => $archive === null ? [] : self::repositoryOf($archive->storage),
+            'retentionDays' => $archive?->retentionDays,
+            'q' => self::quoted(...),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function render(string $name, array $data): string
+    {
+        $view = 'engines.postgres.files.'.str_replace('.', '-', $name);
+
+        if (! $this->views->exists($view)) {
+            throw new LogicException("PostgreSQL has no {$name} template.");
+        }
+
+        return $this->views->make($view, $data)->render();
     }
 
     /**
      * @return array<string, int>
      */
-    private static function modesOf(NodeConfigure $request): array
+    private static function modesOf(NodeConfig $request): array
     {
         $modes = ['pgbouncer.ini' => 0o640, 'pgbouncer-users.txt' => 0o600];
 
@@ -104,7 +158,7 @@ final readonly class PostgresFiles
     /**
      * @return array{array<string, string>, array<string, string>}
      */
-    private static function parametersOf(NodeConfigure $request): array
+    private static function parametersOf(NodeConfig $request): array
     {
         $slots = (string) max(20, count($request->members) * 2 + 4);
         $clusterWide = [...self::REPLICATION_PARAMETERS, 'max_wal_senders' => $slots, 'max_replication_slots' => $slots];
@@ -130,19 +184,6 @@ final readonly class PostgresFiles
     }
 
     /**
-     * @return list<string>
-     */
-    public static function hbaRules(): array
-    {
-        return self::HBA_RULES;
-    }
-
-    public static function poolPort(): string
-    {
-        return self::POOL_PORT;
-    }
-
-    /**
      * @param  list<Member>  $members
      */
     public static function etcdHostsOf(array $members): string
@@ -153,7 +194,7 @@ final readonly class PostgresFiles
     /**
      * @return array{string, string}
      */
-    public static function initialClusterOf(NodeConfigure $request): array
+    public static function initialClusterOf(NodeConfig $request): array
     {
         $own = 0;
 

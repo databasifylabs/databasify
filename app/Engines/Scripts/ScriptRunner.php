@@ -5,32 +5,32 @@ declare(strict_types=1);
 namespace App\Engines\Scripts;
 
 use App\Contracts\Engines\EngineScripts;
-use App\Engines\EngineClient;
-use App\Engines\Requests\RuntimeRun;
-use App\Engines\Requests\TaskLog;
-use App\Engines\Requests\TaskStart;
-use App\Engines\Responses\Operation;
+use App\Engines\Data\Operation;
+use App\Engines\Runtime\Runtime;
 use App\Models\DatabaseNode;
 use App\Models\ServerLog;
+use Throwable;
 
 final readonly class ScriptRunner implements EngineScripts
 {
-    private const string PHASE = 'DATABASIFY_PHASE ';
-
     private const int TAIL_LINES = 20;
 
-    private const int TRANSPORT_GRACE = 30;
-
     public function __construct(
-        private EngineClient $engine,
+        private Runtime $runtime,
         private ScriptView $views,
     ) {}
 
     public function run(DatabaseNode $node, string $script, array $data = [], ?string $user = null, int $timeout = 120, ?string $log = null, array $env = []): ScriptResult
     {
-        $serverLog = $log === null ? null : $this->engine->openLog($node, $log);
-        $request = new RuntimeRun($this->views->render($node, $script, $data), $this->environmentOf($node, $env), $user, $timeout);
-        $reply = $this->engine->sendInto($node, $request, null, $timeout + self::TRANSPORT_GRACE);
+        $serverLog = $log === null ? null : $node->openLog($log);
+
+        try {
+            $reply = $this->runtime->run($node, $this->views->render($node, $script, $data), ScriptEnvironment::of($node, $env), $user, $timeout);
+        } catch (Throwable $exception) {
+            $serverLog?->fail($exception->getMessage());
+
+            throw $exception;
+        }
 
         if ($reply->exit !== 0) {
             $this->failLog($serverLog, $reply->stderr);
@@ -46,25 +46,7 @@ final readonly class ScriptRunner implements EngineScripts
 
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
     {
-        return $this->engine->send($node, new TaskStart($key, $this->views->render($node, $script, $data), $this->environmentOf($node, $env), $user));
-    }
-
-    public function phaseOf(DatabaseNode $node, string $key): ?string
-    {
-        $phases = array_filter(explode("\n", $this->engine->send($node, new TaskLog($key))->lines), fn (string $line): bool => str_starts_with($line, self::PHASE));
-
-        return $phases === [] ? null : substr((string) end($phases), strlen(self::PHASE));
-    }
-
-    /**
-     * @param  array<string, string>  $env
-     * @return array<string, string>
-     */
-    private function environmentOf(DatabaseNode $node, array $env): array
-    {
-        $container = ['DATABASIFY_ENGINE' => $node->database->engine, 'DATABASIFY_LINE' => $node->database->version_line, 'HOME' => '/root'];
-
-        return [...$container, ...array_diff_key($env, $container)];
+        return $this->runtime->startTask($node, $key, $this->views->render($node, $script, $data), ScriptEnvironment::of($node, $env), $user);
     }
 
     private function failLog(?ServerLog $serverLog, string $stderr): void

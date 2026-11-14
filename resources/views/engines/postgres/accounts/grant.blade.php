@@ -9,4 +9,4 @@ if [ "$REPLICATION" = true ]; then
 ALTER ROLE :"name" REPLICATION
 SQL
 fi
-result '{}'
+echo "Granted $NAME its databases."

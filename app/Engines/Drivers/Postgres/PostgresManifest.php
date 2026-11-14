@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
-use App\Engines\Drivers\GoJson;
-use App\Engines\Requests\NodeConfigure;
+use App\Engines\Data\NodeConfig;
+use App\Engines\Drivers\Support\IndentedJson;
 
 final readonly class PostgresManifest
 {
@@ -25,7 +25,7 @@ final readonly class PostgresManifest
 
     private const string RESTART_WAIT = '3s';
 
-    private const string WRAPPER_PATH = '/usr/local/bin/databasify';
+    public const string BACKUP_JOB = PostgresFiles::CONF.'/backup.sh';
 
     private const string LOCKS_SCRIPT = 'pgrep -x postgres > /dev/null || rm -f /srv/postgres/run/.s.PGSQL.* /srv/postgres/data/postmaster.pid';
 
@@ -52,7 +52,7 @@ fi
 exec /usr/local/bin/etcd
 SH;
 
-    public static function of(NodeConfigure $request, string $line): string
+    public static function of(NodeConfig $request, string $line): string
     {
         $manifest = ['processes' => self::processesOf($request, $line)];
 
@@ -61,17 +61,17 @@ SH;
                 'name' => self::BACKUP_UNIT,
                 'onCalendar' => sprintf('%02d:00', $request->archive->backupHour),
                 'timeout' => '24h',
-                'argv' => [self::WRAPPER_PATH, 'engine-task', 'backup'],
+                'argv' => ['bash', self::BACKUP_JOB],
             ]];
         }
 
-        return GoJson::indented($manifest);
+        return IndentedJson::of($manifest);
     }
 
     /**
      * @return list<array<string, mixed>>
      */
-    private static function processesOf(NodeConfigure $request, string $line): array
+    private static function processesOf(NodeConfig $request, string $line): array
     {
         $locks = ['name' => self::LOCKS_UNIT, 'type' => 'oneshot', 'user' => 'postgres', 'argv' => ['sh', '-c', self::LOCKS_SCRIPT], 'enabled' => true];
         $pooler = self::daemon(self::POOLER_UNIT, ['/usr/sbin/pgbouncer', PostgresFiles::CONF.'/pgbouncer.ini'], self::SERVER_UNIT, self::PATRONI_UNIT);

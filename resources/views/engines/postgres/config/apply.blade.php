@@ -20,4 +20,4 @@ SELECT pg_reload_conf()
 SQL
 fi
 unit_do reload databasify-pgbouncer
-result '{}'
+echo "Applied the settings."

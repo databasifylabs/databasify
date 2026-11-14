@@ -13,7 +13,7 @@ use App\Exceptions\Images\ImageUnavailable;
 
 final class FakeImageRegistry implements ImageRegistry
 {
-    private const string SDK = '0.2.0';
+    private const string SDK = '0.2.2';
 
     private const string HOST_REPOSITORY = 'ghcr.io/databasifylabs/engine-sdk';
 
@@ -28,7 +28,7 @@ final class FakeImageRegistry implements ImageRegistry
     public static function withEveryLine(): self
     {
         $registry = new self;
-        $registry->publishIn(self::HOST_REPOSITORY, '0.2.0', self::digestIn(self::HOST_REPOSITORY, '0.2.0'));
+        $registry->publishIn(self::HOST_REPOSITORY, '0.2.2', self::digestIn(self::HOST_REPOSITORY, '0.2.2'));
         EngineCatalog::all()->each(fn (Engine $engine) => collect($engine->lines)->each(fn (VersionLine $line) => $registry->publish($engine->id, "{$line->value}.0")));
 
         return $registry;

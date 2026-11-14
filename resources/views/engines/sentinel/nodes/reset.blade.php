@@ -39,4 +39,4 @@ peers_settled() {
 }
 drop_removed
 wait_until 120 2 peers_settled || databasify_fail internal "$FLAVOR did not become ready within 2m0s"
-result '{}'
+echo "Reset the Sentinel peers."

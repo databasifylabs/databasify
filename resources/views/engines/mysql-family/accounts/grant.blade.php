@@ -8,4 +8,4 @@ if [ "$REPLICATION" = true ]; then
 GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO $quoted_name@'%'
 SQL
 fi
-result '{}'
+echo "Granted $NAME its databases."

@@ -10,4 +10,4 @@ done < <(each_of "$users")
 my '' > /dev/null <<SQL
 DROP DATABASE IF EXISTS $(my_name "$NAME")
 SQL
-result '{}'
+echo "Dropped database $NAME."

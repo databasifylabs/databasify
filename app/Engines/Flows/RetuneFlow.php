@@ -7,9 +7,6 @@ namespace App\Engines\Flows;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Servers\ReadServerFacts;
 use App\Contracts\Engines\Flow;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ConfigApply;
-use App\Engines\Requests\ConfigTune;
 use App\Models\Database;
 use App\Models\DatabaseFlow;
 use App\Models\DatabaseNode;
@@ -19,7 +16,6 @@ final readonly class RetuneFlow implements Flow
     public function __construct(
         private FlowSteps $steps,
         private RollingSteps $rolling,
-        private EngineClient $engine,
         private ReadServerFacts $facts,
         private RefreshDatabaseStatus $refresh,
     ) {}
@@ -62,13 +58,13 @@ final readonly class RetuneFlow implements Flow
     {
         return [
             Step::prepare("tune {$node->server->name}", $this->steps->quick(fn (DatabaseFlow $flow) => $this->tune($flow, $node))),
-            Step::prepare("apply the tuning on {$node->server->name}", $this->steps->send($node, new ConfigApply, 'applying the tuned settings')),
+            Step::prepare("apply the tuning on {$node->server->name}", $this->steps->quick(fn () => $node->driver()->config()->apply())),
         ];
     }
 
     private function tune(DatabaseFlow $flow, DatabaseNode $node): void
     {
-        $restartKeys = $this->engine->send($node, new ConfigTune, "{$node->server->name}: tuning the engine")->restart;
+        $restartKeys = $node->driver()->config()->tune();
 
         if ($restartKeys === [] || $flow->context->restart) {
             return;

@@ -21,7 +21,7 @@ class StoreDatabaseUserRequest extends FormRequest
         return [
             'name' => [
                 'required', 'string', 'max:32', 'regex:/^[A-Za-z][A-Za-z0-9_]*$/',
-                Rule::notIn($this->routeDatabase()->engine_capabilities->reservedUsers ?? []),
+                Rule::notIn($this->routeDatabase()->facts()->reservedUsers),
                 Rule::unique('database_users', 'name')->where('database_id', $this->routeDatabase()->id),
             ],
             'password_encryption' => ['nullable', 'string', Rule::in($this->routeDatabase()->passwordEncryptions())],

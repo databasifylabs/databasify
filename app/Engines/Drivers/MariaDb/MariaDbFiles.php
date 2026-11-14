@@ -7,10 +7,11 @@ namespace App\Engines\Drivers\MariaDb;
 use App\Engines\Data\ConfigFile;
 use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\Member;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Drivers\MySqlFamily\FamilyFiles;
 use App\Engines\Drivers\MySqlFamily\MySqlFamilyEngine;
-use App\Engines\Drivers\NodeState;
-use App\Engines\Requests\NodeConfigure;
+use App\Engines\Drivers\Support\ConfigView;
+use App\Engines\Drivers\Support\NodeState;
 
 final readonly class MariaDbFiles
 {
@@ -26,7 +27,7 @@ final readonly class MariaDbFiles
 
     private const string TLS = self::HOME.'/tls/';
 
-    public static function of(NodeConfigure $request, string $line, bool $newCluster): ConfigFiles
+    public static function of(NodeConfig $request, string $line, bool $newCluster): ConfigFiles
     {
         $engine = MySqlFamilyEngine::of('mariadb');
 
@@ -37,7 +38,7 @@ final readonly class MariaDbFiles
         ], self::manifestOf($request, $newCluster, $engine));
     }
 
-    public static function galera(NodeConfigure $request): bool
+    public static function galera(NodeConfig $request): bool
     {
         return $request->clustered && ! $request->readOnly;
     }
@@ -54,7 +55,7 @@ final readonly class MariaDbFiles
         return strlen($name) <= self::GALERA_NAME_LIMIT ? $name : substr(hash('sha256', $databaseId), 0, self::GALERA_NAME_LIMIT);
     }
 
-    public static function initStatementsOf(NodeConfigure $request): string
+    public static function initStatementsOf(NodeConfig $request): string
     {
         $statements = "FLUSH PRIVILEGES;\nALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD(".FamilyFiles::sqlString((string) $request->secrets->admin).") OR unix_socket;\n";
 
@@ -66,7 +67,7 @@ final readonly class MariaDbFiles
             ."GRANT RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR ON *.* TO 'databasify_sst'@'localhost';\n";
     }
 
-    private static function manifestOf(NodeConfigure $request, bool $newCluster, MySqlFamilyEngine $engine): string
+    private static function manifestOf(NodeConfig $request, bool $newCluster, MySqlFamilyEngine $engine): string
     {
         $argv = ['/usr/sbin/mariadbd', '--defaults-file='.self::HOME.'/conf/my.cnf'];
 
@@ -74,72 +75,30 @@ final readonly class MariaDbFiles
             $argv[] = '--wsrep-new-cluster';
         }
 
-        $watch = $request->clustered ? [FamilyFiles::helper(self::WATCH_UNIT, 'cluster-watch', $engine->serverUnit(), '3s')] : [];
+        $watch = $request->clustered ? [FamilyFiles::helper(self::WATCH_UNIT, FamilyFiles::jobOf($engine, 'cluster-watch'), $engine->serverUnit(), '3s')] : [];
 
         return FamilyFiles::manifestOf($engine, $request, $argv, $watch);
     }
 
-    private static function myCnfOf(NodeConfigure $request, string $line, MySqlFamilyEngine $engine): string
+    private static function myCnfOf(NodeConfig $request, string $line, MySqlFamilyEngine $engine): string
     {
-        $lines = [
-            '[mysqld]',
-            'datadir='.self::HOME.'/data',
-            'socket='.$engine->socket(),
-            'pid-file='.self::HOME.'/run/mariadbd.pid',
-            'port='.FamilyFiles::CLIENT_PORT,
-            'bind-address=*',
-            'server_id='.self::serverIdOf($request),
-            'gtid_domain_id='.self::gtidDomainOf($request),
-            'log_bin=binlog',
-            'log_slave_updates=ON',
-            'binlog_format=ROW',
-            'binlog_expire_logs_seconds=604800',
-            'ssl_ca='.self::TLS.'ca.crt',
-            'ssl_cert='.self::TLS.'server.crt',
-            'ssl_key='.self::TLS.'server.key',
-            'tls_version=TLSv1.2,TLSv1.3',
-            'plugin_load_add=auth_ed25519',
-            'performance_schema=ON',
-            'performance_schema_digests_size=10000',
-        ];
-
-        if (self::parsecOffered($line)) {
-            $lines[] = 'plugin_load_add=auth_parsec';
-        }
-
-        if (self::galera($request)) {
-            array_push($lines,
-                'wsrep_on=ON',
-                'wsrep_provider=/usr/lib/galera/libgalera_smm.so',
-                'wsrep_cluster_name='.self::clusterNameOf($request->databaseId),
-                'wsrep_cluster_address='.self::clusterAddressOf($request->members),
-                "wsrep_node_address={$request->ip}",
-                "wsrep_node_name={$request->ip}",
-                "wsrep_node_incoming_address={$request->ip}:".FamilyFiles::CLIENT_PORT,
-                'wsrep_sst_method=mariabackup',
-                'wsrep_sst_auth=databasify_sst:'.$request->secrets->replication,
-                'wsrep_gtid_mode=ON',
-                'wsrep_gtid_domain_id=1',
-                'wsrep_provider_options="socket.ssl_key='.self::TLS.'server.key;socket.ssl_cert='.self::TLS.'server.crt;socket.ssl_ca='.self::TLS.'ca.crt;gcache.size=1G"',
-                'innodb_autoinc_lock_mode=2',
-                'innodb_force_primary_key=ON',
-            );
-        }
-
-        if ($request->readOnly || self::galera($request)) {
-            $lines[] = 'read_only=ON';
-        }
-
-        $lines = FamilyFiles::withSettings($lines, $request->settings);
-
-        if (self::galera($request)) {
-            array_push($lines, '', '[sst]', 'ssl-mode=VERIFY_CA');
-        }
-
-        return implode("\n", $lines)."\n";
+        return ConfigView::render('engines.mariadb.files.my-cnf', [
+            'config' => $request,
+            'home' => self::HOME,
+            'socket' => $engine->socket(),
+            'tls' => self::TLS,
+            'port' => FamilyFiles::CLIENT_PORT,
+            'serverId' => self::serverIdOf($request),
+            'gtidDomain' => self::gtidDomainOf($request),
+            'parsec' => self::parsecOffered($line),
+            'galera' => self::galera($request),
+            'clusterName' => self::clusterNameOf($request->databaseId),
+            'clusterAddress' => self::clusterAddressOf($request->members),
+            'settings' => FamilyFiles::sorted($request->settings),
+        ]);
     }
 
-    private static function serverIdOf(NodeConfigure $request): int
+    private static function serverIdOf(NodeConfig $request): int
     {
         if (! self::galera($request)) {
             return FamilyFiles::serverIdOfAddress($request->ip);
@@ -148,7 +107,7 @@ final readonly class MariaDbFiles
         return crc32($request->databaseId) % (1 << 31) | 1;
     }
 
-    private static function gtidDomainOf(NodeConfigure $request): int
+    private static function gtidDomainOf(NodeConfig $request): int
     {
         return NodeState::selfOf($request)->position + self::DOMAIN_OFFSET;
     }
@@ -165,6 +124,6 @@ final readonly class MariaDbFiles
 
     private static function agentCnfOf(string $password, MySqlFamilyEngine $engine): string
     {
-        return "[client]\nuser=databasify_agent\npassword={$password}\nsocket={$engine->socket()}\n\n[mariadb-backup]\ndatadir=".self::HOME."/data\n";
+        return ConfigView::render('engines.mariadb.files.agent-cnf', ['password' => $password, 'socket' => $engine->socket(), 'home' => self::HOME]);
     }
 }

@@ -3,18 +3,8 @@
 declare(strict_types=1);
 
 use App\Engines\Data\Member;
-use App\Engines\EngineClient;
-use App\Engines\Requests\ClusterDisable;
-use App\Engines\Requests\ClusterFailover;
-use App\Engines\Requests\ClusterForceQuorum;
-use App\Engines\Requests\ClusterMembership;
-use App\Engines\Requests\ClusterPosition;
-use App\Engines\Requests\ClusterQuorum;
-use App\Engines\Requests\ClusterRejoin;
-use App\Engines\Requests\MemberForget;
 
 beforeEach(function () {
-    config(['databasify.php_engines' => ['postgres']]);
     $this->scripts = fakeScripts();
     $this->node = engineNode();
     $this->node->database->update(['version_line' => '18']);
@@ -22,8 +12,8 @@ beforeEach(function () {
 });
 
 it('switches over and forces a quorum with the Go refusals', function () {
-    resolve(EngineClient::class)->send($this->node, new ClusterFailover('10.0.0.2'));
-    resolve(EngineClient::class)->send($this->node, new ClusterForceQuorum(othersDown: false));
+    $this->node->driver()->cluster()->failover('10.0.0.2');
+    $this->node->driver()->cluster()->forceQuorum(othersDown: false);
 
     $this->scripts->assertRan('postgres/cluster/failover', fn (string $script, array $env): bool => $env === ['TARGET' => '10.0.0.2'] && str_contains($script, 'switchover --candidate "$TARGET" --force'))
         ->assertRan('postgres/cluster/force-quorum', fn (string $script, array $env): bool => $env === ['OTHERS_DOWN' => 'false']
@@ -32,7 +22,7 @@ it('switches over and forces a quorum with the Go refusals', function () {
 });
 
 it('points Patroni at the current etcd members', function () {
-    resolve(EngineClient::class)->send($this->node, new ClusterMembership([new Member('10.0.0.1', 1, true, 2, 4096, 80), new Member('10.0.0.3', 2, true, 2, 4096, 80)]));
+    $this->node->driver()->cluster()->membership([new Member('10.0.0.1', 1, true, 2, 4096, 80), new Member('10.0.0.3', 2, true, 2, 4096, 80)]);
 
     $this->scripts->assertRan('postgres/cluster/membership', fn (string $script, array $env): bool => $env === ['HOSTS' => '10.0.0.1:2379,10.0.0.3:2379']);
 });
@@ -40,17 +30,17 @@ it('points Patroni at the current etcd members', function () {
 it('reads the WAL position and the quorum', function () {
     $this->scripts->respond('postgres/cluster/position', ['position' => 50331648])->respond('postgres/cluster/quorum', ['total' => 3, 'online' => 2]);
 
-    $position = resolve(EngineClient::class)->send($this->node, new ClusterPosition);
-    $quorum = resolve(EngineClient::class)->send($this->node, new ClusterQuorum);
+    $position = $this->node->driver()->cluster()->position();
+    $quorum = $this->node->driver()->cluster()->quorum();
 
-    expect($position->position)->toBe(50331648)->and($quorum->total)->toBe(3)->and($quorum->online)->toBe(2);
+    expect($position)->toBe(50331648)->and($quorum->total)->toBe(3)->and($quorum->online)->toBe(2);
     $this->scripts->assertRan('postgres/cluster/position', fn (string $script, array $env): bool => $env === ['LINE' => '18'] && str_contains($script, 'pg_controldata'));
 });
 
 it('reads an unknown position as null', function () {
     $this->scripts->respond('postgres/cluster/position', ['position' => null]);
 
-    expect(resolve(EngineClient::class)->send($this->node, new ClusterPosition)->position)->toBeNull();
+    expect($this->node->driver()->cluster()->position())->toBeNull();
 });
 
 it('disables the cluster around a standalone configure', function () {
@@ -58,15 +48,15 @@ it('disables the cluster around a standalone configure', function () {
     respondToFileGet($ssh, 'conf/tuned.json', '{"shared_buffers":"1024MB"}');
     $this->scripts->respond('postgres/nodes/configure', ['changed' => true]);
 
-    resolve(EngineClient::class)->send($this->node, new ClusterDisable);
+    $this->node->driver()->cluster()->disable();
 
     expect($this->scripts->ran())->toBe(['postgres/cluster/disable-stop', 'postgres/nodes/configure', 'postgres/cluster/disable-finish']);
     $this->scripts->assertRan('postgres/nodes/configure', fn (string $script, array $env): bool => $env['CLUSTERED'] === 'false' && $env['READ_ONLY'] === 'false');
 });
 
 it('rejoins as a task and forgets an etcd member', function () {
-    $operation = resolve(EngineClient::class)->send($this->node, new ClusterRejoin('flow.9.1', false));
-    resolve(EngineClient::class)->send($this->node, new MemberForget('10.0.0.3'));
+    $operation = $this->node->driver()->cluster()->rejoin('flow.9.1', false);
+    $this->node->driver()->cluster()->forget('10.0.0.3');
 
     expect($operation->key)->toBe('flow.9.1');
     $this->scripts->assertRan('postgres/cluster/rejoin', fn (string $script): bool => str_contains($script, "phase 'starting Patroni'"))

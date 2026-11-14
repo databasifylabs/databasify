@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\Migrations;
 
-use App\Engines\Responses\MigrationProgress as EngineMigrationProgress;
+use App\Engines\Payload;
 use App\Enums\Migrations\MigrationPhase;
 
 final readonly class MigrationProgress
@@ -15,13 +15,15 @@ final readonly class MigrationProgress
         public ?int $lagSeconds = null,
     ) {}
 
-    public static function fromEngine(EngineMigrationProgress $progress): self
+    public static function fromPayload(Payload $payload): self
     {
-        return match ($progress->copy) {
-            'failed' => self::broken($progress->log),
-            'lost' => self::stalled($progress->log),
-            'succeeded' => self::caughtUp($progress->log, $progress->lagSeconds),
-            default => self::working($progress->log),
+        $log = $payload->string('log');
+
+        return match ($payload->string('copy')) {
+            'failed' => self::broken($log),
+            'lost' => self::stalled($log),
+            'succeeded' => self::caughtUp($log, $payload->nullableInt('lagSeconds')),
+            default => self::working($log),
         };
     }
 

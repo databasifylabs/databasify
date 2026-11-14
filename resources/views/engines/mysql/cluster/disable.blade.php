@@ -7,7 +7,7 @@ RESET REPLICA ALL FOR CHANNEL 'group'
 SQL
     rm -f "$ROOT/state/replica"
     my '' > /dev/null <<< 'SET GLOBAL super_read_only = OFF'
-    result '{}'
+    echo "This node is not in a group."
     exit 0
 fi
 my '' > /dev/null <<'SQL'
@@ -15,4 +15,4 @@ STOP GROUP_REPLICATION;
 SET GLOBAL super_read_only = OFF
 SQL
 rm -f "$ROOT/conf/conf.d/grouped.cnf" "$ROOT/state/grouped"
-result '{}'
+echo "Left the group."
