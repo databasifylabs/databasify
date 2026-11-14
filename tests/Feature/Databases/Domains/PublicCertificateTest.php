@@ -13,6 +13,7 @@ use App\Models\DatabaseNode;
 use App\Models\DnsZone;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 function installedCertificates(): array
@@ -25,7 +26,7 @@ function withUnreadableZoneKey(DnsZone $zone): DnsZone
     withZoneCertificate($zone);
     DB::table('dns_zones')->where('id', $zone->id)->update(['certificate_key' => new Encrypter(random_bytes(32), 'aes-256-cbc')->encryptString('old-key')]);
 
-    return $zone->fresh() ?? $zone;
+    return $zone->refresh();
 }
 
 function installEveryNodeCertificate(Database $database): void
@@ -113,10 +114,12 @@ it('queues a certificate renewal for the other databases on a zone once it gets 
 it('installs the private certificate when the zone certificate key can no longer be read', function () {
     fakeEngine();
     $database = withCurrentCertificates(withZone(idleDatabase('valkey', 1, DatabaseMode::Single, 'cache')));
-    withUnreadableZoneKey($database->dnsZone);
+    $zone = withUnreadableZoneKey($database->dnsZone);
+    Log::spy();
 
     installEveryNodeCertificate($database->refresh());
 
+    Log::shouldHaveReceived('warning')->with('A stored secret could not be decrypted with the current app key.', ['model' => DnsZone::class, 'attribute' => 'certificate_key', 'id' => $zone->id]);
     expect(installedCertificates())->toBe([$database->settings->nodeCertificate($database->nodes()->sole()->id, 'server.crt')])
         ->and($database->clientCaCertificate())->toBe($database->settings->certificate('ca.crt'));
 });

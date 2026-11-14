@@ -8,9 +8,11 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 /**
- * @implements CastsAttributes<string|null, string|null>
+ * @implements CastsAttributes<string|null, mixed>
  */
 final class AsSecret implements CastsAttributes
 {
@@ -26,6 +28,12 @@ final class AsSecret implements CastsAttributes
         try {
             return Crypt::decryptString($value);
         } catch (DecryptException) {
+            Log::warning('A stored secret could not be decrypted with the current app key.', [
+                'model' => $model::class,
+                'attribute' => $key,
+                'id' => $model->getKey(),
+            ]);
+
             return null;
         }
     }
@@ -35,6 +43,12 @@ final class AsSecret implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string
     {
-        return is_string($value) ? Crypt::encryptString($value) : null;
+        if ($value === null) {
+            return null;
+        }
+
+        throw_unless(is_string($value), InvalidArgumentException::class, 'A secret must be a string.');
+
+        return Crypt::encryptString($value);
     }
 }

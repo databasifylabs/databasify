@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
 use InvalidArgumentException;
@@ -21,15 +20,13 @@ final class AsCredentials implements CastsAttributes
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): array
     {
-        if (! is_string($value)) {
+        $json = new AsSecret()->get($model, $key, $value, $attributes);
+
+        if ($json === null) {
             return [];
         }
 
-        try {
-            $decoded = json_decode(Crypt::decryptString($value), true);
-        } catch (DecryptException) {
-            return [];
-        }
+        $decoded = json_decode($json, true);
 
         if (! is_array($decoded)) {
             return [];
