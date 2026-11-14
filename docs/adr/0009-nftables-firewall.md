@@ -12,7 +12,7 @@ Docker is started with `iptables: false` ([0002](0002-container-per-node.md)), s
 Each database gets its own nftables table, `databasify_database_<id without dashes>`, written to `/etc/databasify/nftables/<table>.nft`, checked with `nft -c` and applied atomically. A `databasify-firewall` systemd unit restores the tables at boot, before Docker starts.
 
 - Peer ports accept only the `@peers` set.
-- Client ports accept the `@peers` and `@trusted` sets plus the server's private network range (VPC, custom or WireGuard). Trusted sources are IPv4 CIDRs; their labels live only in the app.
+- Client ports accept the `@peers` and `@trusted` sets plus the server's private network range (VPC, custom or WireGuard). Trusted sources are IPv4 CIDRs; their labels live only in the app. The primary and standbys use the database's list and each read-only node its own ([0038](0038-read-only-nodes-managed-on-their-own.md)).
 - With no trusted sources, client ports are open to everyone.
 
 If ufw or firewalld is active, Databasify also opens the matching ports in it. Changes run as a queued operation and are refused while the database runs another one ([0006](0006-operations-and-server-logs.md)).

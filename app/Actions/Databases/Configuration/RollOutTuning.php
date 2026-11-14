@@ -24,12 +24,12 @@ final readonly class RollOutTuning
     {
         $needsRestart = false;
 
-        $this->rolling->each($database, fn (DatabaseNode $node) => $this->facts->handle($node->server), $run, failover: false, resumable: false);
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $this->facts->handle($node->server), $run, failover: false, resumable: false, withReadOnly: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false, withReadOnly: false);
         $this->rolling->each($database, function (DatabaseNode $node) use (&$needsRestart): void {
             $needsRestart = $node->driver()->config()->tune() !== [] || $needsRestart;
             $node->driver()->config()->apply();
-        }, $run, failover: false, resumable: false);
+        }, $run, failover: false, resumable: false, withReadOnly: false);
 
         if ($needsRestart || $this->rolling->begun($database, $run)) {
             $this->rolling->restart($database, $run);

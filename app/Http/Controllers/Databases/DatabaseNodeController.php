@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Databases;
 
+use App\Actions\Databases\Configuration\RetuneNode;
+use App\Actions\Databases\Configuration\UpdateNodeConfig;
 use App\Actions\Databases\Nodes\AddDatabaseNode;
+use App\Actions\Databases\Nodes\RebootNode;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
 use App\Actions\Databases\Nodes\RenameDatabaseNode;
+use App\Actions\Databases\Nodes\StopNodeOperation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Databases\AddDatabaseNodeRequest;
+use App\Http\Requests\Databases\UpdateDatabaseConfigRequest;
 use App\Http\Requests\Databases\UpdateDatabaseNodeRequest;
 use App\Http\Resources\DatabaseNodeResource;
 use App\Http\Resources\DatabaseResource;
@@ -47,6 +52,34 @@ class DatabaseNodeController extends Controller
     public function store(AddDatabaseNodeRequest $request, Database $database, AddDatabaseNode $addNode): RedirectResponse
     {
         $addNode->handle($database, $request->toNode());
+
+        return back();
+    }
+
+    public function config(UpdateDatabaseConfigRequest $request, Database $database, DatabaseNode $node, UpdateNodeConfig $updateConfig): RedirectResponse
+    {
+        $updateConfig->handle($node, $request->config());
+
+        return back();
+    }
+
+    public function reboot(Database $database, DatabaseNode $node, RebootNode $rebootNode): RedirectResponse
+    {
+        $rebootNode->handle($node);
+
+        return back();
+    }
+
+    public function retune(Database $database, DatabaseNode $node, RetuneNode $retuneNode): RedirectResponse
+    {
+        $retuneNode->handle($node);
+
+        return back();
+    }
+
+    public function stop(Database $database, DatabaseNode $node, StopNodeOperation $stopOperation): RedirectResponse
+    {
+        $stopOperation->handle($node);
 
         return back();
     }

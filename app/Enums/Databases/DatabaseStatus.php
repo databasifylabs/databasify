@@ -19,6 +19,11 @@ enum DatabaseStatus: string
     case Ready = 'ready';
     case Failed = 'failed';
 
+    public function claimsReadOnlyNodes(): bool
+    {
+        return in_array($this, [self::Upgrading, self::Redeploying, self::Deleting, self::Scaling], true);
+    }
+
     public function isBusy(): bool
     {
         return $this !== self::Ready && $this !== self::Failed;

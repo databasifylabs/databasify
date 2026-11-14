@@ -9,9 +9,12 @@ import {
     Server as ServerIcon,
     Settings,
     ShieldCheck,
+    Waypoints,
 } from 'lucide-react';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
 import DatabaseNodeController from '@/actions/App/Http/Controllers/Databases/DatabaseNodeController';
+import NodeConnectionPoolController from '@/actions/App/Http/Controllers/Databases/NodeConnectionPoolController';
+import NodeTrustedSourceController from '@/actions/App/Http/Controllers/Databases/NodeTrustedSourceController';
 import ConnectionDetails from '@/components/databases/connection/connection-details';
 import BrandIcon from '@/components/brand-icon';
 import OperationLabel from '@/components/databases/operation-label';
@@ -20,6 +23,8 @@ import { roleOf } from '@/components/databases/nodes/node-dots';
 import InsightsTab from '@/components/databases/tabs/insights-tab';
 import LogsTab from '@/components/databases/tabs/logs-tab';
 import NetworkTab from '@/components/databases/tabs/network-tab';
+import PoolsTab from '@/components/databases/tabs/pools-tab';
+import StopOperationButton from '@/components/databases/stop-operation-button';
 import { ServerSpecItems } from '@/components/servers/server-specs';
 import TabNav from '@/components/tab-nav';
 import type { TabSpec } from '@/components/tab-nav';
@@ -52,14 +57,19 @@ type Props = {
     clientIp: string | null;
 };
 
-const tabs: TabSpec[] = [
-    { value: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { value: 'insights', label: 'Insights', icon: ChartLine },
-    { value: 'network', label: 'Network Access', icon: ShieldCheck },
-    { value: 'logs', label: 'Logs', icon: ScrollText },
-    { value: 'activity', label: 'Activity', icon: History },
-    { value: 'settings', label: 'Settings', icon: Settings },
-];
+function tabsFor(database: Database): TabSpec[] {
+    return [
+        { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { value: 'insights', label: 'Insights', icon: ChartLine },
+        { value: 'network', label: 'Network Access', icon: ShieldCheck },
+        ...(database.pool_port !== null
+            ? [{ value: 'pools', label: 'Connection Pools', icon: Waypoints }]
+            : []),
+        { value: 'logs', label: 'Logs', icon: ScrollText },
+        { value: 'activity', label: 'Activity', icon: History },
+        { value: 'settings', label: 'Settings', icon: Settings },
+    ];
+}
 
 function NodeDetails({
     database,
@@ -137,11 +147,12 @@ export default function ShowNode({
     latestLogId,
     clientIp,
 }: Props) {
+    const tabs = tabsFor(database);
     const [tab, navigate] = useQueryTab(
         tabs.map((entry) => entry.value),
         'overview',
     );
-    const operation = databaseOperation(database);
+    const operation = databaseOperation({ status: node.status ?? 'ready' });
     const busy = operation !== null;
     const role = roleOf(node);
 
@@ -174,10 +185,21 @@ export default function ShowNode({
                                 {capitalize(role)}
                             </Badge>
                             {operation && (
-                                <OperationLabel
-                                    operation={operation}
-                                    className="text-sm"
-                                />
+                                <>
+                                    <OperationLabel
+                                        operation={operation}
+                                        className="text-sm"
+                                    />
+                                    {node.status !== database.status && (
+                                        <StopOperationButton
+                                            stop={DatabaseNodeController.stop({
+                                                database: database.id,
+                                                node: node.id,
+                                            })}
+                                            operation={operation}
+                                        />
+                                    )}
+                                </>
                             )}
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -212,20 +234,44 @@ export default function ShowNode({
                         <InsightsTab database={database} node={node} />
                     </TabsContent>
                     <TabsContent value="network" className="space-y-6">
-                        <Alert>
-                            <Info />
-                            <AlertDescription>
-                                Trusted sources are shared with {database.name}:
-                                a change here applies to every node in the
-                                database.
-                            </AlertDescription>
-                        </Alert>
                         <NetworkTab
-                            database={database}
+                            sources={node.trusted_sources ?? []}
+                            store={NodeTrustedSourceController.store.form({
+                                database: database.id,
+                                node: node.id,
+                            })}
+                            destroy={(sourceId) =>
+                                NodeTrustedSourceController.destroy({
+                                    database: database.id,
+                                    node: node.id,
+                                    trustedSource: sourceId,
+                                })
+                            }
                             clientIp={clientIp}
                             busy={busy}
                         />
                     </TabsContent>
+                    {database.pool_port !== null && (
+                        <TabsContent value="pools">
+                            <PoolsTab
+                                database={database}
+                                pools={node.pools ?? []}
+                                host={node.domain ?? node.public_ip}
+                                store={NodeConnectionPoolController.store({
+                                    database: database.id,
+                                    node: node.id,
+                                })}
+                                destroy={(poolId) =>
+                                    NodeConnectionPoolController.destroy({
+                                        database: database.id,
+                                        node: node.id,
+                                        connectionPool: poolId,
+                                    })
+                                }
+                                busy={busy}
+                            />
+                        </TabsContent>
+                    )}
                     <TabsContent value="logs">
                         <LogsTab database={database} nodes={[node]} />
                     </TabsContent>

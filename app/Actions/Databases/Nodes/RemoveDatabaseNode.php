@@ -31,7 +31,7 @@ final readonly class RemoveDatabaseNode
         $remaining = $database->nodesOtherThan($node);
         $standby = $node->isPrimary() ? $remaining->first(fn (DatabaseNode $peer): bool => $peer->isMember() && $peer->isReplica()) : null;
 
-        $database->markBusy(DatabaseStatus::Scaling);
+        $database->markBusyWithReadOnly(DatabaseStatus::Scaling, fn (): null => null);
         dispatch(new RemoveNodeJob($database, $node, $standby, $force));
     }
 }

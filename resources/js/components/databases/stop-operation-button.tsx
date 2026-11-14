@@ -1,15 +1,14 @@
 import { CircleStop } from 'lucide-react';
-import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
 import ConfirmDialog from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { runAction } from '@/lib/run-action';
-import type { Database } from '@/types';
+import type { RouteDefinition } from '@/wayfinder';
 
 export default function StopOperationButton({
-    database,
+    stop,
     operation,
 }: {
-    database: Database;
+    stop: RouteDefinition<'post'>;
     operation: string;
 }) {
     const label = operation.toLowerCase();
@@ -36,12 +35,9 @@ export default function StopOperationButton({
             confirmLabel="Stop"
             destructive
             onConfirm={() =>
-                runAction(
-                    DatabaseOperationController.stop({ database: database.id }),
-                    {
-                        success: `Stopping ${label}`,
-                    },
-                )
+                runAction(stop, {
+                    success: `Stopping ${label}`,
+                })
             }
         />
     );

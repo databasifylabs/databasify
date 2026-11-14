@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Databases;
 
-use App\Actions\Databases\Lifecycle\EndFailedOperation;
+use App\Actions\Databases\Lifecycle\EndFailedNodeOperation;
 use App\Actions\Databases\Nodes\RedeployNode;
 use App\Enums\Queues\QueueGroup;
 use App\Exceptions\Engines\EngineTaskRunning;
@@ -49,7 +49,7 @@ final class RedeployNodeJob implements ShouldQueue
 
     public function handle(RedeployNode $action, EngineTasks $tasks): void
     {
-        if ($tasks->stillRunning($this->database)) {
+        if ($tasks->stillRunning($this->node)) {
             $this->release(30);
 
             return;
@@ -64,6 +64,6 @@ final class RedeployNodeJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(EndFailedOperation::class)->handle($this->database, "Redeploy {$this->node->displayName()}", $exception);
+        resolve(EndFailedNodeOperation::class)->handle($this->node, "Redeploy {$this->node->displayName()}", $exception);
     }
 }

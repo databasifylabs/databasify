@@ -12,10 +12,12 @@ use App\DTOs\Databases\NodeStatus;
 use App\DTOs\Dns\HostPair;
 use App\Engines\Data\Member;
 use App\Engines\Drivers\AbstractEngineDriver;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\ResourceMetric;
 use App\Models\Collections\DatabaseNodeCollection;
+use App\Models\Concerns\RunsOperations;
 use App\Observers\DatabaseNodeObserver;
 use App\Services\Ssh\Ssh;
 use Carbon\CarbonImmutable;
@@ -29,6 +31,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 
 /**
@@ -43,18 +46,20 @@ use LogicException;
  * @property string|null $certificate_fingerprint
  * @property int $missed_status_reads
  * @property string|null $task_key
+ * @property DatabaseStatus|null $status
+ * @property array<string, string>|null $config
  * @property-read Database $database
  * @property-read Server $server
  * @property-read Collection<int, NodeAlert> $openAlerts
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key'])]
+#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key', 'status', 'config'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
 {
-    use HasUuids;
+    use HasUuids, RunsOperations;
 
     private const int MISSED_READS_BEFORE_UNREACHABLE = 3;
 
@@ -91,6 +96,22 @@ class DatabaseNode extends Model
     public function openAlerts(): HasMany
     {
         return $this->alerts()->open();
+    }
+
+    /**
+     * @return HasMany<TrustedSource, $this>
+     */
+    public function trustedSources(): HasMany
+    {
+        return $this->hasMany(TrustedSource::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<ConnectionPool, $this>
+     */
+    public function connectionPools(): HasMany
+    {
+        return $this->hasMany(ConnectionPool::class)->orderBy('name');
     }
 
     /**
@@ -179,6 +200,59 @@ class DatabaseNode extends Model
     public function isSeed(): bool
     {
         return $this->position === 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function trustedCidrs(): array
+    {
+        return $this->isReadOnly()
+            ? array_values(array_filter($this->trustedSources()->pluck('cidr')->all(), is_string(...)))
+            : $this->database->trustedCidrs();
+    }
+
+    public function isClaimedByDatabase(): bool
+    {
+        $database = $this->database;
+
+        return $this->isReadOnly() && $database->status->claimsReadOnlyNodes() && $this->status === $database->status;
+    }
+
+    public function ensureReadOnly(): void
+    {
+        if (! $this->isReadOnly()) {
+            throw ValidationException::withMessages(['database' => 'Only read-only nodes have their own trusted sources, config and pools.']);
+        }
+    }
+
+    public function operationStatus(): ?DatabaseStatus
+    {
+        return $this->status;
+    }
+
+    public function operationLabel(): string
+    {
+        return $this->displayName();
+    }
+
+    protected function operationKey(): string
+    {
+        return "nodes.{$this->id}";
+    }
+
+    protected function refusalFor(DatabaseStatus $status): ?ValidationException
+    {
+        $database = $this->database;
+
+        return in_array($database->status, [DatabaseStatus::Pending, DatabaseStatus::Creating, DatabaseStatus::Deleting, DatabaseStatus::Failed], true)
+            ? ValidationException::withMessages(['database' => "{$database->name} is {$database->status->value}, wait until it is ready."])
+            : null;
+    }
+
+    protected function endOperation(DatabaseStatus $ended): void
+    {
+        $this->server->serverLogs()->running()->where('database_id', $this->database_id)->lazyById()->each(fn (ServerLog $log) => $log->fail('Interrupted.'));
     }
 
     /**
@@ -297,6 +371,8 @@ class DatabaseNode extends Model
             'role' => NodeRole::class,
             'position' => 'integer',
             'missed_status_reads' => 'integer',
+            'status' => DatabaseStatus::class,
+            'config' => 'array',
         ];
     }
 

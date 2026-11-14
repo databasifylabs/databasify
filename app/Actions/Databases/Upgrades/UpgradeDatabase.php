@@ -23,7 +23,7 @@ final readonly class UpgradeDatabase
             throw ValidationException::withMessages(['version' => $image->sdkRefusalFor($label)]);
         }
 
-        $database->markBusyWith(DatabaseStatus::Upgrading, fn (Database $locked) => $locked->recordInstalledImage($image));
+        $database->markBusyWithReadOnly(DatabaseStatus::Upgrading, fn (Database $locked) => $locked->recordInstalledImage($image));
         dispatch(new UpgradeDatabaseJob($database->refresh()));
     }
 }

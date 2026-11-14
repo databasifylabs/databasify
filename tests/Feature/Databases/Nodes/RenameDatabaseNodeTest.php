@@ -39,7 +39,8 @@ it('moves a renamed read-only node to its new names and gives it a new certifica
     expect($reader->fresh()->name)->toBe('analytics')
         ->and($looked)->toBe(['analytics.db.example.com', 'private-analytics.db.example.com', 'private-reports.db.example.com', 'reports.db.example.com'])
         ->and($database->fresh()->settings->nodeCertificate($reader->id, 'server.pem'))->toBeNull()
-        ->and($database->fresh()->status)->toBe(DatabaseStatus::Scaling);
+        ->and($reader->fresh()->status)->toBe(DatabaseStatus::Redeploying)
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
     Queue::assertPushed(RedeployNodeJob::class);
 });
 
@@ -53,4 +54,15 @@ it('refuses a new name whose hostnames hold records databasify did not create', 
 
     expect($reader->fresh()->name)->toBe('reports');
     Queue::assertNothingPushed();
+});
+
+it('refuses to rename a member node of a database with a domain', function () {
+    fakeCloudflare();
+    $database = withZone(idleDatabase('postgres', 2));
+    $member = $database->seed();
+
+    $this->put(projectUrl("/databases/{$database->id}/nodes/{$member->id}"), ['name' => 'renamed'])->assertSessionHasErrors('database');
+
+    expect($member->fresh()->status)->toBeNull()
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });

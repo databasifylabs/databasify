@@ -25,6 +25,7 @@ final readonly class PostgresDriver extends AbstractEngineDriver
             reservedDatabases: PostgresAccounts::RESERVED_DATABASES,
             ports: new Ports(ClientPorts::CLIENT, ClientPorts::POOL, [8008, 2379, 2380]),
             hostProfile: new HostProfile(['net.core.somaxconn' => '4096', 'net.ipv4.tcp_keepalive_intvl' => '10', 'net.ipv4.tcp_keepalive_probes' => '6', 'net.ipv4.tcp_keepalive_time' => '60', 'vm.swappiness' => '1']),
+            primaryControlledSettings: PostgresFiles::CLUSTER_WIDE_KEYS,
         );
     }
 

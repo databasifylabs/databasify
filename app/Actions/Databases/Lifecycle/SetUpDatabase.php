@@ -47,7 +47,7 @@ final readonly class SetUpDatabase
                 }
 
                 $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
-                $this->firewall->handle($database, $node, $database->trustedCidrs());
+                $this->firewall->handle($database, $node, $node->trustedCidrs());
                 $node->driver()->nodes()->start();
             }
 

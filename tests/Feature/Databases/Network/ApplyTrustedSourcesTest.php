@@ -7,7 +7,7 @@ use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Databases\ApplyTrustedSourcesJob;
 use App\Models\DatabaseNode;
 
-it('applies the trusted ranges on every node including read-only ones', function () {
+it('applies the main trusted ranges on the primary and standbys but not on read-only nodes', function () {
     $database = idleDatabase('postgres', 2);
     withReadOnlyNode($database);
     $database->trustedSources()->create(['cidr' => '203.0.113.0/24']);
@@ -17,10 +17,10 @@ it('applies the trusted ranges on every node including read-only ones', function
 
     runJob(new ApplyTrustedSourcesJob($database));
 
-    expect(collect($ssh->runs)->pluck('server')->all())->toBe($database->nodes()->with('server')->get()->map(fn (DatabaseNode $node): string => $node->server->name)->all())
+    expect(collect($ssh->runs)->pluck('server')->all())->toBe($database->nodes()->members()->with('server')->get()->map(fn (DatabaseNode $node): string => $node->server->name)->all())
         ->and(collect($ssh->runs)->pluck('script'))->each->toContain("elements = { %s } }\\n' '203.0.113.0/24, 198.51.100.7/32'")
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
-        ->and($database->serverLogs()->get())->toHaveCount(3)
+        ->and($database->serverLogs()->get())->toHaveCount(2)
         ->each(fn ($log) => $log->status->toBe(ServerLogStatus::Succeeded)->name->toEndWith(': applying trusted sources'));
 });
 

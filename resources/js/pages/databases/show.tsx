@@ -5,6 +5,7 @@ import {
     ChartLine,
     DatabaseZap,
     History,
+    Info,
     LayoutDashboard,
     ScrollText,
     Settings,
@@ -13,7 +14,10 @@ import {
     Waypoints,
     TriangleAlert,
 } from 'lucide-react';
+import ConnectionPoolController from '@/actions/App/Http/Controllers/Databases/ConnectionPoolController';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
+import TrustedSourceController from '@/actions/App/Http/Controllers/Databases/TrustedSourceController';
+import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
 import DatabaseActions from '@/components/databases/actions/database-actions';
 import {
     configurationOf,
@@ -153,7 +157,9 @@ export default function ShowDatabase({
                                             className="text-sm"
                                         />
                                         <StopOperationButton
-                                            database={database}
+                                            stop={DatabaseOperationController.stop(
+                                                { database: database.id },
+                                            )}
                                             operation={operation}
                                         />
                                     </>
@@ -224,12 +230,59 @@ export default function ShowDatabase({
                     <TabsContent value="users">
                         <UsersTab database={database} appEnv={appEnv} />
                     </TabsContent>
-                    <TabsContent value="pools">
-                        <PoolsTab database={database} busy={busy} />
-                    </TabsContent>
-                    <TabsContent value="network">
-                        <NetworkTab
+                    <TabsContent value="pools" className="space-y-6">
+                        {database.nodes.some(
+                            (node) => node.kind === 'read_only',
+                        ) && (
+                            <Alert>
+                                <Info />
+                                <AlertDescription>
+                                    These pools run on the primary and the
+                                    standbys. Each read-only node has its own,
+                                    on its page.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        <PoolsTab
                             database={database}
+                            pools={database.pools}
+                            host={database.endpoints.public.host}
+                            store={ConnectionPoolController.store({
+                                database: database.id,
+                            })}
+                            destroy={(poolId) =>
+                                ConnectionPoolController.destroy({
+                                    database: database.id,
+                                    connectionPool: poolId,
+                                })
+                            }
+                            busy={busy}
+                        />
+                    </TabsContent>
+                    <TabsContent value="network" className="space-y-6">
+                        {database.nodes.some(
+                            (node) => node.kind === 'read_only',
+                        ) && (
+                            <Alert>
+                                <Info />
+                                <AlertDescription>
+                                    These trusted sources apply to the primary
+                                    and the standbys. Each read-only node has
+                                    its own, on its page.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        <NetworkTab
+                            sources={database.trusted_sources}
+                            store={TrustedSourceController.store.form({
+                                database: database.id,
+                            })}
+                            destroy={(sourceId) =>
+                                TrustedSourceController.destroy({
+                                    database: database.id,
+                                    trustedSource: sourceId,
+                                })
+                            }
                             clientIp={clientIp}
                             busy={busy}
                         />

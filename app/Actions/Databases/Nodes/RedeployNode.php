@@ -25,6 +25,6 @@ final readonly class RedeployNode
         }, $run, only: $node);
 
         $this->refresh->handle($database);
-        $database->markReady();
+        $node->markReady();
     }
 }

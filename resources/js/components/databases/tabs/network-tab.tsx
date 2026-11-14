@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import TrustedSourceController from '@/actions/App/Http/Controllers/Databases/TrustedSourceController';
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import { runAction } from '@/lib/run-action';
@@ -25,17 +24,20 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Database } from '@/types';
+import type { TrustedSource } from '@/types';
+import type { RouteDefinition, RouteFormDefinition } from '@/wayfinder';
 
 const privateAddress =
     /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/;
 
 function AddSourceForm({
-    database,
+    sources,
+    store,
     clientIp,
     busy,
 }: {
-    database: Database;
+    sources: TrustedSource[];
+    store: RouteFormDefinition<'post'>;
     clientIp: string | null;
     busy: boolean;
 }) {
@@ -43,13 +45,11 @@ function AddSourceForm({
     const [label, setLabel] = useState('');
     const myCidr =
         clientIp && !privateAddress.test(clientIp) ? `${clientIp}/32` : null;
-    const alreadyMine = database.trusted_sources.some(
-        (source) => source.cidr === myCidr,
-    );
+    const alreadyMine = sources.some((source) => source.cidr === myCidr);
 
     return (
         <Form
-            {...TrustedSourceController.store.form({ database: database.id })}
+            {...store}
             options={{ preserveScroll: true }}
             onSuccess={() => {
                 toast.success(`Allowing ${cidr}`);
@@ -113,15 +113,18 @@ function AddSourceForm({
 }
 
 export default function NetworkTab({
-    database,
+    sources,
+    store,
+    destroy,
     clientIp,
     busy,
 }: {
-    database: Database;
+    sources: TrustedSource[];
+    store: RouteFormDefinition<'post'>;
+    destroy: (sourceId: string) => RouteDefinition<'delete'>;
     clientIp: string | null;
     busy: boolean;
 }) {
-    const sources = database.trusted_sources;
     const restricted = sources.length > 0;
 
     return (
@@ -201,18 +204,9 @@ export default function NetworkTab({
                                         confirmLabel="Remove source"
                                         destructive
                                         onConfirm={() =>
-                                            runAction(
-                                                TrustedSourceController.destroy(
-                                                    {
-                                                        database: database.id,
-                                                        trustedSource:
-                                                            source.id,
-                                                    },
-                                                ),
-                                                {
-                                                    success: `Removing ${source.cidr}`,
-                                                },
-                                            )
+                                            runAction(destroy(source.id), {
+                                                success: `Removing ${source.cidr}`,
+                                            })
                                         }
                                     />
                                 </li>
@@ -220,7 +214,8 @@ export default function NetworkTab({
                         </ul>
                     )}
                     <AddSourceForm
-                        database={database}
+                        sources={sources}
+                        store={store}
                         clientIp={clientIp}
                         busy={busy}
                     />

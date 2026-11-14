@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import DatabaseSettingsController from '@/actions/App/Http/Controllers/Databases/DatabaseSettingsController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,14 +11,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { runAction } from '@/lib/run-action';
-import type { Database, ConfigField } from '@/types';
+import type { ConfigField } from '@/types';
+import type { RouteDefinition } from '@/wayfinder';
 
 function configWith(
-    database: Database,
+    config: Record<string, string>,
     key: string,
     value: string | null,
 ): Record<string, string> {
-    const { [key]: _removed, ...rest } = database.config;
+    const { [key]: _removed, ...rest } = config;
 
     return value === null ? rest : { ...rest, [key]: value };
 }
@@ -120,17 +120,21 @@ function sourceOf(custom: boolean, field: ConfigField): string {
 }
 
 export default function ConfigSettingRow({
-    database,
     field,
+    config,
+    tunedConfig,
+    save: saveRoute,
     busy,
 }: {
-    database: Database;
     field: ConfigField;
+    config: Record<string, string>;
+    tunedConfig: Record<string, string>;
+    save: RouteDefinition<'put'>;
     busy: boolean;
 }) {
-    const current = database.config[field.key];
+    const current = config[field.key];
     const custom = current !== undefined;
-    const fallback = database.tuned_config[field.key] ?? field.default;
+    const fallback = tunedConfig[field.key] ?? field.default;
     const [editing, setEditing] = useState(false);
     const [value, setValue] = useState(current ?? fallback);
     const [saving, setSaving] = useState(false);
@@ -138,15 +142,12 @@ export default function ConfigSettingRow({
 
     const save = (next: string | null) => {
         setSaving(true);
-        runAction(
-            DatabaseSettingsController.config({ database: database.id }),
-            {
-                data: { config: configWith(database, field.key, next) },
-                success: `Applying ${field.label.toLowerCase()}`,
-                onSuccess: () => setEditing(false),
-                onFinish: () => setSaving(false),
-            },
-        );
+        runAction(saveRoute, {
+            data: { config: configWith(config, field.key, next) },
+            success: `Applying ${field.label.toLowerCase()}`,
+            onSuccess: () => setEditing(false),
+            onFinish: () => setSaving(false),
+        });
     };
 
     const startEditing = () => {

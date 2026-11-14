@@ -26,7 +26,7 @@ final readonly class PostgresFiles
 
     private const string ETCD_PEER_PORT = '2380';
 
-    private const array CLUSTER_WIDE_KEYS = ['max_connections', 'max_locks_per_transaction', 'max_worker_processes', 'max_prepared_transactions', 'max_wal_senders', 'max_replication_slots', 'track_commit_timestamp', 'wal_level'];
+    public const array CLUSTER_WIDE_KEYS = ['max_connections', 'max_locks_per_transaction', 'max_worker_processes', 'max_prepared_transactions', 'max_wal_senders', 'max_replication_slots', 'track_commit_timestamp', 'wal_level'];
 
     private const array HBA_RULES = [
         'local all postgres peer',

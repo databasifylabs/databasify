@@ -18,7 +18,7 @@ class DatabaseNodeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $node = [
             'id' => $this->id,
             'server_id' => $this->server_id,
             'name' => $this->displayName(),
@@ -35,6 +35,18 @@ class DatabaseNodeResource extends JsonResource
             'memory_mb' => $this->server->memory_mb,
             'disk_gb' => $this->server->disk_gb,
             'created_at' => $this->created_at?->toIso8601String(),
+            'status' => $this->status?->value,
+        ];
+
+        if (! $this->isReadOnly()) {
+            return $node;
+        }
+
+        return [
+            ...$node,
+            'trusted_sources' => TrustedSourceResource::collection($this->trustedSources),
+            'pools' => DatabasePoolResource::collection($this->connectionPools),
+            'config' => (object) ($this->config ?? []),
         ];
     }
 }

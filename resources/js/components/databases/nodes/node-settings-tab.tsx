@@ -1,9 +1,10 @@
 import { Form, Link } from '@inertiajs/react';
-import { Globe, Info, Pencil, Trash2, Type } from 'lucide-react';
+import { Globe, Info, Pencil, Power, Trash2, Type } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
 import DatabaseNodeController from '@/actions/App/Http/Controllers/Databases/DatabaseNodeController';
+import ConfigCard from '@/components/databases/settings/config-card';
 import SettingRow from '@/components/databases/settings/setting-row';
 import ConfirmDialog from '@/components/confirm-dialog';
 import InputError from '@/components/input-error';
@@ -205,8 +206,59 @@ export default function NodeSettingsTab({
                             </p>
                         )}
                     </SettingRow>
+
+                    <SettingRow
+                        icon={Power}
+                        title="Reboot server"
+                        description="Restarts this node's server. The primary, the standbys and the other read-only nodes keep running."
+                        action={
+                            <ConfirmDialog
+                                trigger={
+                                    <Button variant="outline" disabled={busy}>
+                                        <Power />
+                                        Reboot
+                                    </Button>
+                                }
+                                title={`Reboot ${node.server_name}?`}
+                                description="Reads on this node stop until the server is back and the node has caught up."
+                                confirmLabel="Reboot"
+                                onConfirm={() =>
+                                    runAction(
+                                        DatabaseNodeController.reboot({
+                                            database: database.id,
+                                            node: node.id,
+                                        }),
+                                        { success: 'Reboot started' },
+                                    )
+                                }
+                            />
+                        }
+                    />
                 </CardContent>
             </Card>
+
+            <ConfigCard
+                database={database}
+                fields={database.config_fields.filter(
+                    (field) =>
+                        !database.primary_controlled_settings.includes(
+                            field.key,
+                        ),
+                )}
+                name={node.name}
+                scope="Changes apply to this read-only node only; settings marked Restart restart it. Settings the primary controls for every node are changed on the database itself."
+                config={node.config ?? {}}
+                save={DatabaseNodeController.config({
+                    database: database.id,
+                    node: node.id,
+                })}
+                retune={DatabaseNodeController.retune({
+                    database: database.id,
+                    node: node.id,
+                })}
+                retuneNeeded={false}
+                busy={busy}
+            />
 
             <Card className="border-destructive/40 py-0">
                 <CardContent>

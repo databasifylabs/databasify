@@ -13,7 +13,7 @@ final readonly class DatabaseNodeObserver
 
     public function deleted(DatabaseNode $node): void
     {
-        $this->children->handle($node->metricSamples(), $node->alerts());
+        $this->children->handle($node->metricSamples(), $node->alerts(), $node->trustedSources(), $node->connectionPools());
         $node->migrations()->update(['database_node_id' => null]);
     }
 }

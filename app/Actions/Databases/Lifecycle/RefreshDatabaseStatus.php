@@ -6,6 +6,7 @@ namespace App\Actions\Databases\Lifecycle;
 
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
+use App\Models\DatabaseNode;
 
 final readonly class RefreshDatabaseStatus
 {
@@ -13,6 +14,6 @@ final readonly class RefreshDatabaseStatus
 
     public function handle(Database $database): DatabaseNodeCollection
     {
-        return $this->refreshNodes->handle($database, $database->nodesWithServers());
+        return $this->refreshNodes->handle($database, $database->nodesWithServers()->reject(fn (DatabaseNode $node): bool => $node->isReadOnly() && $node->isBusy() && ! $node->isClaimedByDatabase())->values());
     }
 }

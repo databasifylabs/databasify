@@ -59,7 +59,7 @@ it('applies settings with config sync once and config apply on every node', func
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
-it('rolls a restart through read-only, standbys, failover, then the former primary', function () {
+it('rolls a restart through standbys, failover and the former primary, then restarts the read-only node on its own', function () {
     $ssh = fakeEngine();
     answerRead('config.pendingRestart', ['max_connections']);
     $database = idleDatabase('postgres', 2);
@@ -71,11 +71,13 @@ it('rolls a restart through read-only, standbys, failover, then the former prima
     $commands = engineCommandsIn($ssh);
     $at = fn (Server $server, string $command): int|false => array_search("{$server->name}: {$command}", $commands, true);
 
-    expect($at($reader->server, 'nodes.restart'))->toBeLessThan($at($standby, 'nodes.restart'))
-        ->and($at($standby, 'nodes.restart'))->toBeLessThan($at($primary, 'cluster.failover'))
+    expect($at($standby, 'nodes.restart'))->toBeLessThan($at($primary, 'cluster.failover'))
         ->and($at($primary, 'cluster.failover'))->toBeLessThan($at($primary, 'nodes.restart'))
+        ->and($at($primary, 'nodes.restart'))->toBeLessThan($at($reader->server, 'nodes.restart'))
+        ->and($reader->fresh()->config)->toBe([])
         ->and(commandsSentTo($primary, $ssh))->toContain('cluster.rejoin')
-        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready);
+        ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
+        ->and($reader->fresh()->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('validates settings against the stored config fields', function () {

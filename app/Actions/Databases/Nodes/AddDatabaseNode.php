@@ -31,7 +31,7 @@ final readonly class AddDatabaseNode
         }
 
         $data->server->ensureSized();
-        $node = $database->markBusyWith(DatabaseStatus::Scaling, fn (Database $locked): DatabaseNode => $locked->addNode($data->server->id, $data->kind, $name));
+        $node = $database->markBusyWithReadOnly(DatabaseStatus::Scaling, fn (Database $locked): DatabaseNode => $locked->addNode($data->server->id, $data->kind, $name));
         dispatch(new AddNodeJob($database, $node));
     }
 }

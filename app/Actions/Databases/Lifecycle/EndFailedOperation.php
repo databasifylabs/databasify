@@ -28,7 +28,7 @@ final readonly class EndFailedOperation
 
         $this->tasks->stopRunning($database);
 
-        $database->serverLogs()->running()->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
+        $database->runningLogsOfItsOwnOperation()->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
 
         if (! $exception instanceof OperationStopped) {
             event(new DatabaseAlertRaised($database, "{$database->name}: {$operation} failed", $exception?->getMessage() ?? 'The job stopped unexpectedly.'));

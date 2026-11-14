@@ -13,13 +13,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $database_id
+ * @property string|null $database_node_id
  * @property string $cidr
  * @property string|null $label
  * @property-read Database $database
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['cidr', 'label'])]
+#[Fillable(['database_id', 'cidr', 'label'])]
 class TrustedSource extends Model
 {
     use HasUuids;

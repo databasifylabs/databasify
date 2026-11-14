@@ -46,6 +46,7 @@ use App\Enums\Servers\ServerLogStatus;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
 use App\Models\Concerns\MovesBetweenProjects;
+use App\Models\Concerns\RunsOperations;
 use App\Observers\DatabaseObserver;
 use App\Support\Engines\SdkRange;
 use Carbon\CarbonImmutable;
@@ -66,7 +67,6 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -97,9 +97,7 @@ use LogicException;
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
 {
-    use BelongsToProject, HasUuids, MovesBetweenProjects;
-
-    private const int STOP_TTL_SECONDS = 86400;
+    use BelongsToProject, HasUuids, MovesBetweenProjects, RunsOperations;
 
     private const int DNS_LOCK_SECONDS = 300;
 
@@ -383,7 +381,7 @@ class Database extends Model implements Movable
      */
     public function connectionPools(): HasMany
     {
-        return $this->hasMany(ConnectionPool::class)->orderBy('name');
+        return $this->hasMany(ConnectionPool::class)->whereNull('database_node_id')->orderBy('name');
     }
 
     /**
@@ -399,7 +397,7 @@ class Database extends Model implements Movable
      */
     public function trustedSources(): HasMany
     {
-        return $this->hasMany(TrustedSource::class)->orderBy('id');
+        return $this->hasMany(TrustedSource::class)->whereNull('database_node_id')->orderBy('id');
     }
 
     public function maintenanceWindow(): MaintenanceWindow
@@ -442,41 +440,6 @@ class Database extends Model implements Movable
     {
         $utc = $moment->copy()->utc();
         $query->where('maintenance_day', $utc->dayOfWeek)->where('maintenance_hour', $utc->hour);
-    }
-
-    public function requestStop(): void
-    {
-        Cache::put($this->stopKey(), true, self::STOP_TTL_SECONDS);
-    }
-
-    /**
-     * @phpstan-impure
-     */
-    public function isStopRequested(): bool
-    {
-        return Cache::has($this->stopKey()) && ! Cache::has($this->cleanupKey());
-    }
-
-    /**
-     * @template TResult
-     *
-     * @param  Closure(): TResult  $cleanup
-     * @return TResult
-     */
-    public function ignoringStop(Closure $cleanup): mixed
-    {
-        Cache::put($this->cleanupKey(), true, self::STOP_TTL_SECONDS);
-
-        try {
-            return $cleanup();
-        } finally {
-            Cache::forget($this->cleanupKey());
-        }
-    }
-
-    public function isBusy(): bool
-    {
-        return $this->status->isBusy();
     }
 
     /**
@@ -542,40 +505,6 @@ class Database extends Model implements Movable
         return $this->migrations()->active()->exists();
     }
 
-    public function busyError(): ValidationException
-    {
-        return ValidationException::withMessages(['database' => "{$this->name} is busy {$this->status->value}, try again when it finishes."]);
-    }
-
-    public function markBusy(DatabaseStatus $status): void
-    {
-        $this->markBusyWith($status, fn (): null => null);
-    }
-
-    /**
-     * @template TResult
-     *
-     * @param  Closure(self): TResult  $changes
-     * @return TResult
-     */
-    public function markBusyWith(DatabaseStatus $status, Closure $changes): mixed
-    {
-        return DB::transaction(function () use ($status, $changes): mixed {
-            if ($this->refreshForUpdate()->isBusy()) {
-                throw $this->busyError();
-            }
-
-            if ($this->status === DatabaseStatus::Failed && $status !== DatabaseStatus::Deleting) {
-                throw ValidationException::withMessages(['database' => "{$this->name} failed to set up, retry the setup or delete it."]);
-            }
-
-            $result = $changes($this);
-            $this->update(['status' => $status]);
-
-            return $result;
-        });
-    }
-
     public function lastFailure(): ?LastFailure
     {
         $latest = $this->serverLogs()->latest('id')->first(['id', 'name', 'status', 'updated_at']);
@@ -589,37 +518,88 @@ class Database extends Model implements Movable
 
     public function markCreating(): void
     {
-        $this->recordStatusAs(DatabaseStatus::Creating);
+        self::query()->whereKey($this->id)->update(['status' => DatabaseStatus::Creating]);
+        $this->forceFill(['status' => DatabaseStatus::Creating])->syncOriginalAttributes(['status']);
     }
 
-    public function markReady(): void
+    /**
+     * @template TResult
+     *
+     * @param  Closure(self): TResult  $changes
+     * @return TResult
+     */
+    public function markBusyWithReadOnly(DatabaseStatus $status, Closure $changes): mixed
     {
-        $this->recordStatusAs(DatabaseStatus::Ready);
-        $this->failInterruptedLogs();
-        $this->forgetStopFlags();
+        return $this->markBusyWith($status, function (self $locked) use ($status, $changes): mixed {
+            $busy = $locked->nodes()->readOnly()->lockForUpdate()->get()->first(fn (DatabaseNode $node): bool => $node->isBusy());
+
+            if ($busy !== null) {
+                throw $busy->busyError();
+            }
+
+            $result = $changes($locked);
+            $locked->nodes()->readOnly()->update(['status' => $status]);
+
+            return $result;
+        });
     }
 
-    public function markFailed(): void
+    public function operationStatus(): ?DatabaseStatus
     {
-        $this->recordStatusAs(DatabaseStatus::Failed);
-        $this->failInterruptedLogs();
-        $this->forgetStopFlags();
+        return $this->status;
     }
 
-    private function failInterruptedLogs(): void
+    public function operationLabel(): string
     {
-        $this->serverLogs()->running()->lazyById()->each(fn (ServerLog $log) => $log->fail('Interrupted.'));
+        return $this->name;
     }
 
-    private function recordStatusAs(DatabaseStatus $status): void
+    protected function operationKey(): string
     {
-        self::query()->whereKey($this->id)->update(['status' => $status]);
-        $this->forceFill(['status' => $status])->syncOriginalAttributes(['status']);
+        return "databases.{$this->id}";
+    }
+
+    protected function refusalFor(DatabaseStatus $status): ?ValidationException
+    {
+        return $this->status === DatabaseStatus::Failed && $status !== DatabaseStatus::Deleting
+            ? ValidationException::withMessages(['database' => "{$this->name} failed to set up, retry the setup or delete it."])
+            : null;
+    }
+
+    /**
+     * @return HasMany<ServerLog, $this>
+     */
+    public function runningLogsOfItsOwnOperation(): HasMany
+    {
+        $busyOnTheirOwn = $this->nodes()->readOnly()->get()->filter(fn (DatabaseNode $node): bool => $node->isBusy() && ! $node->isClaimedByDatabase())->pluck('server_id')->all();
+
+        return $this->serverLogs()->running()->whereNotIn('server_id', $busyOnTheirOwn);
+    }
+
+    protected function endOperation(DatabaseStatus $ended): void
+    {
+        if ($ended->claimsReadOnlyNodes()) {
+            $released = $this->nodes()->readOnly()->where('status', $ended)->get();
+            $this->nodes()->readOnly()->where('status', $ended)->update(['status' => DatabaseStatus::Ready]);
+            $released->each(fn (DatabaseNode $node) => $node->clearStopRequest());
+        }
+
+        $this->runningLogsOfItsOwnOperation()->lazyById()->each(fn (ServerLog $log) => $log->fail('Interrupted.'));
     }
 
     public function addNode(string $serverId, NodeKind $kind = NodeKind::Member, ?string $name = null): DatabaseNode
     {
-        return $this->nodes()->create(['server_id' => $serverId, 'name' => $name, 'position' => $this->nextNodePosition(), 'kind' => $kind]);
+        $attributes = ['server_id' => $serverId, 'name' => $name, 'position' => $this->nextNodePosition(), 'kind' => $kind];
+
+        if ($kind === NodeKind::Member) {
+            return $this->nodes()->create($attributes);
+        }
+
+        $node = $this->nodes()->create([...$attributes, 'status' => DatabaseStatus::Ready, 'config' => $this->settings->config]);
+        $this->trustedSources()->get()->each(fn (TrustedSource $source): TrustedSource => $node->trustedSources()->create(['database_id' => $this->id, 'cidr' => $source->cidr, 'label' => $source->label]));
+        $this->connectionPools()->get()->each(fn (ConnectionPool $pool): ConnectionPool => $node->connectionPools()->create(['database_id' => $this->id, 'name' => $pool->name, 'schema' => $pool->schema, 'mode' => $pool->mode, 'size' => $pool->size]));
+
+        return $node;
     }
 
     public function nodeLimitOf(NodeKind $kind): int
@@ -848,7 +828,7 @@ class Database extends Model implements Movable
     }
 
     /**
-     * @return array<int, string>
+     * @return list<string>
      */
     public function trustedCidrs(): array
     {
@@ -1082,22 +1062,6 @@ class Database extends Model implements Movable
     public function configFields(): array
     {
         return array_map(ConfigField::fromEngine(...), $this->config_fields);
-    }
-
-    private function stopKey(): string
-    {
-        return "databases.{$this->id}.stop";
-    }
-
-    private function forgetStopFlags(): void
-    {
-        Cache::forget($this->stopKey());
-        Cache::forget($this->cleanupKey());
-    }
-
-    private function cleanupKey(): string
-    {
-        return "databases.{$this->id}.cleanup";
     }
 
     protected function casts(): array

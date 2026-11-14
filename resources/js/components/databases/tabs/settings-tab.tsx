@@ -7,6 +7,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
+import DatabaseSettingsController from '@/actions/App/Http/Controllers/Databases/DatabaseSettingsController';
 import DestroyDatabaseDialog from '@/components/databases/actions/destroy-database-dialog';
 import FailoverDialog from '@/components/databases/actions/failover-dialog';
 import UpgradeDatabaseDialog from '@/components/databases/actions/upgrade-database-dialog';
@@ -154,7 +155,21 @@ export default function SettingsTab({
                 </CardContent>
             </Card>
 
-            <ConfigCard database={database} busy={busy} />
+            <ConfigCard
+                database={database}
+                fields={database.config_fields}
+                name={database.name}
+                scope="Changes apply to the primary and standbys, one at a time where a restart is needed; each read-only node has its own configuration."
+                config={database.config}
+                save={DatabaseSettingsController.config({
+                    database: database.id,
+                })}
+                retune={DatabaseOperationController.retune({
+                    database: database.id,
+                })}
+                retuneNeeded={database.retune_needed}
+                busy={busy}
+            />
 
             <Card className="border-destructive/40 py-0">
                 <CardContent>

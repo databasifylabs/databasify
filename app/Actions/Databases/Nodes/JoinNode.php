@@ -32,7 +32,7 @@ final readonly class JoinNode
             $this->deploy->handle($database, $joiner);
         }
 
-        $database->nodes()->with('server')->get()->each(fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $database->trustedCidrs()));
+        $database->nodes()->with('server')->get()->each(fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $node->trustedCidrs()));
 
         if (! $readied) {
             $joiner->driver()->nodes()->configure($this->nodeConfig->handle($database, $joiner));

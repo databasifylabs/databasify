@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $database_id
+ * @property string|null $database_node_id
  * @property string $name
  * @property string $schema
  * @property PoolMode $mode
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'schema', 'mode', 'size'])]
+#[Fillable(['database_id', 'name', 'schema', 'mode', 'size'])]
 class ConnectionPool extends Model
 {
     use HasUuids;

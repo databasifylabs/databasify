@@ -55,6 +55,7 @@ class DatabaseResource extends DatabaseListResource
             'services' => $this->processNames(),
             'config' => $this->settings->config,
             'tuned_config' => (object) [],
+            'primary_controlled_settings' => $this->facts()->primaryControlledSettings,
             'config_fields' => array_map(fn (ConfigField $field): array => $field->toArray(), $this->configFields()),
             'endpoints' => $this->endpointsAmong($this->nodes)->toArray(),
             'users' => DatabaseUserResource::collection($this->users),

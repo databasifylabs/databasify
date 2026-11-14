@@ -37,3 +37,16 @@ it('keeps read-only nodes out of the database insights and shows them on their o
     $this->getJson(projectUrl("/databases/{$database->id}/metrics/history"))->assertJsonPath('nodes', [['id' => $database->seed()->id, 'name' => $database->seed()->server->name]]);
     $this->getJson(projectUrl("/databases/{$database->id}/nodes/{$reader->id}/metrics/history"))->assertJsonPath('nodes', [['id' => $reader->id, 'name' => 'main-ro-1']]);
 });
+
+it('sends a read-only node its own status, trusted sources, pools and config', function () {
+    $database = idleDatabase('postgres', 1);
+    $reader = withReadOnlyNode($database, ['config' => ['work_mem' => '32MB']]);
+    $reader->trustedSources()->create(['database_id' => $database->id, 'cidr' => '198.51.100.7/32']);
+    $reader->connectionPools()->create(['database_id' => $database->id, 'name' => 'reports', 'schema' => 'defaultdb', 'mode' => 'transaction', 'size' => 10]);
+
+    $this->get(projectUrl("/databases/{$database->id}/nodes/{$reader->id}"))->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('node.data.status', 'ready')
+        ->where('node.data.trusted_sources.0.cidr', '198.51.100.7/32')
+        ->where('node.data.pools.0.name', 'reports')
+        ->where('node.data.config', ['work_mem' => '32MB']));
+});

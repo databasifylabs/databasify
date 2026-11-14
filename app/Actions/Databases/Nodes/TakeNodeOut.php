@@ -71,7 +71,7 @@ final readonly class TakeNodeOut
 
             $leaving->delete();
             $database->forgetNodeCertificates($leaving);
-            $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $this->firewall->handle($database, $peer, $database->trustedCidrs())));
+            $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $this->firewall->handle($database, $peer, $peer->trustedCidrs())));
             $database->matchModeToMembers();
             $this->refresh->handle($database);
         });

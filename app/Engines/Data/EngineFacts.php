@@ -13,6 +13,7 @@ final readonly class EngineFacts
      * @param  list<string>  $passwordEncryptions
      * @param  list<string>  $reservedUsers
      * @param  list<string>  $reservedDatabases
+     * @param  list<string>  $primaryControlledSettings
      */
     public function __construct(
         public array $features,
@@ -22,6 +23,7 @@ final readonly class EngineFacts
         public array $reservedDatabases,
         public Ports $ports,
         public HostProfile $hostProfile,
+        public array $primaryControlledSettings = [],
     ) {}
 
     public function offers(Feature $feature): bool

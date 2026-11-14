@@ -11,6 +11,7 @@ use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineNotFound;
 use App\Exceptions\Engines\EngineNotRunning;
 use App\Exceptions\Engines\EngineTaskRunning;
+use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Closure;
@@ -29,7 +30,7 @@ final readonly class EngineTasks
      */
     public function await(DatabaseNode $node, string $run, string $step, string $log, Closure $start): void
     {
-        if ($node->database->isStopRequested()) {
+        if ($this->stopRequestedFor($node)) {
             throw new OperationStopped('Stopped by you.');
         }
 
@@ -39,7 +40,7 @@ final readonly class EngineTasks
         $node->update(['task_key' => $key]);
 
         for ($waited = 0; ; $waited += self::POLL_SECONDS) {
-            if ($node->database->isStopRequested()) {
+            if ($this->stopRequestedFor($node)) {
                 rescue(fn () => $node->driver()->stopTask($key), report: false);
                 $node->update(['task_key' => null]);
                 $serverLog->fail('Stopped by you.');
@@ -88,15 +89,15 @@ final readonly class EngineTasks
         $nodes->each(fn (DatabaseNode $node) => $this->await($node, $run, $step, $log, fn (string $key): Operation => $node->driver()->taskStatus($key)));
     }
 
-    public function stillRunning(Database $database): bool
+    public function stillRunning(Database|DatabaseNode $scope): bool
     {
-        if ($database->isStopRequested()) {
-            $this->stopRunning($database);
+        if ($scope->isStopRequested()) {
+            $this->stopRunning($scope);
 
             throw new OperationStopped('Stopped by you.');
         }
 
-        return $database->nodes()->runningTask()->with('server', 'database')->get()
+        return $this->nodesWithTasksIn($scope)
             ->filter(function (DatabaseNode $node): bool {
                 if ($node->task_key === null) {
                     return false;
@@ -126,9 +127,9 @@ final readonly class EngineTasks
         }
     }
 
-    public function stopRunning(Database $database): void
+    public function stopRunning(Database|DatabaseNode $scope): void
     {
-        $database->nodes()->runningTask()->with('server', 'database')->get()->each(function (DatabaseNode $node): void {
+        $this->nodesWithTasksIn($scope)->each(function (DatabaseNode $node): void {
             $key = $node->task_key;
 
             if ($key !== null) {
@@ -137,6 +138,22 @@ final readonly class EngineTasks
 
             $node->update(['task_key' => null]);
         });
+    }
+
+    private function nodesWithTasksIn(Database|DatabaseNode $scope): DatabaseNodeCollection
+    {
+        if ($scope instanceof DatabaseNode) {
+            return new DatabaseNodeCollection($scope->task_key === null ? [] : [$scope->loadMissing('server', 'database')]);
+        }
+
+        return $scope->nodes()->runningTask()->with('server', 'database')->get()
+            ->filter(fn (DatabaseNode $node): bool => ! $node->isReadOnly() || $node->isClaimedByDatabase())
+            ->values();
+    }
+
+    private function stopRequestedFor(DatabaseNode $node): bool
+    {
+        return $node->isStopRequested() || ($node->database->isStopRequested() && (! $node->isReadOnly() || $node->isClaimedByDatabase()));
     }
 
     private function keyFor(DatabaseNode $node, string $run, string $step): string

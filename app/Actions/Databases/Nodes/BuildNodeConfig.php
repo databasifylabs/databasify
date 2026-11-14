@@ -24,7 +24,7 @@ final readonly class BuildNodeConfig
             ip: $node->privateIp(),
             databaseId: $database->id,
             members: $nodes->toMembers(),
-            settings: array_filter($database->settings->config, fn (string $value): bool => $value !== ''),
+            settings: array_filter($node->isReadOnly() ? $node->config ?? [] : $database->settings->config, fn (string $value): bool => $value !== ''),
             secrets: Secrets::of($database->settings),
             archive: $database->pointInTimeRecovery === null ? null : ArchiveSettings::of($database->pointInTimeRecovery),
             primary: $primary->privateIp(),

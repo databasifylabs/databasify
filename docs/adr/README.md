@@ -81,5 +81,6 @@ Options that were tried or rejected, and why.
 | [0035](0035-engine-api.md)                                  | The app drives engines through PHP drivers               | Accepted           |
 | [0036](0036-operations-as-one-job.md)                       | A database operation is one action and one job           | Accepted           |
 | [0037](0037-engine-tasks-off-the-worker.md)                 | Engine tasks run off the worker                          | Accepted           |
+| [0038](0038-read-only-nodes-managed-on-their-own.md)        | Read-only nodes are managed on their own                 | Accepted           |
 
 The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.

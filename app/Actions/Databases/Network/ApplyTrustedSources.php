@@ -15,10 +15,8 @@ final readonly class ApplyTrustedSources
 
     public function handle(Database $database): void
     {
-        $sources = $database->trustedCidrs();
-        $nodes = $database->nodesWithServers();
-        $nodes->each(
-            fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $sources),
+        $database->nodesWithServers()->members()->each(
+            fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $node->trustedCidrs()),
         );
         $database->markReady();
     }

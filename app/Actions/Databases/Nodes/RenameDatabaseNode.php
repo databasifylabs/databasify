@@ -29,9 +29,10 @@ final readonly class RenameDatabaseNode
             return;
         }
 
-        $database->ensureIdle();
+        $node->ensureReadOnly();
+        $database->ensureRunsSupportedSdk();
         $this->free->handle($zone, HostPair::under($zone, $name)->all(), 'name');
-        $database->markBusy(DatabaseStatus::Scaling);
+        $node->markBusy(DatabaseStatus::Redeploying);
         rescue(fn () => $this->clear->handle($node), report: false);
         $node->rename($name);
         dispatch(new RedeployNodeJob($database, $node));

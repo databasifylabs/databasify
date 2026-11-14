@@ -12,7 +12,7 @@ final readonly class RedeployDatabase
 {
     public function handle(Database $database): void
     {
-        $database->markBusy(DatabaseStatus::Redeploying);
+        $database->markBusyWithReadOnly(DatabaseStatus::Redeploying, fn (): null => null);
         dispatch(new UpgradeDatabaseJob($database));
     }
 }

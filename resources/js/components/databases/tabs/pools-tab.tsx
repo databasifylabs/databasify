@@ -1,6 +1,5 @@
 import { Waypoints, Plus } from 'lucide-react';
 import { useState } from 'react';
-import ConnectionPoolController from '@/actions/App/Http/Controllers/Databases/ConnectionPoolController';
 import ConfirmDialog from '@/components/confirm-dialog';
 import CopyButton from '@/components/copy-button';
 import DeleteButton from '@/components/delete-button';
@@ -32,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import { runAction } from '@/lib/run-action';
 import type { Database, ConnectionPool } from '@/types';
+import type { RouteDefinition } from '@/wayfinder';
 
 const modes = [
     {
@@ -51,15 +51,21 @@ const modes = [
     },
 ];
 
-function poolUri(database: Database, pool: ConnectionPool): string {
-    return `postgresql://<user>:<password>@${database.endpoints.public.host}:${database.pool_port}/${pool.name}?sslmode=require`;
+function poolUri(
+    database: Database,
+    host: string,
+    pool: ConnectionPool,
+): string {
+    return `postgresql://<user>:<password>@${host}:${database.pool_port}/${pool.name}?sslmode=require`;
 }
 
 function AddPoolForm({
     database,
+    store,
     busy,
 }: {
     database: Database;
+    store: RouteDefinition<'post'>;
     busy: boolean;
 }) {
     const [name, setName] = useState('');
@@ -70,7 +76,7 @@ function AddPoolForm({
 
     const submit = () => {
         setSaving(true);
-        runAction(ConnectionPoolController.store({ database: database.id }), {
+        runAction(store, {
             data: {
                 name,
                 schema,
@@ -164,14 +170,22 @@ function AddPoolForm({
 
 export default function PoolsTab({
     database,
+    pools,
+    host,
+    store,
+    destroy,
     busy,
 }: {
     database: Database;
+    pools: ConnectionPool[];
+    host: string;
+    store: RouteDefinition<'post'>;
+    destroy: (poolId: string) => RouteDefinition<'delete'>;
     busy: boolean;
 }) {
     return (
         <div className="space-y-6">
-            {database.pools.length === 0 ? (
+            {pools.length === 0 ? (
                 <EmptyState
                     icon={Waypoints}
                     title="No connection pools yet"
@@ -190,7 +204,7 @@ export default function PoolsTab({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {database.pools.map((pool) => (
+                            {pools.map((pool) => (
                                 <TableRow key={pool.id}>
                                     <TableCell className="pl-6 font-medium">
                                         {pool.name}
@@ -203,7 +217,11 @@ export default function PoolsTab({
                                     <TableCell className="pr-6">
                                         <div className="flex justify-end gap-1">
                                             <CopyButton
-                                                value={poolUri(database, pool)}
+                                                value={poolUri(
+                                                    database,
+                                                    host,
+                                                    pool,
+                                                )}
                                                 label="Copy URI"
                                             />
                                             <ConfirmDialog
@@ -219,14 +237,7 @@ export default function PoolsTab({
                                                 destructive
                                                 onConfirm={() =>
                                                     runAction(
-                                                        ConnectionPoolController.destroy(
-                                                            {
-                                                                database:
-                                                                    database.id,
-                                                                connectionPool:
-                                                                    pool.id,
-                                                            },
-                                                        ),
+                                                        destroy(pool.id),
                                                         {
                                                             success: `Removing ${pool.name}`,
                                                         },
@@ -250,7 +261,11 @@ export default function PoolsTab({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <AddPoolForm database={database} busy={busy} />
+                    <AddPoolForm
+                        database={database}
+                        store={store}
+                        busy={busy}
+                    />
                 </CardContent>
             </Card>
         </div>

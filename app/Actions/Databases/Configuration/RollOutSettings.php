@@ -7,9 +7,12 @@ namespace App\Actions\Databases\Configuration;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Actions\Databases\Recovery\RefreshRecoveryStatus;
+use App\Enums\Databases\DatabaseStatus;
+use App\Jobs\Databases\ApplyNodeSettingsJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Services\Databases\RollingNodes;
+use Illuminate\Validation\ValidationException;
 
 final readonly class RollOutSettings
 {
@@ -24,9 +27,9 @@ final readonly class RollOutSettings
     {
         $primary = $database->primaryOrSeed();
 
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)), $run, failover: false, resumable: false, withReadOnly: false);
         $primary->driver()->config()->sync();
-        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->config()->apply(), $run, failover: false, resumable: false);
+        $this->rolling->each($database, fn (DatabaseNode $node) => $node->driver()->config()->apply(), $run, failover: false, resumable: false, withReadOnly: false);
 
         if ($primary->driver()->config()->pendingRestart() !== [] || $this->rolling->begun($database, $run)) {
             $this->rolling->restart($database, $run);
@@ -38,6 +41,21 @@ final readonly class RollOutSettings
         if ($archiveChanged && $archive !== null) {
             $this->recovery->handle($archive, backUpNow: true);
         }
+
+        $database->nodesWithServers()->readOnly()->each(function (DatabaseNode $node): void {
+            if ($node->isBusy() || $node->driver()->config()->pendingRestart() === []) {
+                return;
+            }
+
+            try {
+                $node->markBusy(DatabaseStatus::Updating);
+            } catch (ValidationException) {
+                return;
+            }
+
+            dispatch(new ApplyNodeSettingsJob($node));
+        });
+
         $database->markReady();
     }
 }

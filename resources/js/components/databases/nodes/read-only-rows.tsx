@@ -4,7 +4,9 @@ import type { ReactNode } from 'react';
 import DatabaseNodeController from '@/actions/App/Http/Controllers/Databases/DatabaseNodeController';
 import { readOnlyNodesOf } from '@/components/databases/describe';
 import NodeDots from '@/components/databases/nodes/node-dots';
+import OperationLabel from '@/components/databases/operation-label';
 import { TableCell, TableRow } from '@/components/ui/table';
+import { databaseOperation } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import type { DatabaseSummary, DatabaseNode } from '@/types';
 
@@ -45,7 +47,17 @@ export default function ReadOnlyRows({
                 </Link>
             </TableCell>
             <TableCell className="text-muted-foreground">
-                Read-only node
+                {databaseOperation({ status: node.status ?? 'ready' }) ? (
+                    <OperationLabel
+                        operation={
+                            databaseOperation({
+                                status: node.status ?? 'ready',
+                            }) ?? ''
+                        }
+                    />
+                ) : (
+                    'Read-only node'
+                )}
             </TableCell>
             <TableCell>
                 <NodeDots nodes={[node]} />

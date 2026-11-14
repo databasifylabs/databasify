@@ -18,6 +18,10 @@ export type DatabaseNode = {
     memory_mb: number | null;
     disk_gb: number | null;
     created_at: string | null;
+    status: string | null;
+    trusted_sources?: TrustedSource[];
+    pools?: ConnectionPool[];
+    config?: Record<string, string>;
 };
 
 export type Endpoint = {
@@ -220,6 +224,7 @@ export type Database = {
     config: Record<string, string>;
     tuned_config: Record<string, string>;
     config_fields: ConfigField[];
+    primary_controlled_settings: string[];
     endpoints: DatabaseEndpoints;
     max_standbys: number;
     max_read_only_nodes: number;

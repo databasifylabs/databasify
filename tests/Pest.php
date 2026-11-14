@@ -26,6 +26,7 @@ use App\Engines\Drivers\Redis\RedisDriver;
 use App\Engines\Drivers\Valkey\ValkeyDriver;
 use App\Engines\Payload;
 use App\Enums\Databases\DatabaseMode;
+use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeKind;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Migrations\MigrationMode;
@@ -468,6 +469,8 @@ function withReadOnlyNode(Database $database, array $attributes = []): DatabaseN
         'server_id' => Server::factory()->ready()->create()->id,
         'position' => $database->nodes()->count(),
         'kind' => NodeKind::ReadOnly,
+        'status' => DatabaseStatus::Ready,
+        'config' => [],
         ...$attributes,
     ]);
 }
