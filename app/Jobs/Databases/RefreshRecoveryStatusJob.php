@@ -39,20 +39,13 @@ final class RefreshRecoveryStatusJob implements ShouldBeUnique, ShouldQueue
     public function handle(RefreshRecoveryStatus $refresh): void
     {
         if ($this->recovery->database->isBusy()) {
-            $this->retryBackUpLater();
+            if ($this->backUpNow) {
+                $this->release(self::BUSY_RETRY_SECONDS);
+            }
 
             return;
         }
 
         $refresh->handle($this->recovery, $this->backUpNow);
-    }
-
-    private function retryBackUpLater(): void
-    {
-        if (! $this->backUpNow) {
-            return;
-        }
-
-        $this->release(self::BUSY_RETRY_SECONDS);
     }
 }

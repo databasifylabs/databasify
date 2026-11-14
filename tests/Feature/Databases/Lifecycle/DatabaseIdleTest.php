@@ -6,8 +6,6 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
-use App\Jobs\Middleware\RunsDatabaseOperation;
-use App\Models\Database;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,16 +18,6 @@ it('reads the current status under the row lock even from a stale copy', functio
 
     expect(fn () => DB::transaction(fn () => $stale->refreshForUpdate()->ensureIdle()))
         ->toThrow(ValidationException::class, 'main is busy upgrading, try again when it finishes.');
-});
-
-it('frees the database once the job finishes', function () {
-    $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    $database->update(['status' => DatabaseStatus::Upgrading]);
-
-    $result = (new RunsDatabaseOperation($database, DatabaseStatus::Upgrading, fn (Database $database) => $database->abandonOperation()))->handle(new stdClass, fn (object $job): string => 'done');
-
-    expect($result)->toBe('done')
-        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
 });
 
 it('drops a leftover cleanup flag when an operation ends, so stop works again', function () {

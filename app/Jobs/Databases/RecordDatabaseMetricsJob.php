@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs\Databases;
 
-use App\Actions\Databases\Monitoring\EvaluateResourceAlerts;
 use App\Actions\Databases\Monitoring\RecordDatabaseMetrics;
 use App\Enums\Queues\QueueGroup;
 use App\Models\Database;
@@ -31,9 +30,8 @@ final class RecordDatabaseMetricsJob implements ShouldBeUnique, ShouldQueue
         return (string) $this->database->id;
     }
 
-    public function handle(RecordDatabaseMetrics $record, EvaluateResourceAlerts $alerts): void
+    public function handle(RecordDatabaseMetrics $record): void
     {
         $record->handle($this->database);
-        $alerts->handle($this->database);
     }
 }

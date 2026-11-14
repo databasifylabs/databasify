@@ -24,5 +24,6 @@ final readonly class ApplyTrustedSources
             fn (DatabaseNode $node) => $this->firewall->handle($database, $node, $sources),
             "applying trusted sources on {$nodes->count()} nodes",
         );
+        $database->markReady();
     }
 }

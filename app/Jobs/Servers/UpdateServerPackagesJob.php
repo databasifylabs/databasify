@@ -6,20 +6,20 @@ namespace App\Jobs\Servers;
 
 use App\Enums\Queues\QueueGroup;
 use App\Enums\Servers\ServerOperation;
-use App\Jobs\Concerns\FailsRunningLogs;
 use App\Models\Server;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Throwable;
 
 #[Queue(QueueGroup::Provisioning)]
 #[Tries(1)]
 #[Timeout(1800)]
 final class UpdateServerPackagesJob implements ShouldQueue
 {
-    use FailsRunningLogs, Queueable;
+    use Queueable;
 
     public function __construct(public Server $server) {}
 
@@ -28,11 +28,8 @@ final class UpdateServerPackagesJob implements ShouldQueue
         $this->server->ssh()->exec('ssh.servers.os.update-packages', log: ServerOperation::UpdatePackages->title());
     }
 
-    /**
-     * @return list<string>
-     */
-    protected function logNames(): array
+    public function failed(?Throwable $exception): void
     {
-        return [ServerOperation::UpdatePackages->title()];
+        $this->server->failRunningLogs([ServerOperation::UpdatePackages->title()], $exception);
     }
 }

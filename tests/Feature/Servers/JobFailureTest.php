@@ -5,9 +5,7 @@ declare(strict_types=1);
 use App\Enums\Servers\ServerLogStatus;
 use App\Jobs\Networks\JoinWireguardNetworkJob;
 use App\Jobs\Networks\LeaveWireguardNetworkJob;
-use App\Jobs\Servers\CreateServerUserJob;
 use App\Jobs\Servers\RebootServerJob;
-use App\Jobs\Servers\RefreshServerFactsJob;
 use App\Jobs\Servers\UpdateServerPackagesJob;
 use App\Models\Network;
 use App\Models\Server;
@@ -20,10 +18,10 @@ function runningLog(Server $server, string $name): ServerLog
 
 it('fails only the failing job\'s logs', function () {
     $server = Server::factory()->ready()->create();
-    $own = runningLog($server, 'Create user app');
-    $other = runningLog($server, 'Update packages');
+    $own = runningLog($server, 'Update packages');
+    $other = runningLog($server, 'Reboot');
 
-    (new CreateServerUserJob($server, 'app', null))->failed(new RuntimeException('boom'));
+    (new UpdateServerPackagesJob($server))->failed(new RuntimeException('boom'));
 
     expect($own->fresh()->status)->toBe(ServerLogStatus::Failed)
         ->and($other->fresh()->status)->toBe(ServerLogStatus::Running);
@@ -47,7 +45,6 @@ it('fails the named log of each server job', function (Closure $job, string $nam
 
     expect($log->fresh()->status)->toBe(ServerLogStatus::Failed);
 })->with([
-    'refresh facts' => [fn (Server $server) => new RefreshServerFactsJob($server), 'Read server facts'],
     'reboot' => [fn (Server $server) => new RebootServerJob($server), 'Reboot'],
     'leave network' => [fn (Server $server) => new LeaveWireguardNetworkJob($server, Network::factory()->wireguard()->create()), 'Leave Databasify network'],
     'join network' => [fn (Server $server) => new JoinWireguardNetworkJob($server, Network::factory()->wireguard()->create()), 'Join Databasify network'],

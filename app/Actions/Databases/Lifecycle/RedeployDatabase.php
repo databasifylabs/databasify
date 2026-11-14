@@ -13,6 +13,6 @@ final readonly class RedeployDatabase
     public function handle(Database $database): void
     {
         $database->markBusy(DatabaseStatus::Redeploying);
-        dispatch(new UpgradeDatabaseJob($database, DatabaseStatus::Redeploying));
+        dispatch(new UpgradeDatabaseJob($database));
     }
 }

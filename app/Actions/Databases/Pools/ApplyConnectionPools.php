@@ -39,5 +39,6 @@ final readonly class ApplyConnectionPools
             },
             "updating connection pools on {$nodes->count()} nodes",
         );
+        $database->markReady();
     }
 }

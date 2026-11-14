@@ -314,7 +314,7 @@ function runOperation(Closure $start): mixed
 function runJob(ShouldQueue $job): void
 {
     try {
-        resolve(Pipeline::class)->send($job)->through($job->middleware())->then(fn (ShouldQueue $job) => app()->call([$job, 'handle']));
+        resolve(Pipeline::class)->send($job)->through(method_exists($job, 'middleware') ? $job->middleware() : [])->then(fn (ShouldQueue $job) => app()->call([$job, 'handle']));
     } catch (Throwable $exception) {
         if (method_exists($job, 'failed')) {
             $job->failed($exception);

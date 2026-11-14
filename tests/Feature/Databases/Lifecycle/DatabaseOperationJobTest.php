@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Engines\Data\Operation;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\OperationState;
@@ -15,7 +16,6 @@ use App\Services\Databases\EngineTasks;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
-use Tests\Support\ScriptedOperationJob;
 
 function upgradingDatabase(): Database
 {
@@ -25,49 +25,16 @@ function upgradingDatabase(): Database
     return $database;
 }
 
-it('marks the database ready after the job succeeds', function () {
-    $database = upgradingDatabase();
-    ScriptedOperationJob::script(fn () => null);
-
-    dispatch(new ScriptedOperationJob($database));
-
-    expect(ScriptedOperationJob::$runs)->toBe(1)
-        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
-});
-
-it('skips the job when the database is no longer in its status', function () {
-    $database = idleDatabase('postgres', 1);
-    ScriptedOperationJob::script(fn () => null);
-
-    dispatch(new ScriptedOperationJob($database));
-
-    expect(ScriptedOperationJob::$runs)->toBe(0)
-        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
-});
-
-it('ends the operation without running when stopped while queued', function () {
-    $database = upgradingDatabase();
-    $database->requestStop();
-    ScriptedOperationJob::script(fn () => null);
-
-    dispatch(new ScriptedOperationJob($database));
-
-    expect(ScriptedOperationJob::$runs)->toBe(0)
-        ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready)
-        ->and($database->isStopRequested())->toBeFalse();
-});
-
-it('fails running logs, alerts and returns to ready when the job fails', function () {
+it('fails running logs, alerts and returns to ready when an operation fails', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = upgradingDatabase();
     $log = $database->seed()->openLog('db-1: upgrade');
-    ScriptedOperationJob::script(fn () => throw new RuntimeException('the image did not start'));
 
-    expect(fn () => dispatch(new ScriptedOperationJob($database)))->toThrow(RuntimeException::class);
+    resolve(EndFailedOperation::class)->handle($database, 'Upgrade', new RuntimeException('the image did not start'));
 
     expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready)
         ->and($log->fresh()?->status)->toBe(ServerLogStatus::Failed);
-    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main: Scripted failed' && $alert->message === 'the image did not start');
+    Event::assertDispatched(DatabaseAlertRaised::class, fn (DatabaseAlertRaised $alert): bool => $alert->subject === 'main: Upgrade failed' && $alert->message === 'the image did not start');
 });
 
 function taskStates(OperationState ...$states): void
@@ -118,15 +85,13 @@ it('stops the engine task when stop is requested', function () {
     expect(collect(recordedCalls())->filter(fn (string $call): bool => $call === 'task.stop'))->toHaveCount(1);
 });
 
-it('leaves a database that moved on alone when an old job fails late', function () {
+it('leaves a database that is no longer busy alone when an old job fails late', function () {
     Event::fake([DatabaseAlertRaised::class]);
-    $database = upgradingDatabase();
-    $database->markReady();
-    $database->markBusy(DatabaseStatus::Rebooting);
+    $database = idleDatabase('postgres', 1);
 
-    (new ScriptedOperationJob($database))->failed(new RuntimeException('redelivered after a restart'));
+    resolve(EndFailedOperation::class)->handle($database, 'Upgrade', new RuntimeException('redelivered after a restart'));
 
-    expect($database->fresh()?->status)->toBe(DatabaseStatus::Rebooting);
+    expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
     Event::assertNotDispatched(DatabaseAlertRaised::class);
 });
 
@@ -134,7 +99,7 @@ it('does not report a stop as a failure', function () {
     Event::fake([DatabaseAlertRaised::class]);
     $database = upgradingDatabase();
 
-    (new ScriptedOperationJob($database))->failed(new OperationStopped('Stopped by you.'));
+    resolve(EndFailedOperation::class)->handle($database, 'Upgrade', new OperationStopped('Stopped by you.'));
 
     expect($database->fresh()?->status)->toBe(DatabaseStatus::Ready);
     Event::assertNotDispatched(DatabaseAlertRaised::class);

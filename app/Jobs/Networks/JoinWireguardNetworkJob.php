@@ -6,7 +6,6 @@ namespace App\Jobs\Networks;
 
 use App\Actions\Networks\JoinWireguardNetwork;
 use App\Enums\Queues\QueueGroup;
-use App\Jobs\Concerns\FailsRunningLogs;
 use App\Models\Network;
 use App\Models\Server;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,13 +13,14 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Throwable;
 
 #[Queue(QueueGroup::Provisioning)]
 #[Tries(1)]
 #[Timeout(900)]
 final class JoinWireguardNetworkJob implements ShouldQueue
 {
-    use FailsRunningLogs, Queueable;
+    use Queueable;
 
     public function __construct(public Server $server, public Network $network) {}
 
@@ -29,11 +29,8 @@ final class JoinWireguardNetworkJob implements ShouldQueue
         $join->handle($this->server, $this->network);
     }
 
-    /**
-     * @return list<string>
-     */
-    protected function logNames(): array
+    public function failed(?Throwable $exception): void
     {
-        return [JoinWireguardNetwork::LOG_NAME];
+        $this->server->failRunningLogs([JoinWireguardNetwork::LOG_NAME], $exception);
     }
 }

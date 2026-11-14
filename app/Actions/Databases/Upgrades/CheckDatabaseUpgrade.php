@@ -6,10 +6,12 @@ namespace App\Actions\Databases\Upgrades;
 
 use App\DTOs\Databases\EngineImage;
 use App\Events\DatabaseAlertRaised;
+use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use App\Support\Engines\SdkRange;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 final readonly class CheckDatabaseUpgrade
 {
@@ -19,7 +21,12 @@ final readonly class CheckDatabaseUpgrade
 
     public function handle(Database $database): ?EngineImage
     {
-        $images = $this->resolver->imagesOf($database, $database->version_line);
+        try {
+            $images = $this->resolver->imagesOf($database, $database->version_line);
+        } catch (ImageUnavailable $unavailable) {
+            throw ValidationException::withMessages(['version' => $unavailable->getMessage()]);
+        }
+
         $newest = $images->newest;
         $refusalKey = "sdk-refused:{$database->id}";
 

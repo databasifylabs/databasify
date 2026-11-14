@@ -33,5 +33,5 @@ Earlier, the app installed one shared wrapper binary over every engine image wit
 - `app/DTOs/Images/HostBinaryImage.php`
 - `resources/views/ssh/databases/nodes/install-host-binary.blade.php`
 - `config/databasify.php`
-- `app/Jobs/Databases/UpgradeDatabaseJob.php`
+- `app/Actions/Databases/Upgrades/RollOutImage.php`
 - `database/migrations/2026_10_22_000003_create_databases_table.php`

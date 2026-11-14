@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Jobs\Servers\CreateServerUserJob;
-use App\Jobs\Servers\DeleteServerUserJob;
+use App\Enums\Servers\ServerLogStatus;
+use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Jobs\Servers\ProvisionServerJob;
 use App\Jobs\Servers\RebootServerJob;
 use App\Jobs\Servers\UpdateServerPackagesJob;
@@ -12,7 +12,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
-    Queue::fake([ProvisionServerJob::class, CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([ProvisionServerJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
 });
 
@@ -24,7 +24,7 @@ it('creates an isolated user with a validated key', function () {
     $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => 'app'])->assertRedirect();
 
     expect($server->users()->pluck('username')->all())->toBe(['app']);
-    Queue::assertPushed(CreateServerUserJob::class, fn (CreateServerUserJob $job) => $job->server->is($server) && $job->username === 'app' && $job->publicKey === null);
+    expect($server->serverLogs()->where('name', 'Create user app')->sole()->status)->toBe(ServerLogStatus::Succeeded);
 });
 
 it('rejects reserved and unsafe usernames', function (string $username) {
@@ -51,7 +51,7 @@ it('deletes a user of the server', function () {
     $this->delete(projectUrl("/servers/{$server->id}/users/{$user->id}"))->assertRedirect();
 
     expect($server->users()->count())->toBe(0);
-    Queue::assertPushed(DeleteServerUserJob::class, fn (DeleteServerUserJob $job) => $job->server->is($server) && $job->username === 'app');
+    expect($server->serverLogs()->where('name', 'Delete user app')->sole()->status)->toBe(ServerLogStatus::Succeeded);
 });
 
 it('returns not found for a user of another server', function () {
@@ -62,4 +62,13 @@ it('returns not found for a user of another server', function () {
 
     expect($user->fresh())->not->toBeNull();
     Queue::assertNothingPushed();
+});
+
+it('shows an ssh failure as an error instead of crashing the page', function () {
+    $server = Server::factory()->ready()->create();
+    fakeSsh()->failWith(SshConnectionFailed::onServer($server, 'connect timed out'));
+
+    $this->post(projectUrl("/servers/{$server->id}/users"), ['username' => 'app'])->assertSessionHasErrors('server');
+
+    expect($server->users()->count())->toBe(0);
 });

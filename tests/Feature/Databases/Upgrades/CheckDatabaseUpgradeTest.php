@@ -6,10 +6,10 @@ use App\Actions\Databases\Upgrades\CheckDatabaseUpgrade;
 use App\DTOs\Databases\EngineImage;
 use App\Enums\Databases\DatabaseMode;
 use App\Events\DatabaseAlertRaised;
-use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Validation\ValidationException;
 
 it('offers a newer release of the line without asking the servers', function () {
     withImage('postgres', '18.6');
@@ -74,7 +74,7 @@ it('keeps the current offer when the registry cannot be reached', function () {
     resolve(CheckDatabaseUpgrade::class)->handle($database);
     imageRegistry()->goDown();
 
-    expect(fn () => resolve(CheckDatabaseUpgrade::class)->handle($database))->toThrow(ImageUnavailable::class)
+    expect(fn () => resolve(CheckDatabaseUpgrade::class)->handle($database))->toThrow(ValidationException::class)
         ->and($database->fresh()->available_image?->release)->toBe('18.7');
 });
 

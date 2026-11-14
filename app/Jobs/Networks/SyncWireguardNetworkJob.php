@@ -6,7 +6,6 @@ namespace App\Jobs\Networks;
 
 use App\Actions\Networks\SyncWireguardNetwork;
 use App\Enums\Queues\QueueGroup;
-use App\Jobs\Concerns\FailsNetworkLogs;
 use App\Models\Network;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +17,7 @@ use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Throwable;
 
 #[Queue(QueueGroup::Provisioning)]
 #[Tries(60)]
@@ -27,7 +27,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 #[UniqueFor(900)]
 final class SyncWireguardNetworkJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
-    use FailsNetworkLogs, Queueable;
+    use Queueable;
 
     private const int WAIT_SECONDS = 15;
 
@@ -53,11 +53,8 @@ final class SyncWireguardNetworkJob implements ShouldBeUniqueUntilProcessing, Sh
         $sync->handle($this->network);
     }
 
-    /**
-     * @return list<string>
-     */
-    protected function logNames(): array
+    public function failed(?Throwable $exception): void
     {
-        return [SyncWireguardNetwork::LOG_NAME];
+        $this->network->failRunningLogs([SyncWireguardNetwork::LOG_NAME], $exception);
     }
 }

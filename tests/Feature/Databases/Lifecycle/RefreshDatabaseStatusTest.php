@@ -96,14 +96,14 @@ it('stays quiet while a database is still being created', function () {
     Event::assertNotDispatched(DatabaseAlertRaised::class);
 });
 
-it('queues a status refresh from the database page', function () {
+it('refreshes the status from the database page', function () {
     $this->actingAs(User::factory()->create());
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
-    Queue::fake([RefreshDatabaseStatusJob::class]);
+    answerNodeStatus(fakeSsh(), $database->seed()->server, 'primary');
 
     $this->post(projectUrl("/databases/{$database->id}/refresh"))->assertRedirect();
 
-    Queue::assertPushed(RefreshDatabaseStatusJob::class, fn (RefreshDatabaseStatusJob $job): bool => $job->database->is($database));
+    expect($database->seed()->fresh()?->role)->toBe(NodeRole::Primary);
 });
 
 it('skips a queued refresh while the database is busy', function () {

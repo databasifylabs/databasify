@@ -14,6 +14,7 @@ use App\Jobs\Servers\ProvisionServerJob;
 use App\Models\Server;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 function osRelease(string $system): string
 {
@@ -243,7 +244,7 @@ it('marks the server failed and installs nothing when reading facts fails', func
     $server = Server::factory()->create(['ssh_password' => 'secret']);
 
     expect(fn () => resolve(ProvisionServer::class)->handle($server, false))
-        ->toThrow(RemoteScriptFailed::class);
+        ->toThrow(ValidationException::class, 'failed with exit code 1');
     expect($server->fresh())
         ->status->toBe(ServerStatus::Failed)
         ->ssh_password->toBe('secret')

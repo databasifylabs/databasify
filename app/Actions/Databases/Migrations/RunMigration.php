@@ -28,5 +28,6 @@ final readonly class RunMigration
 
         $migration->markCopying();
         $this->cleanUpEnded->handle($migration);
+        $migration->database->markReady();
     }
 }

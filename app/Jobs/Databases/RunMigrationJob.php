@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs\Databases;
 
+use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Actions\Databases\Migrations\RunMigration;
-use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
-use App\Jobs\Concerns\FinishesOperation;
-use App\Models\Database;
 use App\Models\DatabaseMigration;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,13 +14,14 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Throwable;
 
 #[Queue(QueueGroup::Migrations)]
 #[Tries(1)]
 #[Timeout(900)]
 final class RunMigrationJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use FinishesOperation, Queueable;
+    use Queueable;
 
     public function __construct(public DatabaseMigration $migration) {}
 
@@ -31,18 +30,8 @@ final class RunMigrationJob implements ShouldBeEncrypted, ShouldQueue
         $action->handle($this->migration);
     }
 
-    protected function operatedDatabase(): Database
+    public function failed(?Throwable $exception): void
     {
-        return $this->migration->database;
-    }
-
-    protected function operatingStatus(): DatabaseStatus
-    {
-        return DatabaseStatus::Migrating;
-    }
-
-    protected function operationName(): string
-    {
-        return "Migrate from {$this->migration->source->address()}";
+        resolve(EndFailedOperation::class)->handle($this->migration->database, "Migrate from {$this->migration->source->address()}", $exception);
     }
 }

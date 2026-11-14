@@ -22,19 +22,17 @@ final readonly class EndMigration
             ? $migration->finishIfActive(MigrationStatus::Completed, 'Finished: the database no longer follows the source, point your app at it.')
             : $migration->finishIfActive(MigrationStatus::Stopped, 'Stopped before finishing.');
 
-        if (! $claimed && ! $force) {
-            return;
-        }
-
-        if ($migration->status === MigrationStatus::Completed) {
+        if (($claimed || $force) && $migration->status === MigrationStatus::Completed) {
             $this->recordSchemas->handle($migration);
             $this->cleanUp($migration, $force);
-
-            return;
         }
 
-        $this->cleanUp($migration, $force);
-        $this->recordLeftovers->handle($migration);
+        if (($claimed || $force) && $migration->status !== MigrationStatus::Completed) {
+            $this->cleanUp($migration, $force);
+            $this->recordLeftovers->handle($migration);
+        }
+
+        $migration->database->markReady();
     }
 
     private function cleanUp(DatabaseMigration $migration, bool $force): void

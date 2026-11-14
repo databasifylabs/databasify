@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace App\Jobs\Databases;
 
 use App\Actions\Databases\Failover\SwitchPrimary;
-use App\Enums\Databases\DatabaseStatus;
+use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Enums\Queues\QueueGroup;
-use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Throwable;
 
 #[Queue(QueueGroup::Databases)]
 #[Tries(1)]
 #[Timeout(3600)]
 final class FailoverDatabaseJob implements ShouldQueue
 {
-    use FinishesOperation, Queueable;
+    use Queueable;
 
     public function __construct(public Database $database) {}
 
@@ -29,13 +29,8 @@ final class FailoverDatabaseJob implements ShouldQueue
         $action->handle($this->database);
     }
 
-    protected function operatingStatus(): DatabaseStatus
+    public function failed(?Throwable $exception): void
     {
-        return DatabaseStatus::Recovering;
-    }
-
-    protected function operationName(): string
-    {
-        return 'Fail over';
+        resolve(EndFailedOperation::class)->handle($this->database, 'Fail over', $exception);
     }
 }

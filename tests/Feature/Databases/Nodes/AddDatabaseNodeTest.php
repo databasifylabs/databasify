@@ -108,14 +108,13 @@ it('adds a standby on a server with less than 1 GB of memory', function () {
     expect($database->nodes()->members()->pluck('server_id'))->toContain($small->id);
 });
 
-it('removes the new node when the add is stopped before it starts', function () {
+it('removes the new node when the add fails', function () {
     $database = idleDatabase('valkey', 1, DatabaseMode::Single);
     $server = Server::factory()->ready()->create();
     Queue::fake([AddNodeJob::class]);
 
     resolve(AddDatabaseNode::class)->handle($database, new NewDatabaseNode($server));
-    $database->requestStop();
-    runJob(Queue::pushed(AddNodeJob::class)->sole());
+    Queue::pushed(AddNodeJob::class)->sole()->failed(new RuntimeException('the copy broke'));
 
     expect($database->nodes()->count())->toBe(1)
         ->and($database->fresh()?->status)->toBe(DatabaseStatus::Ready);

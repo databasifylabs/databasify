@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * @property string $id
@@ -164,5 +165,14 @@ class Network extends Model implements Movable
             'kind' => NetworkKind::class,
             'listen_port' => 'integer',
         ];
+    }
+
+    /**
+     * @param  list<string>  $names
+     */
+    public function failRunningLogs(array $names, ?Throwable $exception): void
+    {
+        ServerLog::query()->running()->whereIn('name', $names)->whereIn('server_id', $this->servers()->select('id'))->lazyById()
+            ->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
     }
 }

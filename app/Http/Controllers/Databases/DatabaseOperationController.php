@@ -7,11 +7,11 @@ namespace App\Http\Controllers\Databases;
 use App\Actions\Databases\Configuration\RetuneDatabase;
 use App\Actions\Databases\Failover\FailoverDatabase;
 use App\Actions\Databases\Failover\RecoverDatabase;
-use App\Actions\Databases\Lifecycle\QueueStatusRefresh;
+use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Lifecycle\RetryDatabaseSetup;
 use App\Actions\Databases\Lifecycle\StopDatabaseOperation;
 use App\Actions\Databases\Nodes\RebootDatabase;
-use App\Actions\Databases\Upgrades\QueueUpgradeCheck;
+use App\Actions\Databases\Upgrades\CheckDatabaseUpgrade;
 use App\Actions\Databases\Upgrades\UpgradeDatabase;
 use App\Http\Controllers\Controller;
 use App\Models\Database;
@@ -27,14 +27,14 @@ class DatabaseOperationController extends Controller
         return back();
     }
 
-    public function refresh(Database $database, QueueStatusRefresh $refresh): RedirectResponse
+    public function refresh(Database $database, RefreshDatabaseStatus $refresh): RedirectResponse
     {
         $refresh->handle($database);
 
         return back();
     }
 
-    public function checkUpgrade(Database $database, QueueUpgradeCheck $check): RedirectResponse
+    public function checkUpgrade(Database $database, CheckDatabaseUpgrade $check): RedirectResponse
     {
         $check->handle($database);
 

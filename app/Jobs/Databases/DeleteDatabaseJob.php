@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace App\Jobs\Databases;
 
+use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Actions\Databases\Lifecycle\TearDownDatabase;
-use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Queues\QueueGroup;
-use App\Jobs\Concerns\FinishesOperation;
 use App\Models\Database;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Throwable;
 
 #[Queue(QueueGroup::Databases)]
 #[Tries(1)]
 #[Timeout(3600)]
 final class DeleteDatabaseJob implements ShouldQueue
 {
-    use FinishesOperation, Queueable;
+    use Queueable;
 
     public function __construct(public Database $database, public bool $eraseData, public bool $force, public bool $deleteBackups = false, public bool $setupFailed = false) {}
 
@@ -29,23 +29,8 @@ final class DeleteDatabaseJob implements ShouldQueue
         $action->handle($this->database, $this->eraseData, $this->force, $this->deleteBackups);
     }
 
-    protected function endFailed(Database $database): void
+    public function failed(?Throwable $exception): void
     {
-        $this->abandon($database);
-    }
-
-    protected function abandon(Database $database): void
-    {
-        $this->setupFailed ? $database->markFailed() : $database->markReady();
-    }
-
-    protected function operatingStatus(): DatabaseStatus
-    {
-        return DatabaseStatus::Deleting;
-    }
-
-    protected function operationName(): string
-    {
-        return 'Delete database';
+        resolve(EndFailedOperation::class)->handle($this->database, 'Delete database', $exception, markFailed: $this->setupFailed);
     }
 }

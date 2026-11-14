@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\Servers\ReadServerFacts;
-use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Models\Server;
+use Illuminate\Validation\ValidationException;
 
 it('stores the facts and leaves the private address as entered', function () {
     $ssh = fakeSsh()->respond("noise\n".'{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":2,"memory_mb":3925,"disk_gb":58,"subnets":["100.72.3.9/10","10.0.0.5/24","10.0.0.9/24","bogus",7]}'."\n");
@@ -39,6 +39,6 @@ it('fails when the facts script fails', function () {
     fakeSsh()->respond("boom\n", 1);
     $server = Server::factory()->ready()->create(['os' => 'Ubuntu 22.04']);
 
-    expect(fn () => resolve(ReadServerFacts::class)->handle($server))->toThrow(RemoteScriptFailed::class);
+    expect(fn () => resolve(ReadServerFacts::class)->handle($server))->toThrow(ValidationException::class, 'failed with exit code 1');
     expect($server->fresh()->os)->toBe('Ubuntu 22.04');
 });

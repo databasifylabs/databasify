@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Throwable;
 
 /**
  * @property string $id
@@ -370,6 +371,14 @@ class Server extends Model implements Movable
     public function logFailure(string $name, string $message, ?Database $database = null): void
     {
         $this->serverLogs()->create(['name' => $name, 'database_id' => $database?->id, 'status' => ServerLogStatus::Failed, 'output' => ServerLog::noteOf($message)]);
+    }
+
+    /**
+     * @param  list<string>  $names
+     */
+    public function failRunningLogs(array $names, ?Throwable $exception): void
+    {
+        $this->serverLogs()->running()->whereIn('name', $names)->lazyById()->each(fn (ServerLog $log) => $log->failBecauseOf($exception));
     }
 
     public function bootId(): string

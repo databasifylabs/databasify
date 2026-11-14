@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Servers;
 
 use App\Actions\Servers\QueueProvisioning;
-use App\Actions\Servers\QueueServerFactsRefresh;
+use App\Actions\Servers\ReadServerFacts;
 use App\Actions\Servers\RunServerOperation;
 use App\Enums\Servers\ServerOperation;
 use App\Http\Controllers\Controller;
@@ -28,7 +28,7 @@ class ServerOperationController extends Controller
         return back();
     }
 
-    public function refresh(Server $server, QueueServerFactsRefresh $refresh): RedirectResponse
+    public function refresh(Server $server, ReadServerFacts $refresh): RedirectResponse
     {
         $refresh->handle($server);
 

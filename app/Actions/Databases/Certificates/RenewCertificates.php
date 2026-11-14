@@ -35,5 +35,6 @@ final readonly class RenewCertificates
             fn (DatabaseNode $node) => $this->install->handle($database, $node),
             "installing certificates on {$nodes->count()} nodes",
         );
+        $database->markReady();
     }
 }

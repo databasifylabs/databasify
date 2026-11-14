@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Enums\Databases\DatabaseMode;
 use App\Enums\Servers\OperatingSystem;
 use App\Enums\Servers\ServerStatus;
-use App\Jobs\Servers\CreateServerUserJob;
-use App\Jobs\Servers\DeleteServerUserJob;
 use App\Jobs\Servers\ProvisionServerJob;
 use App\Jobs\Servers\RebootServerJob;
 use App\Jobs\Servers\UpdateServerPackagesJob;
@@ -19,7 +17,7 @@ use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
-    Queue::fake([ProvisionServerJob::class, CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([ProvisionServerJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
 });
 

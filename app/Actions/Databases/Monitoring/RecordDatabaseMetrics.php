@@ -11,7 +11,10 @@ use App\Models\NodeMetricSample;
 
 final readonly class RecordDatabaseMetrics
 {
-    public function __construct(private ReadDatabaseMetrics $metrics) {}
+    public function __construct(
+        private ReadDatabaseMetrics $metrics,
+        private EvaluateResourceAlerts $alerts,
+    ) {}
 
     public function handle(Database $database): void
     {
@@ -22,5 +25,7 @@ final readonly class RecordDatabaseMetrics
             ->each(fn (NodeMetrics $metrics) => NodeMetricSample::query()->create(
                 MetricSample::from($metrics, $at, NodeMetricSample::query()->where('database_node_id', $metrics->nodeId)->latest('sampled_at')->first())->toRow(),
             ));
+
+        $this->alerts->handle($database);
     }
 }

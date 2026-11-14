@@ -13,5 +13,6 @@ final readonly class SwitchPrimary
     public function handle(Database $database): void
     {
         $this->promote->handle($database);
+        $database->markReady();
     }
 }

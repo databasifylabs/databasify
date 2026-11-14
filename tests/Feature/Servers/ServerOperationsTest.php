@@ -6,11 +6,8 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\NodeRole;
 use App\Enums\Servers\ServerOperation;
 use App\Enums\Servers\ServerStatus;
-use App\Jobs\Servers\CreateServerUserJob;
-use App\Jobs\Servers\DeleteServerUserJob;
 use App\Jobs\Servers\ProvisionServerJob;
 use App\Jobs\Servers\RebootServerJob;
-use App\Jobs\Servers\RefreshServerFactsJob;
 use App\Jobs\Servers\UpdateServerPackagesJob;
 use App\Models\Server;
 use App\Models\User;
@@ -21,7 +18,7 @@ it('refuses reboots and updates on a busy database or its primary', function () 
     $database = idleDatabase('valkey', 2);
     [$primary, $standby] = $database->nodes()->with('server')->get()->all();
     $primary->update(['role' => NodeRole::Primary]);
-    Queue::fake([CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([UpdateServerPackagesJob::class, RebootServerJob::class]);
 
     $this->post(projectUrl("/servers/{$primary->server->id}/operations/reboot"))->assertSessionHasErrors('server');
     $this->post(projectUrl("/servers/{$primary->server->id}/operations/update-packages"))->assertSessionHasErrors(['server' => "{$primary->server->name} is the primary of {$database->name}, fail over first."]);
@@ -33,7 +30,7 @@ it('refuses reboots and updates on a busy database or its primary', function () 
 });
 
 it('refuses work on a server that is not ready', function () {
-    Queue::fake([ProvisionServerJob::class, CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([ProvisionServerJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
     $server = Server::factory()->create();
 
@@ -42,7 +39,7 @@ it('refuses work on a server that is not ready', function () {
 });
 
 it('retries setup of a failed server', function () {
-    Queue::fake([ProvisionServerJob::class, CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([ProvisionServerJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
     $server = Server::factory()->create(['status' => ServerStatus::Failed]);
 
@@ -53,7 +50,7 @@ it('retries setup of a failed server', function () {
 });
 
 it('queues each operation on a ready server', function (ServerOperation $operation) {
-    Queue::fake([CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
     $server = Server::factory()->ready()->create();
 
@@ -63,7 +60,7 @@ it('queues each operation on a ready server', function (ServerOperation $operati
 })->with(ServerOperation::cases());
 
 it('returns not found for an unknown operation', function () {
-    Queue::fake([CreateServerUserJob::class, DeleteServerUserJob::class, UpdateServerPackagesJob::class, RebootServerJob::class]);
+    Queue::fake([UpdateServerPackagesJob::class, RebootServerJob::class]);
     $this->actingAs(User::factory()->create());
     $server = Server::factory()->ready()->create();
 
@@ -80,14 +77,14 @@ it('refuses to set up a server that is already provisioning', function () {
     Queue::assertNothingPushed();
 });
 
-it('queues a refresh of the server facts', function () {
-    Queue::fake([RefreshServerFactsJob::class]);
+it('refreshes the server facts from the server page', function () {
+    fakeSsh()->respond('{"os":"Ubuntu 24.04","id":"ubuntu","version_id":"24.04","cpus":8,"memory_mb":16000,"disk_gb":160}'."\n");
     $this->actingAs(User::factory()->create());
-    $server = Server::factory()->ready()->create();
+    $server = Server::factory()->ready()->create(['cpus' => 2]);
 
     $this->post(projectUrl("/servers/{$server->id}/refresh"))->assertRedirect();
 
-    Queue::assertPushed(RefreshServerFactsJob::class, fn (RefreshServerFactsJob $job) => $job->server->is($server));
+    expect($server->fresh()?->cpus)->toBe(8);
 });
 
 it('refuses operations on a server that is not ready', function () {
