@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Databases\Nodes\AddDatabaseNode;
 use App\Actions\Databases\Nodes\RebootDatabase;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
+use App\Actions\Databases\Nodes\TakeNodeOut;
 use App\Actions\Databases\Upgrades\UpgradeDatabase;
 use App\DTOs\Databases\EngineImage;
 use App\DTOs\Databases\NewDatabaseNode;
@@ -18,6 +19,7 @@ use App\Enums\Databases\NodeRole;
 use App\Enums\Databases\OperationState;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineUnsupported;
+use App\Exceptions\Engines\NotPrimary;
 use App\Jobs\Databases\RedeployNodeJob;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -215,11 +217,37 @@ it('restarts the remaining node on its own when a cluster shrinks to one member'
 
     runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
 
-    expect(sentTo($staying->server, $ssh))->toBe(['nodes.status', 'nodes.configure', 'cluster.disable', 'nodes.status'])
+    expect(sentTo($staying->server, $ssh))->toBe(['nodes.status', 'nodes.status', 'nodes.configure', 'cluster.forget', 'cluster.disable', 'cluster.membership', 'nodes.status'])
         ->and(argsOn($staying->server, 'nodes.configure')[0]->clustered)->toBeFalse()
         ->and($database->fresh()->status)->toBe(DatabaseStatus::Ready)
         ->and($database->nodes()->count())->toBe(1);
 })->with(['postgres', 'mariadb']);
+
+it('refuses to run a stale standby on its own when a cluster shrinks to one member', function () {
+    $ssh = fakeEngine();
+    $database = idleDatabase('postgres', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$leaving, $staying] = $database->nodes()->orderBy('position')->get()->all();
+    answerNodeStatus(answerNodeStatus($ssh, $leaving->server, null), $staying->server, 'replica');
+
+    expect(fn () => resolve(TakeNodeOut::class)->handle($database, $leaving, null, true))->toThrow(NotPrimary::class, "{$staying->server->name} is not the primary");
+    expect(sentTo($staying->server, $ssh))->toBe(['nodes.status'])
+        ->and(sentTo($leaving->server, $ssh))->not->toContain('host remove')
+        ->and($database->nodes()->count())->toBe(2);
+});
+
+it('fails the database when the last node cannot run on its own after a shrink', function () {
+    $ssh = fakeEngine();
+    $database = idleDatabase('postgres', 2);
+    markRoles($database, NodeRole::Primary, NodeRole::Replica);
+    [$staying, $leaving] = $database->nodes()->orderBy('position')->get()->all();
+    $database->nodes()->orderBy('position')->get()->each(fn (DatabaseNode $node, int $index) => answerNodeStatus($ssh, $node->server, $index === 0 ? 'primary' : 'replica'));
+    answerRead('cluster.disable', fn (): never => throw new EngineError('PostgreSQL did not come back as a standalone primary'), $staying->server);
+
+    runOperation(fn () => resolve(RemoveDatabaseNode::class)->handle($leaving));
+
+    expect($database->fresh()->status)->toBe(DatabaseStatus::Failed);
+});
 
 it('fails over before removing the primary', function () {
     $ssh = fakeEngine();

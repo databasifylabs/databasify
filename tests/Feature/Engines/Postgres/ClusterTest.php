@@ -52,7 +52,7 @@ it('disables the cluster around a standalone configure', function () {
 
     expect($this->scripts->ran())->toBe(['engines.postgres.cluster.disable-stop', 'engines.postgres.nodes.configure', 'engines.postgres.cluster.disable-finish']);
     $this->scripts->assertRan('engines.postgres.nodes.configure', fn (string $script, array $env): bool => $env['CLUSTERED'] === 'false' && $env['READ_ONLY'] === 'false')
-        ->assertRan('engines.postgres.cluster.disable-stop', fn (string $script): bool => str_contains($script, 'data/standby.signal data/patroni.dynamic.json') && ! str_contains($script, 'rm -rf /srv/postgres/data'))
+        ->assertRan('engines.postgres.cluster.disable-stop', fn (string $script): bool => str_contains($script, 'for name in etcd conf/patroni.yml conf/etcd.env conf/etcd-initial.env conf/etcd-force.env conf/dcs.yml conf/pgpass data/standby.signal data/patroni.dynamic.json; do'))
         ->assertRan('engines.postgres.cluster.disable-finish', fn (string $script): bool => str_contains($script, 'unit_do restart databasify-postgres') && str_contains($script, 'PostgreSQL did not come back as a standalone primary'));
 });
 

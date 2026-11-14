@@ -7,6 +7,7 @@ namespace App\Jobs\Databases;
 use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Actions\Databases\Nodes\TakeNodeOut;
 use App\Enums\Queues\QueueGroup;
+use App\Exceptions\Databases\LastNodeDown;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,6 +40,6 @@ final class RemoveNodeJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(EndFailedOperation::class)->handle($this->database, "Remove {$this->node->displayName()}", $exception);
+        resolve(EndFailedOperation::class)->handle($this->database, "Remove {$this->node->displayName()}", $exception, markFailed: $exception instanceof LastNodeDown);
     }
 }
