@@ -34,6 +34,7 @@ final readonly class Runtime
 
     /**
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function run(DatabaseNode $node, string $script, array $env, ?string $user, int $timeout): RuntimeRun
     {

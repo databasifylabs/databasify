@@ -8,6 +8,7 @@ use App\DTOs\Migrations\MigrationProgress;
 use App\DTOs\Migrations\SourceReport;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
 
 interface Migration
 {
@@ -20,5 +21,5 @@ interface Migration
 
     public function progress(): MigrationProgress;
 
-    public function stop(): void;
+    public function stop(string $key): Operation;
 }

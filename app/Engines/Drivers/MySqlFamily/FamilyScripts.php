@@ -11,6 +11,7 @@ final readonly class FamilyScripts
 {
     /**
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function run(MySqlFamilyDriver $driver, string $script, array $env = [], int $timeout = 120): void
     {
@@ -19,6 +20,7 @@ final readonly class FamilyScripts
 
     /**
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function read(MySqlFamilyDriver $driver, string $script, array $env = [], int $timeout = 120): Payload
     {

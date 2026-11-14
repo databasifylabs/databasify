@@ -9,14 +9,13 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
 use App\Engines\Scripts\ScriptView;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class PostgresMigration implements Migration
 {
     private const int CHECK_TIMEOUT = 600;
-
-    private const int STOP_TIMEOUT = 600;
 
     private const string PUBLICATION_PREFIX = 'databasify_migration_';
 
@@ -55,9 +54,9 @@ final readonly class PostgresMigration implements Migration
         return MigrationProgress::fromPayload(($this->driver->read('engines.postgres.migration.progress', $this->driver->data())));
     }
 
-    public function stop(): void
+    public function stop(string $key): Operation
     {
-        $this->driver->run('engines.postgres.migration.stop', $this->driver->data(), timeout: self::STOP_TIMEOUT);
+        return $this->driver->task($key, 'engines.postgres.migration.stop', $this->driver->data());
     }
 
     private function publicationName(): string

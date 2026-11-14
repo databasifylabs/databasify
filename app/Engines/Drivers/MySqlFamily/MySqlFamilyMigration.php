@@ -9,6 +9,7 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
@@ -94,9 +95,9 @@ final readonly class MySqlFamilyMigration implements Migration
         return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'engines.mysql-family.migration.progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
     }
 
-    public function stop(): void
+    public function stop(string $key): Operation
     {
-        $this->scripts->run($this->driver, 'engines.mysql-family.migration.stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()], timeout: 600);
+        return $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()]);
     }
 
     /**

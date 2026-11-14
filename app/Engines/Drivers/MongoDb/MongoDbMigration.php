@@ -9,6 +9,7 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
 use App\Engines\Data\Secrets;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
@@ -77,8 +78,8 @@ final readonly class MongoDbMigration implements Migration
         return MigrationProgress::fromPayload(($this->driver->read('engines.mongodb.migration.progress')));
     }
 
-    public function stop(): void
+    public function stop(string $key): Operation
     {
-        $this->driver->run('engines.mongodb.migration.stop', timeout: 3900);
+        return $this->driver->task($key, 'engines.mongodb.migration.stop');
     }
 }

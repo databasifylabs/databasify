@@ -143,7 +143,7 @@ it('reads the migration progress and stops the copy', function (string $engine, 
     $node = idleDatabase($engine, 1, name: uniqid('db'))->nodes()->sole();
 
     $progress = $node->driver()->migration()->progress();
-    $node->driver()->migration()->stop();
+    $node->driver()->migration()->stop('run.migration-stop');
 
     expect($progress->phase)->toBe(MigrationPhase::Working)->and($progress->detail)->toBe('copying shop');
     $this->scripts->assertRan('engines.mysql-family.migration.stop', fn (string $script): bool => str_contains($script, $ignored));

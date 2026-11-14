@@ -9,6 +9,7 @@ use App\DTOs\Migrations\SourceReport;
 use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
 
 final readonly class SentinelMigration implements Migration
 {
@@ -49,8 +50,8 @@ final readonly class SentinelMigration implements Migration
         return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'migration.progress')));
     }
 
-    public function stop(): void
+    public function stop(string $key): Operation
     {
-        $this->scripts->run($this->driver, 'migration.stop');
+        return $this->scripts->start($this->driver, $key, 'migration.stop');
     }
 }

@@ -16,6 +16,7 @@ interface EngineScripts
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function run(DatabaseNode $node, string $script, array $data = [], ?string $user = null, int $timeout = 120, ?string $log = null, array $env = []): ScriptResult;
 

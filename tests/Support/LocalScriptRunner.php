@@ -9,10 +9,10 @@ use App\Engines\Data\Operation;
 use App\Engines\Scripts\ScriptFailure;
 use App\Engines\Scripts\ScriptResult;
 use App\Engines\Scripts\ScriptView;
+use App\Enums\Databases\OperationState;
 use App\Models\DatabaseNode;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
-use LogicException;
 
 final class LocalScriptRunner implements EngineScripts
 {
@@ -96,7 +96,7 @@ final class LocalScriptRunner implements EngineScripts
 
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
     {
-        throw new LogicException('Tasks do not run locally.');
+        return new Operation($key, 'task', OperationState::Succeeded, '', null, null, $this->run($node, $script, $data, $user, env: $env)->stdout);
     }
 
     /**

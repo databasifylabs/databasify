@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Migrations;
 
 use App\Models\DatabaseMigration;
+use Illuminate\Support\Str;
 
 final readonly class CleanUpEndedMigration
 {
@@ -16,6 +17,6 @@ final readonly class CleanUpEndedMigration
             return;
         }
 
-        rescue(fn () => $this->cleanUp->handle($migration), report: false);
+        rescue(fn () => $this->cleanUp->handle($migration, strtolower(Str::ulid()->toBase32())), report: false);
     }
 }

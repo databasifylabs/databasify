@@ -32,6 +32,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function run(string $script, array $data = [], array $env = [], ?string $user = null, int $timeout = 120): void
     {
@@ -41,6 +42,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, string>  $env
+     * @param  int<1, 3600>  $timeout
      */
     public function read(string $script, array $data = [], array $env = [], ?string $user = null, int $timeout = 120): Payload
     {
