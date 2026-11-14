@@ -7,9 +7,11 @@ use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\OperationState;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
+use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Engines\EngineError;
 use App\Jobs\Databases\StopMigrationJob;
 use App\Models\DatabaseMigration;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Sleep;
 
 beforeEach(function () {
@@ -75,4 +77,29 @@ it('keeps a migration whose engine stop failed cleanable and says why', function
         ->and($this->migration->fresh()?->cleanupFailed())->toBeTrue()
         ->and($failure->output)->toContain('duplicate key error')->toContain('Clean up again')
         ->and($this->database->fresh()?->status)->toBe(DatabaseStatus::Ready);
+});
+
+it('runs a stop that was queued before the run id existed', function () {
+    $current = serialize(new StopMigrationJob($this->migration, cutover: true));
+    $queuedBeforeUpdate = (string) preg_replace_callback('/^O:(\d+):"([^"]+)":(\d+):\{(.*)s:3:"run";s:26:"[a-z0-9]{26}";(.*)$/s', fn (array $part): string => "O:{$part[1]}:\"{$part[2]}\":".($part[3] - 1).":{{$part[4]}{$part[5]}", $current);
+
+    expect($queuedBeforeUpdate)->not->toBe($current);
+
+    runJob(unserialize($queuedBeforeUpdate));
+
+    expect($this->migration->fresh())->status->toBe(MigrationStatus::Completed)
+        ->and($this->migration->fresh()?->cleanupFailed())->toBeFalse()
+        ->and($this->database->fresh()?->status)->toBe(DatabaseStatus::Ready);
+});
+
+it('fails a migration whose requested cutover never ran instead of leaving it syncing', function () {
+    Event::fake([DatabaseAlertRaised::class]);
+
+    (new StopMigrationJob($this->migration, cutover: true))->failed(new RuntimeException('the worker crashed'));
+
+    expect($this->migration->fresh())->status->toBe(MigrationStatus::Failed)->detail->toBe('Finishing failed: the worker crashed.')
+        ->and($this->migration->fresh()?->cleanupFailed())->toBeTrue()
+        ->and($this->database->seed()->server->serverLogs()->where('name', 'Clean up migration')->sole()->output)->toContain('the worker crashed')->toContain('Clean up again')
+        ->and($this->database->fresh()?->status)->toBe(DatabaseStatus::Ready);
+    Event::assertDispatched(DatabaseAlertRaised::class);
 });

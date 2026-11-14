@@ -6,10 +6,12 @@ namespace App\Jobs\Databases;
 
 use App\Actions\Databases\Lifecycle\EndFailedOperation;
 use App\Actions\Databases\Migrations\EndMigration;
+use App\Enums\Migrations\MigrationStatus;
 use App\Enums\Queues\QueueGroup;
 use App\Exceptions\Engines\EngineTaskRunning;
 use App\Models\DatabaseMigration;
 use App\Services\Databases\EngineTasks;
+use App\Support\Messages\Sentence;
 use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -30,7 +32,7 @@ final class StopMigrationJob implements ShouldQueue
 {
     use Queueable;
 
-    public string $run;
+    public ?string $run = null;
 
     public function __construct(public DatabaseMigration $migration, public bool $cutover, public bool $force = false)
     {
@@ -51,7 +53,7 @@ final class StopMigrationJob implements ShouldQueue
         }
 
         try {
-            $action->handle($this->migration, $this->cutover, $this->run, $this->force);
+            $action->handle($this->migration, $this->cutover, $this->run ?? substr(str_replace('-', '', $this->job?->uuid() ?? $this->migration->id), 0, 26), $this->force);
         } catch (EngineTaskRunning) {
             $this->release(30);
         }
@@ -59,7 +61,9 @@ final class StopMigrationJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        if ($this->migration->refresh()->cleanupFailed()) {
+        $this->migration->finishIfActive(MigrationStatus::Failed, ($this->cutover ? 'Finishing' : 'Stopping').' failed: '.Sentence::of($exception?->getMessage() ?? 'The job stopped unexpectedly.'));
+
+        if ($this->migration->cleanupFailed()) {
             $this->migration->logCleanupFailure($exception);
         }
 
