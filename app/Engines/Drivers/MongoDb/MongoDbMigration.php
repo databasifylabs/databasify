@@ -78,8 +78,8 @@ final readonly class MongoDbMigration implements Migration
         return MigrationProgress::fromPayload(($this->driver->read('engines.mongodb.migration.progress')));
     }
 
-    public function stop(string $key): Operation
+    public function stop(string $key, bool $cutover): Operation
     {
-        return $this->driver->task($key, 'engines.mongodb.migration.stop');
+        return $this->driver->task($key, 'engines.mongodb.migration.stop', env: ['MIGRATION_CUTOVER' => $cutover ? 'true' : 'false']);
     }
 }

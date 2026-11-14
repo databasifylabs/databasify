@@ -95,7 +95,7 @@ final readonly class MySqlFamilyMigration implements Migration
         return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'engines.mysql-family.migration.progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
     }
 
-    public function stop(string $key): Operation
+    public function stop(string $key, bool $cutover): Operation
     {
         return $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()]);
     }

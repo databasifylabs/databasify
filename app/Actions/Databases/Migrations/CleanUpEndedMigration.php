@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Migrations;
 
+use App\Exceptions\Engines\EngineTaskRunning;
 use App\Models\DatabaseMigration;
 use Illuminate\Support\Str;
+use Throwable;
 
 final readonly class CleanUpEndedMigration
 {
@@ -17,6 +19,13 @@ final readonly class CleanUpEndedMigration
             return;
         }
 
-        rescue(fn () => $this->cleanUp->handle($migration, strtolower(Str::ulid()->toBase32())), report: false);
+        try {
+            $this->cleanUp->handle($migration, strtolower(Str::ulid()->toBase32()));
+        } catch (EngineTaskRunning $running) {
+            $migration->host()->update(['task_key' => null]);
+            $migration->logCleanupFailure($running);
+        } catch (Throwable $exception) {
+            $migration->logCleanupFailure($exception);
+        }
     }
 }

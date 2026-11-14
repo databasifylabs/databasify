@@ -59,6 +59,10 @@ final class StopMigrationJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if ($this->migration->refresh()->cleanupFailed()) {
+            $this->migration->logCleanupFailure($exception);
+        }
+
         resolve(EndFailedOperation::class)->handle($this->migration->database, $this->cutover ? 'Finish migration' : 'Stop migration', $exception);
     }
 }

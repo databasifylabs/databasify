@@ -50,7 +50,7 @@ final readonly class SentinelMigration implements Migration
         return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'migration.progress')));
     }
 
-    public function stop(string $key): Operation
+    public function stop(string $key, bool $cutover): Operation
     {
         return $this->scripts->start($this->driver, $key, 'migration.stop');
     }

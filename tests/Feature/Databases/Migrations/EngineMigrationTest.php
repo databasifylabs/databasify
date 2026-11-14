@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Databases\Migrations\FailMigration;
 use App\Actions\Databases\Migrations\RefreshMigration;
 use App\Actions\Databases\Migrations\RunMigration;
 use App\Actions\Databases\Migrations\StartMigration;
@@ -10,12 +11,15 @@ use App\DTOs\Migrations\MigrationSource;
 use App\DTOs\Migrations\SourceReport;
 use App\Engines\Data\MigrationSource as EngineSource;
 use App\Engines\Data\MigrationStart;
+use App\Engines\Data\Operation;
+use App\Enums\Databases\OperationState;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Events\DatabaseAlertRaised;
 use App\Jobs\Databases\RunMigrationJob;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -126,4 +130,18 @@ it('fails the migration at once when the engine reports a failed copy', function
 
     expect($migration->fresh())->status->toBe(MigrationStatus::Failed)->detail->toContain('access denied')
         ->and(recordedCalls())->toContain('migration.stop');
+});
+
+it('lets go of an engine stop that outlives the short wait after a failed migration and says so', function () {
+    Sleep::fake();
+    $database = migratingDatabase('mongodb');
+    $migration = migrationOf($database, MigrationMode::Continuous, MigrationStatus::Syncing);
+    fakeEngine();
+    answerRead('task.status', fn (string $key): Operation => new Operation($key, 'task', OperationState::Running, '', null, null));
+
+    resolve(FailMigration::class)->handle($migration, 'replication stopped');
+
+    expect($database->seed()->fresh()?->task_key)->toBeNull()
+        ->and($migration->fresh()?->cleanupFailed())->toBeTrue()
+        ->and($database->seed()->server->serverLogs()->where('name', 'Clean up migration')->sole()->output)->toContain('still running')->toContain('Clean up again');
 });

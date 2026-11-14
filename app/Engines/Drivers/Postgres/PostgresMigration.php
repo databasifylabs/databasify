@@ -54,7 +54,7 @@ final readonly class PostgresMigration implements Migration
         return MigrationProgress::fromPayload(($this->driver->read('engines.postgres.migration.progress', $this->driver->data())));
     }
 
-    public function stop(string $key): Operation
+    public function stop(string $key, bool $cutover): Operation
     {
         return $this->driver->task($key, 'engines.postgres.migration.stop', $this->driver->data());
     }

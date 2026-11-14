@@ -14,6 +14,7 @@ use App\Engines\Data\MigrationStart;
 use App\Enums\Migrations\MigrationMode;
 use App\Enums\Migrations\MigrationStatus;
 use App\Services\Ssh\Ssh;
+use App\Support\Messages\Sentence;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -84,6 +85,12 @@ class DatabaseMigration extends Model
     public function markCleanedUp(): void
     {
         $this->update(['cleanup_failed_at' => null]);
+    }
+
+    public function logCleanupFailure(?Throwable $exception): void
+    {
+        $server = $this->host()->server;
+        $server->logFailure('Clean up migration', "Could not clean up the migration on {$server->name}: ".Sentence::of($exception?->getMessage() ?? 'The job stopped unexpectedly.').' The migration has ended, but its copy or replication from the source may still be running. Use Clean up again on the Migrations tab.', $this->database);
     }
 
     public function cleanupFailed(): bool

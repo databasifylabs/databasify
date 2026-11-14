@@ -42,7 +42,27 @@ it('finishes a cutover whose engine stop outlives a worker run without starting 
 
     expect($this->migration->fresh()?->cleanupFailed())->toBeFalse()
         ->and($this->database->fresh()?->status)->toBe(DatabaseStatus::Ready)
-        ->and(collect(useRecordingDrivers()->argsOf('migration.stop'))->pluck(0)->unique()->all())->toBe(["{$job->run}.{$this->database->seed()->id}.migration-stop"]);
+        ->and(collect(useRecordingDrivers()->argsOf('migration.stop'))->unique(0)->values()->all())->toBe([["{$job->run}.{$this->database->seed()->id}.migration-stop", true]]);
+});
+
+it('says why the cleanup failed when the engine stop fails after a release', function () {
+    stopTaskStates(...array_fill(0, 20, OperationState::Running));
+    $job = new StopMigrationJob($this->migration, cutover: true);
+    runJob($job);
+    stopTaskStates(OperationState::Failed);
+
+    expect(fn () => runJob($job))->toThrow(EngineError::class, 'duplicate key error');
+
+    expect($this->database->seed()->server->serverLogs()->where('name', 'Clean up migration')->sole()->output)->toContain('duplicate key error')->toContain('Clean up again')
+        ->and($this->migration->fresh()?->cleanupFailed())->toBeTrue()
+        ->and($this->database->fresh()?->status)->toBe(DatabaseStatus::Ready);
+});
+
+it('stops a migration before it finished without a cutover', function () {
+    runJob(new StopMigrationJob($this->migration, cutover: false));
+
+    expect($this->migration->fresh())->status->toBe(MigrationStatus::Stopped)
+        ->and(useRecordingDrivers()->argsOf('migration.stop')[0][1])->toBeFalse();
 });
 
 it('keeps a migration whose engine stop failed cleanable and says why', function () {

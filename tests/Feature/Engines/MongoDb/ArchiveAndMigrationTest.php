@@ -96,9 +96,9 @@ it('starts, reads and stops the migration', function () {
 
     $this->node->driver()->migration()->start(new MigrationStartData(new MigrationSource('10.0.0.9', 27017, 'm', 'pw', false), ['app'], true, null));
     $progress = $this->node->driver()->migration()->progress();
-    $this->node->driver()->migration()->stop('run.migration-stop');
+    $this->node->driver()->migration()->stop('run.migration-stop', true);
 
     expect($progress->lagSeconds)->toBeNull();
     $this->scripts->assertRan('engines.mongodb.migration.start', fn (string $script, array $env): bool => $env['MIGRATION_CONTINUOUS'] === 'true' && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'pcsm --log-no-color'))
-        ->assertRan('engines.mongodb.migration.stop', fn (string $script): bool => str_contains($script, 'pcsm_post /finalize') && str_contains($script, 'input.state === "finalizing" ? "wait"') && str_contains($script, 'percona_clustersync_mongodb'));
+        ->assertRan('engines.mongodb.migration.stop', fn (string $script, array $env): bool => $env['MIGRATION_CUTOVER'] === 'true');
 });

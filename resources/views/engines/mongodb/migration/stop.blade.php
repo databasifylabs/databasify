@@ -2,8 +2,11 @@
 @include('engines.mongodb._pbm')
 @include('engines.mongodb._pcsm')
 if status=$(pcsm_status); then
-    step=$(json_eval "$status" 'const synced = Boolean(input.initialSync && input.initialSync.completed); print(input.state === "finalizing" ? "wait" : (synced && input.state === "pausing" ? "busy" : (synced && ["running", "paused"].includes(input.state) ? "finalize" : (input.state === "running" ? "pause" : "none"))))') || step=none
-    if [ "$step" = busy ]; then
+    step=$(json_eval "$status" 'const state = String(input.state || ""); const synced = Boolean(input.initialSync && input.initialSync.completed); const cutover = process.env.MIGRATION_CUTOVER === "true"; print(state === "finalizing" ? "wait" : (state === "finalized" ? "none" : (["running", "paused"].includes(state) && (cutover || synced) ? "finalize" : (state === "pausing" && (cutover || synced) ? "busy" : (cutover ? "refuse " + state + (input.error ? ": " + String(input.error) : "") : (state === "running" ? "pause" : "none"))))))') \
+        || fail_task "could not read the ClusterSync status: $status"
+    if [[ $step == refuse\ * ]]; then
+        fail_task "ClusterSync cannot finish the cutover (${step#refuse }); the target keeps its ClusterSync state, fix ClusterSync and clean up again"
+    elif [ "$step" = busy ]; then
         fail_task 'ClusterSync is pausing before it can finalize, clean up again once it paused'
     elif [ "$step" = pause ]; then
         pcsm_post /pause
@@ -22,6 +25,8 @@ if status=$(pcsm_status); then
         }
         wait_until 21600 2 finalized || fail_task 'ClusterSync did not finalize within 6h0m0s'
     fi
+elif [ "${MIGRATION_CUTOVER:-false}" = true ] && unit_active mongodb-migration; then
+    fail_task 'ClusterSync is running but does not answer, clean up again once it answers'
 fi
 databasify ctl stop mongodb-migration > /dev/null 2>&1 || true
 databasify ctl reset-failed mongodb-migration > /dev/null 2>&1 || true

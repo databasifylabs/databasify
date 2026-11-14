@@ -21,5 +21,5 @@ interface Migration
 
     public function progress(): MigrationProgress;
 
-    public function stop(string $key): Operation;
+    public function stop(string $key, bool $cutover): Operation;
 }

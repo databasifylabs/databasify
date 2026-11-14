@@ -281,9 +281,9 @@ final readonly class RecordingDriver extends AbstractEngineDriver
                 return $this->driver->recorded('migration.progress', [], MigrationProgress::working('copying shop'));
             }
 
-            public function stop(string $key): Operation
+            public function stop(string $key, bool $cutover): Operation
             {
-                return $this->driver->recorded('migration.stop', [$key], RecordingDriver::running($key));
+                return $this->driver->recorded('migration.stop', [$key, $cutover], RecordingDriver::running($key));
             }
         };
     }

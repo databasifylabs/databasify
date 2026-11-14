@@ -53,7 +53,7 @@ it('reads progress and stops the migration', function () {
     $this->scripts->respond('engines.postgres.migration.progress', ['copy' => 'running', 'log' => 'copying shop', 'lagSeconds' => null]);
 
     $progress = $this->node->driver()->migration()->progress();
-    $this->node->driver()->migration()->stop('run.migration-stop');
+    $this->node->driver()->migration()->stop('run.migration-stop', false);
 
     expect($progress)->phase->toBe(MigrationPhase::Working)->detail->toBe('copying shop')->lagSeconds->toBeNull();
     $this->scripts->assertRan('engines.postgres.migration.stop', fn (string $script): bool => str_contains($script, 'DROP SUBSCRIPTION :"name"') && str_contains($script, 'DROP PUBLICATION IF EXISTS'));
@@ -87,7 +87,7 @@ it('drops the replication slot on the source when the subscription has to let go
         ->reply('pg_drop_replication_slot', '')
         ->reply('DROP PUBLICATION', '');
 
-    $this->node->driver()->migration()->stop('run.migration-stop');
+    $this->node->driver()->migration()->stop('run.migration-stop', false);
 
     expect($local->statements())->toContain("SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = 'databasify_migration_4a5b6c7d8e9f_shop_1a2b3c4d'");
 });

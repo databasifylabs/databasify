@@ -47,6 +47,7 @@ final readonly class EndMigration
             throw $running;
         } catch (Throwable $exception) {
             throw_unless($force, $exception);
+            $migration->logCleanupFailure($exception);
         }
     }
 }
