@@ -19,7 +19,7 @@ if [ "$MIGRATION_CONTINUOUS" = true ]; then
         fi
         sleep 1
     done
-    if ! reply=$(curl -fsS --max-time 30 -X POST -H 'Content-Type: application/json' -d "$PCSM_START" "$PCSM/start" 2>&1); then
+    if ! reply=$(curl -fsS --max-time 30 -X POST -H 'Content-Type: application/json' -d "$CLUSTERSYNC_START_REQUEST" "$PCSM/start" 2>&1); then
         stop_pcsm
         fail_task "ClusterSync /start: $reply"
     fi

@@ -99,6 +99,26 @@ it('starts the mongodb migration copy as a bash job', function () {
     });
 });
 
+it('starts ClusterSync with no PCSM_ setting but its uris, so PCSM never parses the start request as a flag', function () {
+    $scripts = fakeScripts()->respond('engines.mongodb.migration.start');
+    $node = idleDatabase('mongodb', 1, versionLine: '9.0')->nodes()->sole();
+    $node->driver()->migration()->start(new MigrationStart(new MigrationSource('src.example.com', 27017, 'reader', 'pw', true), ['shop'], true, null));
+    $env = [];
+    $scripts->assertRan('engines.mongodb.migration.start', function (string $script, array $sent) use (&$env): bool {
+        preg_match('/for name in ([A-Z_ ]+); do/', $script, $exported);
+        $env = array_intersect_key($sent, array_flip(explode(' ', $exported[1])));
+
+        return true;
+    });
+
+    $commands = runJobLocally($node, 'engines.mongodb.jobs.migration-copy', [], [
+        'pcsm' => "#!/bin/bash\nenv | grep '^PCSM_' | cut -d= -f1 | sort | sed 's/^/pcsm env /' >> \"\$STUB_DIR/commands.log\"\n",
+        'curl' => "#!/bin/bash\nwhile [ \$# -gt 0 ]; do if [ \"\$1\" = -d ]; then printf 'start %s\\n' \"\$2\" >> \"\$STUB_DIR/commands.log\"; fi; shift; done\nprintf '{\"ok\":true}'\n",
+    ], $env);
+
+    expect(array_values(array_filter(explode("\n", $commands))))->toBe(['pcsm env PCSM_SOURCE_URI', 'pcsm env PCSM_TARGET_URI', 'start {"includeNamespaces":["shop.*"]}']);
+});
+
 it('renders every job script as valid bash', function (string $engine, string $job) {
     $node = idleDatabase($engine, 1)->nodes()->sole();
 

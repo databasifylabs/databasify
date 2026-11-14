@@ -66,7 +66,7 @@ final readonly class MongoDbMigration implements Migration
             'TARGET_URI' => $targetUri,
             'SOURCE_TOOL_CONFIG' => MongoDbFiles::toolConfigOf($sourceUri),
             'TARGET_TOOL_CONFIG' => MongoDbFiles::toolConfigOf($targetUri),
-            'PCSM_START' => json_encode(['includeNamespaces' => array_map(fn (string $database): string => "{$database}.*", $databases)], JSON_THROW_ON_ERROR),
+            'CLUSTERSYNC_START_REQUEST' => json_encode(['includeNamespaces' => array_map(fn (string $database): string => "{$database}.*", $databases)], JSON_THROW_ON_ERROR),
             'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
             'COPY_SCRIPT' => base64_encode($this->driver->script('engines.mongodb.jobs.migration-copy')),

@@ -6,7 +6,7 @@ env_file="$ROOT/state/mongodb-migration.env"
 job_file="$ROOT/state/mongodb-migration.sh"
 (
     umask 077
-    for name in SOURCE_URI TARGET_URI SOURCE_TOOL_CONFIG TARGET_TOOL_CONFIG PCSM_START MIGRATION_DATABASES MIGRATION_CONTINUOUS; do
+    for name in SOURCE_URI TARGET_URI SOURCE_TOOL_CONFIG TARGET_TOOL_CONFIG CLUSTERSYNC_START_REQUEST MIGRATION_DATABASES MIGRATION_CONTINUOUS; do
         printf 'export %s=%q\n' "$name" "${!name}"
     done > "$env_file"
     printf '%s' "$COPY_SCRIPT" | base64 -d > "$job_file"
