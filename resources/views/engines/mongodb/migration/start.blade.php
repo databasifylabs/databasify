@@ -1,6 +1,7 @@
 @include('engines.mongodb._mongo')
 databasify ctl stop mongodb-migration > /dev/null 2>&1 || true
 databasify ctl reset-failed mongodb-migration > /dev/null 2>&1 || true
+rm -f "$ROOT/state/mongodb-migration.finalized"
 env_file="$ROOT/state/mongodb-migration.env"
 job_file="$ROOT/state/mongodb-migration.sh"
 (

@@ -18,7 +18,7 @@ final readonly class CleanUpMigration
     public function handle(DatabaseMigration $migration, string $run): void
     {
         $host = $migration->host();
-        $cutover = $migration->status === MigrationStatus::Completed;
+        $cutover = $migration->status === MigrationStatus::Completed && ! $migration->isOneTime();
 
         $this->tasks->await($host, $run, self::STEP, 'Clean up migration', fn (string $key): Operation => $host->driver()->migration()->stop($key, $cutover));
         $migration->markCleanedUp();

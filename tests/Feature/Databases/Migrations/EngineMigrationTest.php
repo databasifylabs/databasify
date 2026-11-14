@@ -97,7 +97,8 @@ it('completes a one-time copy and records its databases with grants for the defa
 
     expect($migration->fresh()->status)->toBe(MigrationStatus::Completed)
         ->and($database->schemas()->pluck('name'))->toContain('shop')
-        ->and(collect(recordedArgs('accounts.grant')[0]['args'][1])->pluck('database'))->toContain('shop');
+        ->and(collect(recordedArgs('accounts.grant')[0]['args'][1])->pluck('database'))->toContain('shop')
+        ->and(recordedArgs('migration.stop')[0]['args'][1])->toBeFalse();
 });
 
 it('tolerates a few lost readings before failing with an alert', function () {
