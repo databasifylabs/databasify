@@ -29,7 +29,7 @@ final readonly class GrantMigrationSourceRoles
             $accounts->grantMigrationSourceRoles($default);
         } catch (Throwable $exception) {
             $server = $database->primaryServer();
-            $server->logFailure('Grant migration source roles to the default user', "Could not let {$default} serve as a migration source on {$server->name}: ".Sentence::of($exception->getMessage()).' The next upgrade tries again.', $database);
+            $server->logFailure('Grant migration source roles to the default user', "Could not let {$default} serve as a migration source on {$server->name}: ".Sentence::of($exception->getMessage()).' The next redeploy or upgrade tries again.', $database);
         }
     }
 }

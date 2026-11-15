@@ -14,6 +14,7 @@ use App\Engines\Contracts\Archive;
 use App\Engines\Contracts\Cluster;
 use App\Engines\Contracts\Config;
 use App\Engines\Contracts\Migration;
+use App\Engines\Contracts\MigrationSourceRoles;
 use App\Engines\Contracts\Nodes;
 use App\Engines\Contracts\Pools;
 use App\Engines\Data\AccountList;
@@ -201,9 +202,14 @@ final readonly class RecordingDriver extends AbstractEngineDriver
 
     public function accounts(): Accounts
     {
-        return new readonly class($this) implements Accounts
+        return new readonly class($this) implements Accounts, MigrationSourceRoles
         {
             public function __construct(private RecordingDriver $driver) {}
+
+            public function grantMigrationSourceRoles(string $name): void
+            {
+                $this->driver->recorded('accounts.grantMigrationSourceRoles', [$name]);
+            }
 
             public function list(): AccountList
             {

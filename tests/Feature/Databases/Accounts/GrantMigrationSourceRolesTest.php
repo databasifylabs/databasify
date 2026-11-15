@@ -23,7 +23,7 @@ it('logs a failed grant and lets the rollout finish', function () {
 
     resolve(GrantMigrationSourceRoles::class)->handle($database);
 
-    expect($database->primaryServer()->serverLogs()->where('name', 'Grant migration source roles to the default user')->sole()->output)->toContain('The next upgrade tries again');
+    expect($database->primaryServer()->serverLogs()->where('name', 'Grant migration source roles to the default user')->sole()->output)->toContain('The next redeploy or upgrade tries again');
 });
 
 it('leaves engines without source roles alone', function () {

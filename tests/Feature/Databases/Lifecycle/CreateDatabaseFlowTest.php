@@ -175,6 +175,7 @@ it('restores to a point in time through the create flow before checking the acco
 
     expect(array_search('archive.restore', $commands, true))->toBeGreaterThan(array_search('nodes.bootstrap', $commands, true))
         ->and($commands)->toContain('accounts.list')
+        ->and(array_search('accounts.grantMigrationSourceRoles', $commands, true))->toBeGreaterThan(array_search('accounts.list', $commands, true))
         ->and(recordedArgs('archive.restore')[0]['args'][2]->equalTo($target))->toBeTrue()
         ->and($restored->fresh()->status)->toBe(DatabaseStatus::Ready);
 });

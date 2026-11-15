@@ -103,9 +103,9 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
     private function grantEnv(string $name, array $grants, bool $replication): array
     {
         $this->refuseReserved(self::RESERVED_DATABASES, ...array_map(fn (Grant $grant): string => Shell::withoutNul($grant->database), $grants));
-        $source = $replication || $name === $this->driver->node->database->settings->defaultUsername();
+        $withSourceRoles = $replication || $name === $this->driver->node->database->settings->defaultUsername();
 
-        return ['NAME' => Shell::withoutNul($name), 'GRANTS' => json_encode(array_map(fn (Grant $grant): array => $grant->toPayload(), $grants), JSON_THROW_ON_ERROR), 'REPLICATION' => $source ? 'true' : 'false'];
+        return ['NAME' => Shell::withoutNul($name), 'GRANTS' => json_encode(array_map(fn (Grant $grant): array => $grant->toPayload(), $grants), JSON_THROW_ON_ERROR), 'REPLICATION' => $withSourceRoles ? 'true' : 'false'];
     }
 
     /**

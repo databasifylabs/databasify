@@ -312,6 +312,7 @@ it('upgrades in the documented order and reads the engine again afterwards', fun
         ->and($at($primary->server, 'nodes.configure'))->toBeLessThan($at($primary->server, 'nodes.ready'))
         ->and($at($standby->server, 'host deploy'))->toBeLessThan($at($standby->server, 'nodes.configure'))
         ->and($at($standby->server, 'nodes.configure'))->toBeLessThan($at($standby->server, 'nodes.ready'))
+        ->and($at($primary->server, 'accounts.grantMigrationSourceRoles'))->toBeGreaterThan($at($primary->server, 'nodes.ready'))
         ->and(json_decode($ssh->engineRequestAt(collect($ssh->runs)->search(fn (array $run): bool => $run['server'] === $primary->server->name && str_contains($run['script'], '| databasify host deploy '))), true)['image'])->toEndWith('@sha256:'.str_repeat('b', 64))
         ->and($database->fresh())->image->toEqual($offered)->available_image->toBeNull()->status->toBe(DatabaseStatus::Ready)
         ->and($database->fresh()->config_fields)->toHaveCount(1);

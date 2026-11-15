@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Lifecycle;
 
+use App\Actions\Databases\Accounts\GrantMigrationSourceRoles;
 use App\Actions\Databases\Network\ApplyNodeFirewall;
 use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Actions\Databases\Nodes\DeployNode;
@@ -29,6 +30,7 @@ final readonly class SetUpDatabase
         private ApplyNodeFirewall $firewall,
         private EngineTasks $tasks,
         private ReconcileRestoredAccounts $restoredAccounts,
+        private GrantMigrationSourceRoles $sourceRoles,
         private LearnLogUnits $logUnits,
         private RefreshDatabaseStatus $refresh,
     ) {}
@@ -75,6 +77,7 @@ final readonly class SetUpDatabase
 
             if (! $joining) {
                 $this->restoredAccounts->handle($database);
+                $this->sourceRoles->handle($database);
             }
         }
 
