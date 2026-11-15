@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Process;
 /**
  * @return array{ProcessResult, list<string>, bool}
  */
-function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool $unitActive = false, bool $marked = false, bool $dropFails = false, ?string $stubs = null): array
+function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool $unitActive = false, bool $marked = false, bool $dropFails = false, ?string $stubs = null, string $script = 'engines.mongodb.migration.stop'): array
 {
     $stubs ??= temporaryDirectory();
     $marker = "{$stubs}/root/state/mongodb-migration.finalized";
@@ -46,6 +46,10 @@ function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool
             BASH,
         'databasify' => <<<'BASH'
             #!/bin/bash
+            if [ "$2" = show ]; then
+                case $4 in LoadState) echo loaded ;; ActiveState) echo active ;; SubState) echo running ;; *) echo 0 ;; esac
+                exit 0
+            fi
             printf '%s\n' "$*" >> "$STUB_DIR/calls"
             [ "$2" != is-active ] || [ -n "$STUB_UNIT_ACTIVE" ]
             BASH,
@@ -58,7 +62,7 @@ function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool
         chmod("{$stubs}/bin/{$name}", 0755);
     }
 
-    $script = str_replace('/srv/mongodb', "{$stubs}/root", resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), 'engines.mongodb.migration.stop'));
+    $script = str_replace('/srv/mongodb', "{$stubs}/root", resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), $script));
     $run = Process::input($script)->env([
         'PATH' => "{$stubs}/bin:".getenv('PATH'),
         'STUB_DIR' => $stubs,
@@ -122,4 +126,16 @@ it('pauses an unsynced ClusterSync or drops a failed one on a plain stop', funct
 })->with([
     'copying' => ['{"state":"running","initialSync":{"completed":false}}', ['http://127.0.0.1:2242/pause']],
     'failed' => ['{"state":"failed","error":"source gone"}', []],
+]);
+
+it('reports what ClusterSync says about a running continuous copy', function (?string $status, array $expected) {
+    [$run] = runMongoStop($status, false, script: 'engines.mongodb.migration.progress');
+
+    expect($run->successful())->toBeTrue($run->errorOutput())
+        ->and(json_decode(trim(str_replace('DATABASIFY_RESULT ', '', $run->output())), true))->toBe($expected);
+})->with([
+    'initial sync done' => ['{"state":"running","lagTimeSeconds":3,"initialSync":{"completed":true}}', ['copy' => 'succeeded', 'log' => '', 'lagSeconds' => 3]],
+    'still cloning' => ['{"state":"running","lagTimeSeconds":0,"initialSync":{"completed":false}}', ['copy' => 'running', 'log' => '', 'lagSeconds' => null]],
+    'failed' => ['{"ok":false,"error":"clone: startTS: advance source cluster time: (Unauthorized) not authorized on admin","state":"failed","initialSync":{"completed":false,"cloneCompleted":true}}', ['copy' => 'failed', 'log' => 'ClusterSync failed: clone: startTS: advance source cluster time: (Unauthorized) not authorized on admin', 'lagSeconds' => null]],
+    'not answering yet' => [null, ['copy' => 'running', 'log' => '', 'lagSeconds' => null]],
 ]);

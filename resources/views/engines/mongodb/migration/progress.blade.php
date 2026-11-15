@@ -18,6 +18,16 @@ fi
 log=$(tail -n 3 "$ROOT/logs/mongodb-migration.log" 2> /dev/null | tr '\n' ' ' | sed 's/ $//' || true)
 lag=null
 if status=$(pcsm_status); then
-    lag=$(json_eval "$status" 'print(input.state === "running" && input.initialSync && input.initialSync.completed ? String(Math.max(Number(input.lagTimeSeconds || 0), 0)) : "null")') || lag=null
+    clustersync=$(json_eval "$status" 'print(input.state === "failed" ? "failed " + String(input.error || "no error given") : (input.state === "running" && input.initialSync && input.initialSync.completed ? "synced " + String(Math.max(Number(input.lagTimeSeconds || 0), 0)) : "copying"))') || clustersync=copying
+    case $clustersync in
+        failed\ *)
+            copy=failed
+            log="ClusterSync failed: ${clustersync#failed }"
+            ;;
+        synced\ *)
+            copy=succeeded
+            lag=${clustersync#synced }
+            ;;
+    esac
 fi
 result "$(COPY=$copy LOG=$log LAG=$lag mongosh --nodb --quiet --norc --eval 'print(JSON.stringify({ copy: process.env.COPY, log: process.env.LOG, lagSeconds: process.env.LAG === "null" ? null : Number(process.env.LAG) }))')"
