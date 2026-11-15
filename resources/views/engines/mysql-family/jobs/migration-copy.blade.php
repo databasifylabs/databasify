@@ -28,7 +28,7 @@ if [ "$ssl" = 1 ]; then
     ssl_mode=REQUIRED
 fi
 args=(--passwords-from-stdin --uri="$MYSQLSH_URI" --ssl-mode="$ssl_mode" -- util copy-schemas "${databases[@]}" --host=127.0.0.1 --port=25060 --user=root --threads=4)
-printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysqlsh "${args[@]}" | tee "$copy_log" \
+printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysqlsh "${args[@]}" 2>&1 | tee "$copy_log" \
     || fail_task 'MySQL Shell could not copy the schemas'
 grant_owner
 [ "$MIGRATION_CONTINUOUS" = true ] || exit 0
