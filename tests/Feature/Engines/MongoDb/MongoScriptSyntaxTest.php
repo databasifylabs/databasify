@@ -49,3 +49,31 @@ it('never closes a mongosh connection in a finally block, which the async rewrit
 
     expect($offending)->toBe([]);
 });
+
+it('never returns a call straight out of a try block, whose rejection the async rewriter would let escape the catch', function () {
+    $offending = [];
+
+    foreach (Finder::create()->files()->in(resource_path('views/engines/mongodb'))->name('*.blade.php') as $script) {
+        $lines = explode("\n", $script->getContents());
+
+        foreach ($lines as $index => $line) {
+            if (preg_match('/\btry \{\s*$/', $line) !== 1) {
+                continue;
+            }
+
+            for ($depth = 1, $next = $index + 1; $depth > 0 && $next < count($lines); $next++) {
+                if ($depth === 1 && preg_match('/^\s*\}/', $lines[$next]) === 1) {
+                    break;
+                }
+
+                if ($depth === 1 && preg_match('/^\s*return [A-Za-z_$][\w$.]*\((?:(?!\)\.).)*\);\s*$/', $lines[$next]) === 1) {
+                    $offending[] = $script->getRelativePathname().':'.($next + 1);
+                }
+
+                $depth += substr_count($lines[$next], '{') - substr_count($lines[$next], '}');
+            }
+        }
+    }
+
+    expect($offending)->toBe([]);
+});

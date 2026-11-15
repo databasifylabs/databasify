@@ -101,7 +101,8 @@ function reconfig(admin, config, force) {
   while (true) {
     if (force || configCommitted(admin)) {
       try {
-        return runOn(admin, { replSetReconfig: config, force: force });
+        const reply = runOn(admin, { replSetReconfig: config, force: force });
+        return reply;
       } catch (error) {
         if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
       }
@@ -116,7 +117,8 @@ function retry(seconds, label, attempt) {
   let last = null;
   while (true) {
     try {
-      return attempt();
+      const value = attempt();
+      return value;
     } catch (error) {
       if (error && error.databasify && error.databasify !== 'unavailable') throw error;
       last = error;
