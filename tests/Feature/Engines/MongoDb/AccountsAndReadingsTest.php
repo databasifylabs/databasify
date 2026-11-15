@@ -25,7 +25,16 @@ it('creates a user with every value only in the env', function () {
         && ! str_contains($script, $password)
         && str_contains($script, 'createUser: env.NAME')
         && str_contains($script, 'updateUser: env.NAME')
-        && str_contains($script, "'database ' + JSON.stringify(grant.database) + ' does not exist'"));
+        && str_contains($script, "'database ' + JSON.stringify(grant.database) + ' does not exist'")
+        && $env['REPLICATION'] === 'false');
+});
+
+it('keeps the default user a migration source whenever its grants change', function () {
+    $this->node->driver()->accounts()->grant('databasify', [new Grant('shop', GrantAccess::Write)], false);
+    $this->node->driver()->accounts()->grantMigrationSourceRoles('databasify');
+
+    $this->scripts->assertRan('engines.mongodb.accounts.grant', fn (string $script, array $env): bool => $env['NAME'] === 'databasify' && $env['REPLICATION'] === 'true')
+        ->assertRan('engines.mongodb.accounts.grant-source-roles', fn (string $script, array $env): bool => $env['NAME'] === 'databasify');
 });
 
 it('refuses what the Go engine refuses before running anything', function (Closure $call, string $message) {

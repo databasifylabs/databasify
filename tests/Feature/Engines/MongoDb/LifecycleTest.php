@@ -32,7 +32,8 @@ it('bootstraps the seed: initiate, root, agent and the default account', functio
     $this->scripts->assertRan('engines.mongodb.nodes.bootstrap', fn (string $script, array $env): bool => $env['HOST'] === '10.0.0.1:25060' && $env['ADMIN_PASSWORD'] === "ad'm"
         && str_contains($script, 'replSetInitiate') && str_contains($script, 'the server was not ready within 2m0s')
         && str_contains($script, "createRole: 'pbmAnyAction'") && str_contains($script, "createUser: 'databasify_pbm'"))
-        ->assertRan('engines.mongodb.accounts.create-database', fn (string $script, array $env): bool => $env['NAME'] === 'defaultdb');
+        ->assertRan('engines.mongodb.accounts.create-database', fn (string $script, array $env): bool => $env['NAME'] === 'defaultdb')
+        ->assertRan('engines.mongodb.accounts.create-user', fn (string $script, array $env): bool => $env['NAME'] === 'databasify' && $env['REPLICATION'] === 'true');
 });
 
 it('skips bootstrap on a node that is not the seed', function () {

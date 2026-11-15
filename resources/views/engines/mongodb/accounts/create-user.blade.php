@@ -2,7 +2,7 @@
 mongo_js root <<'JS'
 @include('engines.mongodb._roles')
 main(() => {
-  const roles = rolesOf(JSON.parse(env.GRANTS), false);
+  const roles = rolesOf(JSON.parse(env.GRANTS), env.REPLICATION === 'true');
   try {
     run('admin', { createUser: env.NAME, pwd: env.PASSWORD, mechanisms: [env.ENCRYPTION], roles: roles });
     emit('Created user ' + env.NAME + '.');

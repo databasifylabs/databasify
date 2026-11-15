@@ -82,5 +82,6 @@ Options that were tried or rejected, and why.
 | [0036](0036-operations-as-one-job.md)                       | A database operation is one action and one job           | Accepted           |
 | [0037](0037-engine-tasks-off-the-worker.md)                 | Engine tasks run off the worker                          | Accepted           |
 | [0038](0038-read-only-nodes-managed-on-their-own.md)        | Read-only nodes are managed on their own                 | Accepted           |
+| [0039](0039-mongodb-default-user-as-migration-source.md)    | The MongoDB default user can serve as a migration source | Accepted           |
 
 The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.

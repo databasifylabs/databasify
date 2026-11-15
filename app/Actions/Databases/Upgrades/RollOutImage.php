@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Upgrades;
 
+use App\Actions\Databases\Accounts\GrantMigrationSourceRoles;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Actions\Databases\Nodes\DeployNode;
@@ -22,11 +23,11 @@ final readonly class RollOutImage
         private LearnEngine $learn,
         private LearnLogUnits $logUnits,
         private RefreshDatabaseStatus $refresh,
+        private GrantMigrationSourceRoles $grantSourceRoles,
     ) {}
 
     public function handle(Database $database, string $run): void
     {
-
         $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($database, $run): void {
             $this->deploy->handle($database, $node);
             $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node));
@@ -36,6 +37,7 @@ final readonly class RollOutImage
         $this->refresh->handle($database);
         $this->learn->handle($database, $database->primaryOrSeed());
         $this->logUnits->handle($database, $database->primaryOrSeed());
+        $this->grantSourceRoles->handle($database);
         $database->markReady();
     }
 }

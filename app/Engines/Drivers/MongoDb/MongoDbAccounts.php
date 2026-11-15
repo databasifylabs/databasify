@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Engines\Drivers\MongoDb;
 
 use App\Engines\Contracts\Accounts;
+use App\Engines\Contracts\MigrationSourceRoles;
 use App\Engines\Data\AccountList;
 use App\Engines\Data\Grant;
 use App\Engines\Scripts\Shell;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
-final readonly class MongoDbAccounts implements Accounts
+final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
 {
     public const array RESERVED_USERS = ['root', 'databasify_pbm', '__system'];
 
@@ -48,7 +49,7 @@ final readonly class MongoDbAccounts implements Accounts
     public function createUser(string $name, string $password, array $grants, ?string $encryption): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
-        $env = [...$this->passwordEnv($password, $encryption), ...$this->grantEnv($name, $grants)];
+        $env = [...$this->passwordEnv($password, $encryption), ...$this->grantEnv($name, $grants, false)];
 
         $this->driver->run('engines.mongodb.accounts.create-user', env: $env);
     }
@@ -62,7 +63,13 @@ final readonly class MongoDbAccounts implements Accounts
     public function grant(string $name, array $grants, bool $replication): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
-        $this->driver->run('engines.mongodb.accounts.grant', env: [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
+        $this->driver->run('engines.mongodb.accounts.grant', env: $this->grantEnv($name, $grants, $replication));
+    }
+
+    public function grantMigrationSourceRoles(string $name): void
+    {
+        $this->refuseReserved(self::RESERVED_USERS, $name);
+        $this->driver->run('engines.mongodb.accounts.grant-source-roles', env: ['NAME' => Shell::withoutNul($name)]);
     }
 
     public function dropUser(string $name): void
@@ -91,13 +98,14 @@ final readonly class MongoDbAccounts implements Accounts
 
     /**
      * @param  list<Grant>  $grants
-     * @return array{NAME: string, GRANTS: string}
+     * @return array{NAME: string, GRANTS: string, REPLICATION: string}
      */
-    private function grantEnv(string $name, array $grants): array
+    private function grantEnv(string $name, array $grants, bool $replication): array
     {
         $this->refuseReserved(self::RESERVED_DATABASES, ...array_map(fn (Grant $grant): string => Shell::withoutNul($grant->database), $grants));
+        $source = $replication || $name === $this->driver->node->database->settings->defaultUsername();
 
-        return ['NAME' => Shell::withoutNul($name), 'GRANTS' => json_encode(array_map(fn (Grant $grant): array => $grant->toPayload(), $grants), JSON_THROW_ON_ERROR)];
+        return ['NAME' => Shell::withoutNul($name), 'GRANTS' => json_encode(array_map(fn (Grant $grant): array => $grant->toPayload(), $grants), JSON_THROW_ON_ERROR), 'REPLICATION' => $source ? 'true' : 'false'];
     }
 
     /**

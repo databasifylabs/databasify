@@ -141,10 +141,11 @@ it('reports what ClusterSync says about a running continuous copy', function (?s
 ]);
 
 /**
- * @param  list<array{role: string, db: string}>  $roles
- * @return array<string, mixed>
+ * @param  array<string, mixed>  $replies
+ * @param  array<string, string>  $env
+ * @return array{string, list<array<string, mixed>>}
  */
-function checkMongoSourceWithRoles(array $roles): array
+function runMongoScriptAgainst(string $script, array $replies, array $env = []): array
 {
     $stubs = temporaryDirectory();
     mkdir("{$stubs}/bin");
@@ -156,36 +157,43 @@ function checkMongoSourceWithRoles(array $roles): array
         fi
         program=$(mktemp)
         cat > "$program" <<'JS'
+        const fs = require('fs');
         const print = (line) => console.log(line);
         const quit = (code) => process.exit(code);
         const EJSON = { stringify: JSON.stringify };
         const replies = JSON.parse(process.env.STUB_REPLIES);
-        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => replies[Object.keys(command)[0]] }) };
+        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(command) + '\n'); return replies[Object.keys(command)[0]] || { ok: 1 }; } }) };
         JS
         cat "${@: -1}" >> "$program"
         node "$program"
         BASH);
     chmod("{$stubs}/bin/timeout", 0755);
     chmod("{$stubs}/bin/mongosh", 0755);
-    $replies = [
+
+    $rendered = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), $script);
+    $run = Process::input($rendered)->env([...$env, 'PATH' => "{$stubs}/bin:".getenv('PATH'), 'STUB_DIR' => $stubs, 'STUB_REPLIES' => json_encode((object) $replies, JSON_THROW_ON_ERROR), 'MONGO_SECRET' => 'secret'])->run(['bash', '-euo', 'pipefail', '-s']);
+
+    expect($run->successful())->toBeTrue($run->errorOutput());
+    $commands = is_file("{$stubs}/commands") ? array_values(array_map(fn (string $line): array => (array) json_decode($line, true), array_filter(explode("\n", (string) file_get_contents("{$stubs}/commands"))))) : [];
+
+    return [$run->output(), $commands];
+}
+
+/**
+ * @param  list<array{role: string, db: string}>  $roles
+ * @return array<string, mixed>
+ */
+function checkMongoSourceWithRoles(array $roles): array
+{
+    [$output] = runMongoScriptAgainst('engines.mongodb.migration.check', [
         'buildInfo' => ['version' => '8.0.12'],
         'listDatabases' => ['databases' => [['name' => 'app', 'sizeOnDisk' => 1024]]],
         'hello' => ['setName' => 'rs0'],
         'connectionStatus' => ['authInfo' => ['authenticatedUserRoles' => $roles]],
         'listCollections' => ['cursor' => ['firstBatch' => []]],
-    ];
+    ], ['SOURCE_HOST' => 'src:27017', 'SOURCE_USER' => 'm', 'SOURCE_PASSWORD' => 'pw', 'SOURCE_TLS' => 'true', 'DATABASES' => '[]', 'RESERVED_DATABASES' => '["admin","local","config"]']);
 
-    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), 'engines.mongodb.migration.check');
-    $run = Process::input($script)->env([
-        'PATH' => "{$stubs}/bin:".getenv('PATH'),
-        'STUB_REPLIES' => json_encode($replies, JSON_THROW_ON_ERROR),
-        'SOURCE_HOST' => 'src:27017', 'SOURCE_USER' => 'm', 'SOURCE_PASSWORD' => 'pw', 'SOURCE_TLS' => 'true',
-        'DATABASES' => '[]', 'RESERVED_DATABASES' => '["admin","local","config"]', 'MONGO_SECRET' => 'secret',
-    ])->run(['bash', '-euo', 'pipefail', '-s']);
-
-    expect($run->successful())->toBeTrue($run->errorOutput());
-
-    return (array) json_decode(trim((string) preg_replace('/^.*DATABASIFY_RESULT /s', '', $run->output())), true);
+    return (array) json_decode(trim((string) preg_replace('/^.*DATABASIFY_RESULT /s', '', $output)), true);
 }
 
 it('lists the clustersync roles the source user lacks', function (array $roles, array $missing) {
@@ -196,3 +204,15 @@ it('lists the clustersync roles the source user lacks', function (array $roles, 
     'read on local only' => [[['role' => 'read', 'db' => 'local'], ['role' => 'readWrite', 'db' => 'app']], ['backup', 'clusterMonitor', 'readAnyDatabase']],
     'backup on another database' => [[['role' => 'backup', 'db' => 'app'], ['role' => 'clusterMonitor', 'db' => 'admin']], ['backup', 'readAnyDatabase']],
 ]);
+
+it('adds the clustersync source roles to a user without replacing its other roles', function () {
+    [, $commands] = runMongoScriptAgainst('engines.mongodb.accounts.grant-source-roles', [], ['NAME' => 'databasify']);
+
+    expect($commands)->toBe([['grantRolesToUser' => 'databasify', 'roles' => [['role' => 'backup', 'db' => 'admin'], ['role' => 'clusterMonitor', 'db' => 'admin'], ['role' => 'readAnyDatabase', 'db' => 'admin']]]]);
+});
+
+it('gives a user written with replication its databases and the clustersync source roles', function () {
+    [, $commands] = runMongoScriptAgainst('engines.mongodb.accounts.grant', ['listDatabases' => ['databases' => [['name' => 'defaultdb']]]], ['NAME' => 'databasify', 'GRANTS' => '[{"database":"defaultdb","access":"write"}]', 'REPLICATION' => 'true']);
+
+    expect(end($commands))->toBe(['updateUser' => 'databasify', 'roles' => [['role' => 'readWrite', 'db' => 'defaultdb'], ['role' => 'backup', 'db' => 'admin'], ['role' => 'clusterMonitor', 'db' => 'admin'], ['role' => 'readAnyDatabase', 'db' => 'admin']]]);
+});
