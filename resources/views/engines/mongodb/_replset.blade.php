@@ -85,7 +85,7 @@ function primaryOf(hosts) {
   throw failure('unavailable', 'no member of the replica set is primary yet');
 }
 function configOf(admin) { return runOn(admin, { replSetGetConfig: 1 }).config; }
-const CONFIG_BEING_UPDATED = [117, 308];
+const CONFIG_BEING_UPDATED = [109, 117, 308];
 const CONFIG_COMMIT_SECONDS = 120;
 function configCommitted(admin) {
   try {

@@ -240,7 +240,7 @@ function leaveReplicaSetWith(array $reconfigReplies, bool $succeeds = true, stri
 
 it('waits for the previous replica set config to commit before it reconfigures', function () {
     [$reconfigs, $run] = leaveReplicaSetWith([
-        ['ok' => 0, 'code' => 117, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration'],
+        ['ok' => 0, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration', 'code' => 109, 'codeName' => 'ConfigurationInProgress'],
         ['ok' => 1],
     ]);
 
@@ -261,7 +261,7 @@ it('stops at once on a reconfig error other than a config still being updated', 
 it('waits for a read-only node to finish leaving before it makes itself a set of one', function () {
     [$reconfigs, $run] = leaveReplicaSetWith([
         ['ok' => 1],
-        ['ok' => 0, 'code' => 117, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration'],
+        ['ok' => 0, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration', 'code' => 109, 'codeName' => 'ConfigurationInProgress'],
         ['ok' => 1],
     ], self: '10.0.0.3:25060');
 
