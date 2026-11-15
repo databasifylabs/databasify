@@ -145,6 +145,7 @@ it('starts the copy job in its transient unit without the password on argv', fun
         && $env['MIGRATION_CONTINUOUS'] === 'true'
         && $env['MIGRATION_TLS'] === 'true'
         && $env['MIGRATION_UNIT'] === "{$engine}-migration"
+        && $env['MIGRATION_OWNER'] === ''
         && str_contains((string) base64_decode($env['COPY_SCRIPT']), 'copy')
         && ! str_contains($script, "p'w"));
 })->with(['mysql', 'mariadb']);

@@ -7,6 +7,17 @@ if [ "$MIGRATION_TLS" = true ]; then
     ssl=1
 fi
 IFS=$'\n' read -r -d '' -a databases <<< "$MIGRATION_DATABASES" || true
+
+grant_owner() {
+    local database
+    [ -n "$MIGRATION_OWNER" ] || return 0
+    for database in "${databases[@]}"; do
+        my_try '' 2> /dev/null <<SQL
+GRANT ALL PRIVILEGES ON $(my_name "$database").* TO $(my_string "$MIGRATION_OWNER")@'%'
+SQL
+        [ -z "$MY_ERROR" ] || printf 'Could not grant %s on %s: %s\n' "$MIGRATION_OWNER" "$database" "$MY_ERROR_TEXT"
+    done
+}
 @if ($engine->id === 'mysql')
 admin_password=$(sed -n 's/^[[:space:]]*password=//p' "$ROOT/conf/admin.cnf" | head -n 1)
 copy_log=$(mktemp)
@@ -19,6 +30,7 @@ fi
 args=(--passwords-from-stdin --uri="$MYSQLSH_URI" --ssl-mode="$ssl_mode" -- util copy-schemas "${databases[@]}" --host=127.0.0.1 --port=25060 --user=root --threads=4)
 printf '%s\n%s\n' "$MIGRATION_PASSWORD" "$admin_password" | LC_ALL=C.UTF-8 mysqlsh "${args[@]}" | tee "$copy_log" \
     || fail_task 'MySQL Shell could not copy the schemas'
+grant_owner
 [ "$MIGRATION_CONTINUOUS" = true ] || exit 0
 binlog_file=$(sed -n "s/^[[:space:]]*Binlog_file:[[:space:]]*'\{0,1\}\([^']*\)'\{0,1\}[[:space:]]*$/\1/p" "$copy_log" | tail -n 1)
 binlog_position=$(sed -n 's/^[[:space:]]*Binlog_position:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$copy_log" | tail -n 1)
@@ -52,6 +64,7 @@ if [[ $version == *MariaDB* ]]; then
 fi
 copy_from "$MIGRATION_HOST" "$MIGRATION_PORT" "$MIGRATION_USER" "$MIGRATION_PASSWORD" "$MIGRATION_TLS" "$from_mariadb" "${databases[@]}" \
     || fail_task "$ATTEMPT_ERROR"
+grant_owner
 [ "$MIGRATION_CONTINUOUS" = true ] || exit 0
 if [ "$from_mariadb" != true ] || [ -z "$COPIED_GTID" ]; then
     fail_task 'the source gave no MariaDB GTID position, so it cannot be followed'

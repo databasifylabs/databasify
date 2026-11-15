@@ -85,6 +85,7 @@ final readonly class MySqlFamilyMigration implements Migration
             ...$this->sourceEnvOf('MIGRATION', $start->source),
             'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
+            'MIGRATION_OWNER' => $start->owner ?? '',
             'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
             'MYSQLSH_URI' => rawurlencode($start->source->username)."@{$start->source->host}:{$start->source->port}",
             'COPY_SCRIPT' => base64_encode($this->driver->script('engines.mysql-family.jobs.migration-copy', ['engine' => $this->driver->engine()])),

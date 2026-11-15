@@ -264,9 +264,10 @@ it('follows the mysql source from the binlog position MySQL Shell copied at', fu
     $metadata = "---\nDump_metadata:\n  Binlog_file: binlog.000042\n  Binlog_position: 1563\n  Executed_GTID_set: 'aaaa:1-90'\n";
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.migration-copy', [], ['conf/admin.cnf' => "[client]\npassword=secret\n"], [
         'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf 'mysqlsh %s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\nprintf '%s' ".escapeshellarg($metadata)."\n",
-    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'true', 'MIGRATION_DATABASES' => "app\nshop", 'MIGRATION_CONTINUOUS' => 'true', 'MYSQLSH_URI' => 'm@10.0.0.9:3306']);
+    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'true', 'MIGRATION_DATABASES' => "app\nshop", 'MIGRATION_CONTINUOUS' => 'true', 'MIGRATION_OWNER' => 'databasify', 'MYSQLSH_URI' => 'm@10.0.0.9:3306']);
 
     expect($run['commands'])->toContain('util copy-schemas app shop')->not->toContain('updateGtidSet')
+        ->and($run['sql'])->toContain("GRANT ALL PRIVILEGES ON `app`.* TO 'databasify'@'%'")->toContain("GRANT ALL PRIVILEGES ON `shop`.* TO 'databasify'@'%'")
         ->and($run['sql'])->toContain("SOURCE_AUTO_POSITION = 0, SOURCE_LOG_FILE = 'binlog.000042', SOURCE_LOG_POS = 1563, SOURCE_SSL = 1 FOR CHANNEL 'migration'")
         ->toContain("REPLICATE_WILD_DO_TABLE = ('app.%', 'shop.%')");
 });
@@ -274,7 +275,7 @@ it('follows the mysql source from the binlog position MySQL Shell copied at', fu
 it('creates no migration channel when MySQL Shell reports no usable binlog position', function (string $file) {
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.jobs.migration-copy', [], ['conf/admin.cnf' => "[client]\npassword=secret\n"], [
         'mysqlsh' => "#!/bin/bash\ncat > /dev/null\nprintf -- \"---\\nDump_metadata:\\n  Binlog_file: {$file}\\n  Binlog_position: 0\\n\"\n",
-    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'false', 'MIGRATION_DATABASES' => 'app', 'MIGRATION_CONTINUOUS' => 'true', 'MYSQLSH_URI' => 'm@10.0.0.9:3306'], succeeds: false);
+    ], ['MIGRATION_HOST' => '10.0.0.9', 'MIGRATION_PORT' => '3306', 'MIGRATION_USER' => 'm', 'MIGRATION_PASSWORD' => 'pw', 'MIGRATION_TLS' => 'false', 'MIGRATION_DATABASES' => 'app', 'MIGRATION_CONTINUOUS' => 'true', 'MIGRATION_OWNER' => '', 'MYSQLSH_URI' => 'm@10.0.0.9:3306'], succeeds: false);
 
     expect($run['sql'])->not->toContain('CHANGE REPLICATION SOURCE');
 })->with(['no file' => "''", 'position below the first event' => 'binlog.000001']);
