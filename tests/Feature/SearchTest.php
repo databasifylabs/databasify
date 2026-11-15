@@ -30,3 +30,28 @@ test('search requires a term', function () {
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['q' => 'The q field is required.']);
 });
+
+test('search treats wildcard characters as plain text', function (string $term) {
+    $project = Project::factory()->create();
+    Database::factory()->for($project)->create(['name' => 'orders']);
+    Server::factory()->for($project)->create(['name' => 'orders-1']);
+
+    $this->actingAs(User::factory()->create())
+        ->getJson(route('search', ['project' => $project, 'q' => $term]))
+        ->assertOk()
+        ->assertJsonCount(0, 'results');
+})->with([
+    'percent' => '%',
+    'underscore' => 'o_ders',
+    'escape character' => 'orders!',
+]);
+
+test('search ignores letter case', function () {
+    $project = Project::factory()->create();
+    Database::factory()->for($project)->create(['name' => 'orders']);
+
+    $this->actingAs(User::factory()->create())
+        ->getJson(route('search', ['project' => $project, 'q' => 'ORDERS']))
+        ->assertOk()
+        ->assertJsonPath('results.0.title', 'orders');
+});

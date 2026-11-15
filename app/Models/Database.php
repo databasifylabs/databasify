@@ -45,6 +45,7 @@ use App\Enums\Migrations\MigrationStatus;
 use App\Enums\Servers\ServerLogStatus;
 use App\Models\Collections\DatabaseNodeCollection;
 use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MatchesText;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\RunsOperations;
 use App\Observers\DatabaseObserver;
@@ -102,7 +103,7 @@ use LogicException;
 class Database extends Model implements Movable
 {
     /** @use HasFactory<DatabaseFactory> */
-    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects, RunsOperations;
+    use BelongsToProject, HasFactory, HasUuids, MatchesText, MovesBetweenProjects, RunsOperations;
 
     private const int DNS_LOCK_SECONDS = 300;
 
@@ -416,7 +417,7 @@ class Database extends Model implements Movable
     #[Scope]
     protected function matching(Builder $query, string $term): void
     {
-        $query->where(fn (Builder $query) => $query->whereLike('name', "%{$term}%")->orWhereIn('engine', self::enginesLabelledLike($term)));
+        $query->where(fn (Builder $query) => $query->orWhereContains('name', $term)->orWhereIn('engine', self::enginesLabelledLike($term)));
     }
 
     /**

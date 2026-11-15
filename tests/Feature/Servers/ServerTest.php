@@ -145,3 +145,13 @@ test('a server still being created cannot be deleted', function () {
 
     $this->assertModelExists($server);
 });
+
+test('servers can be found by part of their address', function () {
+    $project = Project::factory()->create();
+    Server::factory()->for($project)->create(['public_ip' => '203.0.113.10']);
+    Server::factory()->for($project)->create(['public_ip' => '198.51.100.20']);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('servers.index', ['project' => $project, 'search' => '113.1']))
+        ->assertInertia(fn (Assert $page) => $page->has('servers.data', 1)->where('servers.data.0.public_ip', '203.0.113.10'));
+});

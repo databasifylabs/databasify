@@ -13,6 +13,7 @@ use App\Enums\Servers\OperatingSystem;
 use App\Enums\Servers\ServerLogStatus;
 use App\Enums\Servers\ServerStatus;
 use App\Models\Concerns\BelongsToProject;
+use App\Models\Concerns\MatchesText;
 use App\Models\Concerns\MovesBetweenProjects;
 use App\Models\Concerns\OrdersByName;
 use App\Observers\ServerObserver;
@@ -74,7 +75,7 @@ use Throwable;
 class Server extends Model implements Movable
 {
     /** @use HasFactory<ServerFactory> */
-    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects, OrdersByName;
+    use BelongsToProject, HasFactory, HasUuids, MatchesText, MovesBetweenProjects, OrdersByName;
 
     /**
      * @return HasMany<DatabaseNode, $this>
@@ -292,7 +293,7 @@ class Server extends Model implements Movable
     #[Scope]
     protected function matching(Builder $query, string $term): void
     {
-        $query->where(fn (Builder $query) => $query->whereLike('name', "%{$term}%")->orWhereLike('public_ip', "%{$term}%")->orWhereLike('private_ip', "%{$term}%"));
+        $query->where(fn (Builder $query) => $query->orWhereContains('name', $term)->orWhereContains('public_ip', $term)->orWhereContains('private_ip', $term));
     }
 
     /**
