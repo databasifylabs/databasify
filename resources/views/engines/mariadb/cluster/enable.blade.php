@@ -33,6 +33,10 @@ bootstrapped() {
     synced_now
 }
 
+still_serving_alone() {
+    read_state && [ "$STATE_GALERA" != 1 ]
+}
+
 require_saved
 if saved_is '.readOnly'; then
     writer_to_follow
@@ -59,10 +63,14 @@ seed=false
 if saved_is '.primary == null or .primary == .ip'; then
     seed=true
 fi
-if ! { read_state && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then
+state_read=false
+if read_state; then
+    state_read=true
+fi
+if ! { [ "$state_read" = true ] && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then
     require_primary_keys
     if [ "$seed" = true ]; then
-        if ! read_state || [ "$STATE_GALERA" = 1 ]; then
+        if [ "$state_read" = false ] || [ "$STATE_GALERA" = 1 ] || ! still_serving_alone; then
             fail_task 'only a seed serving its data on its own bootstraps a new cluster'
         fi
         echo 'Bootstrapping…'

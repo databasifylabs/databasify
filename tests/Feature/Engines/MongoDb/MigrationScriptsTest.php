@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Process;
 /**
  * @return array{ProcessResult, list<string>, bool}
  */
-function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool $unitActive = false, bool $marked = false, bool $dropFails = false, ?string $stubs = null, string $script = 'engines.mongodb.migration.stop'): array
+function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool $unitActive = false, bool $marked = false, bool $dropFails = false, ?string $stubs = null, string $script = 'engines.mongodb.migration.stop', ?string $mongosh = null): array
 {
     $stubs ??= temporaryDirectory();
     $marker = "{$stubs}/root/state/mongodb-migration.finalized";
@@ -56,6 +56,8 @@ function runMongoStop(?string $status, bool $cutover, ?string $next = null, bool
         'timeout' => "#!/bin/bash\nshift\nexec \"\$@\"\n",
         'sleep' => "#!/bin/bash\nexit 0\n",
     ];
+
+    $files['mongosh'] = $mongosh ?? $files['mongosh'];
 
     foreach ($files as $name => $content) {
         file_put_contents("{$stubs}/bin/{$name}", $content."\n");
@@ -127,6 +129,73 @@ it('pauses an unsynced ClusterSync or drops a failed one on a plain stop', funct
     'copying' => ['{"state":"running","initialSync":{"completed":false}}', ['http://127.0.0.1:2242/pause']],
     'failed' => ['{"state":"failed","error":"source gone"}', []],
 ]);
+
+dataset('clustersync stop states', function (): iterable {
+    $outcomes = [
+        'running' => ['finalize', 'finalize', 'finalize', 'pause'],
+        'paused' => ['finalize', 'finalize', 'finalize', 'none'],
+        'pausing' => ['busy', 'busy', 'busy', 'none'],
+        'finalizing' => ['wait', 'wait', 'wait', 'wait'],
+        'finalized' => ['done', 'done', 'done', 'done'],
+        'failed' => ['refuse', 'refuse', 'none', 'none'],
+        'idle' => ['refuse', 'refuse', 'none', 'none'],
+        '' => ['refuse', 'refuse', 'none', 'none'],
+    ];
+
+    foreach ($outcomes as $state => $steps) {
+        foreach ([[true, true], [true, false], [false, true], [false, false]] as $index => [$cutover, $synced]) {
+            $label = sprintf('%s, %s, %s', $state === '' ? 'no state' : $state, $cutover ? 'cutover' : 'plain stop', $synced ? 'synced' : 'unsynced');
+
+            yield $label => [$state, $cutover, $synced, $steps[$index]];
+        }
+    }
+});
+
+it('takes the same ClusterSync step for every state, cutover and sync', function (string $state, bool $cutover, bool $synced, string $step) {
+    $status = json_encode(array_filter(['state' => $state, 'error' => 'boom', 'initialSync' => ['completed' => $synced]], fn (mixed $value): bool => $value !== ''), JSON_THROW_ON_ERROR);
+    [$run, $recorded, $marked] = runMongoStop($status, $cutover, $step === 'wait' ? '{"state":"finalized"}' : null);
+
+    $failure = match ($step) {
+        'busy' => 'ClusterSync is pausing before it can finalize, clean up again once it paused',
+        'refuse' => sprintf('ClusterSync cannot finish the cutover (%s: boom); the target keeps its ClusterSync state, fix ClusterSync and clean up again', $state),
+        default => null,
+    };
+    $calls = match ($step) {
+        'finalize' => ['http://127.0.0.1:2242/finalize', ...MONGO_STOP_CLEANUP],
+        'pause' => ['http://127.0.0.1:2242/pause', ...MONGO_STOP_CLEANUP],
+        'busy', 'refuse' => [],
+        default => MONGO_STOP_CLEANUP,
+    };
+
+    expect($run->successful())->toBe($failure === null, $run->errorOutput())
+        ->and($recorded)->toBe($calls)
+        ->and($marked)->toBeFalse();
+
+    if ($failure !== null) {
+        expect($run->errorOutput())->toContain($failure);
+    }
+})->with('clustersync stop states');
+
+it('refuses to stop on a ClusterSync status it cannot read or a finalize that fails', function (string $status, ?string $next, string $error, array $calls) {
+    [$run, $recorded, $marked] = runMongoStop($status, true, $next);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->errorOutput())->toContain($error)
+        ->and($recorded)->toBe($calls)
+        ->and($marked)->toBeFalse();
+})->with([
+    'not JSON' => ['<html>', null, 'could not read the ClusterSync status: <html>', []],
+    'finalize fails' => ['{"state":"finalizing"}', '{"state":"failed","error":"index build failed"}', 'ClusterSync could not finalize: index build failed', []],
+]);
+
+it('refuses to clean up when the ClusterSync step comes back empty', function () {
+    [$run, $recorded, $marked] = runMongoStop('{"state":"running","initialSync":{"completed":true}}', true, mongosh: "#!/bin/bash\n[[ \" \$* \" == *' --nodb '* ]] && exit 0\nprintf 'mongo_js\\n' >> \"\$STUB_DIR/calls\"\n");
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->errorOutput())->toContain("ClusterSync gave an unknown stop step '', so nothing was cleaned up")
+        ->and($recorded)->toBe([])
+        ->and($marked)->toBeFalse();
+});
 
 it('reports what ClusterSync says about a running continuous copy', function (?string $status, array $expected) {
     [$run] = runMongoStop($status, false, script: 'engines.mongodb.migration.progress');

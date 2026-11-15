@@ -29,10 +29,7 @@ serving() {
 }
 until_ok 21600 6h0m0s serving
 echo 'Waiting for TLS…'
-tls_listening() {
-    timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/25061' 2> /dev/null
-}
-until_ok 300 5m0s tls_listening
+until_ok 300 5m0s listening_on 25061
 if [ "$READ_ONLY" != true ] && holding; then
     release
 fi

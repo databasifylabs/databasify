@@ -25,6 +25,10 @@ unit_do() {
     output=$(databasify ctl "$@" 2>&1) || databasify_fail internal "$1 ${*:2}: $output"
 }
 
+listening_on() {
+    timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$1" 2> /dev/null
+}
+
 wait_until() {
     local seconds=$1 every=$2 deadline
     shift 2

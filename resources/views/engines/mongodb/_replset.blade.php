@@ -24,11 +24,6 @@ function withoutVote(config, host) {
   if (!member || numberOf(member.votes) === 0) return [config, false];
   return [withMembers(config, membersOf(config).map((existing) => existing.host === host ? { _id: existing._id, host: host, votes: 0, priority: 0 } : existing)), true];
 }
-function votingAlone(member) {
-  const alone = Object.assign({}, member, { votes: 1, priority: 1 });
-  delete alone.hidden;
-  return alone;
-}
 function withPriority(config, host, priority) {
   return withMembers(config, membersOf(config).map((member) => member.host === host ? Object.assign({}, member, { priority: priority }) : member));
 }
@@ -62,16 +57,19 @@ function connectTo(host, authenticated) {
   return { connection: connection, admin: admin };
 }
 function peer(host) { return connectTo(host, true).admin; }
-function withLocal(authenticated, body) {
-  const local = connectTo('127.0.0.1:25060', authenticated);
+function closingAfter(reached, body) {
   let outcome;
   try {
-    outcome = body(local.admin);
+    outcome = body(reached);
   } catch (error) {
-    local.connection.close();
+    reached.connection.close();
     throw error;
   }
-  local.connection.close();
+  reached.connection.close();
+  return outcome;
+}
+function withLocal(authenticated, body) {
+  const outcome = closingAfter(connectTo('127.0.0.1:25060', authenticated), (local) => body(local.admin));
   return outcome;
 }
 function reachablePrimaryOf(hosts) {
@@ -88,23 +86,17 @@ function reachablePrimaryOf(hosts) {
 const PRIMARY_WAIT_SECONDS = 120;
 function primaryOf(hosts) { return retry(PRIMARY_WAIT_SECONDS, PRIMARY_WAIT_SECONDS + 's', () => reachablePrimaryOf(hosts)); }
 function withPrimary(candidates, body) {
-  const primary = primaryOf(candidates);
-  let outcome;
-  try {
-    outcome = body(primary);
-  } catch (error) {
-    primary.connection.close();
-    throw error;
-  }
-  primary.connection.close();
+  const outcome = closingAfter(primaryOf(candidates), body);
   return outcome;
 }
 function configOf(admin) { return runOn(admin, { replSetGetConfig: 1 }).config; }
 const CONFIG_BEING_UPDATED = [109, 117, 308];
+function configBeingUpdated(error) { return CONFIG_BEING_UPDATED.some((code) => hasCode(error, code)); }
 const CONFIG_COMMIT_SECONDS = 120;
 function configCommitted(admin) {
   try {
-    return runOn(admin, { replSetGetConfig: 1, commitmentStatus: true }).commitmentStatus !== false;
+    const reply = runOn(admin, { replSetGetConfig: 1, commitmentStatus: true });
+    return reply.commitmentStatus !== false;
   } catch (error) {
     return true;
   }
@@ -117,7 +109,7 @@ function reconfig(admin, config, force) {
         const reply = runOn(admin, { replSetReconfig: config, force: force });
         return reply;
       } catch (error) {
-        if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
+        if (!configBeingUpdated(error)) throw error;
       }
     }
     if (Date.now() >= deadline) throw new Error('the replica set was still committing its previous config after ' + CONFIG_COMMIT_SECONDS + 's, so nothing was changed');
@@ -204,7 +196,7 @@ function raiseAboveStranded(admin, own) {
           const reply = runOn(admin, { replSetReconfig: Object.assign({}, fresh, { version: numberOf(own.version) + 1 }), force: false });
           if (reply) return true;
         } catch (error) {
-          if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
+          if (!configBeingUpdated(error)) throw error;
         }
       }
     }

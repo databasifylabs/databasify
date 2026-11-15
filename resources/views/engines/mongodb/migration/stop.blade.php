@@ -5,33 +5,62 @@ finalized_marker="$ROOT/state/mongodb-migration.finalized"
 mark_finalized() {
     { mkdir -p "${finalized_marker%/*}" && : > "$finalized_marker"; } || fail_task "could not record the confirmed finalize in $finalized_marker"
 }
-if status=$(pcsm_status); then
-    step=$(json_eval "$status" 'const state = String(input.state || ""); const synced = Boolean(input.initialSync && input.initialSync.completed); const cutover = process.env.MIGRATION_CUTOVER === "true"; print(state === "finalizing" ? "wait" : (state === "finalized" ? "done" : (["running", "paused"].includes(state) && (cutover || synced) ? "finalize" : (state === "pausing" && (cutover || synced) ? "busy" : (cutover ? "refuse " + state + (input.error ? ": " + String(input.error) : "") : (state === "running" ? "pause" : "none"))))))') \
-        || fail_task "could not read the ClusterSync status: $status"
-    if [ "$step" = done ]; then
-        mark_finalized
-    elif [[ $step == refuse\ * ]]; then
-        fail_task "ClusterSync cannot finish the cutover (${step#refuse }); the target keeps its ClusterSync state, fix ClusterSync and clean up again"
-    elif [ "$step" = busy ]; then
-        fail_task 'ClusterSync is pausing before it can finalize, clean up again once it paused'
-    elif [ "$step" = pause ]; then
-        pcsm_post /pause
-    elif [ "$step" = finalize ] || [ "$step" = wait ]; then
-        if [ "$step" = finalize ]; then
-            pcsm_post /finalize
-        fi
-        finalized() {
-            local state
-            state=$(pcsm_status) || fail_task 'ClusterSync stopped answering while it finalized'
-            state=$(json_eval "$state" 'print(input.state === "failed" ? "failed " + String(input.error || "") : String(input.state || ""))')
-            if [[ $state == failed\ * ]]; then
-                fail_task "ClusterSync could not finalize: ${state#failed }"
-            fi
-            [ "$state" = finalized ] || return 1
-            mark_finalized
-        }
-        wait_until 21600 2 finalized || fail_task 'ClusterSync did not finalize within 6h0m0s'
+clustersync_step() {
+    json_eval "$1" "$(cat <<'JS'
+function stepOf(status, cutover) {
+  const state = String(status.state || "");
+  if (state === "finalizing") return "wait";
+  if (state === "finalized") return "done";
+  const finishing = cutover || Boolean(status.initialSync && status.initialSync.completed);
+  if (["running", "paused"].includes(state) && finishing) return "finalize";
+  if (state === "pausing" && finishing) return "busy";
+  if (cutover) return "refuse " + state + (status.error ? ": " + String(status.error) : "");
+  return state === "running" ? "pause" : "none";
+}
+print(stepOf(input, process.env.MIGRATION_CUTOVER === "true"));
+JS
+)"
+}
+finalized() {
+    local state
+    state=$(pcsm_status) || fail_task 'ClusterSync stopped answering while it finalized'
+    state=$(json_eval "$state" 'print(input.state === "failed" ? "failed " + String(input.error || "") : String(input.state || ""))')
+    if [[ $state == failed\ * ]]; then
+        fail_task "ClusterSync could not finalize: ${state#failed }"
     fi
+    [ "$state" = finalized ] || return 1
+    mark_finalized
+}
+wait_for_finalize() {
+    wait_until 21600 2 finalized || fail_task 'ClusterSync did not finalize within 6h0m0s'
+}
+if status=$(pcsm_status); then
+    step=$(clustersync_step "$status") || fail_task "could not read the ClusterSync status: $status"
+    case $step in
+        done)
+            mark_finalized
+            ;;
+        refuse\ *)
+            fail_task "ClusterSync cannot finish the cutover (${step#refuse }); the target keeps its ClusterSync state, fix ClusterSync and clean up again"
+            ;;
+        busy)
+            fail_task 'ClusterSync is pausing before it can finalize, clean up again once it paused'
+            ;;
+        pause)
+            pcsm_post /pause
+            ;;
+        finalize)
+            pcsm_post /finalize
+            wait_for_finalize
+            ;;
+        wait)
+            wait_for_finalize
+            ;;
+        none) ;;
+        *)
+            fail_task "ClusterSync gave an unknown stop step '$step', so nothing was cleaned up"
+            ;;
+    esac
 elif [ "${MIGRATION_CUTOVER:-false}" = true ]; then
     if unit_active mongodb-migration; then
         fail_task 'ClusterSync is running but does not answer, clean up again once it answers'

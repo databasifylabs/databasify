@@ -47,15 +47,13 @@ it('keeps every other member when it removes a vote, a host or sets a priority',
           already: withoutVote(withoutVote(config, 'b')[0], 'b')[1],
           withoutHost: withoutHost(config, 'b').members,
           priority: withPriority(config, 'b', 2).members,
-          alone: votingAlone({ _id: 3, host: 'z', votes: 0, priority: 0, hidden: true }),
         }));
         JS);
 
     expect($result['withoutVote'])->toBe([['_id' => 0, 'host' => 'a', 'votes' => 1, 'priority' => 1, 'tags' => ['dc' => 'x']], ['_id' => 1, 'host' => 'b', 'votes' => 0, 'priority' => 0]])
         ->and($result['already'])->toBeFalse()
         ->and($result['withoutHost'])->toBe([['_id' => 0, 'host' => 'a', 'votes' => 1, 'priority' => 1, 'tags' => ['dc' => 'x']]])
-        ->and($result['priority'][1])->toBe(['_id' => 1, 'host' => 'b', 'votes' => 1, 'priority' => 2])
-        ->and($result['alone'])->toBe(['_id' => 3, 'host' => 'z', 'votes' => 1, 'priority' => 1]);
+        ->and($result['priority'][1])->toBe(['_id' => 1, 'host' => 'b', 'votes' => 1, 'priority' => 2]);
 });
 
 it('counts healthy voters and spots a member too stale to catch up', function () {
@@ -67,4 +65,53 @@ it('counts healthy voters and spots a member too stale to catch up', function ()
         JS);
 
     expect($result)->toBe(['healthy' => 1, 'primary' => true, 'stale' => true, 'fresh' => false]);
+});
+
+it('closes the local and the primary connection once, whether the body returns or throws', function () {
+    $result = replsetProbe(<<<'JS'
+        env.HOSTS = 'p:25060';
+        env.MONGO_SECRET = 'secret';
+        const closed = [];
+        class Mongo {
+          constructor(uri) { this.host = String(uri).replace(/^mongodb:\/\//, '').split('/')[0]; }
+          getDB() { return { auth: () => {}, runCommand: () => ({ ok: 1, isWritablePrimary: true }) }; }
+          close() { closed.push(this.host); }
+        }
+        const outcome = (body) => {
+          try {
+            return { value: body() };
+          } catch (error) {
+            return { error: error.message };
+          }
+        };
+        console.log(JSON.stringify({
+          localValue: outcome(() => withLocal(true, (admin) => typeof admin.runCommand)),
+          localError: outcome(() => withLocal(true, () => { throw new Error('local boom'); })),
+          primaryValue: outcome(() => withPrimary(hosts(), (primary) => primary.host)),
+          primaryError: outcome(() => withPrimary(hosts(), () => { throw new Error('primary boom'); })),
+          closed: closed,
+        }));
+        JS);
+
+    expect($result)->toBe([
+        'localValue' => ['value' => 'function'],
+        'localError' => ['error' => 'local boom'],
+        'primaryValue' => ['value' => 'p:25060'],
+        'primaryError' => ['error' => 'primary boom'],
+        'closed' => ['127.0.0.1:25060', '127.0.0.1:25060', 'p:25060', 'p:25060'],
+    ]);
+});
+
+it('treats a config as committed unless the member says it is not', function () {
+    $result = replsetProbe(<<<'JS'
+        const adminReplying = (reply) => ({ runCommand: () => reply });
+        console.log(JSON.stringify({
+          committed: configCommitted(adminReplying({ ok: 1, commitmentStatus: true })),
+          pending: configCommitted(adminReplying({ ok: 1, commitmentStatus: false })),
+          unreported: configCommitted(adminReplying({ ok: 1 })),
+          failed: configCommitted(adminReplying({ ok: 0, errmsg: 'not running with --replSet', code: 76 })),
+        }));
+        JS);
+
+    expect($result)->toBe(['committed' => true, 'pending' => false, 'unreported' => true, 'failed' => true]);
 });

@@ -1,0 +1,3 @@
+last_channel_error_sql() {
+    printf "REPLACE(REPLACE(COALESCE((SELECT CONCAT('Error ', w.LAST_ERROR_NUMBER, ': ', w.LAST_ERROR_MESSAGE) FROM performance_schema.replication_applier_status_by_worker w WHERE w.CHANNEL_NAME = '%s' AND w.LAST_ERROR_NUMBER <> 0 ORDER BY w.LAST_ERROR_TIMESTAMP DESC LIMIT 1), (SELECT CONCAT('Error ', o.LAST_ERROR_NUMBER, ': ', o.LAST_ERROR_MESSAGE) FROM performance_schema.replication_applier_status_by_coordinator o WHERE o.CHANNEL_NAME = '%s' AND o.LAST_ERROR_NUMBER <> 0), IF(c.LAST_ERROR_NUMBER <> 0, CONCAT('Error ', c.LAST_ERROR_NUMBER, ': ', c.LAST_ERROR_MESSAGE), NULL), ''), CHAR(9), ' '), CHAR(10), ' ')" "$1" "$1"
+}

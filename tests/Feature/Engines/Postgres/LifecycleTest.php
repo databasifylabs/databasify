@@ -55,7 +55,7 @@ it('waits for readiness and enables the cluster as tasks under their keys', func
     $enable = $this->node->driver()->cluster()->enable('flow.4.1');
 
     expect($ready->key)->toBe('flow.3.1')->and($enable->key)->toBe('flow.4.1');
-    $this->scripts->assertRan('engines.postgres.nodes.ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "echo 'Waiting for PostgreSQL…'") && str_contains($script, 'PostgreSQL was not ready in time') && str_contains($script, 'so it cannot join the cluster; check that etcd runs on the other members'))
+    $this->scripts->assertRan('engines.postgres.nodes.ready', fn (string $script, array $env): bool => $env === ['EXPECT_PRIMARY' => 'true'] && str_contains($script, "echo 'Waiting for PostgreSQL…'") && str_contains($script, 'PostgreSQL was not ready in time') && str_contains($script, 'so it cannot join the cluster; check that etcd runs on the other members') && str_contains($script, "wait_until 300 2 listening_on 25061 || fail_task 'pgbouncer is not listening on 127.0.0.1:25061'"))
         ->assertRan('engines.postgres.cluster.enable', fn (string $script): bool => str_contains($script, "echo 'Starting Patroni…'") && str_contains($script, 'Patroni did not lead or follow the cluster in time'));
 });
 

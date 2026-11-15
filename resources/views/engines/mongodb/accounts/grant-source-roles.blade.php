@@ -3,7 +3,7 @@ mongo_js root <<'JS'
 @include('engines.mongodb._roles')
 main(() => {
   try {
-    run('admin', { grantRolesToUser: env.NAME, roles: sourceRoles });
+    run('admin', { grantRolesToUser: env.NAME, roles: SOURCE_ROLES });
   } catch (error) {
     notFoundAsUser(error);
   }

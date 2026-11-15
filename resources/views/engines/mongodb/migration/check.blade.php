@@ -1,11 +1,12 @@
 @include('engines.mongodb._mongo')
 @include('engines.mongodb._pbm')
 MONGO_HOST=$SOURCE_HOST MONGO_TLS=$SOURCE_TLS MONGO_USER=$SOURCE_USER MONGO_SECRET=$SOURCE_PASSWORD mongo_try root <<'JS'
+@include('engines.mongodb._roles')
 main(() => {
   const version = run('admin', { buildInfo: 1 }).version;
   const listed = run('admin', { listDatabases: 1 }).databases.map((database) => ({ name: database.name, size: Number(database.sizeOnDisk || 0) }));
   const roles = run('admin', { connectionStatus: 1 }).authInfo.authenticatedUserRoles.filter((role) => role.db === 'admin').map((role) => role.role);
-  const missingRoles = roles.includes('root') ? [] : ['backup', 'clusterMonitor', 'readAnyDatabase'].filter((role) => !roles.includes(role));
+  const missingRoles = roles.includes('root') ? [] : SOURCE_ROLES.map((source) => source.role).filter((role) => !roles.includes(role));
   let setName = '';
   try {
     setName = run('admin', { hello: 1 }).setName || '';

@@ -110,7 +110,7 @@ it('runs start, restart, reset and ready like Go', function () {
     $this->scripts->assertRan('engines.sentinel.nodes.start', fn (string $script, array $env): bool => $env['HOLDS'] === 'false' && str_contains($script, 'start-refused'))
         ->assertRan('engines.sentinel.nodes.restart', fn (string $script, array $env): bool => collect(json_decode($env['DIRECTIVES'], true))->firstWhere('name', 'databases') === ['name' => 'databases', 'line' => null])
         ->assertRan('engines.sentinel.nodes.reset', fn (string $script, array $env): bool => $env['KEEP'] === '127.0.0.1 10.0.0.1 10.0.0.2' && $env['PEERS'] === '2')
-        ->assertRan('engines.sentinel.nodes.ready', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true' && str_contains($script, "echo 'Following the primary…'") && str_contains($script, "echo 'Waiting for TLS…'"));
+        ->assertRan('engines.sentinel.nodes.ready', fn (string $script, array $env): bool => $env['READ_ONLY'] === 'true' && str_contains($script, "echo 'Following the primary…'") && str_contains($script, "echo 'Waiting for TLS…'") && str_contains($script, 'until_ok 300 5m0s listening_on 25061'));
 });
 
 it('runs the cluster commands', function () {

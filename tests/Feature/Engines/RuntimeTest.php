@@ -14,6 +14,7 @@ use App\Exceptions\Engines\EngineUnavailable;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 use App\Exceptions\Engines\NotPrimary;
+use Illuminate\Support\Facades\Process;
 
 function runtimeTask(string $state): array
 {
@@ -111,4 +112,23 @@ it('refuses a reply that is not JSON', function () {
     fakeSsh()->respond('Segmentation fault');
 
     expect(fn () => resolve(Runtime::class)->engineInfo(engineNode()))->toThrow(EngineError::class);
+});
+
+it('tells a local port that listens from one that does not', function () {
+    $portOf = fn ($socket): int => (int) parse_url('tcp://'.stream_socket_get_name($socket, false), PHP_URL_PORT);
+    $server = stream_socket_server('tcp://127.0.0.1:0');
+    $released = stream_socket_server('tcp://127.0.0.1:0');
+    $open = $portOf($server);
+    $closed = $portOf($released);
+    fclose($released);
+    $bin = temporaryDirectory();
+    file_put_contents("{$bin}/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    chmod("{$bin}/timeout", 0755);
+
+    $run = Process::input(view('engines._runtime')->render()."\nlistening_on {$open} && echo open\nlistening_on {$closed} || echo closed\n")
+        ->env(['PATH' => "{$bin}:".getenv('PATH')])
+        ->run(['bash', '-euo', 'pipefail', '-s']);
+    fclose($server);
+
+    expect($run->output())->toBe("open\nclosed\n", $run->errorOutput());
 });

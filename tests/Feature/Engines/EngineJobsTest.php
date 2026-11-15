@@ -312,6 +312,20 @@ it('completes a one-time copy that has no channel', function () {
     expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true)['copy'])->toBe('succeeded');
 });
 
+it('reads the lag and the stop reason of a mariadb migration channel even when its fields are empty', function (string $status, string $copy, string $log, ?int $lag) {
+    $run = runFamilyJobLocally('mariadb', 'engines.mysql-family.migration.progress', ['SHOW SLAVE' => "Slave_IO_Running\tSlave_SQL_Running\tSeconds_Behind_Master\tLast_IO_Errno\tLast_IO_Error\tLast_SQL_Errno\tLast_SQL_Error\n{$status}"], ['logs/.keep' => ''], [
+        'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
+    ], env: ['MIGRATION_UNIT' => 'mariadb-migration']);
+
+    expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true))->toBe(['copy' => $copy, 'log' => $log, 'lagSeconds' => $lag]);
+})->with([
+    'following' => ["Yes\tYes\t7\t0\t\t0\t", 'succeeded', '', 7],
+    'empty lag' => ["Yes\tYes\t\t0\t\t0\t", 'succeeded', '', null],
+    'sql error' => ["Yes\tNo\tNULL\t0\t\t1062\tDuplicate entry '1' for key 'PRIMARY'", 'failed', "the migration channel stopped: Error 1062: Duplicate entry '1' for key 'PRIMARY'", null],
+    'empty error text' => ["No\tYes\tNULL\t2003\t\t0\t", 'failed', 'the migration channel stopped: Error 2003: ', null],
+    'empty error' => ["No\tNo\tNULL\t0\t\t0\t", 'failed', 'the migration channel stopped: no error was recorded', null],
+]);
+
 it('reports a running migration channel as caught up', function () {
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.migration.progress', ['replication_connection_status' => "ON\tON\t1\t0\t"], ['logs/.keep' => ''], [
         'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
@@ -324,6 +338,26 @@ it('fails a read-only mysql node at once when its channel stops for good', funct
     $run = runFamilyJobLocally('mysql', 'engines.mysql.cluster.rejoin', ['replication_connection_status' => "OFF\tON\t13117\tError 13117: Fatal error: The replica I/O thread stops because source and replica have equal MySQL server ids"], ['state/.keep' => ''], env: ['READ_ONLY' => 'true'], succeeds: false);
 
     expect($run['errors'])->toContain('the replication channel stopped: Error 13117: Fatal error: The replica I/O thread stops because source and replica have equal MySQL server ids');
+});
+
+it('fails a read-only mysql node at once when only the applier coordinator records why the channel stopped', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql.cluster.rejoin', [
+        'replication_applier_status_by_coordinator' => "ON\tOFF\t0\tError 1755: Cannot execute the current event group in the parallel mode",
+        'replication_connection_status' => "ON\tOFF\t0\t",
+    ], ['state/.keep' => ''], env: ['READ_ONLY' => 'true'], succeeds: false);
+
+    expect($run['errors'])->toContain('the replication channel stopped: Error 1755: Cannot execute the current event group in the parallel mode');
+});
+
+it('prefers the worker error, then the coordinator error, then the connection error of a channel', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql.cluster.rejoin', ['replication_connection_status' => "ON\tOFF\t0\tError 1062: duplicate"], ['state/.keep' => ''], env: ['READ_ONLY' => 'true'], succeeds: false);
+    $worker = strpos($run['sql'], 'FROM performance_schema.replication_applier_status_by_worker w');
+    $coordinator = strpos($run['sql'], 'FROM performance_schema.replication_applier_status_by_coordinator o');
+    $connection = strpos($run['sql'], "IF(c.LAST_ERROR_NUMBER <> 0, CONCAT('Error ', c.LAST_ERROR_NUMBER");
+
+    expect($worker)->toBeInt()
+        ->and($coordinator)->toBeGreaterThan($worker)
+        ->and($connection)->toBeGreaterThan($coordinator);
 });
 
 it('keeps waiting while the channel of a read-only mysql node reconnects', function () {
@@ -371,6 +405,35 @@ it('expires bases older than the retention days', function () {
         ->toContain("deletefile :s3:bucket/archive/base/{$stamp(15)}.binlog-info")
         ->not->toContain("deletefile :s3:bucket/archive/base/{$stamp(8)}")
         ->not->toContain("deletefile :s3:bucket/archive/base/{$stamp(1)}");
+});
+
+it('refuses to bootstrap a galera seed on a state it could not read, even when a later read would serve alone', function (string $first, string $later) {
+    $client = "#!/bin/bash\nsql=\$(cat)\nif grep -qF WSREP_CLUSTER_STATUS <<< \"\$sql\"; then\n    if [ -e \"\$STUB_DIR/state-read\" ]; then printf '%s\\n' \"\$LATER_STATE\"; exit 0; fi\n    : > \"\$STUB_DIR/state-read\"\n    [[ \$FIRST_STATE == ERROR\\ * ]] && { printf '%s\\n' \"\$FIRST_STATE\" >&2; exit 1; }\n    printf '%s\\n' \"\$FIRST_STATE\"\nfi\n";
+    $run = runFamilyJobLocally('mariadb', 'engines.mariadb.cluster.enable', [], ['state/node.json' => json_encode(['clustered' => true, 'readOnly' => false, 'ip' => '10.0.0.1', 'primary' => null])], [
+        'mariadb' => $client,
+        'databasify' => "#!/bin/bash\nprintf '%s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\n",
+    ], ['RESERVED_DATABASES' => '["mysql"]', 'FIRST_STATE' => $first, 'LATER_STATE' => $later], succeeds: false);
+
+    expect($run['errors'])->toContain('only a seed serving its data on its own bootstraps a new cluster')
+        ->and($run['commands'])->not->toContain('restart');
+})->with([
+    'unreadable, then alone' => ["ERROR 2002 (HY000): Can't connect to local server through socket", "0\t0\t\t\t0"],
+    'in a non-primary component' => ["1\t0\tnon-Primary\tInitialized\t0", "0\t0\t\t\t0"],
+    'alone, then in a cluster by the time it bootstraps' => ["0\t0\t\t\t0", "1\t0\tPrimary\tSynced\t0"],
+]);
+
+it('bootstraps a galera seed only when both state reads show it serving alone', function () {
+    $client = "#!/bin/bash\nsql=\$(cat)\nprintf '%s\\n-- end --\\n' \"\$sql\" >> \"\$STUB_DIR/sql.log\"\nif grep -qF WSREP_CLUSTER_STATUS <<< \"\$sql\"; then printf '0\\t0\\t\\t\\t0\\n'; fi\n";
+    $run = runFamilyJobLocally('mariadb', 'engines.mariadb.cluster.enable', [], ['state/node.json' => json_encode(['clustered' => true, 'readOnly' => false, 'ip' => '10.0.0.1', 'primary' => null])], [
+        'mariadb' => $client,
+        'databasify' => "#!/bin/bash\nprintf '%s\\n' \"\$*\" >> \"\$STUB_DIR/commands.log\"\n",
+        'sleep' => "#!/bin/bash\n",
+        'date' => "#!/bin/bash\nif [ -e \"\$STUB_DIR/later\" ]; then echo 9999999999; else : > \"\$STUB_DIR/later\"; echo 0; fi\n",
+    ], ['RESERVED_DATABASES' => '["mysql"]'], succeeds: false);
+
+    expect($run['errors'])->not->toContain('only a seed serving its data on its own bootstraps a new cluster')
+        ->and($run['commands'])->toContain('restart mariadb-server')
+        ->and(substr_count($run['sql'], 'WSREP_CLUSTER_STATUS'))->toBeGreaterThanOrEqual(2);
 });
 
 it('keeps the galera writer on the lowest live node', function () {

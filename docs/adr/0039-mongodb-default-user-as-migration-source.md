@@ -9,7 +9,7 @@ ADR 0013 gives the default user of every in-app database the rights a migration 
 
 ## Decision
 
-- The MongoDB default user holds `backup`, `clusterMonitor` and `readAnyDatabase` on `admin` (the `sourceRoles` list in `engines/mongodb/_roles`).
+- The MongoDB default user holds `backup`, `clusterMonitor` and `readAnyDatabase` on `admin` (the `SOURCE_ROLES` list in `engines/mongodb/_roles`).
 - New databases: the default user is created with them at bootstrap. Every time the driver rewrites the default user's roles (`createUser`, `grant`, for example when a database is created or a migration records its databases), `MongoDbAccounts` adds them, so the default user never loses them. Before this, creating a database replaced the default user's roles with `readWrite` grants only (`updateUser`), so roles granted by hand were silently dropped and the source check then offered only a one-time copy. Other users get them only when asked for replication.
 - Existing databases: every image rollout (redeploy, upgrade or maintenance, `RollOutImage`) ends with `GrantMigrationSourceRoles`. It adds the roles to the default user with `grantRolesToUser`, which only adds roles and never replaces or removes any. This is best effort: a failure writes a failed "Grant migration source roles to the default user" server log, the rollout still succeeds, and the next redeploy or upgrade tries again.
 - Restored and forked databases: their users come back from the backup as they were at the source, so the setup runs `GrantMigrationSourceRoles` again right after it reconciles the restored accounts (`SetUpDatabase`), and a restored database is a source at once.

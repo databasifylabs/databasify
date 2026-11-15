@@ -1,11 +1,11 @@
-const sourceRoles = [{ role: 'backup', db: 'admin' }, { role: 'clusterMonitor', db: 'admin' }, { role: 'readAnyDatabase', db: 'admin' }];
+const SOURCE_ROLES = [{ role: 'backup', db: 'admin' }, { role: 'clusterMonitor', db: 'admin' }, { role: 'readAnyDatabase', db: 'admin' }];
 function rolesOf(grants, replication) {
   const existing = run('admin', { listDatabases: 1, nameOnly: true }).databases.map((database) => database.name);
   const roles = grants.map((grant) => {
     if (!existing.includes(grant.database)) throw failure('not_found', 'database ' + JSON.stringify(grant.database) + ' does not exist');
     return { role: grant.access === 'write' ? 'readWrite' : 'read', db: grant.database };
   });
-  if (replication) roles.push(...sourceRoles);
+  if (replication) roles.push(...SOURCE_ROLES);
   return roles;
 }
 function notFoundAsUser(error) {

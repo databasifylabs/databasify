@@ -28,10 +28,7 @@ SQL
 }
 wait_until 21000 5 serves || fail_task 'PostgreSQL was not ready in time'
 echo 'Waiting for the pooler…'
-pooler_listening() {
-    timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/25061' 2> /dev/null
-}
-wait_until 300 2 pooler_listening || fail_task 'pgbouncer is not listening on 127.0.0.1:25061'
+wait_until 300 2 listening_on 25061 || fail_task 'pgbouncer is not listening on 127.0.0.1:25061'
 pg_try postgres <<'SQL'
 SELECT pg_is_in_recovery()
 SQL

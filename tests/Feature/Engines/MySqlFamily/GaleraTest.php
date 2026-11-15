@@ -29,7 +29,7 @@ it('enables Galera as a task with both manifests', function () {
 it('bootstraps only a seed that serves its data on its own and fails once the server stops', function () {
     $this->node->driver()->cluster()->enable('enable.1');
 
-    $this->scripts->assertRan('engines.mariadb.cluster.enable', fn (string $script): bool => str_contains($script, 'if ! { read_state && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then')
+    $this->scripts->assertRan('engines.mariadb.cluster.enable', fn (string $script): bool => str_contains($script, 'if ! { [ "$state_read" = true ] && [ "$STATE_GALERA" = 1 ] && [ "$STATE_CLUSTER" = Primary ]; }; then')
         && str_contains($script, "fail_task 'only a seed serving its data on its own bootstraps a new cluster'")
         && str_contains($script, '"${grastate/safe_to_bootstrap: 0/safe_to_bootstrap: 1}"')
         && strpos($script, "\n        allow_bootstrap\n") < strpos($script, "\n        restart_server\n        BOOT_BASELINE=\$(restarts)\n")
