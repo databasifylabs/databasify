@@ -85,7 +85,30 @@ function primaryOf(hosts) {
   throw failure('unavailable', 'no member of the replica set is primary yet');
 }
 function configOf(admin) { return runOn(admin, { replSetGetConfig: 1 }).config; }
-function reconfig(admin, config, force) { return runOn(admin, { replSetReconfig: config, force: force }); }
+const CONFIG_BEING_UPDATED = [117, 308];
+const CONFIG_COMMIT_SECONDS = 120;
+function configCommitted(admin) {
+  try {
+    return runOn(admin, { replSetGetConfig: 1, commitmentStatus: true }).commitmentStatus !== false;
+  } catch (error) {
+    return true;
+  }
+}
+function reconfig(admin, config, force) {
+  if (force) return runOn(admin, { replSetReconfig: config, force: true });
+  const deadline = Date.now() + CONFIG_COMMIT_SECONDS * 1000;
+  while (true) {
+    if (configCommitted(admin)) {
+      try {
+        return runOn(admin, { replSetReconfig: config, force: false });
+      } catch (error) {
+        if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
+      }
+    }
+    if (Date.now() >= deadline) throw new Error('the replica set was still committing its previous config after ' + CONFIG_COMMIT_SECONDS + 's, so nothing was changed');
+    sleep(2000);
+  }
+}
 function local() { return db.getSiblingDB('admin'); }
 function retry(seconds, label, attempt) {
   const deadline = Date.now() + seconds * 1000;

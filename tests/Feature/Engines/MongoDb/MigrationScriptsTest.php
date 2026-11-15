@@ -143,9 +143,9 @@ it('reports what ClusterSync says about a running continuous copy', function (?s
 /**
  * @param  array<string, mixed>  $replies
  * @param  array<string, string>  $env
- * @return array{string, list<array<string, mixed>>}
+ * @return array{string, list<array<string, mixed>>, ProcessResult}
  */
-function runMongoScriptAgainst(string $script, array $replies, array $env = []): array
+function runMongoScriptAgainst(string $script, array $replies, array $env = [], bool $succeeds = true): array
 {
     $stubs = temporaryDirectory();
     mkdir("{$stubs}/bin");
@@ -162,7 +162,10 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = []):
         const quit = (code) => process.exit(code);
         const EJSON = { stringify: JSON.stringify };
         const replies = JSON.parse(process.env.STUB_REPLIES);
-        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(command) + '\n'); return replies[Object.keys(command)[0]] || { ok: 1 }; } }) };
+        const sleep = () => {};
+        const answer = (name) => Array.isArray(replies[name]) ? (replies[name].length > 1 ? replies[name].shift() : replies[name][0]) : replies[name];
+        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(command) + '\n'); return answer(Object.keys(command)[0]) || { ok: 1 }; } }) };
+        class Mongo { getDB() { return db.getSiblingDB('admin'); } close() {} }
         JS
         cat "${@: -1}" >> "$program"
         node "$program"
@@ -173,10 +176,12 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = []):
     $rendered = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), $script);
     $run = Process::input($rendered)->env([...$env, 'PATH' => "{$stubs}/bin:".getenv('PATH'), 'STUB_DIR' => $stubs, 'STUB_REPLIES' => json_encode((object) $replies, JSON_THROW_ON_ERROR), 'MONGO_SECRET' => 'secret'])->run(['bash', '-euo', 'pipefail', '-s']);
 
-    expect($run->successful())->toBeTrue($run->errorOutput());
+    if ($succeeds) {
+        expect($run->successful())->toBeTrue($run->errorOutput());
+    }
     $commands = is_file("{$stubs}/commands") ? array_values(array_map(fn (string $line): array => (array) json_decode($line, true), array_filter(explode("\n", (string) file_get_contents("{$stubs}/commands"))))) : [];
 
-    return [$run->output(), $commands];
+    return [$run->output(), $commands, $run];
 }
 
 /**
@@ -215,4 +220,40 @@ it('gives a user written with replication its databases and the clustersync sour
     [, $commands] = runMongoScriptAgainst('engines.mongodb.accounts.grant', ['listDatabases' => ['databases' => [['name' => 'defaultdb']]]], ['NAME' => 'databasify', 'GRANTS' => '[{"database":"defaultdb","access":"write"}]', 'REPLICATION' => 'true']);
 
     expect(end($commands))->toBe(['updateUser' => 'databasify', 'roles' => [['role' => 'readWrite', 'db' => 'defaultdb'], ['role' => 'backup', 'db' => 'admin'], ['role' => 'clusterMonitor', 'db' => 'admin'], ['role' => 'readAnyDatabase', 'db' => 'admin']]]);
+});
+
+/**
+ * @param  list<array<string, mixed>>  $reconfigReplies
+ * @return array{list<array<string, mixed>>, ProcessResult}
+ */
+function leaveReplicaSetWith(array $reconfigReplies, bool $succeeds = true): array
+{
+    $config = ['_id' => 'databasify', 'version' => 3, 'term' => 2, 'members' => [['_id' => 0, 'host' => '10.0.0.1:25060'], ['_id' => 1, 'host' => '10.0.0.2:25060']]];
+    [, $commands, $run] = runMongoScriptAgainst('engines.mongodb.cluster.disable', [
+        'replSetGetConfig' => [['ok' => 1, 'config' => $config, 'commitmentStatus' => false], ['ok' => 1, 'config' => $config, 'commitmentStatus' => true]],
+        'hello' => ['ok' => 1, 'isWritablePrimary' => true],
+        'replSetReconfig' => $reconfigReplies,
+    ], ['SELF' => '10.0.0.1:25060', 'HOSTS' => '10.0.0.1:25060'], $succeeds);
+
+    return [array_values(array_filter($commands, fn (array $command): bool => array_key_exists('replSetReconfig', $command))), $run];
+}
+
+it('waits for the previous replica set config to commit before it reconfigures', function () {
+    [$reconfigs, $run] = leaveReplicaSetWith([
+        ['ok' => 0, 'code' => 117, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration'],
+        ['ok' => 1],
+    ]);
+
+    expect($run->output())->toContain('Left the replica set.')
+        ->and($reconfigs)->toHaveCount(2)
+        ->and(array_column($reconfigs, 'force'))->toBe([false, false])
+        ->and(array_column($reconfigs[1]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060']);
+});
+
+it('stops at once on a reconfig error other than a config still being updated', function () {
+    [$reconfigs, $run] = leaveReplicaSetWith([['ok' => 0, 'code' => 103, 'errmsg' => 'version field value of 4 is not greater than the current version']], succeeds: false);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('is not greater than the current version')
+        ->and($reconfigs)->toHaveCount(1);
 });
