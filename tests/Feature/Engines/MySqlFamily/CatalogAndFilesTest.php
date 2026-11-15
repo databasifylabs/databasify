@@ -9,6 +9,7 @@ use App\Engines\Drivers\MariaDb\MariaDbFiles;
 use App\Engines\Drivers\MariaDb\MariaDbSettings;
 use App\Engines\Drivers\MySql\MySqlFiles;
 use App\Engines\Drivers\MySql\MySqlSettings;
+use App\Engines\Drivers\MySqlFamily\FamilyFiles;
 use App\Engines\Settings\SettingsCatalog;
 
 function familyCatalogOf(string $engine): SettingsCatalog
@@ -60,3 +61,9 @@ it('renders the MariaDB files and manifest byte for byte like the Go engine', fu
         ->and($files->manifest)->toBe($fixture['manifest'])
         ->and(MariaDbFiles::initStatementsOf(nodeConfigFromFixture($fixture['request'])))->toBe($fixture['init']);
 })->with(['standalone-10.11', 'standalone-12.3', 'galera-11.8', 'seed-11.4', 'readonly-12.3']);
+
+it('gives neighbouring addresses different server ids', function () {
+    expect(FamilyFiles::serverIdOfAddress('10.104.0.16'))->toBe(174587920)
+        ->and(FamilyFiles::serverIdOfAddress('10.104.0.17'))->toBe(174587921)
+        ->and(FamilyFiles::serverIdOfAddress('fd00::16'))->not->toBe(FamilyFiles::serverIdOfAddress('fd00::17'));
+});

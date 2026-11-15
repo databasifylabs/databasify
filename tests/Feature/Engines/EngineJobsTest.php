@@ -170,7 +170,7 @@ it('skips the postgres backup on a standby', function () {
  * @param  array<string, string>  $stubs
  * @param  array<string, string>  $env
  * @param  array<string, int>  $modifiedAt
- * @return array{sql: string, commands: string, root: string, output: string}
+ * @return array{sql: string, commands: string, root: string, output: string, errors: string}
  */
 function runFamilyJobLocally(string $engine, string $job, array $replies, array $files = [], array $stubs = [], array $env = [], array $modifiedAt = [], bool $succeeds = true): array
 {
@@ -218,6 +218,7 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
         'commands' => File::exists("{$directory}/commands.log") ? File::get("{$directory}/commands.log") : '',
         'root' => collect(File::allFiles($root))->map(fn (SplFileInfo $file): string => str($file->getPathname())->after("{$root}/")->value())->sort()->values()->implode("\n"),
         'output' => $run->output(),
+        'errors' => $run->errorOutput(),
     ];
     File::deleteDirectory($directory);
 
@@ -317,6 +318,21 @@ it('reports a running migration channel as caught up', function () {
     ], env: ['MIGRATION_UNIT' => 'mysql-migration']);
 
     expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true))->toBe(['copy' => 'succeeded', 'log' => '', 'lagSeconds' => 0]);
+});
+
+it('fails a read-only mysql node at once when its channel stops for good', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql.cluster.rejoin', ['replication_connection_status' => "OFF\tON\t13117\tError 13117: Fatal error: The replica I/O thread stops because source and replica have equal MySQL server ids"], ['state/.keep' => ''], env: ['READ_ONLY' => 'true'], succeeds: false);
+
+    expect($run['errors'])->toContain('the replication channel stopped: Error 13117: Fatal error: The replica I/O thread stops because source and replica have equal MySQL server ids');
+});
+
+it('keeps waiting while the channel of a read-only mysql node reconnects', function () {
+    $run = runFamilyJobLocally('mysql', 'engines.mysql.cluster.rejoin', ['replication_connection_status' => "OFF\tON\t2003\tError 2003: Can't connect to MySQL server"], ['state/.keep' => ''], [
+        'sleep' => "#!/bin/bash\n",
+        'date' => "#!/bin/bash\nif [ -e \"\$STUB_DIR/later\" ]; then echo 9999999999; else : > \"\$STUB_DIR/later\"; echo 0; fi\n",
+    ], ['READ_ONLY' => 'true'], succeeds: false);
+
+    expect($run['errors'])->toContain('the server was not ready within 30m0s')->not->toContain('the replication channel stopped');
 });
 
 it('ships only closed binlogs', function () {

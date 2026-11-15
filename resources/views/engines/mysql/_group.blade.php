@@ -86,10 +86,17 @@ join_attempt() {
 }
 
 channel_running() {
-    local running
-    running=$(my '' <<'SQL'
-SELECT COUNT(*) FROM performance_schema.replication_connection_status c JOIN performance_schema.replication_applier_status a USING (CHANNEL_NAME) WHERE CHANNEL_NAME = 'group' AND c.SERVICE_STATE = 'ON' AND a.SERVICE_STATE = 'ON'
+    local state receiving applying number error
+    state=$(my '' <<'SQL'
+SELECT c.SERVICE_STATE, a.SERVICE_STATE, c.LAST_ERROR_NUMBER, REPLACE(REPLACE(COALESCE((SELECT CONCAT('Error ', w.LAST_ERROR_NUMBER, ': ', w.LAST_ERROR_MESSAGE) FROM performance_schema.replication_applier_status_by_worker w WHERE w.CHANNEL_NAME = 'group' AND w.LAST_ERROR_NUMBER <> 0 ORDER BY w.LAST_ERROR_TIMESTAMP DESC LIMIT 1), IF(c.LAST_ERROR_NUMBER <> 0, CONCAT('Error ', c.LAST_ERROR_NUMBER, ': ', c.LAST_ERROR_MESSAGE), NULL), ''), CHAR(9), ' '), CHAR(10), ' ') FROM performance_schema.replication_connection_status c JOIN performance_schema.replication_applier_status a USING (CHANNEL_NAME) WHERE CHANNEL_NAME = 'group'
 SQL
 ) || return 1
-    [ "$running" = 1 ]
+    IFS=$'\t' read -r receiving applying number error <<< "$state"
+    if [ "$applying" = OFF ] && [ -n "$error" ]; then
+        fail_task "the replication channel stopped: $error"
+    fi
+    if [ "$receiving" = OFF ] && [ -n "$error" ] && [[ ! $number =~ ^(2003|2005|2013)$ ]]; then
+        fail_task "the replication channel stopped: $error"
+    fi
+    [ "$receiving" = ON ] && [ "$applying" = ON ]
 }

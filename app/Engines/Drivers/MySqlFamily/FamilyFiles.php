@@ -36,10 +36,10 @@ final readonly class FamilyFiles
     public static function serverIdOfAddress(string $ip): int
     {
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-            return (int) ip2long($ip) | 1;
+            return ip2long($ip) ?: 1;
         }
 
-        return crc32($ip) | 1;
+        return crc32($ip) ?: 1;
     }
 
     /**
