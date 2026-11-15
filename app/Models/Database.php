@@ -52,14 +52,17 @@ use App\Support\Engines\SdkRange;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
+use Database\Factories\DatabaseFactory;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -94,10 +97,12 @@ use LogicException;
  */
 #[Fillable(['project_id', 'name', 'engine', 'version_line', 'mode', 'status', 'image', 'available_image', 'retune_needed_at', 'maintenance_day', 'maintenance_hour', 'settings', 'dns_zone_id', 'config_fields', 'log_units'])]
 #[Hidden(['settings'])]
+#[UseFactory(DatabaseFactory::class)]
 #[ObservedBy(DatabaseObserver::class)]
 class Database extends Model implements Movable
 {
-    use BelongsToProject, HasUuids, MovesBetweenProjects, RunsOperations;
+    /** @use HasFactory<DatabaseFactory> */
+    use BelongsToProject, HasFactory, HasUuids, MovesBetweenProjects, RunsOperations;
 
     private const int DNS_LOCK_SECONDS = 300;
 

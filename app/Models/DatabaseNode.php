@@ -21,13 +21,16 @@ use App\Models\Concerns\RunsOperations;
 use App\Observers\DatabaseNodeObserver;
 use App\Services\Ssh\Ssh;
 use Carbon\CarbonImmutable;
+use Database\Factories\DatabaseNodeFactory;
 use Illuminate\Database\Eloquent\Attributes\CollectedBy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -56,10 +59,12 @@ use LogicException;
  */
 #[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key', 'status', 'config'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
+#[UseFactory(DatabaseNodeFactory::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]
 class DatabaseNode extends Model
 {
-    use HasUuids, RunsOperations;
+    /** @use HasFactory<DatabaseNodeFactory> */
+    use HasFactory, HasUuids, RunsOperations;
 
     private const int MISSED_READS_BEFORE_UNREACHABLE = 3;
 

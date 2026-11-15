@@ -10,9 +10,12 @@ use App\DTOs\Plugins\PluginAutoload;
 use App\Models\Concerns\OrdersByName;
 use App\Support\Plugins\VersionConstraint;
 use Carbon\CarbonImmutable;
+use Database\Factories\PluginFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -32,9 +35,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['id', 'name', 'author', 'version', 'source', 'class', 'autoload', 'engines', 'requires', 'icon', 'enabled', 'error'])]
+#[UseFactory(PluginFactory::class)]
 class Plugin extends Model
 {
-    use OrdersByName;
+    /** @use HasFactory<PluginFactory> */
+    use HasFactory, OrdersByName;
 
     public $incrementing = false;
 

@@ -16,11 +16,14 @@ use App\Enums\Migrations\MigrationStatus;
 use App\Services\Ssh\Ssh;
 use App\Support\Messages\Sentence;
 use Carbon\CarbonImmutable;
+use Database\Factories\DatabaseMigrationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
@@ -47,9 +50,11 @@ use Throwable;
  */
 #[Fillable(['database_node_id', 'mode', 'status', 'source', 'position', 'detail', 'lag_seconds', 'unhealthy_checks', 'started_at', 'finished_at', 'cleanup_failed_at'])]
 #[Hidden(['source'])]
+#[UseFactory(DatabaseMigrationFactory::class)]
 class DatabaseMigration extends Model
 {
-    use HasUuids;
+    /** @use HasFactory<DatabaseMigrationFactory> */
+    use HasFactory, HasUuids;
 
     /**
      * @return BelongsTo<Database, $this>
