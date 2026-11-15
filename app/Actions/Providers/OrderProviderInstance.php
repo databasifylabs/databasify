@@ -8,12 +8,11 @@ use App\DTOs\Providers\NewProviderServer;
 use App\Models\Server;
 use App\Models\ServerProvider;
 use App\Services\Ssh\AppSshKey;
-use App\Support\Ssh\Fingerprint;
 use RuntimeException;
 
 final readonly class OrderProviderInstance
 {
-    public function __construct(private AppSshKey $appKey) {}
+    public function __construct(private AppSshKey $appKey, private RegisterProviderKey $registerKey) {}
 
     public function handle(Server $server, ServerProvider $provider): string
     {
@@ -27,7 +26,7 @@ final readonly class OrderProviderInstance
             plan: $server->plan ?? throw new RuntimeException("{$server->name} has no plan."),
             image: $driver->image($os) ?? throw new RuntimeException("{$provider->label()} has no {$os->label()} image."),
             networkExternalId: $server->network?->external_id,
-            sshKeyId: $driver->findKey($publicKey) ?? $driver->createKey('databasify-'.substr(str_replace(':', '', Fingerprint::md5($publicKey)), 0, 12), $publicKey),
+            sshKeyId: $this->registerKey->handle($driver, $publicKey),
             publicKey: $publicKey,
         );
         $log->write("Ordering {$order->name}: plan {$order->plan} in {$order->region}, image {$order->image}".PHP_EOL);

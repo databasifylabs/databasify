@@ -10,7 +10,7 @@ Users can order servers on DigitalOcean, Hetzner, Vultr and Linode, or bring the
 ## Decision
 
 - The `ServerDriver` contract covers only regions, plans, private networks (VPCs), SSH keys, and creating, finding and deleting a server.
-- Each provider registration maps every supported operating system to the provider's image ([0016](0016-host-os-and-provisioning.md)). Ordered servers log in as `root` with the app's SSH key, registered with the provider, and always have password login turned off.
+- Each provider registration maps every supported operating system to the provider's image ([0016](0016-host-os-and-provisioning.md)). Ordered servers log in as `root` with the app's SSH key, registered with the provider, and always have password login turned off. The key is looked up by fingerprint first; when adding it fails, because parallel orders raced to add it, it is looked up again and reused, without a lock.
 - After ordering, the app waits up to 10 minutes for the server to boot, then up to 10 more for SSH. From there the server goes through the same provisioning as one the user added by hand.
 - The region and plan catalog is cached for 10 minutes, and networks for 60 seconds.
 
@@ -29,4 +29,5 @@ Users can order servers on DigitalOcean, Hetzner, Vultr and Linode, or bring the
 - `app/ServerProviders/Contracts/ServerDriver.php`
 - `app/Providers/ServerProviderServiceProvider.php`
 - `app/Actions/Providers/LaunchProviderServer.php`
+- `app/Actions/Providers/RegisterProviderKey.php`
 - `app/Services/Providers/ProviderCatalog.php`
