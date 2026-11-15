@@ -9,6 +9,7 @@ An ADR records one decision that shapes Databasify beyond a single change: what 
 - An accepted decision is not rewritten. To change a decision, write a new ADR and mark the old one `Superseded by NNNN`.
 - Facts in an ADR (names, numbers, paths, behaviour) are kept in sync with the code in the same change that alters them.
 - Write an ADR only for a decision that outlives the change that introduced it. Details of a single change belong in its pull request or GitHub issue.
+- An ADR records the decision and its lasting constraints, not implementation detail. Class lists, step-by-step mechanics and other facts the code already shows belong in the code and its pull request.
 - Evidence cites repository paths only. Git history before 2026-11-04 was squashed, so older commit hashes no longer resolve.
 
 ## Template
@@ -42,46 +43,20 @@ Options that were tried or rejected, and why.
 
 ## Index
 
-| #                                                           | Decision                                                 | Status             |
-| ----------------------------------------------------------- | -------------------------------------------------------- | ------------------ |
-| [0001](0001-ssh-control-plane.md)                           | Laravel over SSH is the only control plane               | Accepted           |
-| [0002](0002-container-per-node.md)                          | One engine container per node                            | Accepted           |
-| [0003](0003-engine-binary-pid1.md)                          | The engine binary is PID 1 and reads a process manifest  | Accepted           |
-| [0004](0004-image-digest-pinning.md)                        | Engine images pinned by digest per database              | Accepted           |
-| [0005](0005-engine-uid-64999.md)                            | Engine user is uid/gid 64999, data under `/srv/<engine>` | Accepted           |
-| [0006](0006-operations-and-server-logs.md)                  | One operation per database, one server log per SSH call  | Accepted           |
-| [0007](0007-ha-per-engine.md)                               | Each engine keeps its own HA mechanism                   | Accepted           |
-| [0008](0008-private-networking.md)                          | Provider VPC, custom network or WireGuard mesh           | Accepted           |
-| [0009](0009-nftables-firewall.md)                           | One nftables table per database                          | Accepted           |
-| [0010](0010-tls-private-ca.md)                              | Private CA per database; public wildcard for key-value   | Accepted           |
-| [0011](0011-secrets-and-ssh-keys.md)                        | Encrypted secrets, one app SSH key, pinned host keys     | Accepted           |
-| [0012](0012-dns-hostnames.md)                               | DNS names follow the primary                             | Accepted           |
-| [0013](0013-data-protection-and-migration.md)               | Engine-native PITR and migrations over plain S3          | Accepted           |
-| [0014](0014-app-architecture.md)                            | Application architecture and distribution                | Accepted           |
-| [0015](0015-browser-terminal.md)                            | Browser terminal as a queued SSH shell                   | Accepted           |
-| [0016](0016-host-os-and-provisioning.md)                    | Supported host operating systems and provisioning        | Accepted           |
-| [0017](0017-providers-order-vm-only.md)                     | Cloud providers only order the server                    | Accepted           |
-| [0018](0018-monitoring-by-ssh-polling.md)                   | Monitoring is the app polling over SSH                   | Accepted           |
-| [0019](0019-app-state-sqlite-and-redis.md)                  | App state in SQLite, queues in Redis                     | Accepted           |
-| [0020](0020-live-ui-by-polling.md)                          | Live UI by polling, Reverb only for streams              | Accepted           |
-| [0021](0021-testing-with-boundary-fakes.md)                 | Tests fake the boundaries; real servers tested by hand   | Accepted           |
-| [0022](0022-wireguard-address-blocks.md)                    | WireGuard address blocks of a chosen size, CGNAT only    | Accepted           |
-| [0023](0023-provider-http-client-with-dns-write-retries.md) | One provider HTTP client; DNS record writes retry too    | Accepted           |
-| [0024](0024-projects-as-a-global-scope.md)                  | Projects as a global scope                               | Accepted           |
-| [0025](0025-delete-rules-in-model-observers.md)             | Delete guards in actions, cascades in model observers    | Accepted           |
-| [0026](0026-app-settings-in-env-file.md)                    | App settings live in `/opt/databasify/.env`              | Accepted           |
-| [0027](0027-cache-and-sessions-in-redis.md)                 | Cache, sessions and locks in Redis                       | Accepted           |
-| [0028](0028-engine-commands-and-flows.md)                   | The app drives engines through typed commands and flows  | Superseded by 0036 |
-| [0029](0029-engines-ship-only-as-images.md)                 | Engines ship only as images                              | Accepted           |
-| [0030](0030-community-engines.md)                           | Plugin engines are community engines                     | Accepted           |
-| [0031](0031-one-sdk-range-per-app-release.md)               | Each app release runs one engine SDK range               | Accepted           |
-| [0032](0032-databases-on-a-dropped-sdk-run-read-only.md)    | Databases on a dropped SDK run read-only                 | Accepted           |
-| [0033](0033-self-update-through-a-host-helper.md)           | Self-update through a host helper                        | Accepted           |
-| [0034](0034-a-frozen-engine-runtime.md)                     | A frozen engine runtime                                  | Accepted           |
-| [0035](0035-engine-api.md)                                  | The app drives engines through PHP drivers               | Accepted           |
-| [0036](0036-operations-as-one-job.md)                       | A database operation is one action and one job           | Accepted           |
-| [0037](0037-engine-tasks-off-the-worker.md)                 | Engine tasks run off the worker                          | Accepted           |
-| [0038](0038-read-only-nodes-managed-on-their-own.md)        | Read-only nodes are managed on their own                 | Accepted           |
-| [0039](0039-mongodb-default-user-as-migration-source.md)    | The MongoDB default user can serve as a migration source | Accepted           |
+| #                                                | Decision                                                                                | Status   |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- | -------- |
+| [0001](0001-ssh-control-plane.md)                | Laravel over SSH is the only control plane                                              | Accepted |
+| [0002](0002-hosts-and-container-per-node.md)     | Supported hosts run Docker and one engine container per node                            | Accepted |
+| [0003](0003-engine-images-and-frozen-runtime.md) | Engines ship as pinned images on a frozen runtime                                       | Accepted |
+| [0004](0004-engine-drivers-and-blade-scripts.md) | The app drives engines through PHP drivers and hardened Blade scripts                   | Accepted |
+| [0005](0005-operations-as-one-job.md)            | A database operation is one action and one job, and engine tasks run off the worker     | Accepted |
+| [0006](0006-ha-per-engine-and-dns.md)            | Each engine keeps its own HA, and DNS follows the primary                               | Accepted |
+| [0007](0007-networking-and-firewall.md)          | Private networking and a firewall table per database                                    | Accepted |
+| [0008](0008-tls-private-ca.md)                   | TLS on every engine: a private CA per database, a public wildcard for key-value engines | Accepted |
+| [0009](0009-secrets-and-ssh-keys.md)             | Encrypted secrets, one app SSH key, pinned host keys                                    | Accepted |
+| [0010](0010-data-protection-and-migration.md)    | Engine-native backups, restores and migrations over plain S3                            | Accepted |
+| [0011](0011-app-code-structure.md)               | Application code structure                                                              | Accepted |
+| [0012](0012-projects-as-a-global-scope.md)       | Projects as a global scope                                                              | Accepted |
+| [0013](0013-install-state-and-updates.md)        | One-container install, app state, settings and self-update                              | Accepted |
 
-The ADRs were renumbered 0001 to 0032 on 2026-11-12, when the two superseded wrapper decisions were removed. Commits and pull requests from before that date use the earlier numbers.
+On 2026-11-15, before 1.0, the 39 ADRs were consolidated into 0001 to 0013: superseded decisions were removed, related decisions were merged, and every fact was checked against the code, which won wherever the two differed. This was a one-time exception to the rule that accepted ADRs are not rewritten; from now on a changed decision gets a new ADR that supersedes the old one. Commits, pull requests and notes from before that date use the earlier numbers, and the old texts live in the git history of `docs/adr/`.

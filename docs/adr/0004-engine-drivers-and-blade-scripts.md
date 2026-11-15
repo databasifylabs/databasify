@@ -1,0 +1,46 @@
+# 0004. The app drives engines through PHP drivers and hardened Blade scripts
+
+- Status: Accepted
+- Date: 2026-11-15
+
+## Context
+
+With a frozen runtime in the images ([0003](0003-engine-images-and-frozen-runtime.md)), all engine behaviour lives in the app. It must be readable by Laravel developers, safe against injection and secret leaks, and open to engines that plugins add. Plugins run arbitrary code, so an admin must know who stands behind a plugin engine before its code runs.
+
+## Decision
+
+- **One driver per engine.** `App\Engines\Contracts\EngineDriver` has a static `facts(string $line)` and seven groups: `nodes()`, `cluster()`, `config()`, `accounts()`, `archive()`, `migration()` and `pools()`. Changes return `void`; reads return the app's DTOs. Optional groups throw `EngineUnsupported` in `AbstractEngineDriver`. `$database->driver()` targets the primary (and runs once more on the new primary after a `not_primary` reply); `$node->driver()` targets one node. Drivers resolve through the container, so tests bind a recording stand-in.
+- **Facts are static.** `EngineFacts` (features, password encryptions, reserved names, ports, host profile, cluster order) belong to the driver class and version line. `EngineCatalog` holds only registration data: label, icon, category, image repository, version lines, connection profile, migration source form, flags and the driver class.
+- **Hardened scripts.** A driver runs Blade views named `engines.<engine>.<group>.<action>` through `run()` (a change, logged to a server log named after the script), `read()` (one JSON object after a `DATABASIFY_RESULT` marker, no log) or `task()` (a long step under a key, [0005](0005-operations-as-one-job.md)). Values reach scripts through env or the view's quoting helpers, never argv. A failure calls `databasify_fail <code> <message>`, which becomes a typed exception.
+- **Files and jobs.** Config files are Blade views under `resources/views/engines/<engine>/files/`, quoted per format; the process manifest and `mongod.conf` are PHP arrays encoded by `IndentedJson`. Backups, binlog streaming and shipping, the MariaDB cluster watch and migration copies are scripts written to `/srv/<engine>/conf/<job>.sh` and run by the manifest.
+- **One command builder.** `App\Engines\Runtime\Runtime` is the only class that builds a `| databasify ` command line; `EngineModuleTest` fails otherwise.
+- **Plugin engines are community engines.** An engine registered while a plugin loads is stamped with the plugin's id and author (`Engine::isCommunity()`), must be declared in the plugin's `composer.json` under `extra.databasify.engines`, and is shown with a "Community" badge. Installing a plugin that declares engines is refused until the admin accepts the warning, checked from the staged `composer.json` before any plugin code runs. An update that drops an engine a database still uses is refused.
+
+## Consequences
+
+- An engine behaviour change is an app change: a script, a view or a driver method, tested with rendered scripts, local bash runs for jobs and recording drivers for actions.
+- Server logs name the script that ran.
+- A plugin engine registers a driver class and may extend a built-in family driver.
+- Plugin authors must keep `extra.databasify.engines` in step with what they register.
+
+## Alternatives considered
+
+- **Typed Go commands per operation through an engine client:** removed, two paths for every call hid which code really ran.
+- **Unhardened Blade scripts over SSH:** rejected, values were not escaped and secrets appeared in argv.
+- **Detecting plugin engines by loading the plugin first:** rejected, the warning must come before any plugin code runs.
+
+## Evidence
+
+- `app/Engines/Contracts/EngineDriver.php`
+- `app/Engines/Drivers/AbstractEngineDriver.php`
+- `app/Engines/Data/EngineFacts.php`
+- `app/Engines/EngineCatalog.php`
+- `app/Engines/Runtime/Runtime.php`
+- `app/Engines/Scripts/ScriptResult.php`
+- `app/Engines/Drivers/Support/IndentedJson.php`
+- `resources/views/engines/`
+- `app/Providers/EngineServiceProvider.php`
+- `app/Services/Plugins/PluginLoader.php`
+- `app/Actions/Plugins/ConfirmCommunityEngines.php`
+- `tests/Support/RecordingDriver.php`
+- `tests/Feature/Engines/EngineModuleTest.php`

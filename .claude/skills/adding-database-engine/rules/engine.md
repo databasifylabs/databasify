@@ -1,7 +1,7 @@
 # Phase 1: the engine driver (this repo)
 
-All engine logic lives in the app as a PHP driver and hardened Blade scripts (ADR 0034, 0035). Before writing any, read:
-- `docs/adr/0035-engine-api.md` (the contract, scripts, files, jobs and the runtime);
+All engine logic lives in the app as a PHP driver and hardened Blade scripts (ADR 0003, 0004). Before writing any, read:
+- `docs/adr/0004-engine-drivers-and-blade-scripts.md` (the contract, scripts, files and jobs) and `docs/adr/0003-engine-images-and-frozen-runtime.md` (the runtime);
 - the closest built-in driver under `app/Engines/Drivers/` and its scripts under `resources/views/engines/`;
 - `.claude` memories and `rules/lessons.md` for traps that only showed live.
 
