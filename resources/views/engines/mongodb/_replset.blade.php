@@ -95,12 +95,11 @@ function configCommitted(admin) {
   }
 }
 function reconfig(admin, config, force) {
-  if (force) return runOn(admin, { replSetReconfig: config, force: true });
   const deadline = Date.now() + CONFIG_COMMIT_SECONDS * 1000;
   while (true) {
-    if (configCommitted(admin)) {
+    if (force || configCommitted(admin)) {
       try {
-        return runOn(admin, { replSetReconfig: config, force: false });
+        return runOn(admin, { replSetReconfig: config, force: force });
       } catch (error) {
         if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
       }
