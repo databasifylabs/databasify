@@ -106,3 +106,83 @@ it('shows as many log lines as the step asks for', function () {
 
     expect($output)->toContain('line 11')->not->toContain('line 10'.PHP_EOL);
 });
+
+function ownerDockerStub(string $calls, string $stdin, int $status = 0): string
+{
+    return "docker() { echo \"\$*\" >> $calls; cat > $stdin; return $status; }";
+}
+
+it('reads the owner settings and removes them from the environment', function () {
+    $output = installerScript('. "$SOURCE/install.sh" --functions-only; read_owner_settings; printf "[%s|%s|%s]" "$OWNER_NAME" "$OWNER_EMAIL" "$OWNER_PASSWORD"; env | grep -c "^DATABASIFY_OWNER_" || true', [
+        'DATABASIFY_OWNER_NAME' => 'Owner',
+        'DATABASIFY_OWNER_EMAIL' => 'owner@example.com',
+        'DATABASIFY_OWNER_PASSWORD' => 'long-enough-password',
+    ])->output();
+
+    expect($output)->toContain('[Owner|owner@example.com|long-enough-password]')
+        ->and(trim(str_replace('[Owner|owner@example.com|long-enough-password]', '', $output)))->toBe('0');
+});
+
+it('refuses a partial owner before changing anything', function () {
+    $result = installerScript('. "$SOURCE/install.sh" --functions-only; read_owner_settings; require_complete_owner', ['DATABASIFY_OWNER_EMAIL' => 'owner@example.com']);
+
+    expect($result->exitCode())->toBe(1)
+        ->and($result->output())->toContain('Set DATABASIFY_OWNER_NAME and DATABASIFY_OWNER_EMAIL, and type the password when asked');
+});
+
+it('accepts no owner settings or all three', function (array $env) {
+    expect(installerScript('. "$SOURCE/install.sh" --functions-only; read_owner_settings; require_complete_owner', $env)->exitCode())->toBe(0);
+})->with([
+    'none' => [[]],
+    'all three' => [['DATABASIFY_OWNER_NAME' => 'Owner', 'DATABASIFY_OWNER_EMAIL' => 'owner@example.com', 'DATABASIFY_OWNER_PASSWORD' => 'long-enough-password']],
+]);
+
+it('creates the owner in the app container with the password on standard input only', function () {
+    $dir = temporaryDirectory();
+    $calls = temporaryFile();
+    $stdin = temporaryFile();
+
+    $result = installerScript(ownerDockerStub($calls, $stdin).'; . "$SOURCE/install.sh" --functions-only; read_owner_settings; STEP_RESULT_FILE=$(mktemp); create_owner', [
+        'DATABASIFY_DIR' => $dir,
+        'DATABASIFY_OWNER_NAME' => 'Owner',
+        'DATABASIFY_OWNER_EMAIL' => 'owner@example.com',
+        'DATABASIFY_OWNER_PASSWORD' => 'long-enough-password',
+    ]);
+
+    expect($result->exitCode())->toBe(0)
+        ->and((string) file_get_contents($calls))->toContain('compose exec -T app databasify artisan setup:owner --name=Owner --email=owner@example.com')
+        ->not->toContain('long-enough-password')
+        ->and((string) file_get_contents($stdin))->toBe('long-enough-password');
+});
+
+it('fails the install when the owner cannot be created', function () {
+    $dir = temporaryDirectory();
+
+    $result = installerScript(ownerDockerStub(temporaryFile(), temporaryFile(), 1).'; . "$SOURCE/install.sh" --functions-only; read_owner_settings; LOG=$(mktemp); owner_step; echo REACHED', [
+        'DATABASIFY_DIR' => $dir,
+        'DATABASIFY_OWNER_NAME' => 'Owner',
+        'DATABASIFY_OWNER_EMAIL' => 'owner@example.com',
+        'DATABASIFY_OWNER_PASSWORD' => 'long-enough-password',
+    ]);
+
+    expect($result->exitCode())->not->toBe(0)
+        ->and($result->output())->toContain('Creating the owner account failed')
+        ->not->toContain('REACHED');
+});
+
+it('skips the owner step and keeps the setup hint when no owner is given', function () {
+    $output = installerScript('docker() { echo CALLED; }; . "$SOURCE/install.sh" --functions-only; read_owner_settings; owner_step; next_step_row')->output();
+
+    expect($output)->not->toContain('CALLED')
+        ->and($output)->toContain('Next|Create your admin account on that page');
+});
+
+it('tells the owner to sign in when the owner was created at install', function () {
+    $output = installerScript('. "$SOURCE/install.sh" --functions-only; read_owner_settings; next_step_row', [
+        'DATABASIFY_OWNER_NAME' => 'Owner',
+        'DATABASIFY_OWNER_EMAIL' => 'owner@example.com',
+        'DATABASIFY_OWNER_PASSWORD' => 'long-enough-password',
+    ])->output();
+
+    expect($output)->toBe('Next|Sign in as owner@example.com');
+});

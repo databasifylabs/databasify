@@ -94,6 +94,50 @@ dns_hint() {
     printf '    %sProxy: on (orange cloud) · SSL/TLS mode: Flexible%s\n' "$DIM" "$RESET"
 }
 
+read_owner_settings() {
+    OWNER_NAME=${DATABASIFY_OWNER_NAME-}
+    OWNER_EMAIL=${DATABASIFY_OWNER_EMAIL-}
+    OWNER_PASSWORD=${DATABASIFY_OWNER_PASSWORD-}
+    unset DATABASIFY_OWNER_NAME DATABASIFY_OWNER_EMAIL DATABASIFY_OWNER_PASSWORD
+}
+
+owner_requested() {
+    [ -n "$OWNER_NAME$OWNER_EMAIL$OWNER_PASSWORD" ]
+}
+
+ask_owner_password() {
+    [ -n "$OWNER_NAME" ] && [ -n "$OWNER_EMAIL" ] && has_terminal || return 0
+    printf '\n  %sPassword for %s%s: ' "$BOLD" "$OWNER_EMAIL" "$RESET" > /dev/tty
+    read -rs OWNER_PASSWORD < /dev/tty || true
+    printf '\n' > /dev/tty
+}
+
+require_complete_owner() {
+    owner_requested || return 0
+    [ -n "$OWNER_PASSWORD" ] || ask_owner_password
+    [ -n "$OWNER_NAME" ] && [ -n "$OWNER_EMAIL" ] && [ -n "$OWNER_PASSWORD" ] && return 0
+    refuse 'Set DATABASIFY_OWNER_NAME and DATABASIFY_OWNER_EMAIL, and type the password when asked (or set DATABASIFY_OWNER_PASSWORD), or set none of them' ''
+}
+
+create_owner() {
+    printf '%s' "$OWNER_PASSWORD" | (cd "$DIR" && docker compose exec -T app databasify artisan setup:owner --name="$OWNER_NAME" --email="$OWNER_EMAIL")
+    step_result "Owner account $OWNER_EMAIL created"
+}
+
+owner_step() {
+    owner_requested || return 0
+    STEP_FIX="Create the account at $(app_url)/setup, or run: cd $DIR && sudo docker compose exec app databasify artisan setup:owner" run_step 'Creating the owner account' '' create_owner
+    OWNER_PASSWORD=
+}
+
+next_step_row() {
+    if owner_requested; then
+        printf 'Next|Sign in as %s' "$OWNER_EMAIL"
+        return 0
+    fi
+    printf 'Next|Create your admin account on that page'
+}
+
 already_installed() {
     [ -f "$DIR/.env" ] && [ -f "$DIR/compose.yaml" ]
 }
@@ -124,6 +168,7 @@ if [ "${1:-}" = --functions-only ]; then
     return 0
 fi
 
+read_owner_settings
 LOG=$DIR/install.log
 RETRY_COMMAND='curl -fsSL https://get.databasify.io/install.sh | sudo bash'
 started=$(date +%s)
@@ -131,6 +176,7 @@ started=$(date +%s)
 banner 'Welcome to the Databasify installer' "This sets up Docker and Databasify on this server. It takes 2 to 5 minutes.\n${DIM}Full log: $LOG${RESET}" "$(version_chip '' "$(release_version)")"
 
 require_root
+require_complete_owner
 stop_when_installed
 check_server
 
@@ -156,7 +202,8 @@ run_step 'Installing the updater' '' install_updater
 heading Start
 STEP_FIX="Free the port, or set HTTP_PORT in $DIR/.env" run_step 'Starting containers' '' start_containers
 STEP_LOG_LINES=50 STEP_FIX='See the app container log above' run_step 'Waiting until healthy' '' wait_for_health
+owner_step
 
-summary_box "Databasify is installed  in $(elapsed_since "$started")" "Open|$(app_url)" 'Next|Create your admin account on that page'
+summary_box "Databasify is installed  in $(elapsed_since "$started")" "Open|$(app_url)" "$(next_step_row)"
 [ -z "$domain" ] || dns_hint "$domain" "$address"
 footer

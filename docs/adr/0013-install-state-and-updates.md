@@ -11,7 +11,7 @@ The app installs on one small server and must be easy to back up, update and rol
 
 - **One container.** Releases build a multi-arch image on GHCR from a version tag without a `v` prefix. `scripts/compose.yaml` runs it as one `app` container whose entrypoint checks `APP_KEY`, runs migrations and starts `supervisord` with Redis (bundled), PHP-FPM, nginx, Reverb, Horizon and the scheduler. Horizon gets 30 minutes to finish running jobs on stop. Users install, update and uninstall with the scripts served from `get.databasify.io`.
 - **App state.** SQLite (`storage/database.sqlite`) is the system of record, in WAL mode with a busy timeout and `IMMEDIATE` transactions, so `refreshForUpdate()` serializes like a row lock. `DB_*` settings switch the app to MySQL or PostgreSQL. Redis holds the queues and, in the installed app, the cache, sessions and locks; development keeps them in SQLite. The bundled Redis keeps an append-only file and starts only when no external Redis is set.
-- **Settings live in `/opt/databasify/.env`**, the only source. The installer generates `APP_KEY` and the Reverb credentials and sizes the Horizon workers from the server's CPU and memory (`scripts/horizon-workers.sh`). The updater fills missing values, asks before changing worker counts, and never generates a new `APP_KEY` while a storage volume exists.
+- **Settings live in `/opt/databasify/.env`**, the only source. The installer generates `APP_KEY` and the Reverb credentials and sizes the Horizon workers from the server's CPU and memory (`scripts/horizon-workers.sh`). Given all three of `DATABASIFY_OWNER_NAME`, `DATABASIFY_OWNER_EMAIL` and `DATABASIFY_OWNER_PASSWORD`, it removes them from its environment at once, creates the owner after the health check by piping the password into `setup:owner` (never as an argument, never written to a file), and fails the install if that fails. Without them, `/setup` stays first-come until the owner opens it. The updater fills missing values, asks before changing worker counts, and never generates a new `APP_KEY` while a storage volume exists.
 - **Self-update through a host helper.** The app checks `version.json` daily and on demand. To update, it only writes a request into the bind-mounted updater folder; the systemd unit `databasify-update.path` starts `databasify-update.service`, which runs the latest `update.sh` as root. `update.sh` writes its progress to `status.json` and rolls back to the previous image when the new one is not healthy. Updates exist only on Docker installs with the helper's `installed` marker.
 
 ## Consequences
@@ -38,6 +38,7 @@ The app installs on one small server and must be easy to back up, update and rol
 - `.github/workflows/release.yml`
 - `scripts/compose.yaml`
 - `scripts/env.example`
+- `scripts/install.sh`
 - `scripts/install.sh`
 - `scripts/update.sh`
 - `scripts/lib.sh`

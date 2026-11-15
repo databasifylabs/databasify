@@ -10,7 +10,7 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
 ## Decision
 
 - **Code shape.** Business logic lives in single-purpose `final readonly` Action classes with one `handle()` method; controllers validate, call an action and respond. Arrays crossing boundaries become `final readonly` DTOs. Read models are Query objects. Primary keys are UUIDs. PHPStan runs at max level with full type coverage. Model defaults come from `nunomaduro/essentials` (`config/essentials.php`): strict, unguarded models with automatic eager loading and immutable dates, so models only ever receive validated or DTO data.
-- **One owner.** Auth uses Fortify. There is no public registration: the first visit to `/setup` creates the single owner and a `Default` project. Projects organise resources but are not an authorization boundary ([0012](0012-projects-as-a-global-scope.md)).
+- **One owner.** Auth uses Fortify. There is no public registration: the single owner and a `Default` project come from the first visit to `/setup`, or from `php artisan setup:owner` when the installer is given `DATABASIFY_OWNER_*` settings, in which case `/setup` never opens. Owner creation runs under one cache lock, so two setups can never both create an owner. Projects organise resources but are not an authorization boundary ([0012](0012-projects-as-a-global-scope.md)).
 - **Plugins** are Laravel service providers (`AbstractPlugin`) loaded from `storage/plugins` without Composer. They register database, DNS and server providers through the same builders the built-in providers use; their engines are community engines ([0004](0004-engine-drivers-and-blade-scripts.md)).
 - **Live UI by polling.** Pages refresh with Inertia `usePoll` partial reloads. Reverb carries only byte streams (server log and terminal output); there are no model-change broadcasts. All endpoints are Inertia routes reached through Wayfinder; there is no public API.
 - **Tests fake the boundaries.** Outside systems sit behind contracts bound with `#[Bind]` (`ServerConnection`, `ImageRegistry`, `CertificateAuthority`, `PortProbe`) and feature tests replace them with hand-written fakes from `tests/Support`; provider and DNS APIs use `Http::fake`. Scripts are tested as rendered text. Real servers are tested by an end-to-end run outside CI.
@@ -38,6 +38,7 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
 - `app/Queries/`
 - `config/essentials.php`
 - `app/Actions/Setup/CreateOwnerAccount.php`
+- `app/Console/Commands/Setup/CreateOwnerCommand.php`
 - `app/Plugins/AbstractPlugin.php`
 - `app/Services/Plugins/PluginLoader.php`
 - `resources/js/pages/databases/index.tsx`
