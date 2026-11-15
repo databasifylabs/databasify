@@ -41,6 +41,7 @@ final readonly class MongoDbMigration implements Migration
         $line = $this->driver->node->database->version_line;
         $standalone = $facts->string('setName') === '';
         $sameMajor = implode('.', array_slice(explode('.', $version), 0, 2)) === $line;
+        $missingRoles = $facts->strings('missingRoles');
         $warnings = [];
 
         if ($standalone) {
@@ -51,7 +52,11 @@ final readonly class MongoDbMigration implements Migration
             $warnings[] = "continuous sync needs the same major version ({$line}); only a one-shot copy is possible";
         }
 
-        return SourceReport::checked($version, ! $standalone && $sameMajor, intdiv($facts->int('size'), 1 << 20), $facts->strings('databases'), $facts->strings('unreadable'), occupied: $facts->strings('occupied'), warnings: $warnings);
+        if ($missingRoles !== []) {
+            $warnings[] = 'continuous sync needs the backup, clusterMonitor and readAnyDatabase roles on the source: grant '.implode(', ', $missingRoles).' to the source user; only a one-shot copy is possible';
+        }
+
+        return SourceReport::checked($version, ! $standalone && $sameMajor && $missingRoles === [], intdiv($facts->int('size'), 1 << 20), $facts->strings('databases'), $facts->strings('unreadable'), occupied: $facts->strings('occupied'), warnings: $warnings);
     }
 
     public function start(MigrationStart $start): void

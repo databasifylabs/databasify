@@ -79,16 +79,17 @@ it('restores with PBM as a task', function () {
         && str_contains($script, 'pitr.enabled=true'));
 });
 
-it('checks a source with the Go readiness rules', function (string $version, string $setName, bool $canReplicate, array $warnings) {
-    $this->scripts->respond('engines.mongodb.migration.check', ['error' => null, 'version' => $version, 'setName' => $setName, 'databases' => ['app'], 'unreadable' => ['gone'], 'occupied' => ['app'], 'size' => 3145728]);
+it('checks a source with the Go readiness rules', function (string $version, string $setName, array $missingRoles, bool $canReplicate, array $warnings) {
+    $this->scripts->respond('engines.mongodb.migration.check', ['error' => null, 'version' => $version, 'setName' => $setName, 'missingRoles' => $missingRoles, 'databases' => ['app'], 'unreadable' => ['gone'], 'occupied' => ['app'], 'size' => 3145728]);
 
     $check = $this->node->driver()->migration()->check(new MigrationSource('10.0.0.9', 27017, 'm', "p'w", true), ['app', 'gone']);
 
     expect($check->supportsContinuous())->toBe($canReplicate)->and($check->warnings)->toBe($warnings)->and($check->facts['size_mb'])->toBe('3')->and($check->problems)->toBe(['Databasify cannot read gone on the source.']);
     $this->scripts->assertRan('engines.mongodb.migration.check', fn (string $script, array $env): bool => $env['SOURCE_HOST'] === '10.0.0.9:27017' && $env['SOURCE_PASSWORD'] === "p'w" && ! str_contains($script, "p'w"));
 })->with([
-    'same major replica set' => ['8.0.12', 'rs0', true, []],
-    'standalone older' => ['7.0.3', '', false, ['the source is a standalone server without an oplog; only a one-shot copy is possible', 'continuous sync needs the same major version (8.0); only a one-shot copy is possible']],
+    'same major replica set' => ['8.0.12', 'rs0', [], true, []],
+    'same major without the clustersync roles' => ['8.0.12', 'rs0', ['backup', 'readAnyDatabase'], false, ['continuous sync needs the backup, clusterMonitor and readAnyDatabase roles on the source: grant backup, readAnyDatabase to the source user; only a one-shot copy is possible']],
+    'standalone older' => ['7.0.3', '', [], false, ['the source is a standalone server without an oplog; only a one-shot copy is possible', 'continuous sync needs the same major version (8.0); only a one-shot copy is possible']],
 ]);
 
 it('starts, reads and stops the migration', function () {

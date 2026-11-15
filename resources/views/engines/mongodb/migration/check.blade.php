@@ -4,11 +4,13 @@ MONGO_HOST=$SOURCE_HOST MONGO_TLS=$SOURCE_TLS MONGO_USER=$SOURCE_USER MONGO_SECR
 main(() => {
   const version = run('admin', { buildInfo: 1 }).version;
   const listed = run('admin', { listDatabases: 1 }).databases.map((database) => ({ name: database.name, size: Number(database.sizeOnDisk || 0) }));
+  const roles = run('admin', { connectionStatus: 1 }).authInfo.authenticatedUserRoles.filter((role) => role.db === 'admin').map((role) => role.role);
+  const missingRoles = roles.includes('root') ? [] : ['backup', 'clusterMonitor', 'readAnyDatabase'].filter((role) => !roles.includes(role));
   let setName = '';
   try {
     setName = run('admin', { hello: 1 }).setName || '';
   } catch (error) {}
-  result({ version: version, setName: setName, listed: listed });
+  result({ version: version, setName: setName, listed: listed, missingRoles: missingRoles });
 });
 JS
 if [ -n "$MONGO_ERROR" ]; then
@@ -33,6 +35,6 @@ main(() => {
       return false;
     }
   });
-  result({ error: null, version: source.version, setName: source.setName, databases: databases, unreadable: unreadable, occupied: occupied, size: size });
+  result({ error: null, version: source.version, setName: source.setName, missingRoles: source.missingRoles, databases: databases, unreadable: unreadable, occupied: occupied, size: size });
 });
 JS

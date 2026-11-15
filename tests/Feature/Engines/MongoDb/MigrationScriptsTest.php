@@ -139,3 +139,60 @@ it('reports what ClusterSync says about a running continuous copy', function (?s
     'failed' => ['{"ok":false,"error":"clone: startTS: advance source cluster time: (Unauthorized) not authorized on admin","state":"failed","initialSync":{"completed":false,"cloneCompleted":true}}', ['copy' => 'failed', 'log' => 'ClusterSync failed: clone: startTS: advance source cluster time: (Unauthorized) not authorized on admin', 'lagSeconds' => null]],
     'not answering yet' => [null, ['copy' => 'running', 'log' => '', 'lagSeconds' => null]],
 ]);
+
+/**
+ * @param  list<array{role: string, db: string}>  $roles
+ * @return array<string, mixed>
+ */
+function checkMongoSourceWithRoles(array $roles): array
+{
+    $stubs = temporaryDirectory();
+    mkdir("{$stubs}/bin");
+    file_put_contents("{$stubs}/bin/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$stubs}/bin/mongosh", <<<'BASH'
+        #!/bin/bash
+        if [[ " $* " == *' --nodb '* && " $* " != *' --file '* ]]; then
+            exec node -e "const print = (line) => console.log(line); ${@: -1}"
+        fi
+        program=$(mktemp)
+        cat > "$program" <<'JS'
+        const print = (line) => console.log(line);
+        const quit = (code) => process.exit(code);
+        const EJSON = { stringify: JSON.stringify };
+        const replies = JSON.parse(process.env.STUB_REPLIES);
+        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => replies[Object.keys(command)[0]] }) };
+        JS
+        cat "${@: -1}" >> "$program"
+        node "$program"
+        BASH);
+    chmod("{$stubs}/bin/timeout", 0755);
+    chmod("{$stubs}/bin/mongosh", 0755);
+    $replies = [
+        'buildInfo' => ['version' => '8.0.12'],
+        'listDatabases' => ['databases' => [['name' => 'app', 'sizeOnDisk' => 1024]]],
+        'hello' => ['setName' => 'rs0'],
+        'connectionStatus' => ['authInfo' => ['authenticatedUserRoles' => $roles]],
+        'listCollections' => ['cursor' => ['firstBatch' => []]],
+    ];
+
+    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1, name: uniqid('db'))->nodes()->sole(), 'engines.mongodb.migration.check');
+    $run = Process::input($script)->env([
+        'PATH' => "{$stubs}/bin:".getenv('PATH'),
+        'STUB_REPLIES' => json_encode($replies, JSON_THROW_ON_ERROR),
+        'SOURCE_HOST' => 'src:27017', 'SOURCE_USER' => 'm', 'SOURCE_PASSWORD' => 'pw', 'SOURCE_TLS' => 'true',
+        'DATABASES' => '[]', 'RESERVED_DATABASES' => '["admin","local","config"]', 'MONGO_SECRET' => 'secret',
+    ])->run(['bash', '-euo', 'pipefail', '-s']);
+
+    expect($run->successful())->toBeTrue($run->errorOutput());
+
+    return (array) json_decode(trim((string) preg_replace('/^.*DATABASIFY_RESULT /s', '', $run->output())), true);
+}
+
+it('lists the clustersync roles the source user lacks', function (array $roles, array $missing) {
+    expect(checkMongoSourceWithRoles($roles))->toMatchArray(['error' => null, 'setName' => 'rs0', 'missingRoles' => $missing]);
+})->with([
+    'all three' => [[['role' => 'backup', 'db' => 'admin'], ['role' => 'clusterMonitor', 'db' => 'admin'], ['role' => 'readAnyDatabase', 'db' => 'admin']], []],
+    'root' => [[['role' => 'root', 'db' => 'admin']], []],
+    'read on local only' => [[['role' => 'read', 'db' => 'local'], ['role' => 'readWrite', 'db' => 'app']], ['backup', 'clusterMonitor', 'readAnyDatabase']],
+    'backup on another database' => [[['role' => 'backup', 'db' => 'app'], ['role' => 'clusterMonitor', 'db' => 'admin']], ['backup', 'readAnyDatabase']],
+]);
