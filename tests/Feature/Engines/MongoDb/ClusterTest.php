@@ -29,7 +29,7 @@ it('runs the replica set commands with the Go reconfig rules', function () {
     $this->node->driver()->cluster()->membership([new Member('10.0.0.1', 1, true, 2, 4096, 80), new Member('10.0.0.2', 2, false, 2, 4096, 80)]);
     $this->node->driver()->cluster()->forget('10.0.0.3');
 
-    $this->scripts->assertRan('engines.mongodb.cluster.disable', fn (string $script): bool => str_contains($script, 'votingAlone(self)') && str_contains($script, 'reconfig(local(), alone, true)'))
+    $this->scripts->assertRan('engines.mongodb.cluster.disable', fn (string $script): bool => str_contains($script, 'votingAlone(self)') && str_contains($script, 'withoutHost(current, env.SELF), false)'))
         ->assertRan('engines.mongodb.cluster.failover', fn (string $script, array $env): bool => $env['TARGET_HOST'] === '10.0.0.1:25060' && str_contains($script, 'is not a member of the replica set') && str_contains($script, 'replSetStepDown: 60'))
         ->assertRan('engines.mongodb.cluster.membership', fn (string $script, array $env): bool => $env['WANTED'] === '10.0.0.1:25060,10.0.0.2:25060' && $env['NON_VOTING'] === '10.0.0.2:25060')
         ->assertRan('engines.mongodb.members.forget', fn (string $script, array $env): bool => $env['GONE'] === '10.0.0.3:25060');

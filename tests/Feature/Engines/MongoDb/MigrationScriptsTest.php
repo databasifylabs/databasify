@@ -258,17 +258,15 @@ it('stops at once on a reconfig error other than a config still being updated', 
         ->and($reconfigs)->toHaveCount(1);
 });
 
-it('waits for a read-only node to finish leaving before it makes itself a set of one', function () {
+it('lets the primary remove a leaving read-only node and never force-reconfigures the node, so its config cannot reach the members that remain', function () {
     [$reconfigs, $run] = leaveReplicaSetWith([
-        ['ok' => 1],
         ['ok' => 0, 'errmsg' => 'Cannot run replSetReconfig because the node is currently updating its configuration', 'code' => 109, 'codeName' => 'ConfigurationInProgress'],
         ['ok' => 1],
     ], self: '10.0.0.3:25060');
 
     expect($run->output())->toContain('Left the replica set.')
-        ->and(array_column($reconfigs, 'force'))->toBe([false, true, true])
-        ->and(array_column($reconfigs[0]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060'])
-        ->and(array_column($reconfigs[2]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.3:25060']);
+        ->and(array_column($reconfigs, 'force'))->toBe([false, false])
+        ->and(array_column($reconfigs[1]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060']);
 });
 
 it('waits through an election for a primary before it forgets a member', function () {

@@ -77,3 +77,15 @@ it('never returns a call straight out of a try block, whose rejection the async 
 
     expect($offending)->toBe([]);
 });
+
+it('forces a replica set reconfig only in force-quorum, which runs when a majority is confirmed down', function () {
+    $forcing = [];
+
+    foreach (Finder::create()->files()->in(resource_path('views/engines/mongodb'))->name('*.blade.php') as $script) {
+        if (preg_match('/reconfig\([^;]*,\s*true\)|force:\s*true/', $script->getContents()) === 1) {
+            $forcing[] = $script->getRelativePathname();
+        }
+    }
+
+    expect($forcing)->toBe(['cluster/force-quorum.blade.php']);
+});
