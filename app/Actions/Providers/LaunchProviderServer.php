@@ -8,7 +8,6 @@ use App\Actions\Servers\QueueProvisioning;
 use App\Models\Server;
 use App\Models\ServerProvider;
 use RuntimeException;
-use Throwable;
 
 final readonly class LaunchProviderServer
 {
@@ -23,15 +22,9 @@ final readonly class LaunchProviderServer
     {
         $provider = $server->serverProvider ?? throw new RuntimeException("{$server->name} was not ordered from a provider.");
 
-        try {
-            $id = $this->order->handle($server, $provider);
-            $this->instance->handle($server, $provider, $id);
-            $this->ssh->handle($server);
-        } catch (Throwable $exception) {
-            $server->markFailed();
-
-            throw $exception;
-        }
+        $id = $this->order->handle($server, $provider);
+        $this->instance->handle($server, $provider, $id);
+        $this->ssh->handle($server);
 
         $this->provisioning->handle($server, disablePasswordLogin: true);
     }

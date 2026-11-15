@@ -30,6 +30,7 @@ final class LaunchProviderServerJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $this->server->failSetup();
         $this->server->failRunningLogs($this->server->serverProvider === null ? [] : LaunchProviderServer::logNamesFor($this->server->serverProvider), $exception);
     }
 }

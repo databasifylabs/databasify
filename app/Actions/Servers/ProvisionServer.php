@@ -8,7 +8,6 @@ use App\Actions\Networks\JoinWireguardNetwork;
 use App\Enums\Servers\OsFamily;
 use App\Models\Server;
 use App\Services\Ssh\AppSshKey;
-use Throwable;
 
 final readonly class ProvisionServer
 {
@@ -30,28 +29,22 @@ final readonly class ProvisionServer
     {
         $server->markProvisioning();
 
-        try {
-            $facts = $this->facts->handle($server);
-            $network = $server->wireguardNetwork();
-            $family = $facts->supportedSystem()->family();
-            $data = [
-                'user' => $server->ssh_user,
-                'publicKey' => $this->appKey->get()->public_key,
-                'privateIp' => $network === null ? $server->private_ip : null,
-                'family' => $family,
-                'dockerVersion' => config()->string('databasify.docker.version'),
-                'containerdVersion' => config()->string('databasify.docker.containerd'),
-            ];
+        $facts = $this->facts->handle($server);
+        $network = $server->wireguardNetwork();
+        $family = $facts->supportedSystem()->family();
+        $data = [
+            'user' => $server->ssh_user,
+            'publicKey' => $this->appKey->get()->public_key,
+            'privateIp' => $network === null ? $server->private_ip : null,
+            'family' => $family,
+            'dockerVersion' => config()->string('databasify.docker.version'),
+            'containerdVersion' => config()->string('databasify.docker.containerd'),
+        ];
 
-            collect(self::stepsFor($family, $disablePasswordLogin))->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
+        collect(self::stepsFor($family, $disablePasswordLogin))->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
 
-            if ($network !== null) {
-                $this->wireguard->handle($server, $network);
-            }
-        } catch (Throwable $exception) {
-            $server->markFailed();
-
-            throw $exception;
+        if ($network !== null) {
+            $this->wireguard->handle($server, $network);
         }
 
         $server->markProvisioned();

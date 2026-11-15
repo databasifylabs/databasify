@@ -30,6 +30,7 @@ final class ProvisionServerJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $this->server->failSetup();
         $this->server->failRunningLogs(ProvisionServer::logNames($this->disablePasswordLogin), $exception);
     }
 }
