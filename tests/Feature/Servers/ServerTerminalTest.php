@@ -6,6 +6,7 @@ use App\Jobs\Servers\RunTerminalSessionJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Ssh\TerminalSession;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 
 test('a terminal can be opened on a ready server', function () {
@@ -35,6 +36,19 @@ test('input reaches the open terminal', function () {
     $user = User::factory()->create();
     $server = Server::factory()->ready()->create();
     $session = TerminalSession::open($server, $user);
+
+    $this->actingAs($user)
+        ->postJson(route('servers.terminals.input', [$server->project_id, $server, $session->id]), ['data' => base64_encode("ls\n")])
+        ->assertNoContent();
+
+    expect($session->nextInput())->toBe("ls\n");
+});
+
+test('input reaches the terminal when the cache returns its activity time as a string', function () {
+    $user = User::factory()->create();
+    $server = Server::factory()->ready()->create();
+    $session = TerminalSession::open($server, $user);
+    Cache::put("terminals.{$session->id}.active", (string) now()->getTimestamp());
 
     $this->actingAs($user)
         ->postJson(route('servers.terminals.input', [$server->project_id, $server, $session->id]), ['data' => base64_encode("ls\n")])

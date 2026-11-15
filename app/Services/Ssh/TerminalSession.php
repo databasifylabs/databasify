@@ -96,9 +96,7 @@ final readonly class TerminalSession
 
     public function isActive(): bool
     {
-        $activeAt = Cache::get($this->key('active'));
-
-        return is_int($activeAt) && $activeAt > now()->getTimestamp() - self::IDLE_SECONDS;
+        return Cache::integer($this->key('active'), 0) > now()->getTimestamp() - self::IDLE_SECONDS;
     }
 
     public function close(): void
