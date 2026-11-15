@@ -17,7 +17,6 @@ import {
 import ConnectionPoolController from '@/actions/App/Http/Controllers/Databases/ConnectionPoolController';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
 import TrustedSourceController from '@/actions/App/Http/Controllers/Databases/TrustedSourceController';
-import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
 import DatabaseActions from '@/components/databases/actions/database-actions';
 import {
     configurationOf,
