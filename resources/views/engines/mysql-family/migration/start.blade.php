@@ -10,6 +10,11 @@ job_file="$ROOT/state/$MIGRATION_UNIT.sh"
         printf 'export %s=%q\n' "$name" "${!name}"
     done > "$env_file"
     printf '%s' "$COPY_SCRIPT" | base64 -d > "$job_file"
+    if [ "$MIGRATION_CONTINUOUS" = true ]; then
+        : > "$ROOT/state/$MIGRATION_UNIT.continuous"
+    else
+        rm -f "$ROOT/state/$MIGRATION_UNIT.continuous"
+    fi
 )
 databasify ctl run -u "$MIGRATION_UNIT" -r -- /bin/bash -c '. "$0" && rm -f "$0" && exec /bin/bash "$1"' "$env_file" "$job_file" > /dev/null 2>&1 \
     || { rm -f "$env_file"; databasify_fail internal "could not start $MIGRATION_UNIT"; }

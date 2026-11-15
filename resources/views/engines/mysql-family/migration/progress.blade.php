@@ -16,13 +16,18 @@ elif [ "$(property ExecMainStatus)" = 0 ]; then
 fi
 log=$(tail -n 3 "$ROOT/logs/$MIGRATION_UNIT.log" 2> /dev/null | tr '\n' ' ' | sed 's/ $//' || true)
 lag=null
+channel=present
 @if ($engine->id === 'mysql')
-my_try '' <<'SQL'
+my_try '' 2> /dev/null <<'SQL'
 @verbatim
 SELECT c.SERVICE_STATE, a.SERVICE_STATE, GTID_SUBSET(c.RECEIVED_TRANSACTION_SET, @@gtid_executed), IFNULL(TIMESTAMPDIFF(SECOND, (SELECT MAX(LAST_APPLIED_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP) FROM performance_schema.replication_applier_status_by_worker WHERE CHANNEL_NAME = 'migration'), c.LAST_QUEUED_TRANSACTION_ORIGINAL_COMMIT_TIMESTAMP), 0), REPLACE(REPLACE(COALESCE((SELECT CONCAT('Error ', w.LAST_ERROR_NUMBER, ': ', w.LAST_ERROR_MESSAGE) FROM performance_schema.replication_applier_status_by_worker w WHERE w.CHANNEL_NAME = 'migration' AND w.LAST_ERROR_NUMBER <> 0 ORDER BY w.LAST_ERROR_TIMESTAMP DESC LIMIT 1), (SELECT CONCAT('Error ', o.LAST_ERROR_NUMBER, ': ', o.LAST_ERROR_MESSAGE) FROM performance_schema.replication_applier_status_by_coordinator o WHERE o.CHANNEL_NAME = 'migration' AND o.LAST_ERROR_NUMBER <> 0), IF(c.LAST_ERROR_NUMBER <> 0, CONCAT('Error ', c.LAST_ERROR_NUMBER, ': ', c.LAST_ERROR_MESSAGE), NULL), ''), CHAR(9), ' '), CHAR(10), ' ') FROM performance_schema.replication_connection_status c JOIN performance_schema.replication_applier_status a USING (CHANNEL_NAME) WHERE c.CHANNEL_NAME = 'migration'
 @endverbatim
 SQL
-if [ -z "$MY_ERROR" ] && [ -n "$MY_OUTPUT" ]; then
+if [ -n "$MY_ERROR" ]; then
+    channel=unreadable
+elif [ -z "$MY_OUTPUT" ]; then
+    channel=missing
+else
     IFS=$'\t' read -r receiving applying caught_up seconds channel_error <<< "$(head -n 1 <<< "$MY_OUTPUT")"
     if [ "$copy" = succeeded ] && { [ "$receiving" = OFF ] || [ "$applying" = OFF ]; }; then
         copy=failed
@@ -39,8 +44,12 @@ if [ -z "$MY_ERROR" ] && [ -n "$MY_OUTPUT" ]; then
     fi
 fi
 @else
-MY_HEADERS=true my_try '' <<< "SHOW SLAVE 'migration' STATUS"
-if [ -z "$MY_ERROR" ] && [ -n "$MY_OUTPUT" ]; then
+MY_HEADERS=true my_try '' <<< "SHOW SLAVE 'migration' STATUS" 2> /dev/null
+if [[ $MY_ERROR_TEXT == 'Error 1617 '* ]] || { [ -z "$MY_ERROR" ] && [ -z "$MY_OUTPUT" ]; }; then
+    channel=missing
+elif [ -n "$MY_ERROR" ]; then
+    channel=unreadable
+else
     lag=$(awk -F '\t' 'NR == 1 { for (i = 1; i <= NF; i++) column[$i] = i; next } NR == 2 { if ($column["Slave_IO_Running"] == "Yes" && $column["Slave_SQL_Running"] == "Yes" && $column["Seconds_Behind_Master"] ~ /^[0-9]+$/) print $column["Seconds_Behind_Master"]; else print "null" }' <<< "$MY_OUTPUT")
     lag=${lag:-null}
     channel_error=$(awk -F '\t' 'NR == 1 { for (i = 1; i <= NF; i++) column[$i] = i; next } NR == 2 && ($column["Slave_IO_Running"] == "No" || $column["Slave_SQL_Running"] == "No") { error = $column["Last_SQL_Errno"] != 0 ? "Error " $column["Last_SQL_Errno"] ": " $column["Last_SQL_Error"] : $column["Last_IO_Errno"] != 0 ? "Error " $column["Last_IO_Errno"] ": " $column["Last_IO_Error"] : "no error was recorded"; print error }' <<< "$MY_OUTPUT")
@@ -50,4 +59,16 @@ if [ -z "$MY_ERROR" ] && [ -n "$MY_OUTPUT" ]; then
     fi
 fi
 @endif
+if [ "$copy" = succeeded ] && [ -e "$ROOT/state/$MIGRATION_UNIT.continuous" ]; then
+    case "$channel" in
+        missing)
+            copy=failed
+            log='the migration channel does not exist on this server'
+            ;;
+        unreadable)
+            copy=lost
+            log="could not read the migration channel: $MY_ERROR_TEXT"
+            ;;
+    esac
+fi
 result "$(jq -cn --arg copy "$copy" --arg log "$log" --argjson lag "$lag" '{copy: $copy, log: $log, lagSeconds: $lag}')"

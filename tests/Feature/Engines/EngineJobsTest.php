@@ -195,7 +195,7 @@ function runFamilyJobLocally(string $engine, string $job, array $replies, array 
         File::put(sprintf('%s/rules/%03d', $directory, $index++), "{$needle}\n{$reply}");
     }
 
-    $client = "#!/bin/bash\nsql=\$(cat)\nprintf '%s\\n-- end --\\n' \"\$sql\" >> \"\$STUB_DIR/sql.log\"\nfor rule in \"\$STUB_DIR\"/rules/*; do\n    [ -e \"\$rule\" ] || continue\n    if grep -qF -- \"\$(head -n 1 \"\$rule\")\" <<< \"\$sql\"; then\n        tail -n +2 \"\$rule\"\n        exit 0\n    fi\ndone\n";
+    $client = "#!/bin/bash\nsql=\$(cat)\nprintf '%s\\n-- end --\\n' \"\$sql\" >> \"\$STUB_DIR/sql.log\"\nfor rule in \"\$STUB_DIR\"/rules/*; do\n    [ -e \"\$rule\" ] || continue\n    if grep -qF -- \"\$(head -n 1 \"\$rule\")\" <<< \"\$sql\"; then\n        reply=\$(tail -n +2 \"\$rule\")\n        if [[ \$reply == ERROR\\ * ]]; then\n            printf '%s\\n' \"\$reply\" >&2\n            exit 1\n        fi\n        printf '%s\\n' \"\$reply\"\n        exit 0\n    fi\ndone\n";
     $defaults = [
         'mysql' => $client,
         'mariadb' => $client,
@@ -290,6 +290,25 @@ it('reports a stopped migration channel as a failed copy', function (string $eng
     'mysql applier' => ['mysql', 'replication_connection_status', "ON\tOFF\t0\t5\tError 3101: Plugin instructed the server to rollback", 'Error 3101: Plugin instructed the server to rollback'],
     'mariadb' => ['mariadb', 'SHOW SLAVE', "Slave_IO_Running\tSlave_SQL_Running\tSeconds_Behind_Master\tLast_IO_Errno\tLast_IO_Error\tLast_SQL_Errno\tLast_SQL_Error\nNo\tYes\tNULL\t1236\tbinlog purged\t0\t", 'Error 1236: binlog purged'],
 ]);
+
+it('reports a missing channel of a continuous migration as a failed copy', function (string $engine, string $query, string $reply) {
+    $run = runFamilyJobLocally($engine, 'engines.mysql-family.migration.progress', [$query => $reply], ['logs/.keep' => '', "state/{$engine}-migration.continuous" => ''], [
+        'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
+    ], env: ['MIGRATION_UNIT' => "{$engine}-migration"]);
+
+    expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true))->toBe(['copy' => 'failed', 'log' => 'the migration channel does not exist on this server', 'lagSeconds' => null]);
+})->with([
+    'mysql' => ['mysql', 'replication_connection_status', ''],
+    'mariadb' => ['mariadb', 'SHOW SLAVE', "ERROR 1617 (HY000): There is no master connection 'migration'"],
+]);
+
+it('completes a one-time copy that has no channel', function () {
+    $run = runFamilyJobLocally('mariadb', 'engines.mysql-family.migration.progress', ['SHOW SLAVE' => "ERROR 1617 (HY000): There is no master connection 'migration'"], ['logs/.keep' => ''], [
+        'databasify' => "#!/bin/bash\ncase \"\$*\" in *ExecMainStatus*) echo 0 ;; *LoadState*) echo loaded ;; *) echo inactive ;; esac\n",
+    ], env: ['MIGRATION_UNIT' => 'mariadb-migration']);
+
+    expect(json_decode(str($run['output'])->after('DATABASIFY_RESULT ')->trim()->value(), true)['copy'])->toBe('succeeded');
+});
 
 it('reports a running migration channel as caught up', function () {
     $run = runFamilyJobLocally('mysql', 'engines.mysql-family.migration.progress', ['replication_connection_status' => "ON\tON\t1\t0\t"], ['logs/.keep' => ''], [

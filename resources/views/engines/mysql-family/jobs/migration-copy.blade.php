@@ -34,6 +34,7 @@ CHANGE REPLICATION SOURCE TO SOURCE_HOST = $(my_string "$MIGRATION_HOST"), SOURC
 CHANGE REPLICATION FILTER REPLICATE_WILD_DO_TABLE = ($wild) FOR CHANNEL 'migration';
 START REPLICA FOR CHANNEL 'migration';
 SQL
+echo "Following the source from $binlog_file at $binlog_position."
 @else
 @include('engines._write')
 @include('engines.mariadb._remote')
@@ -55,7 +56,7 @@ copy_from "$MIGRATION_HOST" "$MIGRATION_PORT" "$MIGRATION_USER" "$MIGRATION_PASS
 if [ "$from_mariadb" != true ] || [ -z "$COPIED_GTID" ]; then
     fail_task 'the source gave no MariaDB GTID position, so it cannot be followed'
 fi
-my_try '' <<< "STOP SLAVE 'migration'"
+my_try '' <<< "STOP SLAVE 'migration'" 2> /dev/null
 if [ -n "$MY_ERROR" ] && [[ $MY_ERROR_TEXT != *1617* ]]; then
     fail_task "$MY_ERROR_TEXT"
 fi
@@ -65,4 +66,5 @@ CHANGE MASTER 'migration' TO MASTER_HOST = $(my_string "$MIGRATION_HOST"), MASTE
 SET GLOBAL migration.replicate_do_db = $(my_string "$(IFS=,; printf '%s' "${databases[*]}")");
 START SLAVE 'migration';
 SQL
+echo "Following the source from GTID $COPIED_GTID."
 @endif
