@@ -10,7 +10,7 @@ use App\Exceptions\Engines\EngineUnavailable;
 use App\Exceptions\Engines\NotPrimary;
 use Illuminate\Support\Facades\Process;
 
-function runMongoScript(string $stdout, string $stderr, int $exit): array
+function runMongoScript(string $stdout, string $stderr, int $exit, string $view = 'engines.testing.mongo-run'): array
 {
     $bin = sys_get_temp_dir().'/mongosh-'.uniqid();
     mkdir($bin);
@@ -18,7 +18,7 @@ function runMongoScript(string $stdout, string $stderr, int $exit): array
     file_put_contents("{$bin}/mongosh", "#!/bin/bash\nfor arg in \"\$@\"; do printf '%s\\n' \"\$arg\"; done > \"\$STUB_ARGS\"\nprintf '%s' \"\$STUB_STDOUT\"\nprintf '%s' \"\$STUB_STDERR\" >&2\nexit \"\$STUB_EXIT\"\n");
     chmod("{$bin}/timeout", 0755);
     chmod("{$bin}/mongosh", 0755);
-    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), 'engines.testing.mongo-run');
+    $script = resolve(ScriptView::class)->render(idleDatabase('mongodb', 1)->nodes()->sole(), $view);
 
     $run = Process::input($script)->env(['PATH' => $bin.':'.getenv('PATH'), 'STUB_STDOUT' => $stdout, 'STUB_STDERR' => $stderr, 'STUB_EXIT' => (string) $exit, 'STUB_ARGS' => "{$bin}/args", 'WORD' => "it's"])->run(['bash', '-euo', 'pipefail', '-s']);
     $args = (string) @file_get_contents("{$bin}/args");
@@ -45,6 +45,15 @@ it('turns script and connection failures into the codes Go reports', function (s
     'duplicate user' => ["DATABASIFY_ERROR already_exists\nUser \"a@admin\" already exists\n", '', 3, EngineAlreadyExists::class],
     'refused' => ['', 'MongoNetworkError: connect ECONNREFUSED 127.0.0.1:25060', 1, EngineUnavailable::class],
     'other' => ['', 'SyntaxError: Unexpected token', 1, EngineError::class],
+]);
+
+it('reports a refused node as offline and a timed out read as unanswered', function (string $stderr, bool $answers, string $expected) {
+    [$run] = runMongoScript('', $stderr, 1, 'engines.mongodb.nodes.status');
+
+    expect($run->successful())->toBe($answers)->and($run->output())->toContain($expected);
+})->with([
+    'refused' => ['MongoNetworkError: connect ECONNREFUSED 127.0.0.1:25060', true, 'DATABASIFY_RESULT {"role":"offline","version":null}'],
+    'server selection timed out' => ['MongoServerSelectionError: Server selection timed out after 5000 ms', false, 'DATABASIFY_ERROR unavailable'],
 ]);
 
 it('maps server error codes in the prelude like the Go client', function () {

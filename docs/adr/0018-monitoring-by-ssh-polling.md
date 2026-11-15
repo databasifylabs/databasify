@@ -12,7 +12,7 @@ The app needs node status, resource metrics and alerts. Exporters or agents on e
 - Every minute the scheduler queues unique status and metrics jobs for each database on the `monitoring` queue.
 - They send `databasify node status` and `databasify node metrics` to each node, read the host's CPU, memory and disk with a small facts script (`ssh.databases.monitoring.metrics`), and store the samples in the app database (`NodeMetricSample`).
 - Alert thresholds are fixed in code: usage at or above 90% for 5 consecutive samples (`EvaluateResourceAlerts`).
-- A node that does not answer a status read keeps its last known role until it misses 3 reads in a row (about 3 minutes, counted in `missed_status_reads`); only then does it count as unreachable, so one dropped SSH connection never marks a database offline or sends an alert. A stopped engine container counts at once, and any answer resets the count. A silent node that was primary is dropped at once when another node answers as primary, so DNS follows a failover. Checks before a reboot, recovery or promotion treat a node with any missed read as not answering.
+- A node that does not answer a status read keeps its last known role until it misses 3 reads in a row (about 3 minutes, counted in `missed_status_reads`); only then does it count as unreachable, so one dropped SSH connection never marks a database offline or sends an alert. An engine that refuses the connection or a stopped engine container counts as offline at once; a MongoDB read that times out before `mongod` answers (its 5-second server selection on a busy host) is a missed read instead. Any answer resets the count. A silent node that was primary is dropped at once when another node answers as primary, so DNS follows a failover. Checks before a reboot, recovery or promotion treat a node with any missed read as not answering.
 - The status refresh also keeps DNS records following the primary ([0012](0012-dns-hostnames.md)).
 - There is no Prometheus, exporter or agent.
 
@@ -32,4 +32,5 @@ The app needs node status, resource metrics and alerts. Exporters or agents on e
 - `app/Actions/Databases/Monitoring/ReadDatabaseMetrics.php`
 - `app/Actions/Databases/Monitoring/EvaluateResourceAlerts.php`
 - `app/Actions/Databases/Lifecycle/RefreshDatabaseStatus.php`
+- `resources/views/engines/mongodb/nodes/status.blade.php`
 - `app/Models/NodeMetricSample.php`

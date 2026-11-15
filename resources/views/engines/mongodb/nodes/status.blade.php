@@ -5,7 +5,7 @@ main(() => {
   result({ role: state.isWritablePrimary ? 'primary' : (state.secondary ? 'replica' : 'unknown') });
 });
 JS
-if [ "$MONGO_ERROR" = unavailable ]; then
+if [ "$MONGO_ERROR" = unavailable ] && [[ $MONGO_ERROR_TEXT != *'timed out'* ]]; then
     result '{"role":"offline","version":null}'
     exit 0
 elif [ -n "$MONGO_ERROR" ]; then
