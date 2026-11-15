@@ -60,12 +60,17 @@ main(() => {
     } catch (error) {
       return false;
     }
-    if (state.secondary || state.isWritablePrimary) return 'synced';
+    const own = ownConfig();
+    if (state.secondary || state.isWritablePrimary) {
+      if (own !== null) refuseForcedSelfAhead(own);
+      return 'synced';
+    }
     try {
       if (withLocal(true, (admin) => tooStale(runOn(admin, { replSetGetStatus: 1 })))) return 'stale';
     } catch (error) {}
-    if (recoverStrandedSelf()) raisedAt = Date.now();
-    if (raisedAt !== null && Date.now() - raisedAt > STRANDED_RECOVERY_SECONDS * 1000 && !listsSelf()) throw failure('busy', env.SELF + ' did not install the config of the set within ' + STRANDED_RECOVERY_SECONDS + 's after the primary raised its config version; check that the primary can reach it, then redeploy it');
+    const stranded = own !== null && !memberOf(own, env.SELF);
+    if (stranded && raisedAt === null && recoverStrandedSelf(own)) raisedAt = Date.now();
+    if (stranded && raisedAt !== null && Date.now() - raisedAt > STRANDED_RECOVERY_SECONDS * 1000) throw failure('busy', env.SELF + ' did not install the config of the set within ' + STRANDED_RECOVERY_SECONDS + 's after the primary raised its config version; check that the primary can reach it, then redeploy it');
     return false;
   });
   result({ outcome: outcome });

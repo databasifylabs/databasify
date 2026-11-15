@@ -76,16 +76,29 @@ function withLocal(authenticated, body) {
 }
 function reachablePrimaryOf(hosts) {
   for (const host of hosts) {
+    let reached = null;
     try {
-      const reached = connectTo(host, true);
-      if (runOn(reached.admin, { hello: 1 }).isWritablePrimary) return { admin: reached.admin, host: host };
-      reached.connection.close();
+      reached = connectTo(host, true);
+      if (runOn(reached.admin, { hello: 1 }).isWritablePrimary) return { admin: reached.admin, host: host, connection: reached.connection };
     } catch (error) {}
+    if (reached) reached.connection.close();
   }
   throw failure('unavailable', 'no member of the replica set is primary yet');
 }
 const PRIMARY_WAIT_SECONDS = 120;
 function primaryOf(hosts) { return retry(PRIMARY_WAIT_SECONDS, PRIMARY_WAIT_SECONDS + 's', () => reachablePrimaryOf(hosts)); }
+function withPrimary(candidates, body) {
+  const primary = primaryOf(candidates);
+  let outcome;
+  try {
+    outcome = body(primary);
+  } catch (error) {
+    primary.connection.close();
+    throw error;
+  }
+  primary.connection.close();
+  return outcome;
+}
 function configOf(admin) { return runOn(admin, { replSetGetConfig: 1 }).config; }
 const CONFIG_BEING_UPDATED = [109, 117, 308];
 const CONFIG_COMMIT_SECONDS = 120;
@@ -150,28 +163,54 @@ function newerConfig(config, than) {
 }
 function describeConfig(config) { return 'version ' + numberOf(config.version) + (termOf(config) === null ? ' without a term' : ', term ' + termOf(config)); }
 const STRANDED_RECOVERY_SECONDS = 600;
-function listsSelf() {
+function ownConfig() {
   let own = null;
   try {
     own = withLocal(true, configOf);
   } catch (error) {}
-  return own !== null && memberOf(own, env.SELF) !== null;
+  return own;
 }
-function recoverStrandedSelf() {
-  let own;
+function forcedConfig(config) { return termOf(config) === null || termOf(config) === -1; }
+function refuseNewerSelfListing(own, current) {
+  if (forcedConfig(own) && memberOf(own, env.SELF) && newerConfig(own, current)) throw failure('busy', env.SELF + ' holds a forced replica set config (' + describeConfig(own) + ') that is newer than the config of the primary (' + describeConfig(current) + ') and lists itself, so it may hold writes the set does not have; it is not rejoined automatically. Check its data, then resync it from an empty data directory');
+}
+function otherHosts() { return hosts().filter((host) => host !== env.SELF); }
+function refuseForcedSelfAhead(own) {
+  if (!forcedConfig(own) || !memberOf(own, env.SELF)) return;
+  let primary = null;
+  let current = null;
   try {
-    own = withLocal(true, configOf);
-  } catch (error) {
-    return false;
-  }
-  const primary = primaryOf(hosts());
-  const current = configOf(primary.admin);
-  if (!newerConfig(own, current)) return false;
-  if (memberOf(own, env.SELF)) throw failure('busy', env.SELF + ' holds its own replica set config (' + describeConfig(own) + ') that is newer than the config of the primary (' + describeConfig(current) + ') and lists itself, so it may hold writes the set does not have; it is not rejoined automatically. Check its data, then resync it from an empty data directory');
-  if (!memberOf(current, env.SELF)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(current) + '), and the primary does not list it; add it back to the set, then redeploy it');
-  const serving = (runOn(primary.admin, { replSetGetStatus: 1 }).members || []).filter((member) => ['PRIMARY', 'SECONDARY'].includes(member.stateStr) && memberOf(current, member.name) && isVoter(memberOf(current, member.name))).length;
-  if (serving * 2 <= votersOf(current)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(current) + '), but only ' + serving + ' of ' + votersOf(current) + ' voters are primary or secondary, so the primary cannot safely raise its config version; restore a majority, then redeploy it');
-  reconfig(primary.admin, Object.assign({}, current, { version: numberOf(own.version) + 1 }), false);
-  return true;
+    primary = reachablePrimaryOf(otherHosts());
+    current = configOf(primary.admin);
+  } catch (error) {}
+  if (primary) primary.connection.close();
+  if (current) refuseNewerSelfListing(own, current);
 }
+function servingVotersOf(admin, config) {
+  return (runOn(admin, { replSetGetStatus: 1 }).members || []).filter((member) => ['PRIMARY', 'SECONDARY'].includes(member.stateStr) && memberOf(config, member.name) && isVoter(memberOf(config, member.name))).length;
+}
+function raiseAboveStranded(admin, own) {
+  const deadline = Date.now() + CONFIG_COMMIT_SECONDS * 1000;
+  while (true) {
+    const seen = configOf(admin);
+    if (!newerConfig(own, seen)) return false;
+    if (!memberOf(seen, env.SELF)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), and the primary does not list it; add it back to the set, then redeploy it');
+    const serving = servingVotersOf(admin, seen);
+    if (serving * 2 <= votersOf(seen)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), but only ' + serving + ' of ' + votersOf(seen) + ' voters are primary or secondary, so the primary cannot safely raise its config version; restore a majority, then redeploy it, or resync ' + env.SELF + ' from an empty data directory if it is one of the missing voters');
+    if (configCommitted(admin)) {
+      const fresh = configOf(admin);
+      if (numberOf(fresh.version) === numberOf(seen.version) && termOf(fresh) === termOf(seen)) {
+        try {
+          const reply = runOn(admin, { replSetReconfig: Object.assign({}, fresh, { version: numberOf(own.version) + 1 }), force: false });
+          if (reply) return true;
+        } catch (error) {
+          if (!CONFIG_BEING_UPDATED.some((code) => hasCode(error, code))) throw error;
+        }
+      }
+    }
+    if (Date.now() >= deadline) throw new Error('the replica set was still committing its previous config after ' + CONFIG_COMMIT_SECONDS + 's, so its version was not raised above ' + env.SELF);
+    sleep(2000);
+  }
+}
+function recoverStrandedSelf(own) { return withPrimary(otherHosts(), (primary) => raiseAboveStranded(primary.admin, own)); }
 function hosts() { return env.HOSTS.split(',').filter((host) => host !== ''); }

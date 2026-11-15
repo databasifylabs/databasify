@@ -164,7 +164,10 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = [], 
         const quit = (code) => process.exit(code);
         const EJSON = { stringify: JSON.stringify };
         const replies = JSON.parse(process.env.STUB_REPLIES);
-        const sleep = () => {};
+        let elapsed = 0;
+        const realNow = Date.now.bind(Date);
+        Date.now = () => realNow() + elapsed;
+        const sleep = (milliseconds) => { elapsed += milliseconds; };
         const answer = (name, host) => {
           const source = host && replies[host] && replies[host][name] !== undefined ? replies[host] : replies;
           const value = source[name];
@@ -172,7 +175,11 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = [], 
         };
         const databaseOn = (host) => ({ getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(host ? Object.assign({ on: host }, command) : command) + '\n'); return answer(Object.keys(command)[0], host) || { ok: 1 }; } }) });
         const db = databaseOn(null);
-        class Mongo { constructor(uri) { this.host = String(uri).replace(/^mongodb:\/\//, '').split('/')[0]; } getDB() { return databaseOn(this.host).getSiblingDB('admin'); } close() {} }
+        class Mongo {
+          constructor(uri) { this.host = String(uri).replace(/^mongodb:\/\//, '').split('/')[0]; fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify({ connect: this.host }) + '\n'); }
+          getDB() { return databaseOn(this.host).getSiblingDB('admin'); }
+          close() { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify({ close: this.host }) + '\n'); }
+        }
         JS
         cat "${@: -1}" >> "$program"
         node "$program"
@@ -312,25 +319,33 @@ it('waits through an election for a primary before it forgets a member', functio
  * @param  list<array<string, mixed>>  $serving
  * @return array{list<array<string, mixed>>, ProcessResult}
  */
-function rejoinWith(array $own, array $serving, bool $succeeds = true): array
+function rejoinWith(array $own, array $serving, bool $succeeds = true, ?array $set = null, ?array $localHellos = null, ?array &$all = null): array
 {
-    $set = ['_id' => 'databasify', 'version' => 12, 'term' => 3, 'members' => [['_id' => 0, 'host' => '10.0.0.1:25060'], ['_id' => 1, 'host' => '10.0.0.2:25060'], ['_id' => 2, 'host' => '10.0.0.3:25060']]];
+    $set ??= SET_CONFIG;
     [, $commands, $run] = runMongoScriptAgainst('engines.mongodb.cluster.rejoin', [
         '127.0.0.1:25060' => [
-            'hello' => [['ok' => 1, 'secondary' => false, 'isWritablePrimary' => false], ['ok' => 1, 'secondary' => true]],
+            'hello' => $localHellos ?? [['ok' => 1, 'secondary' => false, 'isWritablePrimary' => false], ['ok' => 1, 'secondary' => true]],
             'replSetGetConfig' => ['ok' => 1, 'config' => $own],
             'replSetGetStatus' => ['ok' => 1, 'members' => [['name' => '10.0.0.3:25060', 'self' => true, 'stateStr' => 'REMOVED']]],
         ],
         '10.0.0.1:25060' => [
             'hello' => ['ok' => 1, 'isWritablePrimary' => true],
-            'replSetGetConfig' => ['ok' => 1, 'config' => $set, 'commitmentStatus' => true],
+            'replSetGetConfig' => array_is_list($set) ? array_map(fn (array $config): array => ['ok' => 1, 'config' => $config, 'commitmentStatus' => true], $set) : ['ok' => 1, 'config' => $set, 'commitmentStatus' => true],
             'replSetGetStatus' => ['ok' => 1, 'members' => $serving],
             'replSetReconfig' => ['ok' => 1],
         ],
     ], ['SELF' => '10.0.0.3:25060', 'HOSTS' => '10.0.0.1:25060,10.0.0.2:25060,10.0.0.3:25060', 'READ_ONLY' => 'true'], $succeeds);
 
+    $all = $commands;
+
     return [array_values(array_filter($commands, fn (array $command): bool => array_key_exists('replSetReconfig', $command))), $run];
 }
+
+const SET_CONFIG = ['_id' => 'databasify', 'version' => 12, 'term' => 3, 'members' => [['_id' => 0, 'host' => '10.0.0.1:25060'], ['_id' => 1, 'host' => '10.0.0.2:25060'], ['_id' => 2, 'host' => '10.0.0.3:25060']]];
+
+const STRANDED_CONFIG = ['_id' => 'databasify', 'version' => 30207, 'members' => [['_id' => 3, 'host' => '10.0.0.9:25060', 'votes' => 1, 'priority' => 1]]];
+
+const NOT_SERVING = ['ok' => 1, 'secondary' => false, 'isWritablePrimary' => false];
 
 const HEALTHY_SET = [['name' => '10.0.0.1:25060', 'stateStr' => 'PRIMARY', 'health' => 1], ['name' => '10.0.0.2:25060', 'stateStr' => 'SECONDARY', 'health' => 1], ['name' => '10.0.0.3:25060', 'stateStr' => 'REMOVED', 'health' => 1]];
 
@@ -359,4 +374,47 @@ it('refuses at once to raise the config without a healthy majority', function ()
     expect($run->successful())->toBeFalse()
         ->and($run->output().$run->errorOutput())->toContain('only 1 of 3 voters are primary or secondary')
         ->and($reconfigs)->toBe([]);
+});
+
+it('lets a normal initial sync wait without a reconfig or a primary connection per pass', function () {
+    [$reconfigs, $run] = rejoinWith(SET_CONFIG, HEALTHY_SET, localHellos: [NOT_SERVING, NOT_SERVING, NOT_SERVING, ['ok' => 1, 'secondary' => true]], all: $commands);
+
+    expect($run->successful())->toBeTrue($run->errorOutput())
+        ->and($reconfigs)->toBe([])
+        ->and(array_filter($commands, fn (array $command): bool => ($command['connect'] ?? null) === '10.0.0.1:25060'))->toHaveCount(1);
+});
+
+it('refuses at once to raise the config when the primary does not list the stranded member', function () {
+    $withoutMember = [...SET_CONFIG, 'members' => array_slice(SET_CONFIG['members'], 0, 2)];
+    [$reconfigs, $run] = rejoinWith(STRANDED_CONFIG, HEALTHY_SET, succeeds: false, set: $withoutMember, localHellos: [NOT_SERVING]);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('the primary does not list it')
+        ->and(array_filter($reconfigs, fn (array $reconfig): bool => $reconfig['replSetReconfig']['version'] > 1000))->toBe([]);
+});
+
+it('fails ten minutes after raising the config when the member still has not installed it', function () {
+    [$reconfigs, $run] = rejoinWith(STRANDED_CONFIG, HEALTHY_SET, succeeds: false, localHellos: [NOT_SERVING]);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('did not install the config of the set within 600s')
+        ->and(array_column(array_column($reconfigs, 'replSetReconfig'), 'version'))->toBe([30208]);
+});
+
+it('refuses a member on a newer forced config that lists itself even when it already reports primary', function () {
+    [$reconfigs, $run] = rejoinWith(['_id' => 'databasify', 'version' => 30207, 'members' => [['_id' => 2, 'host' => '10.0.0.3:25060']]], HEALTHY_SET, succeeds: false, localHellos: [['ok' => 1, 'isWritablePrimary' => true]]);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('may hold writes the set does not have')
+        ->and($reconfigs)->toBe([]);
+});
+
+it('raises the latest primary config, not one a concurrent reconfig replaced while it waited', function () {
+    $changed = [...SET_CONFIG, 'version' => 13, 'members' => [SET_CONFIG['members'][0], [...SET_CONFIG['members'][1], 'priority' => 2], SET_CONFIG['members'][2]]];
+    [$reconfigs, $run] = rejoinWith(STRANDED_CONFIG, HEALTHY_SET, set: [SET_CONFIG, SET_CONFIG, $changed, $changed, $changed, $changed]);
+
+    expect($run->successful())->toBeTrue($run->errorOutput())
+        ->and($reconfigs)->toHaveCount(1)
+        ->and($reconfigs[0]['replSetReconfig']['version'])->toBe(30208)
+        ->and($reconfigs[0]['replSetReconfig']['members'][1]['priority'])->toBe(2);
 });
