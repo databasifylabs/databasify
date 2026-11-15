@@ -21,10 +21,10 @@ final readonly class EndMigration
 
     public function handle(DatabaseMigration $migration, bool $cutover, string $run, bool $force = false): void
     {
-        $claimed = ($cutover
+        $finished = $cutover
             ? $migration->finishIfActive(MigrationStatus::Completed, 'Finished: the database no longer follows the source, point your app at it.')
-            : $migration->finishIfActive(MigrationStatus::Stopped, 'Stopped before finishing.'))
-            || $this->tasks->started($migration->host(), $run, CleanUpMigration::STEP);
+            : $migration->finishIfActive(MigrationStatus::Stopped, 'Stopped before finishing.');
+        $claimed = $finished || $this->tasks->started($migration->host(), $run, CleanUpMigration::STEP);
 
         if (($claimed || $force) && $migration->status === MigrationStatus::Completed) {
             $this->recordSchemas->handle($migration);

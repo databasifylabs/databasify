@@ -19,9 +19,9 @@ final readonly class RedeployNode
 
     public function handle(Database $database, DatabaseNode $node, string $run): void
     {
-        $this->rolling->each($database, function (DatabaseNode $node, bool $expectPrimary) use ($run): void {
-            $this->deploy->handle($node->database, $node);
-            $this->rolling->backOnline($node, $run, $expectPrimary);
+        $this->rolling->each($database, function (DatabaseNode $member, bool $expectPrimary) use ($run): void {
+            $this->deploy->handle($member->database, $member);
+            $this->rolling->backOnline($member, $run, $expectPrimary);
         }, $run, only: $node);
 
         $this->refresh->handle($database);

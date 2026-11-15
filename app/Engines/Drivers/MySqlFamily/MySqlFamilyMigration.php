@@ -42,28 +42,14 @@ final readonly class MySqlFamilyMigration implements Migration
         $sizes = $facts->object('sizes');
         $local = $facts->object('localTables');
         $missing = $facts->object('missingKeys');
-        $unreadable = [];
-        $occupied = [];
-        $warnings = [];
-        $bytes = 0;
-
-        foreach ($wanted as $database) {
-            if (! in_array($database, $visible, true)) {
-                $unreadable[] = $database;
-
-                continue;
-            }
-
-            $bytes += $sizes->int($database);
-
-            if ($local->int($database) > 0) {
-                $occupied[] = $database;
-            }
-
-            if ($missing->int($database) > 0) {
-                $warnings[] = "{$database} has {$missing->int($database)} tables without a primary key, which a cluster refuses";
-            }
-        }
+        $readable = collect($wanted)->intersect($visible);
+        $unreadable = array_values(array_diff($wanted, $visible));
+        $bytes = $readable->sum(fn (string $database): int => $sizes->int($database));
+        $occupied = array_values($readable->filter(fn (string $database): bool => $local->int($database) > 0)->all());
+        $warnings = $readable
+            ->filter(fn (string $database): bool => $missing->int($database) > 0)
+            ->map(fn (string $database): string => "{$database} has {$missing->int($database)} tables without a primary key, which a cluster refuses")
+            ->all();
 
         $version = $facts->string('version');
         $release = explode('-', $version, 2)[0];

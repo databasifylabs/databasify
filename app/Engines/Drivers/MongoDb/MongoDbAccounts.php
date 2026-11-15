@@ -113,10 +113,10 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
      */
     private function refuseReserved(array $reserved, string ...$names): void
     {
-        foreach ($names as $name) {
-            if (in_array($name, $reserved, true)) {
-                throw new InvalidEngineRequest("{$name} is reserved");
-            }
+        $taken = collect($names)->first(fn (string $name): bool => in_array($name, $reserved, true));
+
+        if ($taken !== null) {
+            throw new InvalidEngineRequest("{$taken} is reserved");
         }
     }
 

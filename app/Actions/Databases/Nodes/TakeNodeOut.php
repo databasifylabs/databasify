@@ -39,8 +39,10 @@ final readonly class TakeNodeOut
             $leaving->driver()->cluster()->failover($standby->privateIp());
         }
 
-        if ($leavesAlone && $remaining->sole()->driver()->nodes()->status()->role !== NodeRole::Primary) {
-            throw new NotPrimary("{$remaining->sole()->server->name} is not the primary, so running it on its own could serve stale data. Bring {$leaving->server->name} back or fail over to {$remaining->sole()->server->name} first, then remove the node again.");
+        $survivor = $leavesAlone ? $remaining->sole() : null;
+
+        if ($survivor !== null && $survivor->driver()->nodes()->status()->role !== NodeRole::Primary) {
+            throw new NotPrimary("{$survivor->server->name} is not the primary, so running it on its own could serve stale data. Bring {$leaving->server->name} back or fail over to {$survivor->server->name} first, then remove the node again.");
         }
 
         try {
@@ -58,28 +60,28 @@ final readonly class TakeNodeOut
 
         $hosts = array_values($remaining->toBase()->map(fn (DatabaseNode $peer): string => $peer->privateIp())->all());
 
-        foreach ($remaining as $node) {
+        $remaining->each(function (DatabaseNode $peer) use ($database, $leaving, $remaining, $leavesAlone, $hosts): void {
             try {
-                $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node, without: $leaving));
+                $peer->driver()->nodes()->configure($this->nodeConfig->handle($database, $peer, without: $leaving));
                 $forgot = true;
 
                 try {
-                    $node->driver()->cluster()->forget($leaving->privateIp());
+                    $peer->driver()->cluster()->forget($leaving->privateIp());
                 } catch (EngineUnsupported) {
                     $forgot = false;
                 }
 
                 if ($leavesAlone || ($remaining->hasSole() && ! $forgot)) {
-                    $node->driver()->cluster()->disable();
+                    $peer->driver()->cluster()->disable();
                 } elseif (! $forgot) {
-                    $node->driver()->nodes()->reset($remaining->count() - 1, $hosts);
+                    $peer->driver()->nodes()->reset($remaining->count() - 1, $hosts);
                 }
 
-                $node->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
+                $peer->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
             } catch (Throwable $failure) {
-                throw $remaining->hasSole() ? LastNodeDown::after($node, $failure) : $failure;
+                throw $remaining->hasSole() ? LastNodeDown::after($peer, $failure) : $failure;
             }
-        }
+        });
 
         try {
             $this->runtime->remove($leaving, erase: true);

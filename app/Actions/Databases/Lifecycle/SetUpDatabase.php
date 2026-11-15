@@ -40,7 +40,7 @@ final readonly class SetUpDatabase
         $database->markCreating();
         $nodes = $database->orderedNodesWithout();
 
-        foreach ($nodes as $node) {
+        $nodes->each(function (DatabaseNode $node) use ($database, $run): void {
             if (! $this->tasks->started($node, $run, 'ready')) {
                 $this->deploy->handle($database, $node);
 
@@ -54,7 +54,7 @@ final readonly class SetUpDatabase
             }
 
             $this->tasks->await($node, $run, 'ready', 'waiting for the node', fn (string $key): Operation => $node->driver()->nodes()->ready($key, expectPrimary: $node->isSeed()));
-        }
+        });
 
         $settings = $database->settings;
         $source = $settings->restore;
@@ -63,12 +63,12 @@ final readonly class SetUpDatabase
         $joining = $clustered && $this->tasks->started($nodes->firstOrFail(), $run, 'join');
 
         if (! $joining && ($source === null || ! $this->tasks->started($seed, $run, 'restore'))) {
-            foreach ($nodes as $node) {
+            $nodes->each(function (DatabaseNode $node) use ($settings): void {
                 try {
                     $node->driver()->nodes()->bootstrap(Secrets::of($settings), DefaultAccount::of($settings));
                 } catch (EngineUnsupported) {
                 }
-            }
+            });
         }
 
         if ($source !== null) {
