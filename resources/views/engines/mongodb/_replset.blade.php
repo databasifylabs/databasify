@@ -141,4 +141,37 @@ function until(seconds, label, check) {
     sleep(2000);
   }
 }
+function termOf(config) { return config.term === undefined || config.term === null ? null : numberOf(config.term); }
+function newerConfig(config, than) {
+  const term = termOf(config);
+  const otherTerm = termOf(than);
+  if (term !== null && otherTerm !== null && term !== otherTerm) return term > otherTerm;
+  return numberOf(config.version) > numberOf(than.version);
+}
+function describeConfig(config) { return 'version ' + numberOf(config.version) + (termOf(config) === null ? ' without a term' : ', term ' + termOf(config)); }
+const STRANDED_RECOVERY_SECONDS = 600;
+function listsSelf() {
+  let own = null;
+  try {
+    own = withLocal(true, configOf);
+  } catch (error) {}
+  return own !== null && memberOf(own, env.SELF) !== null;
+}
+function recoverStrandedSelf() {
+  let own;
+  try {
+    own = withLocal(true, configOf);
+  } catch (error) {
+    return false;
+  }
+  const primary = primaryOf(hosts());
+  const current = configOf(primary.admin);
+  if (!newerConfig(own, current)) return false;
+  if (memberOf(own, env.SELF)) throw failure('busy', env.SELF + ' holds its own replica set config (' + describeConfig(own) + ') that is newer than the config of the primary (' + describeConfig(current) + ') and lists itself, so it may hold writes the set does not have; it is not rejoined automatically. Check its data, then resync it from an empty data directory');
+  if (!memberOf(current, env.SELF)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(current) + '), and the primary does not list it; add it back to the set, then redeploy it');
+  const serving = (runOn(primary.admin, { replSetGetStatus: 1 }).members || []).filter((member) => ['PRIMARY', 'SECONDARY'].includes(member.stateStr) && memberOf(current, member.name) && isVoter(memberOf(current, member.name))).length;
+  if (serving * 2 <= votersOf(current)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(current) + '), but only ' + serving + ' of ' + votersOf(current) + ' voters are primary or secondary, so the primary cannot safely raise its config version; restore a majority, then redeploy it');
+  reconfig(primary.admin, Object.assign({}, current, { version: numberOf(own.version) + 1 }), false);
+  return true;
+}
 function hosts() { return env.HOSTS.split(',').filter((host) => host !== ''); }

@@ -150,6 +150,8 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = [], 
     $stubs = temporaryDirectory();
     mkdir("{$stubs}/bin");
     file_put_contents("{$stubs}/bin/timeout", "#!/bin/bash\nshift\nexec \"\$@\"\n");
+    file_put_contents("{$stubs}/bin/databasify", "#!/bin/bash\nexit 0\n");
+    chmod("{$stubs}/bin/databasify", 0755);
     file_put_contents("{$stubs}/bin/mongosh", <<<'BASH'
         #!/bin/bash
         if [[ " $* " == *' --nodb '* && " $* " != *' --file '* ]]; then
@@ -163,9 +165,14 @@ function runMongoScriptAgainst(string $script, array $replies, array $env = [], 
         const EJSON = { stringify: JSON.stringify };
         const replies = JSON.parse(process.env.STUB_REPLIES);
         const sleep = () => {};
-        const answer = (name) => Array.isArray(replies[name]) ? (replies[name].length > 1 ? replies[name].shift() : replies[name][0]) : replies[name];
-        const db = { getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(command) + '\n'); return answer(Object.keys(command)[0]) || { ok: 1 }; } }) };
-        class Mongo { getDB() { return db.getSiblingDB('admin'); } close() {} }
+        const answer = (name, host) => {
+          const source = host && replies[host] && replies[host][name] !== undefined ? replies[host] : replies;
+          const value = source[name];
+          return Array.isArray(value) ? (value.length > 1 ? value.shift() : value[0]) : value;
+        };
+        const databaseOn = (host) => ({ getSiblingDB: () => ({ auth: () => {}, runCommand: (command) => { fs.appendFileSync(process.env.STUB_DIR + '/commands', JSON.stringify(host ? Object.assign({ on: host }, command) : command) + '\n'); return answer(Object.keys(command)[0], host) || { ok: 1 }; } }) });
+        const db = databaseOn(null);
+        class Mongo { constructor(uri) { this.host = String(uri).replace(/^mongodb:\/\//, '').split('/')[0]; } getDB() { return databaseOn(this.host).getSiblingDB('admin'); } close() {} }
         JS
         cat "${@: -1}" >> "$program"
         node "$program"
@@ -298,4 +305,58 @@ it('waits through an election for a primary before it forgets a member', functio
         ->and($reconfigs)->toHaveCount(1)
         ->and($reconfigs[0]['force'])->toBeFalse()
         ->and(array_column($reconfigs[0]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060']);
+});
+
+/**
+ * @param  array<string, mixed>  $own
+ * @param  list<array<string, mixed>>  $serving
+ * @return array{list<array<string, mixed>>, ProcessResult}
+ */
+function rejoinWith(array $own, array $serving, bool $succeeds = true): array
+{
+    $set = ['_id' => 'databasify', 'version' => 12, 'term' => 3, 'members' => [['_id' => 0, 'host' => '10.0.0.1:25060'], ['_id' => 1, 'host' => '10.0.0.2:25060'], ['_id' => 2, 'host' => '10.0.0.3:25060']]];
+    [, $commands, $run] = runMongoScriptAgainst('engines.mongodb.cluster.rejoin', [
+        '127.0.0.1:25060' => [
+            'hello' => [['ok' => 1, 'secondary' => false, 'isWritablePrimary' => false], ['ok' => 1, 'secondary' => true]],
+            'replSetGetConfig' => ['ok' => 1, 'config' => $own],
+            'replSetGetStatus' => ['ok' => 1, 'members' => [['name' => '10.0.0.3:25060', 'self' => true, 'stateStr' => 'REMOVED']]],
+        ],
+        '10.0.0.1:25060' => [
+            'hello' => ['ok' => 1, 'isWritablePrimary' => true],
+            'replSetGetConfig' => ['ok' => 1, 'config' => $set, 'commitmentStatus' => true],
+            'replSetGetStatus' => ['ok' => 1, 'members' => $serving],
+            'replSetReconfig' => ['ok' => 1],
+        ],
+    ], ['SELF' => '10.0.0.3:25060', 'HOSTS' => '10.0.0.1:25060,10.0.0.2:25060,10.0.0.3:25060', 'READ_ONLY' => 'true'], $succeeds);
+
+    return [array_values(array_filter($commands, fn (array $command): bool => array_key_exists('replSetReconfig', $command))), $run];
+}
+
+const HEALTHY_SET = [['name' => '10.0.0.1:25060', 'stateStr' => 'PRIMARY', 'health' => 1], ['name' => '10.0.0.2:25060', 'stateStr' => 'SECONDARY', 'health' => 1], ['name' => '10.0.0.3:25060', 'stateStr' => 'REMOVED', 'health' => 1]];
+
+it('raises the primary config above a member stranded on a newer forced config so it rejoins', function () {
+    [$reconfigs, $run] = rejoinWith(['_id' => 'databasify', 'version' => 30207, 'members' => [['_id' => 3, 'host' => '10.0.0.9:25060']]], HEALTHY_SET);
+
+    expect($run->output())->toContain('Syncing…')
+        ->and($reconfigs)->toHaveCount(1)
+        ->and($reconfigs[0]['on'])->toBe('10.0.0.1:25060')
+        ->and($reconfigs[0]['force'])->toBeFalse()
+        ->and($reconfigs[0]['replSetReconfig']['version'])->toBe(30208)
+        ->and(array_column($reconfigs[0]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060', '10.0.0.3:25060']);
+});
+
+it('refuses at once to rejoin a member whose newer own config lists itself, since it may hold writes the set lacks', function () {
+    [$reconfigs, $run] = rejoinWith(['_id' => 'databasify', 'version' => 30207, 'members' => [['_id' => 2, 'host' => '10.0.0.3:25060']]], HEALTHY_SET, succeeds: false);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('may hold writes the set does not have')
+        ->and($reconfigs)->toBe([]);
+});
+
+it('refuses at once to raise the config without a healthy majority', function () {
+    [$reconfigs, $run] = rejoinWith(['_id' => 'databasify', 'version' => 30207, 'members' => [['_id' => 3, 'host' => '10.0.0.9:25060']]], [['name' => '10.0.0.1:25060', 'stateStr' => 'PRIMARY', 'health' => 1], ['name' => '10.0.0.2:25060', 'stateStr' => '(not reachable/healthy)', 'health' => 0], ['name' => '10.0.0.3:25060', 'stateStr' => 'REMOVED', 'health' => 1]], succeeds: false);
+
+    expect($run->successful())->toBeFalse()
+        ->and($run->output().$run->errorOutput())->toContain('only 1 of 3 voters are primary or secondary')
+        ->and($reconfigs)->toBe([]);
 });

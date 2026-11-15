@@ -52,6 +52,7 @@ JS
     synced=$(MONGO_TIMEOUT=21660 mongo_js peers <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
+  let raisedAt = null;
   const outcome = until(21600, '6h0m0s', () => {
     let state = null;
     try {
@@ -63,6 +64,8 @@ main(() => {
     try {
       if (withLocal(true, (admin) => tooStale(runOn(admin, { replSetGetStatus: 1 })))) return 'stale';
     } catch (error) {}
+    if (recoverStrandedSelf()) raisedAt = Date.now();
+    if (raisedAt !== null && Date.now() - raisedAt > STRANDED_RECOVERY_SECONDS * 1000 && !listsSelf()) throw failure('busy', env.SELF + ' did not install the config of the set within ' + STRANDED_RECOVERY_SECONDS + 's after the primary raised its config version; check that the primary can reach it, then redeploy it');
     return false;
   });
   result({ outcome: outcome });
