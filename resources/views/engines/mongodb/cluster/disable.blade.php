@@ -4,9 +4,8 @@ MONGO_TIMEOUT=840 mongo_js root <<'JS'
 main(() => {
   const primary = primaryOf(hosts());
   if (primary.host === env.SELF) {
-    const config = configOf(local());
-    const self = memberOf(config, env.SELF) || { _id: 0, host: env.SELF };
-    reconfig(local(), withMembers(config, [votingAlone(self)]), false);
+    const others = membersOf(configOf(local())).filter((member) => member.host !== env.SELF);
+    if (others.length > 0) throw failure('busy', 'this node is still the primary of a replica set with other members; fail over to another member first, then remove it');
     return emit('Left the replica set.');
   }
   const current = configOf(primary.admin);

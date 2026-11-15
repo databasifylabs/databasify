@@ -82,7 +82,11 @@ it('forces a replica set reconfig only in force-quorum, which runs when a majori
     $forcing = [];
 
     foreach (Finder::create()->files()->in(resource_path('views/engines/mongodb'))->name('*.blade.php') as $script) {
-        if (preg_match('/reconfig\([^;]*,\s*true\)|force:\s*true/', $script->getContents()) === 1) {
+        $contents = $script->getContents();
+        preg_match_all('/^(?!function reconfig).*\breconfig\((.*)\)/m', $contents, $calls);
+        $forcedCall = collect($calls[1])->contains(fn (string $arguments): bool => preg_match('/,\s*false$/', $arguments) !== 1);
+
+        if ($forcedCall || preg_match('/force:\s*+(?!false\b|force\b)/', $contents) === 1) {
             $forcing[] = $script->getRelativePathname();
         }
     }
