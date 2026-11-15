@@ -19,7 +19,7 @@ JS
 resync() {
     MONGO_TIMEOUT=60 mongo_try peers <<'JS'
 @include('engines.mongodb._replset')
-main(() => { primaryOf(hosts()); result({}); });
+main(() => { reachablePrimaryOf(hosts()); result({}); });
 JS
     if [ -n "$MONGO_ERROR" ]; then
         fail_task 'this member is too stale to catch up and no primary is reachable to copy from; its data stays untouched'

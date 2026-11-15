@@ -41,7 +41,7 @@ final readonly class MongoDbCluster implements Cluster
             throw new EngineBusy('forcing the replica set while other members may be alive would roll back writes; confirm the others are down');
         }
 
-        $this->driver->run('engines.mongodb.cluster.force-quorum');
+        $this->driver->run('engines.mongodb.cluster.force-quorum', timeout: self::WAITING_TIMEOUT);
     }
 
     public function membership(array $members): void
@@ -73,7 +73,7 @@ final readonly class MongoDbCluster implements Cluster
 
     public function forget(string $ip): void
     {
-        $this->driver->run('engines.mongodb.members.forget', env: [...$this->setEnvOf(), 'GONE' => MongoDbFiles::hostOf($ip)]);
+        $this->driver->run('engines.mongodb.members.forget', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf(), 'GONE' => MongoDbFiles::hostOf($ip)]);
     }
 
     /**

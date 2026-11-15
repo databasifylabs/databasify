@@ -74,7 +74,7 @@ function withLocal(authenticated, body) {
   local.connection.close();
   return outcome;
 }
-function primaryOf(hosts) {
+function reachablePrimaryOf(hosts) {
   for (const host of hosts) {
     try {
       const reached = connectTo(host, true);
@@ -84,6 +84,8 @@ function primaryOf(hosts) {
   }
   throw failure('unavailable', 'no member of the replica set is primary yet');
 }
+const PRIMARY_WAIT_SECONDS = 120;
+function primaryOf(hosts) { return retry(PRIMARY_WAIT_SECONDS, PRIMARY_WAIT_SECONDS + 's', () => reachablePrimaryOf(hosts)); }
 function configOf(admin) { return runOn(admin, { replSetGetConfig: 1 }).config; }
 const CONFIG_BEING_UPDATED = [109, 117, 308];
 const CONFIG_COMMIT_SECONDS = 120;

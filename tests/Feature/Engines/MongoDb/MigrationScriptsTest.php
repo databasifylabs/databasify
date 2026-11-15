@@ -270,3 +270,19 @@ it('waits for a read-only node to finish leaving before it makes itself a set of
         ->and(array_column($reconfigs[0]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060'])
         ->and(array_column($reconfigs[2]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.3:25060']);
 });
+
+it('waits through an election for a primary before it forgets a member', function () {
+    $config = ['_id' => 'databasify', 'version' => 5, 'term' => 3, 'members' => [['_id' => 0, 'host' => '10.0.0.1:25060'], ['_id' => 1, 'host' => '10.0.0.2:25060'], ['_id' => 2, 'host' => '10.0.0.4:25060', 'votes' => 0, 'priority' => 0]]];
+    [$output, $commands] = runMongoScriptAgainst('engines.mongodb.members.forget', [
+        'hello' => [['ok' => 1, 'isWritablePrimary' => false], ['ok' => 1, 'isWritablePrimary' => false], ['ok' => 1, 'isWritablePrimary' => true]],
+        'replSetGetConfig' => ['ok' => 1, 'config' => $config, 'commitmentStatus' => true],
+        'replSetReconfig' => ['ok' => 1],
+    ], ['GONE' => '10.0.0.4:25060', 'HOSTS' => '10.0.0.1:25060,10.0.0.2:25060']);
+    $reconfigs = array_values(array_filter($commands, fn (array $command): bool => array_key_exists('replSetReconfig', $command)));
+
+    expect($output)->toContain('Removed 10.0.0.4:25060 from the replica set.')
+        ->and(array_filter($commands, fn (array $command): bool => array_key_exists('hello', $command)))->toHaveCount(3)
+        ->and($reconfigs)->toHaveCount(1)
+        ->and($reconfigs[0]['force'])->toBeFalse()
+        ->and(array_column($reconfigs[0]['replSetReconfig']['members'], 'host'))->toBe(['10.0.0.1:25060', '10.0.0.2:25060']);
+});
