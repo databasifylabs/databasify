@@ -347,7 +347,7 @@ export default function UsersTab({
                     </TableBody>
                 </Table>
                 {options.some(
-                    (option) => option.value === 'mysql_native_password',
+                    (option) => option.value === 'caching_sha2_password',
                 ) && (
                     <p className="px-6 text-sm text-muted-foreground">
                         Having trouble connecting? Your MySQL client might not
