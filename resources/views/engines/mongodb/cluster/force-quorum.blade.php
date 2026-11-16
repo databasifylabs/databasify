@@ -1,5 +1,3 @@
-@include('engines.mongodb._mongo')
-MONGO_TIMEOUT=840 mongo_js root <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
   const config = configOf(local());
@@ -9,4 +7,3 @@ main(() => {
   reconfig(local(), withMembers(config, healthy), true);
   emit('Forced a new quorum from the healthy members.');
 });
-JS

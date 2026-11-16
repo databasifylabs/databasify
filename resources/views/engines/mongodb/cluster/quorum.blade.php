@@ -1,5 +1,3 @@
-@include('engines.mongodb._mongo')
-mongo_js root <<'JS'
 @include('engines.mongodb._replset')
 main(() => {
   let config;
@@ -15,4 +13,3 @@ main(() => {
   } catch (error) {}
   result(quorum);
 });
-JS

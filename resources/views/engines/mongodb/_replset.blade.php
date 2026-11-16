@@ -1,3 +1,7 @@
+@isset($self)
+const SELF = @json($self);
+const HOSTS = @json($hosts);
+@endisset
 function numberOf(value) {
   if (value === undefined || value === null) return 0;
   if (typeof value === 'object' && typeof value.toNumber === 'function') return value.toNumber();
@@ -164,11 +168,11 @@ function ownConfig() {
 }
 function forcedConfig(config) { return termOf(config) === null || termOf(config) === -1; }
 function refuseNewerSelfListing(own, current) {
-  if (forcedConfig(own) && memberOf(own, env.SELF) && newerConfig(own, current)) throw failure('busy', env.SELF + ' holds a forced replica set config (' + describeConfig(own) + ') that is newer than the config of the primary (' + describeConfig(current) + ') and lists itself, so it may hold writes the set does not have; it is not rejoined automatically. Check its data, then resync it from an empty data directory');
+  if (forcedConfig(own) && memberOf(own, SELF) && newerConfig(own, current)) throw failure('busy', SELF + ' holds a forced replica set config (' + describeConfig(own) + ') that is newer than the config of the primary (' + describeConfig(current) + ') and lists itself, so it may hold writes the set does not have; it is not rejoined automatically. Check its data, then resync it from an empty data directory');
 }
-function otherHosts() { return hosts().filter((host) => host !== env.SELF); }
+function otherHosts() { return HOSTS.filter((host) => host !== SELF); }
 function refuseForcedSelfAhead(own) {
-  if (!forcedConfig(own) || !memberOf(own, env.SELF)) return;
+  if (!forcedConfig(own) || !memberOf(own, SELF)) return;
   let primary = null;
   let current = null;
   try {
@@ -186,9 +190,9 @@ function raiseAboveStranded(admin, own) {
   while (true) {
     const seen = configOf(admin);
     if (!newerConfig(own, seen)) return false;
-    if (!memberOf(seen, env.SELF)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), and the primary does not list it; add it back to the set, then redeploy it');
+    if (!memberOf(seen, SELF)) throw failure('busy', SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), and the primary does not list it; add it back to the set, then redeploy it');
     const serving = servingVotersOf(admin, seen);
-    if (serving * 2 <= votersOf(seen)) throw failure('busy', env.SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), but only ' + serving + ' of ' + votersOf(seen) + ' voters are primary or secondary, so the primary cannot safely raise its config version; restore a majority, then redeploy it, or resync ' + env.SELF + ' from an empty data directory if it is one of the missing voters');
+    if (serving * 2 <= votersOf(seen)) throw failure('busy', SELF + ' holds a newer replica set config (' + describeConfig(own) + ') than the primary (' + describeConfig(seen) + '), but only ' + serving + ' of ' + votersOf(seen) + ' voters are primary or secondary, so the primary cannot safely raise its config version; restore a majority, then redeploy it, or resync ' + SELF + ' from an empty data directory if it is one of the missing voters');
     if (configCommitted(admin)) {
       const fresh = configOf(admin);
       if (numberOf(fresh.version) === numberOf(seen.version) && termOf(fresh) === termOf(seen)) {
@@ -200,9 +204,8 @@ function raiseAboveStranded(admin, own) {
         }
       }
     }
-    if (Date.now() >= deadline) throw new Error('the replica set was still committing its previous config after ' + CONFIG_COMMIT_SECONDS + 's, so its version was not raised above ' + env.SELF);
+    if (Date.now() >= deadline) throw new Error('the replica set was still committing its previous config after ' + CONFIG_COMMIT_SECONDS + 's, so its version was not raised above ' + SELF);
     sleep(2000);
   }
 }
 function recoverStrandedSelf(own) { return withPrimary(otherHosts(), (primary) => raiseAboveStranded(primary.admin, own)); }
-function hosts() { return env.HOSTS.split(',').filter((host) => host !== ''); }

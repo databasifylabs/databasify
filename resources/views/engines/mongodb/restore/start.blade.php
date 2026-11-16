@@ -37,34 +37,16 @@ sync_storage() {
 echo 'Stopping oplog slicing…'
 sync_storage "$RESTORE_CONFIG"
 echo 'Restoring…'
-pbm_locked restore "--time=$TARGET" --yes --wait || fail_task "$PBM_ERROR"
-if [ -n "$ADMIN_PASSWORD" ]; then
-    mongo_try member <<'JS'
-main(() => { run('admin', { createUser: 'root', pwd: env.ADMIN_PASSWORD, roles: [{ role: 'root', db: 'admin' }] }); result({}); });
-JS
-    if [ -n "$MONGO_ERROR" ]; then
-        mongo_js member > /dev/null <<'JS'
-main(() => { run('admin', { updateUser: 'root', pwd: env.ADMIN_PASSWORD }); result({}); });
-JS
-    fi
-    mongo_js member > /dev/null <<'JS'
+pbm_locked restore {!! $sh->arg('--time='.$target) !!} --yes --wait || fail_task "$PBM_ERROR"
+@if ($savesUsers)
+mongo_js member > /dev/null <<'JS'
+@include('engines.mongodb._service-users')
 main(() => {
-  try {
-    run('admin', { createRole: 'pbmAnyAction', privileges: [{ resource: { anyResource: true }, actions: ['anyAction'] }], roles: [] });
-  } catch (error) {
-    if (codeOf(error) !== 'already_exists') throw error;
-  }
-  const roles = [{ role: 'backup', db: 'admin' }, { role: 'restore', db: 'admin' }, { role: 'clusterMonitor', db: 'admin' }, { role: 'readWrite', db: 'admin' }, { role: 'pbmAnyAction', db: 'admin' }];
-  try {
-    run('admin', { createUser: 'databasify_pbm', pwd: env.AGENT_PASSWORD, roles: roles });
-  } catch (error) {
-    if (codeOf(error) !== 'already_exists') throw error;
-    run('admin', { updateUser: 'databasify_pbm', pwd: env.AGENT_PASSWORD, roles: roles });
-  }
+  saveServiceUsers(env.ADMIN_PASSWORD, env.AGENT_PASSWORD);
   result({});
 });
 JS
-fi
+@endif
 echo 'Backing up…'
 sync_storage "$SAVED_CONFIG"
 pbm_locked backup --compression=zstd --wait || fail_task "$PBM_ERROR"

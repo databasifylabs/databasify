@@ -8,6 +8,7 @@ function codeOf(error) {
   const code = error && error.code;
   if (code === 10107 || code === 13435) return 'not_primary';
   if (code === 11000 || code === 51003 || code === 51002) return 'already_exists';
+  if (code === 11) return 'not_found';
   const name = String((error && error.name) || '');
   const message = String((error && error.message) || error);
   if (name.includes('MongoNetwork') || name.includes('ServerSelection') || message.includes('ECONNREFUSED') || message.includes('Server selection timed out')) return 'unavailable';

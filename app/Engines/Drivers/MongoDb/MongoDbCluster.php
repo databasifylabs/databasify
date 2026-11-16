@@ -7,12 +7,15 @@ namespace App\Engines\Drivers\MongoDb;
 use App\DTOs\Databases\QuorumCount;
 use App\Engines\Contracts\Cluster;
 use App\Engines\Data\Member;
+use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Operation;
 use App\Exceptions\Engines\EngineBusy;
 
 final readonly class MongoDbCluster implements Cluster
 {
     private const int WAITING_TIMEOUT = 900;
+
+    private const int SCRIPT_TIMEOUT = 840;
 
     public function __construct(
         private MongoDbDriver $driver,
@@ -22,17 +25,23 @@ final readonly class MongoDbCluster implements Cluster
 
     public function enable(string $key): Operation
     {
-        return $this->driver->task($key, 'engines.mongodb.cluster.enable', env: $this->setEnvOf());
+        $saved = $this->configuration->savedRequestOf();
+
+        return $this->driver->task($key, 'engines.mongodb.cluster.enable', [...$this->replicaSetOf($saved), 'seed' => $this->lifecycle->isSeed($saved)]);
     }
 
     public function disable(): void
     {
-        $this->driver->run('engines.mongodb.cluster.disable', timeout: self::WAITING_TIMEOUT, env: $this->setEnvOf());
+        $this->driver->query('engines.mongodb.cluster.disable', $this->waitingData(), timeout: self::WAITING_TIMEOUT);
     }
 
     public function failover(string $targetIp): void
     {
-        $this->driver->run('engines.mongodb.cluster.failover', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf(), 'TARGET' => $targetIp, 'TARGET_HOST' => MongoDbFiles::hostOf($targetIp)]);
+        $this->driver->query('engines.mongodb.cluster.failover', [
+            ...$this->waitingData(),
+            'target' => $targetIp,
+            'targetHost' => MongoDbFiles::hostOf($targetIp),
+        ], timeout: self::WAITING_TIMEOUT);
     }
 
     public function forceQuorum(bool $othersDown): void
@@ -41,17 +50,17 @@ final readonly class MongoDbCluster implements Cluster
             throw new EngineBusy('forcing the replica set while other members may be alive would roll back writes; confirm the others are down');
         }
 
-        $this->driver->run('engines.mongodb.cluster.force-quorum', timeout: self::WAITING_TIMEOUT);
+        $this->driver->query('engines.mongodb.cluster.force-quorum', ['timeout' => self::SCRIPT_TIMEOUT], timeout: self::WAITING_TIMEOUT);
     }
 
     public function membership(array $members): void
     {
         $nonVoting = array_filter($members, fn (Member $member): bool => ! $member->voting);
-        $this->driver->run('engines.mongodb.cluster.membership', timeout: self::WAITING_TIMEOUT, env: [
-            ...$this->setEnvOf(),
-            'WANTED' => $this->hostsOf($members),
-            'NON_VOTING' => $this->hostsOf($nonVoting),
-        ]);
+        $this->driver->query('engines.mongodb.cluster.membership', [
+            ...$this->waitingData(),
+            'wanted' => $this->hostsOf($members),
+            'nonVoting' => $this->hostsOf($nonVoting),
+        ], timeout: self::WAITING_TIMEOUT);
     }
 
     public function position(): ?int
@@ -61,41 +70,43 @@ final readonly class MongoDbCluster implements Cluster
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->driver->read('engines.mongodb.cluster.quorum');
+        $reply = $this->driver->queryJson('engines.mongodb.cluster.quorum');
 
         return new QuorumCount($reply->int('total'), $reply->int('online'));
     }
 
     public function rejoin(string $key, bool $readOnly): Operation
     {
-        return $this->driver->task($key, 'engines.mongodb.cluster.rejoin', env: $this->setEnvOf());
+        return $this->driver->task($key, 'engines.mongodb.cluster.rejoin', $this->replicaSetOf($this->configuration->savedRequestOf()));
     }
 
     public function forget(string $ip): void
     {
-        $this->driver->run('engines.mongodb.members.forget', timeout: self::WAITING_TIMEOUT, env: [...$this->setEnvOf(), 'GONE' => MongoDbFiles::hostOf($ip)]);
+        $this->driver->query('engines.mongodb.members.forget', [...$this->waitingData(), 'gone' => MongoDbFiles::hostOf($ip)], timeout: self::WAITING_TIMEOUT);
     }
 
     /**
-     * @return array{HOSTS: string, SELF: string, SEED: string, READ_ONLY: string}
+     * @return array{self: string, hosts: list<string>, readOnly: bool, timeout: int}
      */
-    private function setEnvOf(): array
+    private function waitingData(): array
     {
-        $saved = $this->configuration->savedRequestOf();
+        return [...$this->replicaSetOf($this->configuration->savedRequestOf()), 'timeout' => self::SCRIPT_TIMEOUT];
+    }
 
-        return [
-            'HOSTS' => $this->hostsOf($saved->members),
-            'SELF' => MongoDbFiles::hostOf($saved->ip),
-            'SEED' => $this->lifecycle->isSeed($saved) ? 'true' : 'false',
-            'READ_ONLY' => $saved->readOnly ? 'true' : 'false',
-        ];
+    /**
+     * @return array{self: string, hosts: list<string>, readOnly: bool}
+     */
+    private function replicaSetOf(NodeConfig $saved): array
+    {
+        return ['self' => MongoDbFiles::hostOf($saved->ip), 'hosts' => $this->hostsOf($saved->members), 'readOnly' => $saved->readOnly];
     }
 
     /**
      * @param  array<array-key, Member>  $members
+     * @return list<string>
      */
-    private function hostsOf(array $members): string
+    private function hostsOf(array $members): array
     {
-        return implode(',', array_map(fn (Member $member): string => MongoDbFiles::hostOf($member->ip), $members));
+        return array_values(array_map(fn (Member $member): string => MongoDbFiles::hostOf($member->ip), $members));
     }
 }

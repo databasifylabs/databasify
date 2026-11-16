@@ -40,18 +40,21 @@ final readonly class MongoDbConfiguration
         $saved = $this->state->tunedOf($this->driver, self::TUNED_STATE);
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
         $conf = MongoDbFiles::HOME.'/conf';
+        $mongodConf = "{$conf}/mongod.conf";
+        $keyfile = "{$conf}/keyfile";
 
-        $this->driver->run('engines.mongodb.nodes.configure', env: [
-            'REQUEST_JSON' => NodeState::requestJsonOf($request),
-            'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'FILES' => $this->filesTsvOf([
-                new ConfigFile("{$conf}/mongod.conf", 0o600, MongoDbFiles::mongodConfOf($catalog->effective($tuned, $request->settings))),
-                new ConfigFile("{$conf}/keyfile", 0o400, MongoDbFiles::keyfileOf($request->secrets->replication)),
+        $this->driver->run('engines.mongodb.nodes.configure', [
+            'requestJson' => NodeState::requestJsonOf($request),
+            'tunedJson' => $saved === null ? NodeState::tunedJsonOf($tuned) : null,
+            'files' => [
+                new ConfigFile($mongodConf, 0o600, MongoDbFiles::mongodConfOf($catalog->effective($tuned, $request->settings))),
+                new ConfigFile($keyfile, 0o400, MongoDbFiles::keyfileOf($request->secrets->replication)),
                 new ConfigFile("{$conf}/admin.pw", 0o600, $request->secrets->admin),
                 ...$this->jobsFor($request),
-            ]),
-            'MANIFEST' => base64_encode(MongoDbFiles::manifestOf($request)),
-            'START_AGENT' => $request->archive !== null && $request->secrets->agent !== null ? 'true' : 'false',
+            ],
+            'owned' => [$mongodConf, $keyfile],
+            'manifest' => MongoDbFiles::manifestOf($request),
+            'agent' => MongoDbFiles::runsAgent($request),
         ]);
     }
 
@@ -81,18 +84,10 @@ final readonly class MongoDbConfiguration
      */
     private function jobsFor(NodeConfig $request): array
     {
-        if ($request->archive === null || $request->secrets->agent === null) {
+        if (! MongoDbFiles::runsAgent($request)) {
             return [];
         }
 
         return [new ConfigFile(MongoDbFiles::BACKUP_JOB, self::JOB_MODE, $this->driver->script('engines.mongodb.jobs.backup'))];
-    }
-
-    /**
-     * @param  list<ConfigFile>  $files
-     */
-    private function filesTsvOf(array $files): string
-    {
-        return implode("\n", array_map(fn (ConfigFile $file): string => $file->path."\t".decoct($file->mode)."\t".base64_encode($file->content), $files));
     }
 }

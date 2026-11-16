@@ -1,10 +1,8 @@
-@include('engines.mongodb._mongo')
-MONGO_TIMEOUT=840 mongo_js root <<'JS'
 @include('engines.mongodb._replset')
+const GONE = @json($gone);
 main(() => {
-  const primary = primaryOf(hosts());
+  const primary = primaryOf(HOSTS);
   const config = configOf(primary.admin);
-  if (memberOf(config, env.GONE)) reconfig(primary.admin, withoutHost(config, env.GONE), false);
-  emit('Removed ' + env.GONE + ' from the replica set.');
+  if (memberOf(config, GONE)) reconfig(primary.admin, withoutHost(config, GONE), false);
+  emit('Removed ' + GONE + ' from the replica set.');
 });
-JS

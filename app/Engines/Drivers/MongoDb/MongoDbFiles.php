@@ -82,6 +82,11 @@ final readonly class MongoDbFiles
         return IndentedJson::of(['processes' => $processes, 'schedules' => $schedules]);
     }
 
+    public static function runsAgent(NodeConfig $request): bool
+    {
+        return $request->archive !== null && $request->secrets->agent !== null;
+    }
+
     public static function hostOf(string $ip): string
     {
         return $ip.':'.self::CLIENT_PORT;

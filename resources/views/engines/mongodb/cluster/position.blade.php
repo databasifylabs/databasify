@@ -4,10 +4,9 @@ if ! unit_active mongod; then
     exit 0
 fi
 mongo_try root <<'JS'
-@include('engines.mongodb._replset')
 main(() => {
-  const optime = selfOf(run('admin', { replSetGetStatus: 1 })).optimeDate;
-  result({ position: optime ? Math.floor(new Date(optime).getTime() / 1000) : -1 });
+  const self = (run('admin', { replSetGetStatus: 1 }).members || []).find((member) => member.self) || {};
+  result({ position: self.optimeDate ? Math.floor(new Date(self.optimeDate).getTime() / 1000) : -1 });
 });
 JS
 if [ -n "$MONGO_ERROR" ]; then

@@ -1,5 +1,3 @@
-@include('engines.mongodb._mongo')
-mongo_js root <<'JS'
 main(() => {
   const parameters = run('admin', { getParameter: 1, logLevel: 1, transactionLifetimeLimitSeconds: 1 });
   const cache = run('admin', { serverStatus: 1 }).wiredTiger.cache['maximum bytes configured'];
@@ -17,4 +15,3 @@ main(() => {
     defaultWriteConcern: String((concern.defaultWriteConcern && concern.defaultWriteConcern.w) || ''),
   } });
 });
-JS

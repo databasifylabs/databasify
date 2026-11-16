@@ -1,33 +1,16 @@
 @include('engines.mongodb._mongo')
-@include('engines.mongodb._pbm')
 @include('engines.mongodb._pcsm')
 property() {
     databasify ctl show -p "$1" --value mongodb-migration 2> /dev/null || true
 }
-
-if [ "$(property LoadState)" = not-found ]; then
-    result '{"copy":"lost","log":"","lagSeconds":null}'
-    exit 0
-fi
-copy=failed
-if [ "$(property ActiveState)" = active ] && [ "$(property SubState)" = running ]; then
-    copy=running
-elif [ "$(property ExecMainStatus)" = 0 ]; then
-    copy=succeeded
-fi
-log=$(tail -n 3 "$ROOT/logs/mongodb-migration.log" 2> /dev/null | tr '\n' ' ' | sed 's/ $//' || true)
-lag=null
-if status=$(pcsm_status); then
-    clustersync=$(json_eval "$status" 'print(input.state === "failed" ? "failed " + String(input.error || "no error given") : (input.state === "running" && input.initialSync && input.initialSync.completed ? "synced " + String(Math.max(Number(input.lagTimeSeconds || 0), 0)) : "copying"))') || clustersync=copying
-    case $clustersync in
-        failed\ *)
-            copy=failed
-            log="ClusterSync failed: ${clustersync#failed }"
-            ;;
-        synced\ *)
-            copy=succeeded
-            lag=${clustersync#synced }
-            ;;
-    esac
-fi
-result "$(COPY=$copy LOG=$log LAG=$lag mongosh --nodb --quiet --norc --eval 'print(JSON.stringify({ copy: process.env.COPY, log: process.env.LOG, lagSeconds: process.env.LAG === "null" ? null : Number(process.env.LAG) }))')"
+clustersync=$(pcsm_status) || clustersync=null
+output=$(LOAD_STATE=$(property LoadState) ACTIVE_STATE=$(property ActiveState) SUB_STATE=$(property SubState) EXIT_STATUS=$(property ExecMainStatus) \
+    LOG=$(tail -n 3 "$ROOT/logs/mongodb-migration.log" 2> /dev/null | tr '\n' ' ' | sed 's/ $//' || true) CLUSTERSYNC=$clustersync \
+    mongosh --nodb --quiet --norc --eval '
+const env = process.env;
+let clustersync = null;
+try {
+  clustersync = JSON.parse(env.CLUSTERSYNC);
+} catch (error) {}
+print(JSON.stringify({ loadState: env.LOAD_STATE, activeState: env.ACTIVE_STATE, subState: env.SUB_STATE, exitStatus: env.EXIT_STATUS, log: env.LOG, clustersync: clustersync }));')
+result "$output"

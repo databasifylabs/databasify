@@ -1,13 +1,4 @@
-@include('engines.mongodb._mongo')
-mongo_js root <<'JS'
-@include('engines.mongodb._roles')
 main(() => {
-  const roles = rolesOf(JSON.parse(env.GRANTS), env.REPLICATION === 'true');
-  try {
-    run('admin', { updateUser: env.NAME, roles: roles });
-  } catch (error) {
-    notFoundAsUser(error);
-  }
-  emit('Updated the grants of ' + env.NAME + '.');
+  run('admin', { updateUser: @json($name), roles: @json($roles) });
+  emit('Updated the grants of the user.');
 });
-JS

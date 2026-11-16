@@ -17,7 +17,7 @@ function stepOf(status, cutover) {
   if (cutover) return "refuse " + state + (status.error ? ": " + String(status.error) : "");
   return state === "running" ? "pause" : "none";
 }
-print(stepOf(input, process.env.MIGRATION_CUTOVER === "true"));
+print(stepOf(input, @json($cutover)));
 JS
 )"
 }
@@ -61,11 +61,12 @@ if status=$(pcsm_status); then
             fail_task "ClusterSync gave an unknown stop step '$step', so nothing was cleaned up"
             ;;
     esac
-elif [ "${MIGRATION_CUTOVER:-false}" = true ]; then
-    if unit_active mongodb-migration; then
-        fail_task 'ClusterSync is running but does not answer, clean up again once it answers'
-    fi
-    [ -f "$finalized_marker" ] || fail_task 'the cutover never confirmed finalized; check indexes before cleaning up'
+@if ($cutover)
+elif unit_active mongodb-migration; then
+    fail_task 'ClusterSync is running but does not answer, clean up again once it answers'
+elif [ ! -f "$finalized_marker" ]; then
+    fail_task 'the cutover never confirmed finalized; check indexes before cleaning up'
+@endif
 fi
 databasify ctl stop mongodb-migration > /dev/null 2>&1 || true
 databasify ctl reset-failed mongodb-migration > /dev/null 2>&1 || true

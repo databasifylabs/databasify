@@ -58,6 +58,16 @@ final readonly class MongoDbDriver extends AbstractEngineDriver
         return new MongoDbMigration($this);
     }
 
+    protected function queryRunner(): string
+    {
+        return 'engines.mongodb._query';
+    }
+
+    protected function viewData(): array
+    {
+        return ['auth' => 'root', 'timeout' => 100];
+    }
+
     private function configuration(): MongoDbConfiguration
     {
         return new MongoDbConfiguration($this, new NodeState);

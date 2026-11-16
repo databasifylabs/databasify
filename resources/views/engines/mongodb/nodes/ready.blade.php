@@ -1,6 +1,8 @@
 @include('engines.mongodb._mongo')
-@include('engines.mongodb._units')
 echo 'Waiting for MongoDB…'
+restarts() {
+    databasify ctl show -p NRestarts --value mongod 2> /dev/null || echo 0
+}
 baseline=$(restarts)
 serving() {
     if [ $(( $(restarts) - baseline )) -gt 3 ]; then

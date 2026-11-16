@@ -20,14 +20,15 @@ final readonly class MongoDbConfig implements Config
     public function apply(): void
     {
         $value = $this->valuesOf();
+        $writeConcern = $value(MongoDbSettings::WRITE_CONCERN);
 
-        $this->driver->run('engines.mongodb.config.apply', env: [
-            'VERBOSITY' => (string) (int) $value(MongoDbSettings::VERBOSITY),
-            'LIFETIME' => (string) (int) $value(MongoDbSettings::TRANSACTIONS),
-            'SLOW' => (string) (int) $value(MongoDbSettings::SLOW_OPERATION),
-            'CACHE_MB' => (string) (int) ((float) $value(MongoDbSettings::CACHE_SIZE) * 1024),
-            'READ_CONCERN' => $value(MongoDbSettings::READ_CONCERN),
-            'WRITE_CONCERN' => $value(MongoDbSettings::WRITE_CONCERN),
+        $this->driver->query('engines.mongodb.config.apply', [
+            'verbosity' => (int) $value(MongoDbSettings::VERBOSITY),
+            'lifetime' => (int) $value(MongoDbSettings::TRANSACTIONS),
+            'slow' => (int) $value(MongoDbSettings::SLOW_OPERATION),
+            'cacheMb' => (int) ((float) $value(MongoDbSettings::CACHE_SIZE) * 1024),
+            'readConcern' => $value(MongoDbSettings::READ_CONCERN),
+            'writeConcern' => preg_match('/^-?\d+$/', $writeConcern) === 1 ? (int) $writeConcern : $writeConcern,
         ]);
     }
 
@@ -36,7 +37,7 @@ final readonly class MongoDbConfig implements Config
     public function pendingRestart(): array
     {
         $effective = $this->configuration->effectiveOf($this->configuration->savedRequestOf());
-        $live = $this->driver->read('engines.mongodb.config.show')->stringMap('values');
+        $live = $this->driver->queryJson('engines.mongodb.config.show')->stringMap('values');
         $pending = array_filter(MongoDbSettings::catalog()->fields, fn (EngineField $field): bool => $field->restart && isset($effective[$field->key]) && ($live[$field->key] ?? '') !== $effective[$field->key]);
 
         return array_values(array_map(fn (EngineField $field): string => $field->key, $pending));

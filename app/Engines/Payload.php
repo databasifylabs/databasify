@@ -109,6 +109,14 @@ final readonly class Payload
     }
 
     /**
+     * @return list<self>
+     */
+    public function optionalObjects(string $key): array
+    {
+        return $this->valueOf($key) === null ? [] : $this->objects($key);
+    }
+
+    /**
      * @return array<string, string>
      */
     public function stringMap(string $key): array
