@@ -20,8 +20,6 @@ abstract readonly class SentinelDriver extends AbstractEngineDriver
     {
         return new EngineFacts(
             features: [Feature::Migration],
-            passwordEncryptions: [],
-            defaultPasswordEncryption: null,
             reservedUsers: [],
             reservedDatabases: [],
             ports: new Ports(ClientPorts::KEY_VALUE, null, [SentinelFiles::DATA_PORT, SentinelFiles::SENTINEL_PORT]),

@@ -9,6 +9,7 @@ use App\Engines\Contracts\MigrationSourceRoles;
 use App\Engines\Data\AccountList;
 use App\Engines\Data\Grant;
 use App\Engines\Scripts\Shell;
+use App\Enums\Databases\PasswordEncryption;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
@@ -16,10 +17,6 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
     public const array RESERVED_USERS = ['root', 'databasify_pbm', '__system'];
 
     public const array RESERVED_DATABASES = ['admin', 'local', 'config'];
-
-    private const string SCRAM_SHA_256 = 'SCRAM-SHA-256';
-
-    private const array ENCRYPTIONS = [self::SCRAM_SHA_256, 'SCRAM-SHA-1'];
 
     public function __construct(
         private MongoDbDriver $driver,
@@ -46,7 +43,7 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
         $this->driver->run('engines.mongodb.accounts.drop-database', env: ['NAME' => Shell::withoutNul($name)]);
     }
 
-    public function createUser(string $name, string $password, array $grants, ?string $encryption): void
+    public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
         $env = [...$this->passwordEnv($password, $encryption), ...$this->grantEnv($name, $grants, false)];
@@ -54,7 +51,7 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
         $this->driver->run('engines.mongodb.accounts.create-user', env: $env);
     }
 
-    public function setPassword(string $name, string $password, ?string $encryption): void
+    public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void
     {
         $this->refuseReserved(self::RESERVED_USERS, $name);
         $this->driver->run('engines.mongodb.accounts.set-password', env: [...$this->passwordEnv($password, $encryption), 'NAME' => Shell::withoutNul($name)]);
@@ -81,19 +78,19 @@ final readonly class MongoDbAccounts implements Accounts, MigrationSourceRoles
     /**
      * @return array{PASSWORD: string, ENCRYPTION: string}
      */
-    private function passwordEnv(string $password, ?string $requested): array
+    private function passwordEnv(string $password, ?PasswordEncryption $requested): array
     {
-        $encryption = $requested ?? self::SCRAM_SHA_256;
+        $encryption = $requested ?? PasswordEncryption::ScramSha256;
 
-        if (! in_array($encryption, self::ENCRYPTIONS, true)) {
-            throw new InvalidEngineRequest('password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
+        if (! in_array($encryption, MongoDbDriver::facts($this->driver->node->database->version_line)->passwordEncryptions, true)) {
+            throw new InvalidEngineRequest('password encryption '.json_encode($encryption->value, JSON_THROW_ON_ERROR).' is not offered');
         }
 
-        if ($encryption === self::SCRAM_SHA_256 && preg_match('/\p{Cc}/u', $password) === 1) {
+        if ($encryption === PasswordEncryption::ScramSha256 && preg_match('/\p{Cc}/u', $password) === 1) {
             throw new InvalidEngineRequest('a SCRAM-SHA-256 password cannot contain control characters such as a newline or tab');
         }
 
-        return ['PASSWORD' => Shell::withoutNul($password), 'ENCRYPTION' => $encryption];
+        return ['PASSWORD' => Shell::withoutNul($password), 'ENCRYPTION' => $encryption->value];
     }
 
     /**

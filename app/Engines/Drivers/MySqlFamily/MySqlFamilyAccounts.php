@@ -8,6 +8,7 @@ use App\Engines\Contracts\Accounts;
 use App\Engines\Data\AccountList;
 use App\Engines\Data\Grant;
 use App\Engines\Scripts\MySqlSql;
+use App\Enums\Databases\PasswordEncryption;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class MySqlFamilyAccounts implements Accounts
@@ -37,12 +38,12 @@ final readonly class MySqlFamilyAccounts implements Accounts
         $this->scripts->run($this->driver, 'engines.mysql-family.accounts.drop-database', ['name' => $name, 'users' => $this->driver->node->database->userNames()]);
     }
 
-    public function createUser(string $name, string $password, array $grants, ?string $encryption): void
+    public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void
     {
         $this->scripts->run($this->driver, 'engines.mysql-family.accounts.create-user', [...$this->grantData($name, $grants), 'identified' => $this->identifiedBy($password, $encryption)]);
     }
 
-    public function setPassword(string $name, string $password, ?string $encryption): void
+    public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void
     {
         $identified = $this->identifiedBy($password, $encryption);
         $this->refuseReserved($this->driver->engine()->reservedUsers, $name);
@@ -60,13 +61,13 @@ final readonly class MySqlFamilyAccounts implements Accounts
         $this->scripts->query($this->driver, 'engines.mysql-family.accounts.drop-user', ['name' => $name]);
     }
 
-    private function identifiedBy(string $password, ?string $requested): string
+    private function identifiedBy(string $password, ?PasswordEncryption $requested): string
     {
         $engine = $this->driver->engine();
         $encryption = $requested ?? $engine->defaultEncryption;
 
         if (! in_array($encryption, $engine->encryptionsOn($this->driver->node->database->version_line), true)) {
-            throw new InvalidEngineRequest('password encryption '.json_encode($encryption, JSON_THROW_ON_ERROR).' is not offered');
+            throw new InvalidEngineRequest('password encryption '.json_encode($encryption->value, JSON_THROW_ON_ERROR).' is not offered');
         }
 
         [$by, $close] = $engine->identifiedWith($encryption);

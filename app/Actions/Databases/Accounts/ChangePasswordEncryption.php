@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Accounts;
 
+use App\Enums\Databases\PasswordEncryption;
 use App\Models\DatabaseUser;
 use Illuminate\Validation\ValidationException;
 
 final readonly class ChangePasswordEncryption
 {
-    public function handle(DatabaseUser $user, string $encryption): DatabaseUser
+    public function handle(DatabaseUser $user, PasswordEncryption $encryption): DatabaseUser
     {
         $user->database->ensureRunsSupportedSdk();
         if (! $user->hasEncryptionChoice()) {

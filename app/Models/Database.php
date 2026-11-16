@@ -38,6 +38,7 @@ use App\Enums\Databases\DatabaseMode;
 use App\Enums\Databases\DatabaseStatus;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeKind;
+use App\Enums\Databases\PasswordEncryption;
 use App\Enums\Databases\Persistence;
 use App\Enums\Engines\Feature;
 use App\Enums\Migrations\MigrationMode;
@@ -646,14 +647,14 @@ class Database extends Model implements Movable
     }
 
     /**
-     * @return list<string>
+     * @return list<PasswordEncryption>
      */
     public function passwordEncryptions(): array
     {
         return $this->facts()->passwordEncryptions;
     }
 
-    public function passwordEncryptionFor(?string $chosen): ?string
+    public function passwordEncryptionFor(?PasswordEncryption $chosen): ?PasswordEncryption
     {
         $default = $this->facts()->defaultPasswordEncryption;
 

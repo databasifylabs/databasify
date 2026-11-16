@@ -6,6 +6,7 @@ namespace App\Engines\Contracts;
 
 use App\Engines\Data\AccountList;
 use App\Engines\Data\Grant;
+use App\Enums\Databases\PasswordEncryption;
 
 interface Accounts
 {
@@ -18,9 +19,9 @@ interface Accounts
     /**
      * @param  list<Grant>  $grants
      */
-    public function createUser(string $name, string $password, array $grants, ?string $encryption): void;
+    public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void;
 
-    public function setPassword(string $name, string $password, ?string $encryption): void;
+    public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void;
 
     /**
      * @param  list<Grant>  $grants

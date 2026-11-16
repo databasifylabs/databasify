@@ -72,7 +72,7 @@ class DatabaseResource extends DatabaseListResource
     }
 
     /**
-     * @param  list<string>  $encryptions
+     * @param  list<PasswordEncryption>  $encryptions
      * @return list<array{value: string, label: string}>
      */
     private function encryptionChoicesOf(array $encryptions): array
@@ -81,7 +81,7 @@ class DatabaseResource extends DatabaseListResource
             return [];
         }
 
-        return array_map(fn (string $encryption): array => ['value' => $encryption, 'label' => PasswordEncryption::from($encryption)->label()], $encryptions);
+        return array_map(fn (PasswordEncryption $encryption): array => ['value' => $encryption->value, 'label' => $encryption->label()], $encryptions);
     }
 
     private function networkOfNodes(): ?NetworkResource

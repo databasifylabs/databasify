@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Databases\EngineImage;
 use App\Engines\Data\Grant;
 use App\Enums\Databases\GrantAccess;
+use App\Enums\Databases\PasswordEncryption;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\User;
@@ -77,8 +78,8 @@ test('a mysql user can switch password encryption', function () {
         ->post(route('databases.users.encryption', [$database->project_id, $database, $user]), ['password_encryption' => 'mysql_native_password'])
         ->assertSessionHasNoErrors();
 
-    expect($user->refresh()->password_encryption)->toBe('mysql_native_password')
-        ->and(engine()->callsOf('accounts.setPassword')->sole()['args'])->toBe(['legacy', 'secret', 'mysql_native_password']);
+    expect($user->refresh()->password_encryption)->toBe(PasswordEncryption::MysqlNativePassword)
+        ->and(engine()->callsOf('accounts.setPassword')->sole()['args'])->toBe(['legacy', 'secret', PasswordEncryption::MysqlNativePassword]);
 });
 
 test('password encryptions the engine does not offer are refused', function () {

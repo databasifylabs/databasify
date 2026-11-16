@@ -30,6 +30,7 @@ use App\Engines\Data\Storage;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
 use App\Engines\EngineCatalog;
+use App\Enums\Databases\PasswordEncryption;
 use Carbon\CarbonImmutable;
 
 final readonly class RecordingDriver extends AbstractEngineDriver
@@ -213,12 +214,12 @@ final readonly class RecordingDriver extends AbstractEngineDriver
                 $this->record(__FUNCTION__, func_get_args());
             }
 
-            public function createUser(string $name, string $password, array $grants, ?string $encryption): void
+            public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void
             {
                 $this->record(__FUNCTION__, func_get_args());
             }
 
-            public function setPassword(string $name, string $password, ?string $encryption): void
+            public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void
             {
                 $this->record(__FUNCTION__, func_get_args());
             }

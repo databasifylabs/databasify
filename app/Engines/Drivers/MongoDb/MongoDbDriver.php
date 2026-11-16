@@ -9,6 +9,7 @@ use App\Engines\Data\HostProfile;
 use App\Engines\Data\Ports;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Support\NodeState;
+use App\Enums\Databases\PasswordEncryption;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
 
@@ -18,8 +19,8 @@ final readonly class MongoDbDriver extends AbstractEngineDriver
     {
         return new EngineFacts(
             features: [Feature::Accounts, Feature::Archive, Feature::Migration],
-            passwordEncryptions: ['SCRAM-SHA-256', 'SCRAM-SHA-1'],
-            defaultPasswordEncryption: 'SCRAM-SHA-256',
+            passwordEncryptions: [PasswordEncryption::ScramSha256, PasswordEncryption::ScramSha1],
+            defaultPasswordEncryption: PasswordEncryption::ScramSha256,
             reservedUsers: ['root', 'databasify_pbm', '__system'],
             reservedDatabases: ['admin', 'local', 'config'],
             ports: new Ports(ClientPorts::CLIENT, null, []),

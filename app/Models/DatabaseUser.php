@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Databases\PasswordEncryption;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -17,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  * @property string $database_id
  * @property string $name
  * @property string $password
- * @property string|null $password_encryption
+ * @property PasswordEncryption|null $password_encryption
  * @property-read Database $database
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -55,6 +56,6 @@ class DatabaseUser extends Model
 
     protected function casts(): array
     {
-        return ['password' => 'encrypted'];
+        return ['password' => 'encrypted', 'password_encryption' => PasswordEncryption::class];
     }
 }

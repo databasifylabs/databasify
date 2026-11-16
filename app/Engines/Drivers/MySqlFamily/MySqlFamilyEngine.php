@@ -6,6 +6,7 @@ namespace App\Engines\Drivers\MySqlFamily;
 
 use App\Engines\Drivers\MariaDb\MariaDbFiles;
 use App\Engines\Drivers\MySql\MySqlFiles;
+use App\Enums\Databases\PasswordEncryption;
 use InvalidArgumentException;
 
 final readonly class MySqlFamilyEngine
@@ -21,7 +22,7 @@ final readonly class MySqlFamilyEngine
         public string $home,
         public string $client,
         public string $daemon,
-        public string $defaultEncryption,
+        public PasswordEncryption $defaultEncryption,
         public array $reservedUsers,
         public array $reservedDatabases,
         public array $peerPorts,
@@ -30,10 +31,10 @@ final readonly class MySqlFamilyEngine
     public static function of(string $engine): self
     {
         return match ($engine) {
-            'mysql' => new self('mysql', 'MySQL', '/srv/mysql', 'mysql', 'mysqld', 'caching_sha2_password',
+            'mysql' => new self('mysql', 'MySQL', '/srv/mysql', 'mysql', 'mysqld', PasswordEncryption::CachingSha2Password,
                 ['root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'databasify_repl', 'databasify_agent'],
                 ['mysql', 'sys', 'performance_schema', 'information_schema'], [33061]),
-            'mariadb' => new self('mariadb', 'MariaDB', '/srv/mariadb', 'mariadb', 'mariadbd', 'mysql_native_password',
+            'mariadb' => new self('mariadb', 'MariaDB', '/srv/mariadb', 'mariadb', 'mariadbd', PasswordEncryption::MysqlNativePassword,
                 ['root', 'mysql', 'mariadb.sys', 'databasify_sst', 'databasify_repl', 'databasify_agent'],
                 ['mysql', 'sys', 'performance_schema', 'information_schema', 'databasify'], [4444, 4567, 4568]),
             default => throw new InvalidArgumentException("{$engine} is not a MySQL family engine."),
@@ -41,25 +42,25 @@ final readonly class MySqlFamilyEngine
     }
 
     /**
-     * @return list<string>
+     * @return list<PasswordEncryption>
      */
     public function encryptionsOn(string $line): array
     {
         return match (true) {
-            $this->id === 'mysql' => MySqlFiles::nativePasswords($line) ? ['caching_sha2_password', 'mysql_native_password'] : ['caching_sha2_password'],
-            MariaDbFiles::parsecOffered($line) => ['mysql_native_password', 'ed25519', 'parsec'],
-            default => ['mysql_native_password', 'ed25519'],
+            $this->id === 'mysql' => MySqlFiles::nativePasswords($line) ? [PasswordEncryption::CachingSha2Password, PasswordEncryption::MysqlNativePassword] : [PasswordEncryption::CachingSha2Password],
+            MariaDbFiles::parsecOffered($line) => [PasswordEncryption::MysqlNativePassword, PasswordEncryption::Ed25519, PasswordEncryption::Parsec],
+            default => [PasswordEncryption::MysqlNativePassword, PasswordEncryption::Ed25519],
         };
     }
 
     /**
      * @return array{string, string}
      */
-    public function identifiedWith(string $encryption): array
+    public function identifiedWith(PasswordEncryption $encryption): array
     {
         return match (true) {
-            $this->id === 'mysql' => ["IDENTIFIED WITH {$encryption} BY ", ''],
-            in_array($encryption, ['ed25519', 'parsec'], true) => ["IDENTIFIED VIA {$encryption} USING PASSWORD(", ')'],
+            $this->id === 'mysql' => ["IDENTIFIED WITH {$encryption->value} BY ", ''],
+            in_array($encryption, [PasswordEncryption::Ed25519, PasswordEncryption::Parsec], true) => ["IDENTIFIED VIA {$encryption->value} USING PASSWORD(", ')'],
             default => ['IDENTIFIED BY ', ''],
         };
     }

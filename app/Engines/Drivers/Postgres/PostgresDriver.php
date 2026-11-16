@@ -19,8 +19,6 @@ final readonly class PostgresDriver extends AbstractEngineDriver
     {
         return new EngineFacts(
             features: [Feature::Accounts, Feature::Archive, Feature::Migration, Feature::Pools],
-            passwordEncryptions: [],
-            defaultPasswordEncryption: null,
             reservedUsers: PostgresAccounts::RESERVED_USERS,
             reservedDatabases: PostgresAccounts::RESERVED_DATABASES,
             ports: new Ports(ClientPorts::CLIENT, ClientPorts::POOL, [8008, 2379, 2380]),

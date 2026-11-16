@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Databases\Accounts;
 
+use App\Enums\Databases\PasswordEncryption;
 use App\Models\Database;
 use App\Models\DatabaseUser;
 use Illuminate\Validation\ValidationException;
 
 final readonly class CreateDatabaseUser
 {
-    public function handle(Database $database, string $name, ?string $encryption = null): DatabaseUser
+    public function handle(Database $database, string $name, ?PasswordEncryption $encryption = null): DatabaseUser
     {
         $database->ensureRunsSupportedSdk();
         $database->ensureManagesAccounts();

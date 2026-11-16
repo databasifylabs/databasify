@@ -7,6 +7,7 @@ namespace App\Engines\Drivers\Postgres;
 use App\Engines\Contracts\Accounts;
 use App\Engines\Data\AccountList;
 use App\Engines\Data\Grant;
+use App\Enums\Databases\PasswordEncryption;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class PostgresAccounts implements Accounts
@@ -38,14 +39,14 @@ final readonly class PostgresAccounts implements Accounts
         $this->driver->run('engines.postgres.accounts.drop-database', $this->driver->data(), env: ['NAME' => $name]);
     }
 
-    public function createUser(string $name, string $password, array $grants, ?string $encryption): void
+    public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void
     {
         $this->rejectEncryption($encryption);
         $this->refuseReservedAccount($name, $grants);
         $this->driver->run('engines.postgres.accounts.create-user', $this->driver->data(), env: [...$this->grantEnv($name, $grants), 'PASSWORD' => $password]);
     }
 
-    public function setPassword(string $name, string $password, ?string $encryption): void
+    public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void
     {
         $this->rejectEncryption($encryption);
         $this->refuseReservedAccount($name, []);
@@ -102,7 +103,7 @@ final readonly class PostgresAccounts implements Accounts
         }
     }
 
-    private function rejectEncryption(?string $encryption): void
+    private function rejectEncryption(?PasswordEncryption $encryption): void
     {
         if ($encryption !== null) {
             throw new InvalidEngineRequest('PostgreSQL has no password encryption choice');
