@@ -107,7 +107,26 @@ final readonly class PluginLoader
         }
     }
 
+    public function hasCode(Plugin $plugin): bool
+    {
+        $this->autoload($plugin);
+
+        return is_subclass_of($plugin->class, AbstractPlugin::class);
+    }
+
     private function instantiate(Plugin $plugin): AbstractPlugin
+    {
+        $this->autoload($plugin);
+        $class = $plugin->class;
+
+        if (! is_subclass_of($class, AbstractPlugin::class)) {
+            throw new RuntimeException("{$class} is not a Databasify plugin class.");
+        }
+
+        return new $class($this->app);
+    }
+
+    private function autoload(Plugin $plugin): void
     {
         $loader = new ClassLoader;
 
@@ -120,13 +139,5 @@ final readonly class PluginLoader
         if (is_file("{$plugin->directory()}/vendor/autoload.php")) {
             require_once "{$plugin->directory()}/vendor/autoload.php";
         }
-
-        $class = $plugin->class;
-
-        if (! is_subclass_of($class, AbstractPlugin::class)) {
-            throw new RuntimeException("{$class} is not a Databasify plugin class.");
-        }
-
-        return new $class($this->app);
     }
 }

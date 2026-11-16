@@ -22,7 +22,10 @@ final readonly class UninstallPlugin
 
         if ($root !== false) {
             try {
-                $this->loader->call($plugin, 'uninstall');
+                if ($this->loader->hasCode($plugin)) {
+                    $this->loader->call($plugin, 'uninstall');
+                }
+
                 $paths = collect($this->migrator->paths())
                     ->push("{$plugin->directory()}/database/migrations")
                     ->map(fn (string $path): string|false => realpath($path))

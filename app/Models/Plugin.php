@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $id
  * @property string $name
  * @property string $author
+ * @property string|null $author_url
  * @property string $version
  * @property string $source
  * @property string $class
@@ -35,7 +36,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['id', 'name', 'author', 'version', 'source', 'class', 'autoload', 'engines', 'requires', 'icon', 'enabled', 'error'])]
+#[Fillable(['id', 'name', 'author', 'author_url', 'version', 'source', 'class', 'autoload', 'engines', 'requires', 'icon', 'enabled', 'error'])]
 #[UseFactory(PluginFactory::class)]
 class Plugin extends Model
 {

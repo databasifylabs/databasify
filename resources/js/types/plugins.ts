@@ -2,6 +2,7 @@ export type InstalledPlugin = {
     id: string;
     name: string;
     author: string;
+    author_url: string | null;
     community: boolean;
     version: string;
     source: string;

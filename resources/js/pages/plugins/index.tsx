@@ -28,6 +28,21 @@ function Plugin({ plugin }: { plugin: InstalledPlugin }) {
                                 <CommunityBadge author={plugin.author} />
                             )}
                         </div>
+                        <div className="text-sm text-muted-foreground">
+                            by{' '}
+                            {plugin.author_url ? (
+                                <a
+                                    href={plugin.author_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline-offset-4 hover:underline"
+                                >
+                                    {plugin.author}
+                                </a>
+                            ) : (
+                                plugin.author
+                            )}
+                        </div>
                         <div className="truncate font-mono text-xs text-muted-foreground">
                             {plugin.source}
                         </div>

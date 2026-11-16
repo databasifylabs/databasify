@@ -19,7 +19,7 @@ afterEach(function () {
     File::deleteDirectory(Plugin::root());
 });
 
-function pluginZip(array $databasify = [], string $name = 'acme/hello'): UploadedFile
+function pluginZip(array $databasify = [], string $name = 'acme/hello', array $author = ['name' => 'Acme']): UploadedFile
 {
     $path = tempnam(sys_get_temp_dir(), 'plugin').'.zip';
     $zip = new ZipArchive;
@@ -27,7 +27,7 @@ function pluginZip(array $databasify = [], string $name = 'acme/hello'): Uploade
     $zip->addFromString('composer.json', json_encode([
         'name' => $name,
         'version' => '1.0.0',
-        'authors' => [['name' => 'Acme']],
+        'authors' => [$author],
         'autoload' => ['psr-4' => ['Acme\\Hello\\' => 'src/']],
         'extra' => ['databasify' => ['plugin' => 'Acme\\Hello\\HelloPlugin', ...$databasify]],
     ]));
@@ -66,6 +66,28 @@ test('a plugin can be installed from an uploaded zip', function () {
         ->author->toBe('Acme')
         ->source->toBe('hello.zip (uploaded)')
         ->and(is_file("{$plugin->directory()}/src/HelloPlugin.php"))->toBeTrue();
+});
+
+test('the plugins page links each plugin to its author', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('plugins.store'), ['archive' => pluginZip(author: ['name' => 'Acme', 'homepage' => 'https://acme.test'])])
+        ->assertSessionHasNoErrors();
+
+    withPluginFiles(Plugin::query()->sole());
+
+    $this->get(route('plugins.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('plugins.0.name', 'acme/hello')
+            ->where('plugins.0.author', 'Acme')
+            ->where('plugins.0.author_url', 'https://acme.test'));
+});
+
+test('an author link that is not a web address is dropped', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('plugins.store'), ['archive' => pluginZip(author: ['name' => 'Acme', 'homepage' => 'javascript:alert(1)'])])
+        ->assertSessionHasNoErrors();
+
+    expect(Plugin::query()->sole()->author_url)->toBeNull();
 });
 
 test('a zip without a databasify manifest is refused', function () {

@@ -22,6 +22,7 @@ class PluginResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'author' => $this->author,
+            'author_url' => $this->author_url,
             'community' => $this->isCommunity(),
             'version' => $this->version,
             'source' => $this->source,

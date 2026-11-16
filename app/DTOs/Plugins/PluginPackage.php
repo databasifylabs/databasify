@@ -17,6 +17,7 @@ final readonly class PluginPackage
         public string $id,
         public string $name,
         public string $author,
+        public ?string $authorUrl,
         public string $version,
         public string $class,
         public PluginAutoload $autoload,
@@ -43,7 +44,7 @@ final readonly class PluginPackage
         $icon = Arr::get($manifest, 'extra.databasify.icon', 'icon.svg');
         $icon = is_string($icon) && ! str_contains($icon, '..') && is_file("{$directory}/public/{$icon}") ? $icon : null;
 
-        return new self(Str::after($name, '/'), $name, self::authorOf($manifest, $name), is_string($version) ? $version : 'dev', $class, $autoload, is_string($requires) ? $requires : null, $icon, self::enginesOf($manifest));
+        return new self(Str::after($name, '/'), $name, self::authorOf($manifest, $name), self::authorUrlOf($manifest), is_string($version) ? $version : 'dev', $class, $autoload, is_string($requires) ? $requires : null, $icon, self::enginesOf($manifest));
     }
 
     /**
@@ -58,6 +59,20 @@ final readonly class PluginPackage
 
     /**
      * @param  array<mixed>  $manifest
+     */
+    private static function authorUrlOf(array $manifest): ?string
+    {
+        $url = Arr::get($manifest, 'authors.0.homepage');
+
+        if (! is_string($url) || ! Str::startsWith($url, ['https://', 'http://']) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    /**
+     * @param  array<mixed>  $manifest
      * @return list<string>
      */
     private static function enginesOf(array $manifest): array
@@ -68,15 +83,15 @@ final readonly class PluginPackage
     }
 
     /**
-     * @return array{name: string, author: string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
+     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
      */
     public function attributes(): array
     {
-        return ['name' => $this->name, 'author' => $this->author, 'version' => $this->version, 'class' => $this->class, 'autoload' => $this->autoload, 'requires' => $this->requires, 'icon' => $this->icon, 'engines' => $this->engines];
+        return ['name' => $this->name, 'author' => $this->author, 'author_url' => $this->authorUrl, 'version' => $this->version, 'class' => $this->class, 'autoload' => $this->autoload, 'requires' => $this->requires, 'icon' => $this->icon, 'engines' => $this->engines];
     }
 
     /**
-     * @return array{id: string, source: string, name: string, author: string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
+     * @return array{id: string, source: string, name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
      */
     public function toInstallRow(string $source): array
     {
@@ -84,7 +99,7 @@ final readonly class PluginPackage
     }
 
     /**
-     * @return array{name: string, author: string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>, source: string, error: null}
+     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>, source: string, error: null}
      */
     public function toUpdateRow(string $source): array
     {
