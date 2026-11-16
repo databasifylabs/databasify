@@ -87,6 +87,10 @@ final readonly class PluginLoader
                 throw UndeclaredEngine::named($id);
             }
 
+            if (! $plugin->isCommunity()) {
+                continue;
+            }
+
             config([EngineCatalog::CONFIG.".{$id}.plugin" => $plugin->id, EngineCatalog::CONFIG.".{$id}.author" => $plugin->author]);
         }
     }

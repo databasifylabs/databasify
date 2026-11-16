@@ -7,6 +7,7 @@ use App\Models\Plugin;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -89,6 +90,30 @@ test('a plugin with community engines needs the warning accepted', function () {
         ->assertSessionHasErrors(['community_engines' => 'Community engine: clickhouse. This engine is built and supported by Acme, not Databasify. Bugs or data loss in it are theirs to fix.']);
 
     expect(Plugin::query()->exists())->toBeFalse();
+});
+
+test('a plugin from the databasifylabs organization installs without the community warning', function () {
+    Http::fake([
+        'api.github.com/repos/databasifylabs/plugin-hello/releases/latest' => Http::response([], 404),
+        'api.github.com/repos/databasifylabs/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engines' => ['clickhouse']])->getRealPath())),
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('plugins.store'), ['source' => 'https://github.com/databasifylabs/plugin-hello'])
+        ->assertSessionHasNoErrors();
+
+    expect(Plugin::query()->sole()->isCommunity())->toBeFalse();
+});
+
+test('a plugin from a lookalike organization still needs the warning accepted', function () {
+    Http::fake([
+        'api.github.com/repos/databasifylabs-tools/plugin-hello/releases/latest' => Http::response([], 404),
+        'api.github.com/repos/databasifylabs-tools/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engines' => ['clickhouse']])->getRealPath())),
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('plugins.store'), ['source' => 'databasifylabs-tools/plugin-hello'])
+        ->assertSessionHasErrors(['community_engines' => 'Community engine: clickhouse. This engine is built and supported by Acme, not Databasify. Bugs or data loss in it are theirs to fix.']);
 });
 
 test('plugin sources must be a github repository or an https link', function () {

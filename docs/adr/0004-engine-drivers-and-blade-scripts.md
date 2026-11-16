@@ -17,7 +17,7 @@ With a frozen runtime in the images ([0003](0003-engine-images-and-frozen-runtim
 - **Values and state.** Values are rendered with the view's quoting helpers (`$sql->string()`, `$sql->name()`, `$sh->arg()`, `@json`), never argv. `$sql` is the driver's `SqlQuoting` (`sqlQuoting()`), so a plugin SQL engine ships its own quoting class. Env carries only secrets for tasks and migration sources, and configuration a tool reads from its environment (rclone, pgBackRest). Scripts the app runs get saved node state rendered from the driver's `savedRequestOf()`, not `jq` on `state/node.json`; background jobs run without the app and keep reading that file. A failure calls `databasify_fail <code> <message>`, which becomes a typed exception.
 - **Files and jobs.** Config files are Blade views under `resources/views/engines/<engine>/files/`, quoted per format; the process manifest and `mongod.conf` are PHP arrays encoded by `IndentedJson`. Backups, binlog streaming and shipping, the MariaDB cluster watch and migration copies are scripts written to `/srv/<engine>/conf/<job>.sh` and run by the manifest.
 - **One command builder.** `App\Engines\Runtime\Runtime` is the only class that builds a `| databasify ` command line; `EngineModuleTest` fails otherwise.
-- **Plugin engines are community engines.** An engine registered while a plugin loads is stamped with the plugin's id and author (`Engine::isCommunity()`), must be declared in the plugin's `composer.json` under `extra.databasify.engines`, and is shown with a "Community" badge. Installing a plugin that declares engines is refused until the admin accepts the warning, checked from the staged `composer.json` before any plugin code runs. An update that drops an engine a database still uses is refused.
+- **Plugin engines are community engines, unless the plugin is ours.** An engine registered while a plugin loads is stamped with the plugin's id and author (`Engine::isCommunity()`). A plugin installed from a GitHub repository owned by `databasifylabs` (`PluginSource::isOfficial()`) is official: its engines are not stamped, need no warning and show no badge. An uploaded zip or any other link stays community even when it holds our code, because only the download source proves who published it. Every plugin engine must be declared in the plugin's `composer.json` under `extra.databasify.engines`, and a community engine is shown with a "Community" badge. Installing a community plugin that declares engines is refused until the admin accepts the warning, checked from the staged `composer.json` before any plugin code runs. An update that drops an engine a database still uses is refused.
 
 ## Consequences
 
@@ -53,5 +53,6 @@ With a frozen runtime in the images ([0003](0003-engine-images-and-frozen-runtim
 - `app/Providers/EngineServiceProvider.php`
 - `app/Services/Plugins/PluginLoader.php`
 - `app/Actions/Plugins/ConfirmCommunityEngines.php`
+- `app/DTOs/Plugins/PluginSource.php`
 - `tests/Support/RecordingDriver.php`
 - `tests/Feature/Engines/EngineModuleTest.php`

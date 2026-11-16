@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Casts\AsEngineIds;
 use App\Casts\AsPluginAutoload;
 use App\DTOs\Plugins\PluginAutoload;
+use App\DTOs\Plugins\PluginSource;
 use App\Models\Concerns\OrdersByName;
 use App\Support\Plugins\VersionConstraint;
 use Carbon\CarbonImmutable;
@@ -95,7 +96,7 @@ class Plugin extends Model
 
     public function isCommunity(): bool
     {
-        return $this->engines !== [];
+        return $this->engines !== [] && ! (new PluginSource($this->source))->isOfficial();
     }
 
     public function setEnabled(bool $enabled): void

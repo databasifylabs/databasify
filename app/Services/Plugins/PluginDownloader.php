@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Plugins;
 
+use App\DTOs\Plugins\PluginSource;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -13,8 +14,6 @@ use ZipArchive;
 
 final readonly class PluginDownloader
 {
-    private const string GITHUB = '#^(?:https://github\.com/)?([\w.-]+)/([\w.-]+?)(?:\.git)?/?$#';
-
     private const int CONNECT_TIMEOUT_SECONDS = 5;
 
     private const int DOWNLOAD_TIMEOUT_SECONDS = 120;
@@ -80,7 +79,7 @@ final readonly class PluginDownloader
 
     private function zipUrl(string $source): string
     {
-        if (preg_match(self::GITHUB, $source, $repository) === 1) {
+        if (preg_match(PluginSource::GITHUB, $source, $repository) === 1) {
             $api = "https://api.github.com/repos/{$repository[1]}/{$repository[2]}";
             $release = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)->timeout(self::RELEASE_TIMEOUT_SECONDS)->acceptJson()->get("{$api}/releases/latest");
 

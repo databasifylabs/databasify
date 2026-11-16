@@ -15,7 +15,7 @@ final readonly class ConfirmCommunityEngines
      */
     public function handle(array $engines, string $author, PluginSource $source): void
     {
-        if ($engines === [] || $source->acceptsCommunityEngines) {
+        if ($engines === [] || $source->acceptsCommunityEngines || $source->isOfficial()) {
             return;
         }
 
