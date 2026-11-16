@@ -75,6 +75,7 @@ if ! group_plugin_loaded; then
     unit_do restart "$SERVER_UNIT"
     wait_ready 'MySQL with Group Replication'
 fi
+my '' > /dev/null <<< {!! $sh->arg('SET GLOBAL group_replication_ip_allowlist = '.$sql->string($allowlist)) !!}
 @if (in_array($saved->primary, [null, $saved->ip], true))
 echo 'Bootstrapping…'
 bootstrap_group "$REPLICATION_SECRET"

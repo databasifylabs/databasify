@@ -30,7 +30,7 @@ final readonly class MySqlFamilyCluster implements Cluster
     {
         $engine = $this->driver->engine();
         $saved = $this->configuration->savedRequestOf();
-        $data = $engine->id === 'mysql' ? ['groupName' => MySqlFiles::groupNameOf($saved->databaseId)] : $this->filesDataOf($saved);
+        $data = $engine->id === 'mysql' ? ['groupName' => MySqlFiles::groupNameOf($saved->databaseId), 'allowlist' => MySqlFiles::allowlistOf($saved->members)] : $this->filesDataOf($saved);
 
         return $this->scripts->start($this->driver, $key, 'engines.{engine}.cluster.enable', ['saved' => $saved, 'reserved' => $engine->reservedDatabases, ...$data], ['REPLICATION_SECRET' => (string) $saved->secrets->replication]);
     }
@@ -75,7 +75,7 @@ final readonly class MySqlFamilyCluster implements Cluster
     public function membership(array $members): void
     {
         if ($this->driver->engine()->id === 'mysql') {
-            $this->scripts->query($this->driver, 'engines.mysql.cluster.membership', ['seeds' => MySqlFiles::seedsOf($members)]);
+            $this->scripts->query($this->driver, 'engines.mysql.cluster.membership', MySqlFiles::groupSettingsOf($members));
 
             return;
         }
@@ -123,7 +123,7 @@ final readonly class MySqlFamilyCluster implements Cluster
     {
         $saved = $this->configuration->savedRequestOf();
 
-        return $this->scripts->start($this->driver, $key, 'engines.{engine}.cluster.rejoin', ['saved' => $saved, 'readOnly' => $readOnly], ['REPLICATION_SECRET' => (string) $saved->secrets->replication]);
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.cluster.rejoin', ['saved' => $saved, 'readOnly' => $readOnly, 'allowlist' => MySqlFiles::allowlistOf($saved->members)], ['REPLICATION_SECRET' => (string) $saved->secrets->replication]);
     }
 
     public function forget(string $ip): void
@@ -133,7 +133,7 @@ final readonly class MySqlFamilyCluster implements Cluster
         }
 
         $members = array_values(array_filter($this->configuration->savedRequestOf()->members, fn (Member $member): bool => $member->ip !== $ip));
-        $this->scripts->query($this->driver, 'engines.mysql.members.forget', ['seeds' => MySqlFiles::seedsOf($members)]);
+        $this->scripts->query($this->driver, 'engines.mysql.members.forget', MySqlFiles::groupSettingsOf($members));
     }
 
     /**
