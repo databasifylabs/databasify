@@ -25,6 +25,7 @@ plugin-load-add=group_replication.so
 group_replication_group_name={!! $groupName !!}
 group_replication_local_address={!! $config->ip !!}:{!! $groupPort !!}
 group_replication_group_seeds={!! $seeds !!}
+group_replication_ip_allowlist={!! $allowlist !!}
 group_replication_single_primary_mode=ON
 group_replication_start_on_boot=OFF
 group_replication_ssl_mode=REQUIRED

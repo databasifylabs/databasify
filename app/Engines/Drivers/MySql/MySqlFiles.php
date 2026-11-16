@@ -59,6 +59,23 @@ final readonly class MySqlFiles
         return implode(',', array_map(fn (Member $member): string => "{$member->ip}:".self::GROUP_PORT, $voting));
     }
 
+    /**
+     * @param  list<Member>  $members
+     */
+    public static function allowlistOf(array $members): string
+    {
+        return implode(',', [...array_map(fn (Member $member): string => $member->ip, $members), '127.0.0.1', '::1']);
+    }
+
+    /**
+     * @param  list<Member>  $members
+     * @return array{seeds: string, allowlist: string}
+     */
+    public static function groupSettingsOf(array $members): array
+    {
+        return ['seeds' => self::seedsOf($members), 'allowlist' => self::allowlistOf($members)];
+    }
+
     private static function myCnfOf(NodeConfig $request, string $line): string
     {
         return ConfigView::render('engines.mysql.files.my-cnf', [
@@ -71,6 +88,7 @@ final readonly class MySqlFiles
             'groupName' => self::groupNameOf($request->databaseId),
             'groupPort' => self::GROUP_PORT,
             'seeds' => self::seedsOf($request->members),
+            'allowlist' => self::allowlistOf($request->members),
             'settings' => FamilyFiles::sorted($request->settings),
         ]);
     }
