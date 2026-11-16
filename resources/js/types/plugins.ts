@@ -1,5 +1,6 @@
 export type InstalledPlugin = {
     id: string;
+    key: string;
     name: string;
     author: string;
     author_url: string | null;

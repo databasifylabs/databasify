@@ -83,7 +83,7 @@ export default function InstallPluginDialog() {
                                     <ZipDropzone
                                         id="plugin-archive"
                                         name="archive"
-                                        hint="Up to 50 MB, with the plugin's composer.json at its root or in one top folder."
+                                        hint="Up to 50 MB, with the plugin's plugin.json at its root or in one top folder."
                                         onFileChange={() =>
                                             clearErrors('community_engines')
                                         }

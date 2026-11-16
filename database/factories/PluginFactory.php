@@ -16,23 +16,19 @@ class PluginFactory extends Factory
     public function definition(): array
     {
         return [
-            'id' => 'hello',
-            'name' => 'acme/hello',
+            'key' => 'acme/hello',
+            'name' => 'Hello',
             'author' => 'Acme',
             'version' => '1.0.0',
             'source' => 'hello.zip (uploaded)',
             'class' => 'Acme\\Hello\\HelloPlugin',
             'autoload' => new PluginAutoload(['Acme\\Hello\\' => 'src/']),
-            'engines' => [],
             'enabled' => true,
         ];
     }
 
-    /**
-     * @param  list<string>  $engines
-     */
-    public function withEngines(array $engines): static
+    public function withEngine(string $engine): static
     {
-        return $this->state(['engines' => $engines]);
+        return $this->state(['engine' => $engine]);
     }
 }

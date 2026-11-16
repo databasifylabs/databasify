@@ -35,11 +35,11 @@ final readonly class InstallPlugin
                 throw ValidationException::withMessages(['source' => $incompatibility]);
             }
 
-            if (preg_match('/^[a-z0-9][a-z0-9-]{0,39}$/', $package->id) !== 1 || $package->id === 'core' || Plugin::query()->whereKey($package->id)->exists()) {
-                throw ValidationException::withMessages(['source' => "A plugin called \"{$package->id}\" is already installed or the name is not allowed."]);
+            if (preg_match('#^'.Plugin::KEY_PATTERN.'$#', $package->key) !== 1 || Plugin::query()->where('key', $package->key)->exists()) {
+                throw ValidationException::withMessages(['source' => "A plugin with the key \"{$package->key}\" is already installed or the key is not allowed."]);
             }
 
-            $this->confirmCommunityEngines->handle($package->engines, $package->author, $source);
+            $this->confirmCommunityEngines->handle($package->engine, $package->author, $source);
             $plugin = new Plugin($package->toInstallRow($source->label));
             File::ensureDirectoryExists(Plugin::root());
             File::copyDirectory($staging, $plugin->directory());

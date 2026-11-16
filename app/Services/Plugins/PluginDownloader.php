@@ -40,7 +40,7 @@ final readonly class PluginDownloader
         $files = "{$download}/files";
         $folder = File::directories($files)[0] ?? null;
 
-        return is_file("{$files}/composer.json") || ! is_string($folder) ? $files : $folder;
+        return is_file("{$files}/plugin.json") || ! is_string($folder) ? $files : $folder;
     }
 
     private function downloadedZipOf(string $source): string

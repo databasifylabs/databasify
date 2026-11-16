@@ -20,6 +20,7 @@ class PluginResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'key' => $this->key,
             'name' => $this->name,
             'author' => $this->author,
             'author_url' => $this->author_url,

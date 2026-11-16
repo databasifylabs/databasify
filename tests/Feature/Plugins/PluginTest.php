@@ -19,18 +19,20 @@ afterEach(function () {
     File::deleteDirectory(Plugin::root());
 });
 
-function pluginZip(array $databasify = [], string $name = 'acme/hello', array $author = ['name' => 'Acme']): UploadedFile
+function pluginZip(array $manifest = []): UploadedFile
 {
     $path = tempnam(sys_get_temp_dir(), 'plugin').'.zip';
     $zip = new ZipArchive;
     $zip->open($path, ZipArchive::CREATE);
-    $zip->addFromString('composer.json', json_encode([
-        'name' => $name,
+    $zip->addFromString('plugin.json', json_encode(array_filter([
+        'key' => 'acme/hello',
+        'name' => 'Hello',
         'version' => '1.0.0',
-        'authors' => [$author],
-        'autoload' => ['psr-4' => ['Acme\\Hello\\' => 'src/']],
-        'extra' => ['databasify' => ['plugin' => 'Acme\\Hello\\HelloPlugin', ...$databasify]],
-    ]));
+        'author' => ['name' => 'Acme'],
+        'class' => 'Acme\\Hello\\HelloPlugin',
+        'autoload' => ['Acme\\Hello\\' => 'src/'],
+        ...$manifest,
+    ], fn (mixed $value): bool => $value !== null)));
     $zip->addFromString('src/HelloPlugin.php', "<?php\n\nnamespace Acme\\Hello;\n\nclass HelloPlugin extends \\App\\Plugins\\AbstractPlugin {}\n");
     $zip->addFromString('public/icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
     $zip->close();
@@ -62,7 +64,8 @@ test('a plugin can be installed from an uploaded zip', function () {
 
     $plugin = Plugin::query()->sole();
     expect($plugin)
-        ->id->toBe('hello')
+        ->key->toBe('acme/hello')
+        ->name->toBe('Hello')
         ->author->toBe('Acme')
         ->source->toBe('hello.zip (uploaded)')
         ->and(is_file("{$plugin->directory()}/src/HelloPlugin.php"))->toBeTrue();
@@ -70,30 +73,48 @@ test('a plugin can be installed from an uploaded zip', function () {
 
 test('the plugins page links each plugin to its author', function () {
     $this->actingAs(User::factory()->create())
-        ->post(route('plugins.store'), ['archive' => pluginZip(author: ['name' => 'Acme', 'homepage' => 'https://acme.test'])])
+        ->post(route('plugins.store'), ['archive' => pluginZip(['author' => ['name' => 'Acme', 'url' => 'https://acme.test']])])
         ->assertSessionHasNoErrors();
 
     withPluginFiles(Plugin::query()->sole());
 
     $this->get(route('plugins.index'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('plugins.0.name', 'acme/hello')
+            ->where('plugins.0.name', 'Hello')
             ->where('plugins.0.author', 'Acme')
             ->where('plugins.0.author_url', 'https://acme.test'));
 });
 
 test('an author link that is not a web address is dropped', function () {
     $this->actingAs(User::factory()->create())
-        ->post(route('plugins.store'), ['archive' => pluginZip(author: ['name' => 'Acme', 'homepage' => 'javascript:alert(1)'])])
+        ->post(route('plugins.store'), ['archive' => pluginZip(['author' => ['name' => 'Acme', 'url' => 'javascript:alert(1)']])])
         ->assertSessionHasNoErrors();
 
     expect(Plugin::query()->sole()->author_url)->toBeNull();
 });
 
-test('a zip without a databasify manifest is refused', function () {
+test('plugins with the same name from two vendors can both be installed', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->post(route('plugins.store'), ['archive' => pluginZip()])->assertSessionHasNoErrors();
+    $this->post(route('plugins.store'), ['archive' => pluginZip(['key' => 'other/hello'])])->assertSessionHasNoErrors();
+
+    expect(Plugin::query()->pluck('key')->sort()->values()->all())->toBe(['acme/hello', 'other/hello'])
+        ->and(is_dir(Plugin::root().'/other/hello/src'))->toBeTrue();
+});
+
+test('a zip without a complete plugin.json is refused', function () {
     $this->actingAs(User::factory()->create())
-        ->post(route('plugins.store'), ['archive' => pluginZip(name: 'no-vendor')])
-        ->assertSessionHasErrors(['source' => 'This is not a Databasify plugin: its composer.json needs a name, autoload.psr-4 and extra.databasify.plugin.']);
+        ->post(route('plugins.store'), ['archive' => pluginZip(['class' => null])])
+        ->assertSessionHasErrors(['source' => 'This is not a Databasify plugin: its plugin.json needs a key, name, version, class and autoload.']);
+
+    expect(Plugin::query()->exists())->toBeFalse();
+});
+
+test('a plugin key without a vendor is refused', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('plugins.store'), ['archive' => pluginZip(['key' => 'hello'])])
+        ->assertSessionHasErrors(['source' => 'A plugin with the key "hello" is already installed or the key is not allowed.']);
 
     expect(Plugin::query()->exists())->toBeFalse();
 });
@@ -106,9 +127,9 @@ test('a plugin for another databasify version is refused', function () {
     expect(Plugin::query()->exists())->toBeFalse();
 });
 
-test('a plugin with community engines needs the warning accepted', function () {
+test('a plugin with a community engine needs the warning accepted', function () {
     $this->actingAs(User::factory()->create())
-        ->post(route('plugins.store'), ['archive' => pluginZip(['engines' => ['clickhouse']])])
+        ->post(route('plugins.store'), ['archive' => pluginZip(['engine' => 'clickhouse'])])
         ->assertSessionHasErrors(['community_engines' => 'Community engine: clickhouse. This engine is built and supported by Acme, not Databasify. Bugs or data loss in it are theirs to fix.']);
 
     expect(Plugin::query()->exists())->toBeFalse();
@@ -117,7 +138,7 @@ test('a plugin with community engines needs the warning accepted', function () {
 test('a plugin from the databasifylabs organization installs without the community warning', function () {
     Http::fake([
         'api.github.com/repos/databasifylabs/plugin-hello/releases/latest' => Http::response([], 404),
-        'api.github.com/repos/databasifylabs/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engines' => ['clickhouse']])->getRealPath())),
+        'api.github.com/repos/databasifylabs/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engine' => 'clickhouse'])->getRealPath())),
     ]);
 
     $this->actingAs(User::factory()->create())
@@ -130,7 +151,7 @@ test('a plugin from the databasifylabs organization installs without the communi
 test('a plugin from a lookalike organization still needs the warning accepted', function () {
     Http::fake([
         'api.github.com/repos/databasifylabs-tools/plugin-hello/releases/latest' => Http::response([], 404),
-        'api.github.com/repos/databasifylabs-tools/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engines' => ['clickhouse']])->getRealPath())),
+        'api.github.com/repos/databasifylabs-tools/plugin-hello/zipball' => Http::response(File::get(pluginZip(['engine' => 'clickhouse'])->getRealPath())),
     ]);
 
     $this->actingAs(User::factory()->create())
@@ -159,18 +180,18 @@ test('an uploaded plugin is updated only from a newer zip', function () {
 
     $this->actingAs(User::factory()->create())
         ->post(route('plugins.upgrade', $plugin))
-        ->assertSessionHasErrors(['archive' => 'acme/hello was uploaded, so upload its newer zip.']);
+        ->assertSessionHasErrors(['archive' => 'Hello was uploaded, so upload its newer zip.']);
 });
 
 test('an update that drops an engine still in use is refused', function () {
-    $plugin = withPluginFiles(Plugin::factory()->withEngines(['clickhouse'])->create());
+    $plugin = withPluginFiles(Plugin::factory()->withEngine('clickhouse')->create());
     Database::factory()->create(['engine' => 'clickhouse']);
 
     $this->actingAs(User::factory()->create())
         ->post(route('plugins.upgrade', $plugin), ['archive' => pluginZip()])
         ->assertSessionHasErrors(['source' => 'This update removes the clickhouse engine, still used by 1 database.']);
 
-    expect($plugin->refresh()->engines)->toBe(['clickhouse']);
+    expect($plugin->refresh()->engine)->toBe('clickhouse');
 });
 
 test('a plugin can be uninstalled', function () {
@@ -208,8 +229,8 @@ test('a plugin whose code is gone can be uninstalled', function () {
 test('plugin assets are served from the public folder only', function () {
     User::factory()->create();
     $plugin = withPluginFiles(Plugin::factory()->create());
-    File::put("{$plugin->directory()}/composer.json", '{"secret": true}');
+    File::put("{$plugin->directory()}/plugin.json", '{"secret": true}');
 
     $this->get(route('plugins.asset', [$plugin, 'icon.svg']))->assertOk();
-    $this->get(route('plugins.asset', [$plugin, '../composer.json']))->assertNotFound();
+    $this->get(route('plugins.asset', [$plugin, '../plugin.json']))->assertNotFound();
 });

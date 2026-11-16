@@ -10,11 +10,8 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class PluginPackage
 {
-    /**
-     * @param  list<string>  $engines
-     */
     public function __construct(
-        public string $id,
+        public string $key,
         public string $name,
         public string $author,
         public ?string $authorUrl,
@@ -23,83 +20,78 @@ final readonly class PluginPackage
         public PluginAutoload $autoload,
         public ?string $requires,
         public ?string $icon,
-        public array $engines,
+        public ?string $engine,
     ) {}
 
     public static function read(string $directory): self
     {
-        $manifest = json_decode((string) @file_get_contents("{$directory}/composer.json"), true);
+        $manifest = json_decode((string) @file_get_contents("{$directory}/plugin.json"), true);
         $manifest = is_array($manifest) ? $manifest : [];
-        $class = Arr::get($manifest, 'extra.databasify.plugin');
-        $autoload = PluginAutoload::fromArray((array) Arr::get($manifest, 'autoload.psr-4', []));
+        $key = self::stringIn($manifest, 'key');
+        $name = self::stringIn($manifest, 'name');
+        $version = self::stringIn($manifest, 'version');
+        $class = self::stringIn($manifest, 'class');
+        $autoload = PluginAutoload::fromArray((array) Arr::get($manifest, 'autoload', []));
 
-        $name = Arr::get($manifest, 'name');
-
-        if (! is_string($name) || ! str_contains($name, '/') || ! is_string($class) || $autoload->isEmpty()) {
-            throw ValidationException::withMessages(['source' => 'This is not a Databasify plugin: its composer.json needs a name, autoload.psr-4 and extra.databasify.plugin.']);
+        if ($key === null || $name === null || $version === null || $class === null || $autoload->isEmpty()) {
+            throw ValidationException::withMessages(['source' => 'This is not a Databasify plugin: its plugin.json needs a key, name, version, class and autoload.']);
         }
 
-        $version = Arr::get($manifest, 'version');
-        $requires = Arr::get($manifest, 'extra.databasify.requires');
-        $icon = Arr::get($manifest, 'extra.databasify.icon', 'icon.svg');
-        $icon = is_string($icon) && ! str_contains($icon, '..') && is_file("{$directory}/public/{$icon}") ? $icon : null;
+        $icon = self::stringIn($manifest, 'icon') ?? 'icon.svg';
+        $icon = ! str_contains($icon, '..') && is_file("{$directory}/public/{$icon}") ? $icon : null;
 
-        return new self(Str::after($name, '/'), $name, self::authorOf($manifest, $name), self::authorUrlOf($manifest), is_string($version) ? $version : 'dev', $class, $autoload, is_string($requires) ? $requires : null, $icon, self::enginesOf($manifest));
+        return new self(
+            key: $key,
+            name: Str::limit($name, 100),
+            author: self::stringIn($manifest, 'author.name') ?? Str::before($key, '/'),
+            authorUrl: self::webAddressIn($manifest, 'author.url'),
+            version: $version,
+            class: $class,
+            autoload: $autoload,
+            requires: self::stringIn($manifest, 'requires'),
+            icon: $icon,
+            engine: self::stringIn($manifest, 'engine'),
+        );
     }
 
     /**
      * @param  array<mixed>  $manifest
      */
-    private static function authorOf(array $manifest, string $name): string
+    private static function stringIn(array $manifest, string $path): ?string
     {
-        $author = Arr::get($manifest, 'authors.0.name');
+        $value = Arr::get($manifest, $path);
 
-        return is_string($author) && $author !== '' ? $author : Str::before($name, '/');
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     /**
      * @param  array<mixed>  $manifest
      */
-    private static function authorUrlOf(array $manifest): ?string
+    private static function webAddressIn(array $manifest, string $path): ?string
     {
-        $url = Arr::get($manifest, 'authors.0.homepage');
+        $url = self::stringIn($manifest, $path);
 
-        if (! is_string($url) || ! Str::startsWith($url, ['https://', 'http://']) || filter_var($url, FILTER_VALIDATE_URL) === false) {
-            return null;
-        }
-
-        return $url;
+        return $url !== null && Str::startsWith($url, ['https://', 'http://']) && filter_var($url, FILTER_VALIDATE_URL) !== false ? $url : null;
     }
 
     /**
-     * @param  array<mixed>  $manifest
-     * @return list<string>
-     */
-    private static function enginesOf(array $manifest): array
-    {
-        $engines = Arr::get($manifest, 'extra.databasify.engines');
-
-        return is_array($engines) ? array_values(array_unique(array_filter($engines, is_string(...)))) : [];
-    }
-
-    /**
-     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
+     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engine: ?string}
      */
     public function attributes(): array
     {
-        return ['name' => $this->name, 'author' => $this->author, 'author_url' => $this->authorUrl, 'version' => $this->version, 'class' => $this->class, 'autoload' => $this->autoload, 'requires' => $this->requires, 'icon' => $this->icon, 'engines' => $this->engines];
+        return ['name' => $this->name, 'author' => $this->author, 'author_url' => $this->authorUrl, 'version' => $this->version, 'class' => $this->class, 'autoload' => $this->autoload, 'requires' => $this->requires, 'icon' => $this->icon, 'engine' => $this->engine];
     }
 
     /**
-     * @return array{id: string, source: string, name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>}
+     * @return array{key: string, source: string, name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engine: ?string}
      */
     public function toInstallRow(string $source): array
     {
-        return array_merge(['id' => $this->id, 'source' => $source], $this->attributes());
+        return array_merge(['key' => $this->key, 'source' => $source], $this->attributes());
     }
 
     /**
-     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engines: list<string>, source: string, error: null}
+     * @return array{name: string, author: string, author_url: ?string, version: string, class: string, autoload: PluginAutoload, requires: ?string, icon: ?string, engine: ?string, source: string, error: null}
      */
     public function toUpdateRow(string $source): array
     {

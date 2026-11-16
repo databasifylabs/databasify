@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Casts\AsEngineIds;
 use App\Casts\AsPluginAutoload;
 use App\DTOs\Plugins\PluginAutoload;
 use App\DTOs\Plugins\PluginSource;
@@ -16,11 +15,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * @property string $id
+ * @property string $key
  * @property string $name
  * @property string $author
  * @property string|null $author_url
@@ -28,7 +29,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $source
  * @property string $class
  * @property PluginAutoload $autoload
- * @property list<string> $engines
+ * @property string|null $engine
  * @property bool $enabled
  * @property string|null $requires
  * @property string|null $icon
@@ -36,16 +37,14 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['id', 'name', 'author', 'author_url', 'version', 'source', 'class', 'autoload', 'engines', 'requires', 'icon', 'enabled', 'error'])]
+#[Fillable(['key', 'name', 'author', 'author_url', 'version', 'source', 'class', 'autoload', 'engine', 'requires', 'icon', 'enabled', 'error'])]
 #[UseFactory(PluginFactory::class)]
 class Plugin extends Model
 {
     /** @use HasFactory<PluginFactory> */
-    use HasFactory, OrdersByName;
+    use HasFactory, HasUuids, OrdersByName;
 
-    public $incrementing = false;
-
-    protected $keyType = 'string';
+    public const string KEY_PATTERN = '[a-z0-9][a-z0-9-]{0,39}/[a-z0-9][a-z0-9-]{0,39}';
 
     /**
      * @param  Builder<self>  $query
@@ -70,7 +69,7 @@ class Plugin extends Model
 
     public function directory(): string
     {
-        return self::root()."/{$this->id}";
+        return self::root()."/{$this->key}";
     }
 
     public function iconUrl(): ?string
@@ -97,7 +96,7 @@ class Plugin extends Model
 
     public function isCommunity(): bool
     {
-        return $this->engines !== [] && ! (new PluginSource($this->source))->isOfficial();
+        return $this->engine !== null && ! (new PluginSource($this->source))->isOfficial();
     }
 
     public function setEnabled(bool $enabled): void
@@ -116,7 +115,6 @@ class Plugin extends Model
     {
         return [
             'autoload' => AsPluginAutoload::class,
-            'engines' => AsEngineIds::class,
             'enabled' => 'boolean',
         ];
     }

@@ -83,7 +83,7 @@ final readonly class PluginLoader
     private function stampEnginesAddedBy(Plugin $plugin, array $before): void
     {
         foreach (array_keys(array_diff_key(config()->array(EngineCatalog::CONFIG, []), $before)) as $id) {
-            if (! in_array($id, $plugin->engines, true)) {
+            if ($id !== $plugin->engine) {
                 throw UndeclaredEngine::named($id);
             }
 
@@ -91,7 +91,7 @@ final readonly class PluginLoader
                 continue;
             }
 
-            config([EngineCatalog::CONFIG.".{$id}.plugin" => $plugin->id, EngineCatalog::CONFIG.".{$id}.author" => $plugin->author]);
+            config([EngineCatalog::CONFIG.".{$id}.plugin" => $plugin->key, EngineCatalog::CONFIG.".{$id}.author" => $plugin->author]);
         }
     }
 

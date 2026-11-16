@@ -33,8 +33,8 @@ final readonly class UpdatePlugin
             $files = $this->downloader->packageIn($download);
             $package = PluginPackage::read($files);
 
-            if ($package->id !== $plugin->id) {
-                throw ValidationException::withMessages(['source' => "This zip is the {$package->id} plugin, not {$plugin->id}."]);
+            if ($package->key !== $plugin->key) {
+                throw ValidationException::withMessages(['source' => "This zip is the {$package->key} plugin, not {$plugin->key}."]);
             }
 
             $incompatibility = Plugin::incompatibilityWith($package->requires);
@@ -43,18 +43,16 @@ final readonly class UpdatePlugin
                 throw ValidationException::withMessages(['source' => $incompatibility]);
             }
 
-            foreach (array_diff($plugin->engines, $package->engines) as $engine) {
-                $databases = Database::query()->withoutProject()->where('engine', $engine)->count();
+            $databases = $plugin->engine === null || $plugin->engine === $package->engine ? 0 : Database::query()->withoutProject()->where('engine', $plugin->engine)->count();
 
-                if ($databases > 0) {
-                    throw ValidationException::withMessages(['source' => "This update removes the {$engine} engine, still used by {$databases} ".Str::plural('database', $databases).'.']);
-                }
+            if ($databases > 0) {
+                throw ValidationException::withMessages(['source' => "This update removes the {$plugin->engine} engine, still used by {$databases} ".Str::plural('database', $databases).'.']);
             }
 
-            $this->confirmCommunityEngines->handle(array_values(array_diff($package->engines, $plugin->engines)), $package->author, $source);
+            $this->confirmCommunityEngines->handle($package->engine === $plugin->engine ? null : $package->engine, $package->author, $source);
 
-            $new = Plugin::root()."/.{$plugin->id}-new";
-            $old = Plugin::root()."/.{$plugin->id}-old";
+            $new = "{$plugin->directory()}.new";
+            $old = "{$plugin->directory()}.old";
             File::deleteDirectory($new);
             File::deleteDirectory($old);
             File::copyDirectory($files, $new);

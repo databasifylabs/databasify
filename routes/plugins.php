@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Plugins\PluginController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('plugin-assets/{plugin}/{path}', [PluginController::class, 'asset'])->where(['plugin' => '[a-z0-9-]+', 'path' => '.*'])->name('plugins.asset');
+Route::get('plugin-assets/{plugin}/{path}', [PluginController::class, 'asset'])->whereUuid('plugin')->where('path', '.*')->name('plugins.asset');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('plugins', [PluginController::class, 'index'])->name('plugins.index');
