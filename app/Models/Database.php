@@ -704,7 +704,7 @@ class Database extends Model implements Movable
             return;
         }
 
-        $this->users()->create(['name' => $this->settings->defaultUsername(), 'password' => $this->settings->defaultPassword()]);
+        $this->users()->create(['name' => $this->settings->defaultUsername(), 'password' => $this->settings->defaultPassword(), 'password_encryption' => $this->passwordEncryptionFor(null)]);
         $this->schemas()->create(['name' => $this->settings->defaultSchema()]);
     }
 
