@@ -1,7 +1,6 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
 @include('engines.mysql-family._rewrite')
-@include('engines.mysql-family._saved')
 @include('engines.mysql-family._server')
 @include('engines.mysql-family._keys')
 @include('engines.mariadb._state')
@@ -37,10 +36,10 @@ still_serving_alone() {
     read_state && [ "$STATE_GALERA" != 1 ]
 }
 
-require_saved
-if saved_is '.readOnly'; then
-    writer_to_follow
-    replication_password
+[ -n "$REPLICATION_SECRET" ] || databasify_fail invalid_request 'MariaDB clusters need the replication secret'
+@if ($saved->readOnly)
+    WRITER={!! $sh->arg((string) $saved->primary) !!}
+    [ -n "$WRITER" ] || fail_task 'a read-only node needs the writer to follow'
     position=$(my '' <<'SQL'
 @verbatim
 SELECT @@gtid_slave_pos
@@ -55,14 +54,11 @@ SQL
     follow_writer "$WRITER" "$REPLICATION_SECRET"
     : | write_file "$ROOT/state/replica" 600 false || true
     exit 0
-fi
-if ! saved_is '.clustered and (.readOnly | not)'; then
-    fail_task 'run node configure with clustered on first'
-fi
-seed=false
-if saved_is '.primary == null or .primary == .ip'; then
-    seed=true
-fi
+@endif
+@if (! $saved->clustered)
+fail_task 'run node configure with clustered on first'
+@endif
+seed={{ in_array($saved->primary, [null, $saved->ip], true) ? 'true' : 'false' }}
 state_read=false
 if read_state; then
     state_read=true
@@ -88,5 +84,5 @@ echo 'Syncing…'
 wait_until 21600 2 synced_now || fail_task 'the server was not ready within 6h0m0s'
 clear_new_cluster
 if [ "$seed" = true ]; then
-    become_writer_if_recorded "$(saved .ip)"
+    become_writer_if_recorded {!! $sh->arg($saved->ip) !!}
 fi

@@ -36,7 +36,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function run(string $script, array $data = [], array $env = [], ?string $user = null, int $timeout = 120): void
     {
-        $this->onPrimary(fn (DatabaseNode $node) => $this->scripts()->run($node, $script, $data, $user, $timeout, $this->logNameOf($node, $script), $env));
+        $this->onPrimary(fn (DatabaseNode $node) => $this->scripts()->run($node, $script, $this->withViewData($data), $user, $timeout, $this->logNameOf($node, $script), $env));
     }
 
     /**
@@ -46,7 +46,25 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function read(string $script, array $data = [], array $env = [], ?string $user = null, int $timeout = 120): Payload
     {
-        return $this->onPrimary(fn (DatabaseNode $node): Payload => $this->scripts()->run($node, $script, $data, $user, $timeout, null, $env)->json());
+        return $this->onPrimary(fn (DatabaseNode $node): Payload => $this->scripts()->run($node, $script, $this->withViewData($data), $user, $timeout, null, $env)->json());
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  int<1, 3600>  $timeout
+     */
+    public function query(string $view, array $data = [], int $timeout = 120): void
+    {
+        $this->onPrimary(fn (DatabaseNode $node) => $this->scripts()->run($node, $this->queryRunner(), $this->queryData($node, $view, $data, false), null, $timeout, $this->logNameOf($node, $view)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  int<1, 3600>  $timeout
+     */
+    public function queryJson(string $view, array $data = [], int $timeout = 120): Payload
+    {
+        return $this->onPrimary(fn (DatabaseNode $node): Payload => $this->scripts()->run($node, $this->queryRunner(), $this->queryData($node, $view, $data, true), null, $timeout)->json());
     }
 
     /**
@@ -55,7 +73,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function task(string $key, string $script, array $data = [], array $env = [], ?string $user = null): Operation
     {
-        return $this->scripts()->start($this->node, $key, $script, $data, $user, $env);
+        return $this->scripts()->start($this->node, $key, $script, $this->withViewData($data), $user, $env);
     }
 
     public function taskStatus(string $key): Operation
@@ -118,6 +136,19 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
         throw EngineUnsupported::command('pool list');
     }
 
+    protected function queryRunner(): string
+    {
+        throw EngineUnsupported::command('query');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function viewData(): array
+    {
+        return [];
+    }
+
     /**
      * @template TResult
      *
@@ -134,6 +165,26 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
 
             return $work($this->node->database->refresh()->primaryOrSeed());
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function queryData(DatabaseNode $node, string $view, array $data, bool $json): array
+    {
+        $merged = $this->withViewData($data);
+
+        return [...$merged, 'view' => $view, 'query' => base64_encode(resolve(ScriptView::class)->render($node, $view, $merged)), 'json' => $json];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withViewData(array $data): array
+    {
+        return [...$this->viewData(), ...$data];
     }
 
     private function logNameOf(DatabaseNode $node, string $script): string

@@ -1,15 +1,13 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
 @include('engines.mysql-family._rewrite')
-@include('engines.mysql-family._saved')
 @include('engines.mysql-family._server')
 @include('engines.mariadb._replica')
-require_saved
-if saved_is '.readOnly'; then
-    stop_following
-    echo "This node is not in a cluster."
-    exit 0
-fi
+@if ($saved->readOnly)
+stop_following
+echo "This node is not in a cluster."
+exit 0
+@endif
 rm -f "$ROOT/state/new-cluster"
 write_config_files
 unit_do daemon-reload

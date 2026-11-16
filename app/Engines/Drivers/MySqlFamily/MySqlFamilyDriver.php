@@ -39,7 +39,7 @@ abstract readonly class MySqlFamilyDriver extends AbstractEngineDriver
 
     public function cluster(): MySqlFamilyCluster
     {
-        return new MySqlFamilyCluster($this, new FamilyScripts, $this->configuration());
+        return new MySqlFamilyCluster($this, new FamilyScripts, $this->configuration(), new NodeState);
     }
 
     public function config(): MySqlFamilyConfig
@@ -60,6 +60,16 @@ abstract readonly class MySqlFamilyDriver extends AbstractEngineDriver
     public function migration(): MySqlFamilyMigration
     {
         return new MySqlFamilyMigration($this, new FamilyScripts);
+    }
+
+    protected function queryRunner(): string
+    {
+        return 'engines.mysql-family._query';
+    }
+
+    protected function viewData(): array
+    {
+        return ['engine' => static::engine()];
     }
 
     private function configuration(): MySqlFamilyConfiguration

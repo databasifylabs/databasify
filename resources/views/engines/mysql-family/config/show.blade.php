@@ -1,7 +1,1 @@
-@include('engines.mysql-family._mysql')
-
-rows=$(my '' <<SQL
-SHOW GLOBAL VARIABLES WHERE Variable_name IN ($NAMES)
-SQL
-)
-result "$(jq -cRn '{values: ([inputs | select(. != "") | split("\t") | {key: (.[0] | ascii_downcase), value: (.[1:] | join("\t"))}] | from_entries)}' <<< "$rows")"
+SELECT JSON_OBJECT('values', COALESCE(JSON_OBJECTAGG(LOWER(VARIABLE_NAME), VARIABLE_VALUE), JSON_OBJECT())) FROM {{ $engine->id === 'mysql' ? 'performance_schema.global_variables' : 'information_schema.GLOBAL_VARIABLES' }} WHERE LOWER(VARIABLE_NAME) IN ({!! collect($names)->map(fn (string $name): string => $sql->string($name))->implode(', ') !!});

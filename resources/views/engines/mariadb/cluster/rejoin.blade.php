@@ -1,16 +1,15 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
-@include('engines.mysql-family._saved')
 @include('engines.mariadb._state')
 @include('engines.mariadb._replica')
-if [ "$READ_ONLY" = true ]; then
-    echo 'Pointing replication at a synced member…'
-    require_saved
-    writer_to_follow
-    replication_password
-    follow_writer "$WRITER" "$REPLICATION_SECRET"
-    exit 0
-fi
+@if ($readOnly)
+echo 'Pointing replication at a synced member…'
+[ -n "$REPLICATION_SECRET" ] || databasify_fail invalid_request 'MariaDB clusters need the replication secret'
+WRITER={!! $sh->arg((string) $saved->primary) !!}
+[ -n "$WRITER" ] || fail_task 'a read-only node needs the writer to follow'
+follow_writer "$WRITER" "$REPLICATION_SECRET"
+exit 0
+@endif
 echo 'Starting MariaDB…'
 unit_do start mariadb-server
 echo 'Waiting for Galera to sync…'

@@ -1,9 +1,15 @@
 @include('engines._runtime')
 MY_CLIENT={!! $sh->arg($engine->client) !!}
 MY_CNF={!! $sh->arg($engine->adminCnf()) !!}
+@if ($engine->id === 'mariadb')
+@verbatim
+MY_SESSION="SET SESSION sql_mode = CONCAT_WS(',', NULLIF(TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@SESSION.sql_mode, ','), ',NO_BACKSLASH_ESCAPES,', ',')), ''), 'NO_AUTO_CREATE_USER')"
+@endverbatim
+@else
 @verbatim
 MY_SESSION="SET SESSION sql_mode = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@SESSION.sql_mode, ','), ',NO_BACKSLASH_ESCAPES,', ','))"
 @endverbatim
+@endif
 
 my() {
     local database=$1 errors output status names=-N

@@ -13,13 +13,6 @@ SQL
     wait_until 600 2 slave_running || fail_task 'the server was not ready within 10m0s'
 }
 
-writer_to_follow() {
-    WRITER=$(saved '.primary // empty')
-    if [ -z "$WRITER" ]; then
-        fail_task 'a read-only node needs the writer to follow'
-    fi
-}
-
 stop_following() {
     my '' > /dev/null <<'SQL'
 STOP SLAVE;

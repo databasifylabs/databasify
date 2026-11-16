@@ -13,6 +13,11 @@ final readonly class Grant
         public GrantAccess $access,
     ) {}
 
+    public function privileges(): string
+    {
+        return $this->access === GrantAccess::Write ? 'ALL PRIVILEGES' : 'SELECT, SHOW VIEW';
+    }
+
     /**
      * @return array{database: string, access: string}
      */

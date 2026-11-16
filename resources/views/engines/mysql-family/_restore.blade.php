@@ -3,6 +3,10 @@
 @include('engines.mysql-family._server')
 @include('engines.mysql-family._rclone')
 RESTORE="$ROOT/restore"
+SUFFIX={!! $sh->arg($engine->baseSuffix()) !!}
+TARGET={!! $sh->arg($target) !!}
+TARGET_STAMP={!! $sh->arg($targetStamp) !!}
+TARGET_RFC3339={!! $sh->arg($targetRfc3339) !!}
 
 piped() {
     local label=$1 output

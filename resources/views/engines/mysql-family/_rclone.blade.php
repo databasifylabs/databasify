@@ -8,7 +8,7 @@ remote_of() {
 rclone_list() {
     local output errors
     errors=$(mktemp)
-    if output=$(rclone lsjson "$(remote_of "$1")" 2> "$errors"); then
+    if output=$(rclone lsjson "${@:2}" "$(remote_of "$1")" 2> "$errors"); then
         rm -f "$errors"
         printf '%s' "${output:-[]}"
         return 0

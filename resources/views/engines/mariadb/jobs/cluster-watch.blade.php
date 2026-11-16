@@ -1,9 +1,16 @@
 set -uo pipefail
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
-@include('engines.mysql-family._saved')
 @include('engines.mariadb._state')
 @include('engines.mariadb._remote')
+saved() {
+    jq -r "$1" "$ROOT/state/node.json"
+}
+
+saved_is() {
+    jq -e "$1" "$ROOT/state/node.json" > /dev/null
+}
+
 WATCH_INTERVAL=10
 DISCONNECTED_CHECKS=3
 REPOINT_TIMEOUT=60

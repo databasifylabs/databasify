@@ -42,21 +42,21 @@ final readonly class MySqlFamilyConfiguration
         $tuned = $saved ?? $catalog->tuned(NodeState::selfOf($request));
 
         $this->scripts->run($this->driver, 'engines.mysql-family.nodes.configure', [
-            ...$this->filesEnvOf($request, $tuned),
-            'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'INIT_SQL' => $this->initSqlOf($engine, $request),
-            'INIT_COMMAND' => $this->initCommandOf($engine),
-            'SEED' => $this->startsNewCluster($engine, $request) ? 'true' : 'false',
-            'GROUPED_BOOT' => $engine->id === 'mysql' && $request->clustered && ! $request->readOnly ? 'true' : 'false',
-            'HELPERS' => implode(' ', $this->helpersOf($engine, $request)),
+            ...$this->filesDataOf($request, $tuned),
+            'tunedJson' => $saved === null ? NodeState::tunedJsonOf($tuned) : null,
+            'initSql' => $this->initSqlOf($engine, $request),
+            'initCommand' => $this->initCommandOf($engine),
+            'seed' => $this->startsNewCluster($engine, $request),
+            'groupedBoot' => $engine->id === 'mysql' && $request->clustered && ! $request->readOnly,
+            'helpers' => $this->helpersOf($engine, $request),
         ], timeout: self::CONFIGURE_TIMEOUT);
     }
 
     /**
      * @param  array<string, string>  $tuned
-     * @return array{REQUEST_JSON: string, FILES: string, MANIFEST: string, MANIFEST_NEW_CLUSTER: string}
+     * @return array{files: ConfigFiles, newClusterManifest: ?string, requestJson: string}
      */
-    public function filesEnvOf(NodeConfig $request, array $tuned): array
+    public function filesDataOf(NodeConfig $request, array $tuned): array
     {
         $engine = $this->driver->engine();
         $line = $this->driver->node->database->version_line;
@@ -64,10 +64,9 @@ final readonly class MySqlFamilyConfiguration
         $files = $this->filesOf($engine, $effective, $line, false);
 
         return [
-            'REQUEST_JSON' => NodeState::requestJsonOf($request),
-            'FILES' => NodeState::filesJsonOf([...$files->files, ...$this->jobsFor($engine, $request)]),
-            'MANIFEST' => base64_encode($files->manifest),
-            'MANIFEST_NEW_CLUSTER' => $engine->id === 'mariadb' ? base64_encode($this->filesOf($engine, $effective, $line, true)->manifest) : '',
+            'files' => new ConfigFiles([...$files->files, ...$this->jobsFor($engine, $request)], $files->manifest),
+            'newClusterManifest' => $engine->id === 'mariadb' ? $this->filesOf($engine, $effective, $line, true)->manifest : null,
+            'requestJson' => NodeState::requestJsonOf($request),
         ];
     }
 
@@ -151,14 +150,17 @@ final readonly class MySqlFamilyConfiguration
         return "ALTER USER 'root'@'localhost' IDENTIFIED BY ".FamilyFiles::sqlString((string) $request->secrets->admin).";\n";
     }
 
-    private function initCommandOf(MySqlFamilyEngine $engine): string
+    /**
+     * @return list<string>
+     */
+    private function initCommandOf(MySqlFamilyEngine $engine): array
     {
-        $data = "{$engine->home}/data";
+        $dataDir = "--datadir={$engine->home}/data";
         $init = "{$engine->home}/conf/init.sql";
 
         return $engine->id === 'mysql'
-            ? "/usr/sbin/mysqld --no-defaults --initialize-insecure --user=mysql --datadir={$data} --init-file={$init}"
-            : "mariadb-install-db --no-defaults --user=mysql --datadir={$data} --skip-test-db --auth-root-authentication-method=socket --extra-file={$init}";
+            ? ['/usr/sbin/mysqld', '--no-defaults', '--initialize-insecure', '--user=mysql', $dataDir, "--init-file={$init}"]
+            : ['mariadb-install-db', '--no-defaults', '--user=mysql', $dataDir, '--skip-test-db', '--auth-root-authentication-method=socket', "--extra-file={$init}"];
     }
 
     private function startsNewCluster(MySqlFamilyEngine $engine, NodeConfig $request): bool

@@ -26,29 +26,26 @@ final readonly class MySqlFamilyMigration implements Migration
     public function check(MigrationSource $source, array $databases): SourceReport
     {
         $engine = $this->driver->engine();
-        $facts = $this->scripts->read($this->driver, 'engines.mysql-family.migration.check', [
-            ...$this->sourceEnvOf('SOURCE', $source),
-            'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR),
-            'RESERVED_DATABASES' => json_encode($engine->reservedDatabases, JSON_THROW_ON_ERROR),
-        ], timeout: 600);
+        $facts = $this->scripts->read($this->driver, 'engines.mysql-family.migration.check', env: $this->sourceEnvOf('SOURCE', $source), timeout: 600);
         $error = $facts->nullableString('error');
 
         if ($error !== null) {
             return SourceReport::unreachable(strtok($error, "\n") ?: $error);
         }
 
-        $visible = $facts->strings('visible');
+        $visible = array_values(collect($facts->strings('visible'))->diff($engine->reservedDatabases)->sort()->all());
         $wanted = $databases === [] ? $visible : $databases;
         $sizes = $facts->object('sizes');
         $local = $facts->object('localTables');
         $missing = $facts->object('missingKeys');
+        $countIn = fn (Payload $counts, string $database): int => $counts->has($database) ? $counts->int($database) : 0;
         $readable = collect($wanted)->intersect($visible);
         $unreadable = array_values(array_diff($wanted, $visible));
-        $bytes = $readable->sum(fn (string $database): int => $sizes->int($database));
-        $occupied = array_values($readable->filter(fn (string $database): bool => $local->int($database) > 0)->all());
+        $bytes = $readable->sum(fn (string $database): int => $countIn($sizes, $database));
+        $occupied = array_values($readable->filter(fn (string $database): bool => $countIn($local, $database) > 0)->all());
         $warnings = $readable
-            ->filter(fn (string $database): bool => $missing->int($database) > 0)
-            ->map(fn (string $database): string => "{$database} has {$missing->int($database)} tables without a primary key, which a cluster refuses")
+            ->filter(fn (string $database): bool => $countIn($missing, $database) > 0)
+            ->map(fn (string $database): string => "{$database} has {$countIn($missing, $database)} tables without a primary key, which a cluster refuses")
             ->all();
 
         $version = $facts->string('version');
@@ -68,27 +65,27 @@ final readonly class MySqlFamilyMigration implements Migration
         }
 
         $this->scripts->run($this->driver, 'engines.mysql-family.migration.start', [
+            'continuous' => $start->continuous,
+            'copyScript' => $this->driver->script('engines.mysql-family.jobs.migration-copy', ['engine' => $this->driver->engine()]),
+        ], [
             ...$this->sourceEnvOf('MIGRATION', $start->source),
             'MIGRATION_DATABASES' => implode("\n", $databases),
             'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
             'MIGRATION_OWNER' => $start->owner ?? '',
-            'MIGRATION_UNIT' => $this->driver->engine()->migrationUnit(),
             'MYSQLSH_URI' => rawurlencode($start->source->username)."@{$start->source->host}:{$start->source->port}",
-            'COPY_SCRIPT' => base64_encode($this->driver->script('engines.mysql-family.jobs.migration-copy', ['engine' => $this->driver->engine()])),
         ]);
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->scripts->read($this->driver, 'engines.mysql-family.migration.progress', ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()])));
+        return MigrationProgress::fromPayload($this->scripts->read($this->driver, 'engines.mysql-family.migration.progress'));
     }
 
     public function stop(string $key, bool $cutover): Operation
     {
-        $env = ['MIGRATION_UNIT' => $this->driver->engine()->migrationUnit()];
-        $operation = $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop', $env);
+        $operation = $this->scripts->start($this->driver, $key, 'engines.mysql-family.migration.stop');
         $this->driver->node->database->membersOtherThan($this->driver->node)
-            ->each(fn (DatabaseNode $member) => $member->driver()->run('engines.mysql-family.migration.stop', ['engine' => $this->driver->engine()], $env, timeout: 600));
+            ->each(fn (DatabaseNode $member) => $member->driver()->run('engines.mysql-family.migration.stop', timeout: 600));
 
         return $operation;
     }
@@ -138,7 +135,7 @@ final readonly class MySqlFamilyMigration implements Migration
 
     private function grants(Payload $facts, string $privilege): bool
     {
-        $granted = strtoupper(implode(' ', $facts->strings('grants')));
+        $granted = strtoupper($facts->string('grants'));
 
         return str_contains($granted, $privilege) || str_contains($granted, 'ALL PRIVILEGES ON *.*');
     }

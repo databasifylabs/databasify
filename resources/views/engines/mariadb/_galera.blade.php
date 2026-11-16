@@ -86,9 +86,7 @@ clear_new_cluster() {
         return 0
     fi
     rm -f "$ROOT/state/new-cluster"
-    if [ -n "$MANIFEST" ]; then
-        write_manifest || true
-    fi
+    write_manifest || true
     unit_do daemon-reload
 }
 

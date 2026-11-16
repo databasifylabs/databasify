@@ -1,6 +1,5 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
-@include('engines.mysql-family._saved')
 @include('engines.mysql-family._server')
 @include('engines.mysql._group')
 @include('engines.mysql-family._keys')
@@ -46,7 +45,7 @@ group_plugin_loaded() {
 }
 
 follow_group() {
-    PRIMARY=$(saved '.primary // empty')
+    PRIMARY={!! $sh->arg((string) $saved->primary) !!}
     if [ -z "$PRIMARY" ]; then
         fail_task 'a read-only node needs the primary to follow'
     fi
@@ -57,35 +56,34 @@ follow_group() {
     echo 'Following…'
     my '' > /dev/null <<SQL
 CHANGE REPLICATION SOURCE TO SOURCE_HOST = $(my_string "$PRIMARY"), SOURCE_PORT = 25060, SOURCE_USER = 'databasify_repl', SOURCE_PASSWORD = $(my_string "$REPLICATION_SECRET"), SOURCE_AUTO_POSITION = 1, SOURCE_SSL = 1, SOURCE_CONNECT_RETRY = 5, SOURCE_RETRY_COUNT = 3, SOURCE_CONNECTION_AUTO_FAILOVER = 1 FOR CHANNEL 'group';
-SELECT asynchronous_connection_failover_add_managed('group', 'GroupReplication', $(my_string "$GROUP_NAME"), $(my_string "$PRIMARY"), 25060, '', 80, 60);
+SELECT asynchronous_connection_failover_add_managed('group', 'GroupReplication', {!! $sql->string($groupName) !!}, $(my_string "$PRIMARY"), 25060, '', 80, 60);
 START REPLICA FOR CHANNEL 'group'
 SQL
     wait_until 1800 2 channel_running || fail_task 'the server was not ready within 30m0s'
     : | write_file "$ROOT/state/replica" 600 false || true
 }
 
-require_saved
-replication_password
-if saved_is '.readOnly'; then
-    follow_group
-    echo 'Following the primary as a read-only node.'
-    exit 0
-fi
+[ -n "$REPLICATION_SECRET" ] || databasify_fail invalid_request 'MySQL clusters need the replication secret'
+@if ($saved->readOnly)
+follow_group
+echo 'Following the primary as a read-only node.'
+exit 0
+@endif
 require_primary_keys
 if ! group_plugin_loaded; then
     echo 'Restarting into the new config…'
     unit_do restart "$SERVER_UNIT"
     wait_ready 'MySQL with Group Replication'
 fi
-if saved_is '.primary == null or .primary == .ip'; then
-    echo 'Bootstrapping…'
-    bootstrap_group "$REPLICATION_SECRET"
-    JOINED='Started the group as its primary.'
-else
-    echo 'Joining…'
-    retry_or_fail 1800 30m0s join_attempt
-    JOINED='Joined the group as a standby.'
-fi
+@if (in_array($saved->primary, [null, $saved->ip], true))
+echo 'Bootstrapping…'
+bootstrap_group "$REPLICATION_SECRET"
+JOINED='Started the group as its primary.'
+@else
+echo 'Joining…'
+retry_or_fail 1800 30m0s join_attempt
+JOINED='Joined the group as a standby.'
+@endif
 echo 'Recovering…'
 online_and_joined "$REPLICATION_SECRET"
 echo "$JOINED"

@@ -30,16 +30,18 @@ final readonly class MySqlFamilyArchive implements Archive
         $archive = $this->configuration->savedRequestOf()->archive ?? throw new EngineUnsupported('this engine does not implement "archive status"');
         $backupUnit = $engine->archiveUnits()['backup'];
 
-        $reply = $this->scripts->read($this->driver, 'engines.mysql-family.archive.status', [
-            ...FamilyFiles::storageEnvOf($archive->storage),
-            'SUFFIX' => $engine->baseSuffix(),
-            'BACKUP_UNIT' => $backupUnit,
-            'BACK_UP_NOW' => $backUpNow ? 'true' : 'false',
-        ], timeout: 900);
+        $reply = $this->scripts->read($this->driver, 'engines.mysql-family.archive.status', env: FamilyFiles::storageEnvOf($archive->storage), timeout: 900);
 
         $bases = $this->basesIn($reply->objects('base'), $engine->baseSuffix());
-        $shipped = $this->latestOf($reply->strings('shipped'));
+        $shipped = $this->latestOf(array_values(collect($reply->objects('binlogs'))
+            ->reject(fn (Payload $entry): bool => $entry->bool('IsDir'))
+            ->map(fn (Payload $entry): string => $entry->string('ModTime'))
+            ->all()));
         $failure = in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.";
+
+        if ($backUpNow || ($bases === [] && $failure === null)) {
+            $this->scripts->run($this->driver, 'engines.mysql-family.archive.back-up');
+        }
 
         if ($bases === []) {
             return new ArchiveStatus(0, null, null, null, $failure);
@@ -56,12 +58,10 @@ final readonly class MySqlFamilyArchive implements Archive
         $target = $target->utc();
 
         return $this->scripts->start($this->driver, $key, 'engines.{engine}.restore.start', [
-            ...FamilyFiles::storageEnvOf($storage),
-            'SUFFIX' => $this->driver->engine()->baseSuffix(),
-            'TARGET' => $target->format('Y-m-d H:i:s'),
-            'TARGET_STAMP' => $target->format(self::STAMP_FORMAT),
-            'TARGET_RFC3339' => $this->timeOf($target),
-        ]);
+            'target' => $target->format('Y-m-d H:i:s'),
+            'targetStamp' => $target->format(self::STAMP_FORMAT),
+            'targetRfc3339' => $this->timeOf($target),
+        ], FamilyFiles::storageEnvOf($storage));
     }
 
     /**

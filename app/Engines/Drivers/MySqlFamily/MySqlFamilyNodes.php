@@ -17,6 +17,8 @@ use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Drivers\TlsPair;
 use App\Enums\Databases\GrantAccess;
 use App\Enums\Databases\NodeRole;
+use App\Exceptions\Engines\EngineBusy;
+use App\Exceptions\Engines\EngineUnavailable;
 use App\Exceptions\Engines\EngineUnsupported;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
@@ -41,7 +43,14 @@ final readonly class MySqlFamilyNodes implements Nodes
 
     public function start(): void
     {
-        $this->scripts->run($this->driver, 'engines.{engine}.nodes.start', timeout: self::LIFECYCLE_TIMEOUT);
+        $engine = $this->driver->engine();
+        $saved = $this->state->requestOf($this->driver, MySqlFamilyConfiguration::REQUEST_STATE);
+
+        if ($saved === null && $engine->id === 'mariadb') {
+            throw new EngineBusy('run node configure first');
+        }
+
+        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.start', ['helpers' => $saved === null ? [] : $this->configuration->helpersOf($engine, $saved)], timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function wake(bool $all): void
@@ -65,9 +74,19 @@ final readonly class MySqlFamilyNodes implements Nodes
             throw new InvalidEngineRequest($this->driver->engine()->label.' needs the replication and agent secrets');
         }
 
-        $seed = $this->scripts->read($this->driver, 'engines.{engine}.nodes.bootstrap', ['REPLICATION_PASSWORD' => $secrets->replication, 'AGENT_PASSWORD' => $secrets->agent])->bool('seed');
+        $saved = $this->configuration->savedRequestOf();
 
-        if ($seed && $account !== null) {
+        if ($saved->clustered && ($saved->readOnly || ! in_array($saved->primary, [null, $saved->ip], true))) {
+            return;
+        }
+
+        $this->scripts->query($this->driver, 'engines.{engine}.nodes.bootstrap', ['replication' => $secrets->replication, 'agent' => $secrets->agent]);
+
+        if ($this->driver->engine()->id === 'mariadb' && $saved->clustered) {
+            $this->scripts->run($this->driver, 'engines.mariadb.nodes.claim-writer', ['ip' => $saved->ip]);
+        }
+
+        if ($account !== null) {
             $this->accounts->createDatabase($account->database);
             $this->accounts->createUser($account->user, $account->password, [new Grant($account->database, GrantAccess::Write)], null);
         }
@@ -76,34 +95,30 @@ final readonly class MySqlFamilyNodes implements Nodes
     public function installTls(string $certificate, string $key, string $ca): void
     {
         TlsPair::checkPair($certificate, $key, $ca);
-        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.tls-install', ['CERTIFICATE' => $certificate, 'KEY' => $key, 'CA' => $ca]);
+        $this->scripts->run($this->driver, 'engines.mysql-family.nodes.tls-install', ['certificate' => $certificate, 'key' => $key, 'ca' => $ca]);
     }
 
     public function ready(string $key, bool $expectPrimary): Operation
     {
-        return $this->scripts->start($this->driver, $key, 'engines.{engine}.nodes.ready', ['MANIFEST' => $this->manifestWithoutNewCluster()]);
+        $saved = $this->configuration->savedRequestOf();
+        $files = $this->driver->engine()->id === 'mariadb' ? MariaDbFiles::of($saved, $this->driver->node->database->version_line, false) : null;
+
+        return $this->scripts->start($this->driver, $key, 'engines.{engine}.nodes.ready', ['saved' => $saved, 'files' => $files], ['REPLICATION_SECRET' => (string) $saved->secrets->replication]);
     }
 
     public function status(): NodeStatus
     {
-        $reply = $this->scripts->read($this->driver, 'engines.{engine}.nodes.status');
+        try {
+            $reply = $this->scripts->queryJson($this->driver, 'engines.{engine}.nodes.status');
+        } catch (EngineUnavailable) {
+            return NodeStatus::reported(NodeRole::Offline, null);
+        }
 
         return NodeStatus::reported(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
     }
 
     public function metrics(): NodeMetrics
     {
-        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'engines.mysql-family.nodes.metrics'));
-    }
-
-    private function manifestWithoutNewCluster(): string
-    {
-        if ($this->driver->engine()->id !== 'mariadb') {
-            return '';
-        }
-
-        $saved = $this->state->requestOf($this->driver, MySqlFamilyConfiguration::REQUEST_STATE);
-
-        return $saved === null ? '' : base64_encode(MariaDbFiles::of($saved, $this->driver->node->database->version_line, false)->manifest);
+        return NodeMetrics::fromPayload($this->scripts->queryJson($this->driver, 'engines.mysql-family.nodes.metrics'));
     }
 }

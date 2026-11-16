@@ -1,10 +1,8 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
 @include('engines.mysql-family._rewrite')
-@include('engines.mysql-family._saved')
 @include('engines.mariadb._state')
 @include('engines.mariadb._galera')
-require_saved
 if read_state; then
     if [ "$STATE_CLUSTER" = Primary ]; then
         databasify_fail busy 'this node is already in a primary component'

@@ -1,5 +1,6 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
+MIGRATION_UNIT={!! $sh->arg($engine->migrationUnit()) !!}
 property() {
     databasify ctl show -p "$1" --value "$MIGRATION_UNIT" 2> /dev/null || true
 }

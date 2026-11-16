@@ -1,7 +1,7 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
-databasify ctl stop "$MIGRATION_UNIT" > /dev/null 2>&1 || true
-databasify ctl reset-failed "$MIGRATION_UNIT" > /dev/null 2>&1 || true
+databasify ctl stop {!! $sh->arg($engine->migrationUnit()) !!} > /dev/null 2>&1 || true
+databasify ctl reset-failed {!! $sh->arg($engine->migrationUnit()) !!} > /dev/null 2>&1 || true
 
 ignoring_missing() {
     my_try '' <<< "$1" 2> /dev/null
@@ -21,5 +21,5 @@ ignoring_missing "RESET REPLICA ALL FOR CHANNEL 'migration'"
 ignoring_missing "STOP SLAVE 'migration'"
 ignoring_missing "RESET SLAVE 'migration' ALL"
 @endif
-rm -f "$ROOT/state/$MIGRATION_UNIT.continuous"
+rm -f "$ROOT/state/{{ $engine->migrationUnit() }}.continuous"
 echo "Stopped the migration."

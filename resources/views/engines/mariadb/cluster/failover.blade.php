@@ -1,17 +1,16 @@
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
-@include('engines.mysql-family._saved')
 @include('engines.mariadb._remote')
-require_saved
-replication_password
+REPLICATION_SECRET={!! $sh->arg((string) $saved->secrets->replication) !!}
+[ -n "$REPLICATION_SECRET" ] || databasify_fail invalid_request 'MariaDB clusters need the replication secret'
+TARGET={!! $sh->arg($target) !!}
 target_cnf=$(remote_cnf "$TARGET" "$REPLICATION_SECRET")
 MY_DEFAULTS=$target_cnf my '' > /dev/null <<SQL
 CREATE DATABASE IF NOT EXISTS databasify;
 CREATE TABLE IF NOT EXISTS databasify.writer (id TINYINT PRIMARY KEY, ip VARCHAR(45) NOT NULL);
-REPLACE INTO databasify.writer VALUES (1, $(my_string "$TARGET"))
+REPLACE INTO databasify.writer VALUES (1, {!! $sql->string($target) !!})
 SQL
-while IFS= read -r member; do
-    [ -z "$member" ] && continue
+for member in {!! collect($saved->members)->filter(fn ($member): bool => $member->voting && $member->ip !== $target)->map(fn ($member): string => $sh->arg($member->ip))->implode(' ') !!}; do
     member_cnf=$(remote_cnf "$member" "$REPLICATION_SECRET")
     MY_DEFAULTS=$member_cnf my_try '' <<< 'SET GLOBAL read_only = ON'
     rm -f "$member_cnf"
@@ -19,7 +18,7 @@ while IFS= read -r member; do
         rm -f "$target_cnf"
         databasify_fail "$MY_ERROR" "$MY_ERROR_TEXT"
     fi
-done < <(jq -r --arg target "$TARGET" '.members[] | select(.voting and .ip != $target) | .ip' "$ROOT/state/node.json")
+done
 MY_DEFAULTS=$target_cnf my '' > /dev/null <<< 'SET GLOBAL read_only = OFF'
 
 writable() {

@@ -1,4 +1,3 @@
-@include('engines.mysql-family._mysql')
-@include('engines.mysql-family._server')
-unit_do restart "$SERVER_UNIT"
+@include('engines._runtime')
+unit_do restart {!! $sh->arg($engine->serverUnit()) !!}
 echo "Restarted the server."
