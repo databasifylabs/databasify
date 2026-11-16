@@ -17,6 +17,8 @@ final readonly class PostgresConfig implements Config
 
     private const int SYNC_TIMEOUT = 720;
 
+    private const array HOT_STANDBY_SETTINGS = ['max_connections', 'max_locks_per_transaction', 'max_prepared_transactions', 'max_wal_senders', 'max_worker_processes'];
+
     public function __construct(
         private PostgresDriver $driver,
         private NodeState $state,
@@ -25,18 +27,30 @@ final readonly class PostgresConfig implements Config
 
     public function apply(): void
     {
-        $this->driver->run('engines.postgres.config.apply', $this->driver->data(), timeout: self::APPLY_TIMEOUT);
+        $this->driver->run('engines.postgres.config.apply', ['clustered' => $this->configuration->savedRequestOf()->clustered], timeout: self::APPLY_TIMEOUT);
     }
 
     public function sync(): void
     {
-        $this->driver->run('engines.postgres.config.sync', $this->driver->data(), timeout: self::SYNC_TIMEOUT);
+        $request = $this->configuration->savedRequestOf();
+
+        if (! $request->clustered) {
+            return;
+        }
+
+        [$clusterParameters] = PostgresFiles::parametersOf($this->configuration->effectiveOf($request, $this->tunedOf($request)));
+        $live = $this->driver->queryJson('engines.postgres.config.limits', ['names' => self::HOT_STANDBY_SETTINGS]);
+        $current = $live->stringMap('current');
+        $defaults = $live->stringMap('defaults');
+        $restartPrimary = collect(self::HOT_STANDBY_SETTINGS)->contains(fn (string $name): bool => isset($current[$name], $defaults[$name]) && (int) ($clusterParameters[$name] ?? $defaults[$name]) < (int) $current[$name]);
+
+        $this->driver->run('engines.postgres.config.sync', ['restartPrimary' => $restartPrimary], timeout: self::SYNC_TIMEOUT);
     }
 
     public function pendingRestart(): array
     {
-        $keys = implode(',', array_map(fn (EngineField $field): string => $field->key, $this->configuration->catalog()->fields));
-        $values = $this->driver->read('engines.postgres.config.show', $this->driver->data(), env: ['KEYS' => $keys])->objects('values');
+        $keys = array_map(fn (EngineField $field): string => $field->key, $this->configuration->catalog()->fields);
+        $values = $this->driver->queryJson('engines.postgres.config.show', ['keys' => $keys])->objects('values');
 
         return array_values(array_map(fn (Payload $value): string => $value->string('key'), array_filter($values, fn (Payload $value): bool => $value->bool('pendingRestart'))));
     }

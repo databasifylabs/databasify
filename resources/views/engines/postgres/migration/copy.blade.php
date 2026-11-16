@@ -1,8 +1,9 @@
 set -euo pipefail
 @include('engines.postgres._psql')
-@include('engines.postgres._accounts')
 @include('engines.postgres._source')
 STATE=/srv/postgres/migration/state
+OWNER={!! $sh->arg($owner) !!}
+PUBLICATION={!! $sh->arg($publication) !!}
 set -a
 . "$STATE/copy.env"
 set +a
@@ -15,37 +16,41 @@ trap finish EXIT
 exec 3>&1
 
 copy_database() {
-    local database=$1 created
-    recovery=$(pg postgres <<'SQL'
-SELECT pg_is_in_recovery()
-SQL
-)
+    local database=$1 recovery
+    recovery=$(pg postgres <<< 'SELECT pg_is_in_recovery()')
     if [ "$recovery" = t ]; then
         databasify_fail not_primary 'this node is a replica; run the command on the primary'
     fi
-    DATABASIFY_VAR_name="$database" pg postgres > /dev/null <<'SQL'
-SELECT NOT EXISTS (SELECT FROM pg_database WHERE datname = :'name') AS created \gset
-\if :created
-CREATE DATABASE :"name";
+    pg postgres > /dev/null <<SQL
+SELECT NOT EXISTS (SELECT FROM pg_database WHERE datname = $(pg_string "$database")) AS missing \gset
+\if :missing
+CREATE DATABASE $(pg_name "$database");
 \endif
 SQL
-    NAME=$MIGRATION_OWNER
-    grant_write_on "$database" "$(owner_of "$database")"
+    pg "$database" > /dev/null <<SQL
+SELECT pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = current_database() \gset
+GRANT ALL PRIVILEGES ON DATABASE $(pg_name "$database") TO $(pg_name "$OWNER");
+GRANT ALL ON SCHEMA public TO $(pg_name "$OWNER");
+GRANT ALL ON ALL TABLES IN SCHEMA public TO $(pg_name "$OWNER");
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO $(pg_name "$OWNER");
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT ALL ON TABLES TO $(pg_name "$OWNER");
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT ALL ON SEQUENCES TO $(pg_name "$OWNER");
+SQL
     dump_and_restore "$database"
-    if [ "$MIGRATION_CONTINUOUS" = true ]; then
-        subscribe "$database"
-    fi
+@if ($continuous)
+    subscribe "$database"
+@endif
 }
 
 dump_and_restore() {
     local database=$1 dump_args=(--no-owner --no-acl -Fc) dump_errors restore_errors
-    if [ "$MIGRATION_CONTINUOUS" = true ]; then
-        dump_args+=(--schema-only)
-    fi
+@if ($continuous)
+    dump_args+=(--schema-only)
+@endif
     dump_errors=$(mktemp)
     restore_errors=$(mktemp)
     if ! as_source "$database" timeout 259200 pg_dump "${dump_args[@]}" 2> "$dump_errors" \
-        | HOME=/var/lib/postgresql setpriv --reuid=64999 --regid=64999 --clear-groups timeout 259200 pg_restore -h /srv/postgres/run -p "$PG_PORT" -U postgres "--role=$MIGRATION_OWNER" -d "$database" --no-owner --no-acl --exit-on-error > /dev/null 2> "$restore_errors"; then
+        | as_postgres timeout 259200 pg_restore -h /srv/postgres/run -p "$PG_PORT" -U postgres "--role=$OWNER" -d "$database" --no-owner --no-acl --exit-on-error > /dev/null 2> "$restore_errors"; then
         if [ -s "$restore_errors" ]; then
             echo "$database: pg_restore: $(tail -n 3 "$restore_errors")"
         else
@@ -54,6 +59,7 @@ dump_and_restore() {
         exit 1
     fi
 }
+@if ($continuous)
 
 conninfo_of() {
     local database=$1 key value parts=()
@@ -77,21 +83,23 @@ subscribe() {
         echo "$database has no tables to replicate"
         return 0
     fi
-    on_source "$database" "DROP PUBLICATION IF EXISTS \"$MIGRATION_PUBLICATION\"; CREATE PUBLICATION \"$MIGRATION_PUBLICATION\" FOR TABLE $tables" > /dev/null || { echo "$database: $SOURCE_ERROR"; exit 1; }
-    DATABASIFY_VAR_publication="$MIGRATION_PUBLICATION" DATABASIFY_VAR_db="$database" DATABASIFY_VAR_conninfo="$(conninfo_of "$database")" pg "$database" > /dev/null <<'SQL'
-SELECT :'publication' || '_' || left(:'db', 20) || '_' || left(md5(:'db'), 8) AS name \gset
-CREATE SUBSCRIPTION :"name" CONNECTION :'conninfo' PUBLICATION :"publication" WITH (copy_data = true);
+    on_source "$database" "DROP PUBLICATION IF EXISTS $(pg_name "$PUBLICATION"); CREATE PUBLICATION $(pg_name "$PUBLICATION") FOR TABLE $tables" > /dev/null || { echo "$database: $SOURCE_ERROR"; exit 1; }
+    PG_SESSION='-c log_statement=none -c log_min_duration_statement=-1 -c log_min_error_statement=panic' pg "$database" > /dev/null <<SQL
+SELECT $(pg_string "$PUBLICATION") || '_' || left($(pg_string "$database"), 20) || '_' || left(md5($(pg_string "$database")), 8) AS name \gset
+CREATE SUBSCRIPTION :"name" CONNECTION $(pg_string "$(conninfo_of "$database")") PUBLICATION $(pg_name "$PUBLICATION") WITH (copy_data = true);
 SQL
 }
+@endif
 
-databases=$MIGRATION_DATABASES
-if [ -z "$databases" ]; then
-    if ! listed=$(on_source postgres "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname"); then
-        echo "$SOURCE_ERROR"
-        exit 1
-    fi
-    databases=$(copyable <<< "$listed")
+@if ($databases === [])
+if ! listed=$(on_source postgres "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname"); then
+    echo "$SOURCE_ERROR"
+    exit 1
 fi
+databases=$(copyable <<< "$listed")
+@else
+databases={!! $sh->arg(implode("\n", $databases)) !!}
+@endif
 IFS=$'\n' read -r -d '' -a database_list <<< "$databases" || true
 for database in "${database_list[@]}"; do
     echo "copying $database"

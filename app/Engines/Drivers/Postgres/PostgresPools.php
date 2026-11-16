@@ -6,6 +6,7 @@ namespace App\Engines\Drivers\Postgres;
 
 use App\Engines\Contracts\Pools;
 use App\Engines\Data\Pool;
+use App\Engines\Payload;
 use App\Exceptions\Engines\EngineAlreadyExists;
 use App\Exceptions\Engines\EngineNotFound;
 use App\Exceptions\Engines\InvalidEngineRequest;
@@ -14,6 +15,8 @@ final readonly class PostgresPools implements Pools
 {
     private const array RESERVED = ['postgres', 'pgbouncer'];
 
+    private const string POOLS_STATE = 'conf/pools.json';
+
     public function __construct(
         private PostgresDriver $driver,
         private PostgresAccounts $accounts,
@@ -21,7 +24,13 @@ final readonly class PostgresPools implements Pools
 
     public function list(): array
     {
-        return array_map(Pool::fromPayload(...), $this->driver->read('engines.postgres.pools.list', $this->driver->data())->objects('pools'));
+        $poolsJson = $this->driver->getFile(self::POOLS_STATE);
+
+        if ($poolsJson === null) {
+            return [];
+        }
+
+        return array_map(Pool::fromPayload(...), Payload::decode('{"pools":'.$poolsJson.'}')->objects('pools'));
     }
 
     public function create(Pool $pool): void
@@ -65,7 +74,12 @@ final readonly class PostgresPools implements Pools
      */
     private function save(array $pools): void
     {
-        $this->driver->run('engines.postgres.pools.save', $this->driver->data(), env: ['POOLS' => json_encode(array_map(fn (Pool $pool): array => $pool->toPayload(), $pools), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
+        $this->driver->run('engines.postgres.pools.save', [
+            'poolsJson' => json_encode(array_map(fn (Pool $pool): array => $pool->toPayload(), $pools), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'poolsIni' => collect($pools)
+                ->map(fn (Pool $pool): string => "{$pool->name} = host=127.0.0.1 port=".PostgresFiles::CLIENT_PORT." dbname={$pool->database} pool_size={$pool->size} pool_mode={$pool->mode}\n")
+                ->implode(''),
+        ]);
     }
 
     private function requireDatabase(string $database): void

@@ -1,12 +1,10 @@
 @include('engines.postgres._psql')
-@include('engines.postgres._units')
-if clustered && [ "$ALL" != true ]; then
-    unit_do start databasify-etcd
-    echo "Started etcd."
-    exit 0
-fi
-units=$(manifest_units)
-for name in $units; do
-    databasify ctl start "$name" > /dev/null 2>&1 || true
-done
+@if ($etcdOnly)
+unit_do start databasify-etcd
+echo "Started etcd."
+@else
+@foreach ($units as $unit)
+databasify ctl start {!! $sh->arg($unit) !!} > /dev/null 2>&1 || true
+@endforeach
 echo "Started every unit."
+@endif

@@ -103,7 +103,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     public function script(string $script, array $data = []): string
     {
-        return resolve(ScriptView::class)->render($this->node, $script, $data);
+        return resolve(ScriptView::class)->render($this->node, $script, $this->withViewData($data));
     }
 
     public function putFile(string $path, string $content, int $mode, ?string $owner = null): void

@@ -1,14 +1,14 @@
 @include('engines._runtime')
 PG_PORT={!! $sh->arg((string) $port) !!}
 
+as_postgres() {
+    HOME=/var/lib/postgresql setpriv --reuid=64999 --regid=64999 --clear-groups "$@"
+}
+
 pg() {
-    local database=$1 script name errors output status getenv=''
-    script=$(cat)
-    for name in $(env | sed -n 's/^DATABASIFY_VAR_\([a-z_][a-z0-9_]*\)=.*/\1/p' | sort); do
-        getenv+="\\getenv ${name} DATABASIFY_VAR_${name}"$'\n'
-    done
+    local database=$1 errors output status
     errors=$(mktemp)
-    output=$(printf '%s%s\n' "$getenv" "$script" | HOME=/var/lib/postgresql USER=postgres PGDATABASE="$database" PGOPTIONS='-c statement_timeout=55s' timeout 60 setpriv --reuid=64999 --regid=64999 --clear-groups psql -X -A -t -q -v ON_ERROR_STOP=1 -h /srv/postgres/run -p "$PG_PORT" -f - 2>"$errors") && status=0 || status=$?
+    output=$(HOME=/var/lib/postgresql USER=postgres PGDATABASE="$database" PGOPTIONS="-c statement_timeout=55s${PG_SESSION:+ $PG_SESSION}" timeout 60 setpriv --reuid=64999 --regid=64999 --clear-groups psql -X -A -t -q -v ON_ERROR_STOP=1 -h /srv/postgres/run -p "$PG_PORT" -f - 2>"$errors") && status=0 || status=$?
     if [ "$status" -ne 0 ]; then
         pg_failed "$status" "$errors"
     fi
@@ -28,7 +28,12 @@ pg_failed() {
             fi
             databasify_fail unavailable "$(printf '%s' "$message" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             ;;
-        3) databasify_fail sql "$message" ;;
+        3)
+            if [[ $message =~ (ERROR|FATAL):\ +((role|database)\ \"[^\"]*\"\ does\ not\ exist) ]]; then
+                databasify_fail not_found "${BASH_REMATCH[2]}"
+            fi
+            databasify_fail sql "$message"
+            ;;
         *) databasify_fail internal "psql exited $1: $message" ;;
     esac
 }
@@ -45,8 +50,14 @@ pg_try() {
     rm -f "$errors"
 }
 
-clustered() {
-    [ -e /srv/postgres/conf/patroni.yml ] && [ ! -e /srv/postgres/conf/postgresql.conf ]
+pg_string() {
+    local quote="'"
+    printf "'%s'" "${1//"$quote"/"$quote$quote"}"
+}
+
+pg_name() {
+    local quote='"'
+    printf '"%s"' "${1//"$quote"/"$quote$quote"}"
 }
 
 patroni_state() {
@@ -55,7 +66,7 @@ patroni_state() {
 
 patronictl_run() {
     local output
-    output=$(HOME=/var/lib/postgresql setpriv --reuid=64999 --regid=64999 --clear-groups timeout 300 patronictl -c /srv/postgres/conf/patroni.yml "$@" 2>&1) \
+    output=$(as_postgres timeout 300 patronictl -c /srv/postgres/conf/patroni.yml "$@" 2>&1) \
         || databasify_fail internal "patronictl $1: $(tail -n 5 <<< "$output")"
     printf '%s' "$output"
 }

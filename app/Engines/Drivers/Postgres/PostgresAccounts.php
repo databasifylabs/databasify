@@ -22,7 +22,7 @@ final readonly class PostgresAccounts implements Accounts
 
     public function list(): AccountList
     {
-        $reply = $this->driver->read('engines.postgres.accounts.list', $this->driver->data());
+        $reply = $this->driver->queryJson('engines.postgres.accounts.list');
 
         return new AccountList($this->withoutReserved($reply->strings('users'), self::RESERVED_USERS), $this->withoutReserved($reply->strings('databases'), self::RESERVED_DATABASES));
     }
@@ -30,52 +30,48 @@ final readonly class PostgresAccounts implements Accounts
     public function createDatabase(string $name): void
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $name);
-        $this->driver->run('engines.postgres.accounts.create-database', $this->driver->data(), env: ['NAME' => $name]);
+        $this->driver->query('engines.postgres.accounts.create-database', ['name' => $name]);
     }
 
     public function dropDatabase(string $name): void
     {
         $this->refuseReserved(self::RESERVED_DATABASES, $name);
-        $this->driver->run('engines.postgres.accounts.drop-database', $this->driver->data(), env: ['NAME' => $name]);
+        $this->driver->query('engines.postgres.accounts.drop-database', ['name' => $name]);
     }
 
     public function createUser(string $name, string $password, array $grants, ?PasswordEncryption $encryption): void
     {
         $this->rejectEncryption($encryption);
-        $this->refuseReservedAccount($name, $grants);
-        $this->driver->run('engines.postgres.accounts.create-user', $this->driver->data(), env: [...$this->grantEnv($name, $grants), 'PASSWORD' => $password]);
+        $this->driver->query('engines.postgres.accounts.create-user', [...$this->grantData($name, $grants), 'password' => $password]);
     }
 
     public function setPassword(string $name, string $password, ?PasswordEncryption $encryption): void
     {
         $this->rejectEncryption($encryption);
         $this->refuseReservedAccount($name, []);
-        $this->driver->run('engines.postgres.accounts.set-password', $this->driver->data(), env: ['NAME' => $name, 'PASSWORD' => $password]);
+        $this->driver->query('engines.postgres.accounts.set-password', ['name' => $name, 'password' => $password]);
     }
 
     public function grant(string $name, array $grants, bool $replication): void
     {
-        $this->refuseReservedAccount($name, $grants);
-        $this->driver->run('engines.postgres.accounts.grant', $this->driver->data(), env: [...$this->grantEnv($name, $grants), 'REPLICATION' => $replication ? 'true' : 'false']);
+        $this->driver->query('engines.postgres.accounts.grant', [...$this->grantData($name, $grants), 'replication' => $replication]);
     }
 
     public function dropUser(string $name): void
     {
         $this->refuseReservedAccount($name, []);
-        $this->driver->run('engines.postgres.accounts.drop-user', $this->driver->data(), env: ['NAME' => $name]);
+        $this->driver->query('engines.postgres.accounts.drop-user', ['name' => $name, 'managed' => $this->driver->node->database->schemaNames()]);
     }
 
     /**
      * @param  list<Grant>  $grants
-     * @return array{NAME: string, GRANTS: string, RESERVED_DATABASES: string}
+     * @return array{name: string, grants: list<Grant>, managed: list<string>}
      */
-    private function grantEnv(string $name, array $grants): array
+    private function grantData(string $name, array $grants): array
     {
-        return [
-            'NAME' => $name,
-            'GRANTS' => json_encode(array_map(fn (Grant $grant): array => $grant->toPayload(), $grants), JSON_THROW_ON_ERROR),
-            'RESERVED_DATABASES' => json_encode(self::RESERVED_DATABASES, JSON_THROW_ON_ERROR),
-        ];
+        $this->refuseReservedAccount($name, $grants);
+
+        return ['name' => $name, 'grants' => $grants, 'managed' => $this->driver->node->database->schemaNames()];
     }
 
     /**

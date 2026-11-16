@@ -158,7 +158,7 @@ final readonly class PostgresFiles
     /**
      * @return array{array<string, string>, array<string, string>}
      */
-    private static function parametersOf(NodeConfig $request): array
+    public static function parametersOf(NodeConfig $request): array
     {
         $slots = (string) max(20, count($request->members) * 2 + 4);
         $clusterWide = [...self::REPLICATION_PARAMETERS, 'max_wal_senders' => $slots, 'max_replication_slots' => $slots];
@@ -189,6 +189,18 @@ final readonly class PostgresFiles
     public static function etcdHostsOf(array $members): string
     {
         return implode(',', array_map(fn (Member $member): string => $member->ip.':'.self::ETCD_CLIENT_PORT, $members));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function etcdEndpointsOf(NodeConfig $config): array
+    {
+        $peers = collect($config->members)
+            ->reject(fn (Member $member): bool => $member->ip === $config->ip)
+            ->map(fn (Member $member): string => "http://{$member->ip}:".self::ETCD_CLIENT_PORT);
+
+        return ['http://127.0.0.1:'.self::ETCD_CLIENT_PORT, ...$peers->values()->all()];
     }
 
     /**

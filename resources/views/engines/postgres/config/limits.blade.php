@@ -1,0 +1,1 @@
+SELECT json_build_object('current', json_object_agg(name, setting), 'defaults', json_object_agg(name, boot_val)) FROM pg_settings WHERE name = ANY (ARRAY[{!! collect($names)->map($sql->string(...))->implode(', ') !!}]::text[]);

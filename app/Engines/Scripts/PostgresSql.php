@@ -17,4 +17,9 @@ final readonly class PostgresSql implements SqlQuoting
     {
         return '"'.str_replace('"', '""', Shell::withoutNul($value)).'"';
     }
+
+    public function connect(string $database): string
+    {
+        return "\\connect '".str_replace(['\\', "'"], ['\\\\', "''"], Shell::withoutNul($database))."'";
+    }
 }

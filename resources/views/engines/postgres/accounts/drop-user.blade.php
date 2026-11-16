@@ -1,20 +1,9 @@
-@include('engines.postgres._psql')
-@include('engines.postgres._accounts')
-@include('engines.postgres._primary')
-exists=$(role_exists)
-if [ "$exists" != t ]; then
-    echo "User $NAME was already gone."
-    exit 0
-fi
-listing=$(listed_databases)
-while IFS= read -r database; do
-    [ -z "$database" ] && continue
-    DATABASIFY_VAR_name="$NAME" pg "$database" > /dev/null <<'SQL'
-REASSIGN OWNED BY :"name" TO postgres;
-DROP OWNED BY :"name"
-SQL
-done <<< "$listing"
-DATABASIFY_VAR_name="$NAME" pg postgres > /dev/null <<'SQL'
-DROP ROLE :"name"
-SQL
-echo "Dropped user $NAME."
+SELECT EXISTS (SELECT FROM pg_roles WHERE rolname = {!! $sql->string($name) !!}) AS present \gset
+\if :present
+@foreach (['postgres', ...$managed] as $database)
+{!! $sql->connect($database) !!}
+REASSIGN OWNED BY {!! $sql->name($name) !!} TO postgres;
+DROP OWNED BY {!! $sql->name($name) !!};
+@endforeach
+DROP ROLE {!! $sql->name($name) !!};
+\endif

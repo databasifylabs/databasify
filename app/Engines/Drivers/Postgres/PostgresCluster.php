@@ -6,9 +6,9 @@ namespace App\Engines\Drivers\Postgres;
 
 use App\DTOs\Databases\QuorumCount;
 use App\Engines\Contracts\Cluster;
+use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Operation;
-use App\Exceptions\Engines\EngineBusy;
 
 final readonly class PostgresCluster implements Cluster
 {
@@ -21,51 +21,61 @@ final readonly class PostgresCluster implements Cluster
 
     public function enable(string $key): Operation
     {
-        return $this->driver->task($key, 'engines.postgres.cluster.enable', $this->driver->data());
+        $saved = $this->configuration->savedRequestOf();
+
+        return $this->driver->task($key, 'engines.postgres.cluster.enable', ['saved' => $saved, 'etcdEndpoints' => PostgresFiles::etcdEndpointsOf($saved)]);
     }
 
     public function disable(): void
     {
-        $this->driver->run('engines.postgres.cluster.disable-stop', $this->driver->data());
-        $config = $this->configuration->savedConfig() ?? throw new EngineBusy('run node configure first');
-        $this->configuration->configure(new NodeConfig(false, false, $config->ip, $config->databaseId, $config->members, $config->settings, $config->secrets, $config->archive, $config->primary));
-        $this->driver->run('engines.postgres.cluster.disable-finish', $this->driver->data(), timeout: 420);
+        $this->driver->run('engines.postgres.cluster.disable-stop');
+        $saved = $this->configuration->savedRequestOf();
+        $this->configuration->configure(new NodeConfig(false, false, $saved->ip, $saved->databaseId, $saved->members, $saved->settings, $saved->secrets, $saved->archive, $saved->primary));
+        $this->driver->run('engines.postgres.cluster.disable-finish', timeout: 420);
     }
 
     public function failover(string $targetIp): void
     {
-        $this->driver->run('engines.postgres.cluster.failover', $this->driver->data(), timeout: 480, env: ['TARGET' => $targetIp]);
+        $this->driver->run('engines.postgres.cluster.failover', ['target' => $targetIp], timeout: 480);
     }
 
     public function forceQuorum(bool $othersDown): void
     {
-        $this->driver->run('engines.postgres.cluster.force-quorum', $this->driver->data(), timeout: self::WAITING_TIMEOUT, env: ['OTHERS_DOWN' => $othersDown ? 'true' : 'false']);
+        $this->driver->run('engines.postgres.cluster.force-quorum', ['saved' => $this->configuration->savedRequestOf(), 'othersDown' => $othersDown], timeout: self::WAITING_TIMEOUT);
     }
 
     public function membership(array $members): void
     {
-        $this->driver->run('engines.postgres.cluster.membership', $this->driver->data(), env: ['HOSTS' => PostgresFiles::etcdHostsOf($members)]);
+        if (! $this->configuration->savedRequestOf()->clustered) {
+            return;
+        }
+
+        $this->driver->run('engines.postgres.cluster.membership', ['hosts' => PostgresFiles::etcdHostsOf($members)]);
     }
 
     public function rejoin(string $key, bool $readOnly): Operation
     {
-        return $this->driver->task($key, 'engines.postgres.cluster.rejoin', $this->driver->data());
+        return $this->driver->task($key, 'engines.postgres.cluster.rejoin', ['units' => PostgresManifest::unitsOf($this->configuration->savedRequestOf())]);
     }
 
     public function forget(string $ip): void
     {
-        $this->driver->run('engines.postgres.members.forget', $this->driver->data(), env: ['IP' => $ip]);
+        $this->driver->run('engines.postgres.members.forget', ['ip' => $ip]);
     }
 
     public function position(): ?int
     {
-        return $this->driver->read('engines.postgres.cluster.position', $this->driver->data(), timeout: 180, env: ['LINE' => $this->driver->node->database->version_line])->nullableInt('position');
+        return $this->driver->read('engines.postgres.cluster.position', timeout: 180)->nullableInt('position');
     }
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->driver->read('engines.postgres.cluster.quorum', $this->driver->data(), timeout: 300);
+        $voters = collect($this->configuration->savedRequestOf()->members)
+            ->filter(fn (Member $member): bool => $member->voting)
+            ->map(fn (Member $member): string => $member->ip)
+            ->values()
+            ->all();
 
-        return new QuorumCount($reply->int('total'), $reply->int('online'));
+        return new QuorumCount(count($voters), $this->driver->read('engines.postgres.cluster.quorum', ['voters' => $voters], timeout: 300)->int('online'));
     }
 }

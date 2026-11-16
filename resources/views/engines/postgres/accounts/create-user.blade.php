@@ -1,16 +1,6 @@
-@include('engines.postgres._psql')
-@include('engines.postgres._accounts')
-@include('engines.postgres._primary')
-require_databases
-created=$(DATABASIFY_VAR_name="$NAME" DATABASIFY_VAR_password="$PASSWORD" pg postgres <<'SQL'
-SET log_min_duration_statement = -1; SET log_statement = 'none'; SET log_min_error_statement = panic;
-SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'name') AS created \gset
-\if :created
-CREATE ROLE :"name" LOGIN;
+SELECT NOT EXISTS (SELECT FROM pg_roles WHERE rolname = {!! $sql->string($name) !!}) AS missing \gset
+\if :missing
+CREATE ROLE {!! $sql->name($name) !!} LOGIN;
 \endif
-ALTER ROLE :"name" LOGIN PASSWORD :'password';
-SELECT :'created'
-SQL
-)
-apply_grants
-[ "$created" = t ] && echo "Created user $NAME." || echo "Updated the password of $NAME."
+ALTER ROLE {!! $sql->name($name) !!} LOGIN PASSWORD {!! $sql->string($password) !!};
+@include('engines.postgres.accounts._grants')

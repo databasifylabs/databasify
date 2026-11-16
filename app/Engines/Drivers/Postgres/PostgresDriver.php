@@ -9,7 +9,6 @@ use App\Engines\Data\HostProfile;
 use App\Engines\Data\Ports;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Support\NodeState;
-use App\Engines\Scripts\ScriptView;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
 
@@ -50,12 +49,12 @@ final readonly class PostgresDriver extends AbstractEngineDriver
 
     public function archive(): PostgresArchive
     {
-        return new PostgresArchive($this, resolve(PostgresFiles::class));
+        return new PostgresArchive($this, resolve(PostgresFiles::class), $this->configuration());
     }
 
     public function migration(): PostgresMigration
     {
-        return new PostgresMigration($this, resolve(ScriptView::class));
+        return new PostgresMigration($this);
     }
 
     public function pools(): PostgresPools
@@ -63,10 +62,12 @@ final readonly class PostgresDriver extends AbstractEngineDriver
         return new PostgresPools($this, $this->accounts());
     }
 
-    /**
-     * @return array{port: int}
-     */
-    public function data(): array
+    protected function queryRunner(): string
+    {
+        return 'engines.postgres._query';
+    }
+
+    protected function viewData(): array
     {
         return ['port' => $this->node->database->clientPort()];
     }

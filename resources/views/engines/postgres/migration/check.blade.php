@@ -1,29 +1,26 @@
 @include('engines.postgres._psql')
 @include('engines.postgres._source')
-list_query="SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname"
 if ! version=$(on_source postgres 'SHOW server_version'); then
-    message=$(tail -n 1 <<< "$SOURCE_ERROR")
-    result "$(jq -cn --arg error "$message" '{reachable: false, error: $error, version: null, walLevel: null, canReplicate: false, sizeMb: null, databases: [], unreadable: [], unowned: [], occupied: [], warnings: [], problems: []}')"
+    output=$(jq -cn --arg error "$(tail -n 1 <<< "$SOURCE_ERROR")" '{error: $error}')
+    result "$output"
     exit 0
 fi
 wal_level=$(on_source postgres 'SHOW wal_level' || true)
 replicates=$(on_source postgres 'SELECT rolsuper OR rolreplication FROM pg_roles WHERE rolname = current_user' || true)
 size=$(on_source postgres "SELECT round(COALESCE(sum(pg_database_size(datname)), 0) / 1048576) FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres'" || true)
-listed=$(on_source postgres "$list_query" || true)
-if [ "$(jq 'length' <<< "$DATABASES")" -gt 0 ]; then
-    wanted=$(jq -r '.[]' <<< "$DATABASES")
-else
-    wanted=$(copyable <<< "$listed")
-fi
+listed=$(on_source postgres "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname" || true)
+@if ($databases === [])
+wanted=$(copyable <<< "$listed")
+@else
+wanted={!! $sh->arg(implode("\n", $databases)) !!}
+@endif
+local_databases=$(pg postgres <<< 'SELECT datname FROM pg_database')
 source_tables() {
     on_source "$1" "SELECT format('%I.%I.%I', current_database(), n.nspname, c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ($2) AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND $3 ORDER BY 1" || true
 }
 holds_rows() {
     local probe
-    DATABASIFY_VAR_db="$1" pg_try postgres <<'SQL'
-SELECT 1 FROM pg_database WHERE datname = :'db'
-SQL
-    [ -z "$PG_ERROR" ] && [ "$PG_OUTPUT" = 1 ] || return 1
+    grep -qxF -- "$1" <<< "$local_databases" || return 1
     pg_try "$1" <<'SQL'
 SELECT string_agg(format('SELECT 1 FROM %I.%I', schemaname, tablename), ' UNION ALL ') FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
 SQL
@@ -43,9 +40,6 @@ while IFS= read -r database; do
         occupied+="$database"$'\n'
     fi
 done <<< "$wanted"
-lines() {
-    jq -cR '[., inputs] | map(select(. != ""))' <<< "$1"
-}
-result "$(jq -cn --arg version "${version%% *}" --arg wal "$wal_level" --arg replicates "$replicates" --arg size "$size" \
-    --argjson databases "$(lines "$listed")" --argjson unreadable "$(lines "$unreadable")" --argjson unowned "$(lines "$unowned")" --argjson occupied "$(lines "$occupied")" \
-    '{reachable: true, error: null, version: $version, walLevel: $wal, canReplicate: ($replicates == "t" and $wal == "logical"), sizeMb: (($size | tonumber?) // 0), databases: $databases, unreadable: $unreadable, unowned: $unowned, occupied: $occupied, warnings: [], problems: []}')"
+output=$(jq -cn --arg version "${version%% *}" --arg wal "$wal_level" --arg replicates "$replicates" --arg size "$size" --arg databases "$listed" --arg unreadable "$unreadable" --arg unowned "$unowned" --arg occupied "$occupied" \
+    'def lines: split("\n") | map(select(. != "")); {version: $version, walLevel: $wal, replicates: ($replicates == "t"), sizeMb: (($size | tonumber?) // 0), databases: ($databases | lines), unreadable: ($unreadable | lines), unowned: ($unowned | lines), occupied: ($occupied | lines)}')
+result "$output"

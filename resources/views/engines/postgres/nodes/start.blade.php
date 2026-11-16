@@ -1,7 +1,6 @@
 @include('engines.postgres._psql')
-@include('engines.postgres._units')
-for name in $(manifest_units); do
-    unit_do enable "$name"
-    unit_do restart "$name"
-done
+@foreach ($units as $unit)
+unit_do enable {!! $sh->arg($unit) !!}
+unit_do restart {!! $sh->arg($unit) !!}
+@endforeach
 echo "Started PostgreSQL."

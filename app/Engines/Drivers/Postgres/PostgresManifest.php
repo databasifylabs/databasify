@@ -69,6 +69,14 @@ SH;
     }
 
     /**
+     * @return list<string>
+     */
+    public static function unitsOf(NodeConfig $request): array
+    {
+        return array_values(array_filter(array_column(self::processesOf($request, ''), 'name'), is_string(...)));
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private static function processesOf(NodeConfig $request, string $line): array

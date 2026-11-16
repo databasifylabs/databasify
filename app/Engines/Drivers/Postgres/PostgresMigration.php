@@ -10,7 +10,6 @@ use App\Engines\Contracts\Migration;
 use App\Engines\Data\MigrationSource;
 use App\Engines\Data\MigrationStart;
 use App\Engines\Data\Operation;
-use App\Engines\Scripts\ScriptView;
 use App\Exceptions\Engines\InvalidEngineRequest;
 
 final readonly class PostgresMigration implements Migration
@@ -21,16 +20,28 @@ final readonly class PostgresMigration implements Migration
 
     private const int TARGET_TAG_LENGTH = 12;
 
-    public function __construct(
-        private PostgresDriver $driver,
-        private ScriptView $views,
-    ) {}
+    public function __construct(private PostgresDriver $driver) {}
 
     public function check(MigrationSource $source, array $databases): SourceReport
     {
-        $env = [...$this->sourceEnv($source), 'DATABASES' => json_encode($databases, JSON_THROW_ON_ERROR)];
+        $facts = $this->driver->read('engines.postgres.migration.check', ['databases' => $databases], $this->sourceEnv($source), timeout: self::CHECK_TIMEOUT);
 
-        return SourceReport::fromPayload(($this->driver->read('engines.postgres.migration.check', $this->driver->data(), timeout: self::CHECK_TIMEOUT, env: $env)));
+        if ($facts->has('error')) {
+            return SourceReport::unreachable($facts->string('error'));
+        }
+
+        $walLevel = $facts->string('walLevel');
+
+        return SourceReport::checked(
+            version: $facts->string('version'),
+            canReplicate: $facts->bool('replicates') && $walLevel === 'logical',
+            sizeMb: $facts->int('sizeMb'),
+            databases: $facts->strings('databases'),
+            unreadable: $facts->strings('unreadable'),
+            unowned: $facts->strings('unowned'),
+            occupied: $facts->strings('occupied'),
+            walLevel: $walLevel,
+        );
     }
 
     public function start(MigrationStart $start): void
@@ -39,24 +50,24 @@ final readonly class PostgresMigration implements Migration
             throw new InvalidEngineRequest('PostgreSQL migrations need an owner');
         }
 
-        $this->driver->run('engines.postgres.migration.start', $this->driver->data(), env: [
-            ...$this->sourceEnv($start->source),
-            'MIGRATION_DATABASES' => implode("\n", $start->databases),
-            'MIGRATION_OWNER' => $start->owner,
-            'MIGRATION_CONTINUOUS' => $start->continuous ? 'true' : 'false',
-            'MIGRATION_PUBLICATION' => $this->publicationName(),
-            'COPY_SCRIPT' => base64_encode($this->views->render($this->driver->node, 'engines.postgres.migration.copy', $this->driver->data())),
+        $copyScript = $this->driver->script('engines.postgres.migration.copy', [
+            'databases' => $start->databases,
+            'owner' => $start->owner,
+            'continuous' => $start->continuous,
+            'publication' => $this->publicationName(),
         ]);
+
+        $this->driver->run('engines.postgres.migration.start', ['copyScript' => $copyScript], $this->sourceEnv($start->source));
     }
 
     public function progress(): MigrationProgress
     {
-        return MigrationProgress::fromPayload(($this->driver->read('engines.postgres.migration.progress', $this->driver->data())));
+        return MigrationProgress::fromPayload($this->driver->read('engines.postgres.migration.progress'));
     }
 
     public function stop(string $key, bool $cutover): Operation
     {
-        return $this->driver->task($key, 'engines.postgres.migration.stop', $this->driver->data());
+        return $this->driver->task($key, 'engines.postgres.migration.stop');
     }
 
     private function publicationName(): string
