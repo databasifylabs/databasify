@@ -120,9 +120,11 @@ test('a plugin key without a vendor is refused', function () {
 });
 
 test('a plugin for another databasify version is refused', function () {
+    config(['app.version' => '1.4.0']);
+
     $this->actingAs(User::factory()->create())
         ->post(route('plugins.store'), ['archive' => pluginZip(['requires' => '^9.0'])])
-        ->assertSessionHasErrors(['source' => 'Needs Databasify ^9.0; this is 0.2.0.']);
+        ->assertSessionHasErrors(['source' => 'Needs Databasify ^9.0; this is 1.4.0.']);
 
     expect(Plugin::query()->exists())->toBeFalse();
 });
