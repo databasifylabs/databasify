@@ -7,10 +7,6 @@ until_ok() {
     wait_until "$seconds" 2 "$@" || fail_task "$FLAVOR did not become ready within $label"
 }
 
-conf_text() {
-    cat "$CONF" 2> /dev/null || true
-}
-
 write_conf() {
     printf '%s' "$1" | write_file "$CONF" 600 true || true
 }
@@ -133,8 +129,4 @@ newest_primary() {
 require_replicas() {
     local_cli CONFIG SET min-replicas-to-write "$1" > /dev/null
     write_conf "$(sed "s/^min-replicas-to-write [0-9]*$/min-replicas-to-write $1/" "$CONF")"$'\n'
-}
-
-daemon_reload() {
-    unit_do daemon-reload
 }

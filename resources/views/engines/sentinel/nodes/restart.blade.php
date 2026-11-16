@@ -1,18 +1,10 @@
 @include('engines.sentinel._cli')
 @include('engines.sentinel._node')
-if [ -f "$CONF" ] && [ "$DIRECTIVES" != '[]' ]; then
-    text=$(cat "$CONF"; printf x)
-    text=${text%x}
-    while IFS=$'\t' read -r name line; do
-        [ -z "$name" ] && continue
-        text=$(printf '%s' "$text" | awk -v name="$name" 'index($0, name " ") != 1'; printf x)
-        text=${text%x}
-        text=${text%$'\n'}$'\n'
-        if [ "$line" != null ]; then
-            text+="$line"$'\n'
-        fi
-    done < <(jq -r '.[] | [.name, (.line // "null")] | @tsv' <<< "$DIRECTIVES")
-    write_conf "$text"
+@if ($names !== [])
+if [ -f "$CONF" ]; then
+    kept=$(awk -v names={!! $sh->arg(implode(' ', $names)) !!} 'BEGIN { split(names, list, " ") } { for (i in list) if (index($0, list[i] " ") == 1) next; print }' "$CONF")
+    printf '%s\n' "$kept" {!! collect($lines)->map($sh->arg(...))->implode(' ') !!} | write_file "$CONF" 600 true || true
 fi
+@endif
 unit_do restart "$FLAVOR-server"
 echo "Restarted $FLAVOR."

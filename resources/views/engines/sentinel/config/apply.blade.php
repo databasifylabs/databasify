@@ -1,27 +1,44 @@
 @include('engines.sentinel._cli')
-@include('engines.sentinel._node')
-originals=$(cat "$ROOT/state/originals.json" 2> /dev/null || echo '{}')
+@include('engines._write')
+originals=$(cat "$ROOT/state/originals.json" 2> /dev/null || true)
 [ -n "$originals" ] || originals='{}'
-while IFS= read -r name; do
-    [ -z "$name" ] && continue
-    if jq -e --arg name "$name" 'has($name)' <<< "$originals" > /dev/null; then
-        continue
-    fi
-    value=$(config_value "$name")
-    originals=$(jq -c --arg name "$name" --arg value "$value" '. + {($name): $value}' <<< "$originals")
-done < <(jq -r --argjson keys "$CONFIG_KEYS" '.[] | $keys[.] // .' <<< "$SETTING_KEYS")
-applied=$(cat "$ROOT/state/applied.json" 2> /dev/null || echo '[]')
-desired=$(jq -c --argjson applied "${applied:-[]}" --argjson kept "$SETTING_KEYS" --argjson keys "$CONFIG_KEYS" --argjson originals "$originals" \
-    'reduce ($applied[] | select(. as $key | $kept | index($key) | not)) as $key (.; .[($keys[$key] // $key)] = ($originals[($keys[$key] // $key)] // ""))' <<< "$DESIRED")
-printf '%s' "$originals" | write_file "$ROOT/state/originals.json" 600 true || true
-while IFS=$'\t' read -r name value; do
-    [ -z "$name" ] && continue
-    cli_try local_cli CONFIG SET "$name" "$value"
+remembered() {
+    jq -e --arg name "$1" 'has($name)' <<< "$originals" > /dev/null
+}
+remember() {
+    local reply
+    remembered "$1" && return 0
+    reply=$(local_cli CONFIG GET "$1")
+    [ "$(head -n 1 <<< "$reply")" = "$1" ] || databasify_fail internal "$FLAVOR has no setting named $1"
+    originals=$(jq -c --arg name "$1" --arg value "$(tail -n +2 <<< "$reply")" '. + {($name): $value}' <<< "$originals")
+}
+set_config() {
+    cli_try local_cli CONFIG SET "$1" "$2"
     if [ -n "$CLI_ERROR" ]; then
-        databasify_fail internal "could not set $name: $CLI_ERROR_TEXT"
+        databasify_fail internal "could not set $1: $CLI_ERROR_TEXT"
     elif [ "$CLI_OUTPUT" != OK ]; then
-        databasify_fail internal "could not set $name: $CLI_OUTPUT"
+        databasify_fail internal "could not set $1: $CLI_OUTPUT"
     fi
-done < <(jq -r 'to_entries | sort_by(.key)[] | [.key, .value] | @tsv' <<< "$desired")
-printf '%s' "$SETTING_KEYS" | write_file "$ROOT/state/applied.json" 600 true || true
+}
+restore() {
+    local value
+    remembered "$1" || return 0
+    value=$(jq -r --arg name "$1" '.[$name]' <<< "$originals")
+    set_config "$1" "$value"
+    originals=$(jq -c --arg name "$1" 'del(.[$name])' <<< "$originals")
+}
+save_originals() {
+    printf '%s' "$originals" | write_file "$ROOT/state/originals.json" 600 true || true
+}
+@foreach ($desired as $name => $value)
+remember {!! $sh->arg($name) !!}
+@endforeach
+save_originals
+@foreach ($desired as $name => $value)
+set_config {!! $sh->arg($name) !!} {!! $sh->arg($value) !!}
+@endforeach
+@foreach ($removed as $name)
+restore {!! $sh->arg($name) !!}
+@endforeach
+save_originals
 echo "Applied the online settings."

@@ -15,7 +15,6 @@ final readonly class SentinelCluster implements Cluster
 
     public function __construct(
         private SentinelDriver $driver,
-        private SentinelScripts $scripts,
         private SentinelConfiguration $configuration,
     ) {}
 
@@ -23,34 +22,34 @@ final readonly class SentinelCluster implements Cluster
     {
         $saved = $this->configuration->savedRequestOf();
 
-        return $this->scripts->start($this->driver, $key, 'cluster.enable', [
-            'SELF' => $saved->ip,
-            'REQUIRED' => (string) SentinelFiles::requiredReplicasFor(count($saved->members)),
+        return $this->driver->task($key, 'engines.sentinel.cluster.enable', [
+            'self' => $saved->ip,
+            'required' => SentinelFiles::requiredReplicasFor(count($saved->members)),
         ]);
     }
 
     public function disable(): void
     {
-        $this->scripts->run($this->driver, 'cluster.disable');
+        $this->driver->run('engines.sentinel.cluster.disable');
     }
 
     public function failover(string $targetIp): void
     {
-        $this->scripts->run($this->driver, 'cluster.failover', ['TARGET' => $targetIp, 'SELF' => $this->selfIp()], self::WAITING_TIMEOUT);
+        $this->driver->run('engines.sentinel.cluster.failover', ['target' => $targetIp, 'self' => $this->selfIp()], timeout: self::WAITING_TIMEOUT);
     }
 
     public function forceQuorum(bool $othersDown): void
     {
-        $this->scripts->run($this->driver, 'cluster.force-quorum', ['SELF' => $this->selfIp()], self::WAITING_TIMEOUT);
+        $this->driver->run('engines.sentinel.cluster.force-quorum', ['self' => $this->selfIp()], timeout: self::WAITING_TIMEOUT);
     }
 
     public function membership(array $members): void
     {
         $size = count($members);
 
-        $this->scripts->run($this->driver, 'cluster.membership', [
-            'QUORUM' => (string) SentinelFiles::majorityOf($size),
-            'REQUIRED' => (string) SentinelFiles::requiredReplicasFor($size),
+        $this->driver->run('engines.sentinel.cluster.membership', [
+            'quorum' => SentinelFiles::majorityOf($size),
+            'required' => SentinelFiles::requiredReplicasFor($size),
         ]);
     }
 
@@ -58,10 +57,10 @@ final readonly class SentinelCluster implements Cluster
     {
         $saved = $this->configuration->savedRequestOf();
 
-        return $this->scripts->start($this->driver, $key, 'cluster.rejoin', [
-            'SELF' => $saved->ip,
-            'READ_ONLY' => $readOnly ? 'true' : 'false',
-            'PERSISTENT' => SentinelFiles::persistent($saved->settings) ? 'true' : 'false',
+        return $this->driver->task($key, 'engines.sentinel.cluster.rejoin', [
+            'self' => $saved->ip,
+            'readOnly' => $readOnly,
+            'persistent' => SentinelFiles::persistent($saved->settings),
         ]);
     }
 
@@ -72,14 +71,23 @@ final readonly class SentinelCluster implements Cluster
 
     public function position(): ?int
     {
-        return $this->scripts->read($this->driver, 'cluster.position', timeout: 300)->nullableInt('position');
+        return $this->driver->read('engines.sentinel.cluster.position', timeout: 300)->nullableInt('position');
     }
 
     public function quorum(): QuorumCount
     {
-        $reply = $this->scripts->read($this->driver, 'cluster.quorum');
+        $reply = $this->driver->read('engines.sentinel.cluster.quorum');
+        $master = new SentinelReply($reply->string('master'));
 
-        return new QuorumCount($reply->int('total'), $reply->int('online'));
+        if ($master->isEmpty()) {
+            return new QuorumCount(0, 0);
+        }
+
+        $healthy = collect((new SentinelReply($reply->string('sentinels')))->valuesOf('flags'))
+            ->reject(fn (string $flags): bool => preg_match('/s_down|o_down|disconnected/', $flags) === 1)
+            ->count();
+
+        return new QuorumCount((int) $master->valueOf('num-other-sentinels') + 1, $reply->bool('serving') ? $healthy + 1 : 0);
     }
 
     private function selfIp(): string

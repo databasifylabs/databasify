@@ -1,10 +1,11 @@
 @include('engines.sentinel._cli')
 @include('engines.sentinel._node')
+self={!! $sh->arg($self) !!}
 databasify ctl reset-failed "$FLAVOR-server" "$FLAVOR-sentinel" > /dev/null 2>&1 || true
 databasify ctl start "$FLAVOR-sentinel" > /dev/null 2>&1 || true
 newest_primary
 if [ -n "$NEWEST_PRIMARY" ] && [ "$NEWEST_EPOCH" -ge 0 ]; then
-    if [ "$NEWEST_PRIMARY" = "$SELF" ]; then
+    if [ "$NEWEST_PRIMARY" = "$self" ]; then
         require_replicas 0
     elif ! unit_active "$FLAVOR-server"; then
         set_replica_of "$NEWEST_PRIMARY"
@@ -25,7 +26,7 @@ while IFS= read -r host; do
 done < <(sentinel_hosts | awk '!seen[$0]++')
 epoch=$(( highest + 1 ))
 unit_do stop "$FLAVOR-sentinel"
-rewritten=$(grep -v -E '^sentinel (config-epoch|leader-epoch) main [0-9]+$|^sentinel current-epoch [0-9]+$|^sentinel known-replica ' "$ROOT/sentinel/sentinel.conf" | sed "s/^sentinel monitor main [^ ]* /sentinel monitor main $SELF /"; printf x)
+rewritten=$(grep -v -E '^sentinel (config-epoch|leader-epoch) main [0-9]+$|^sentinel current-epoch [0-9]+$|^sentinel known-replica ' "$ROOT/sentinel/sentinel.conf" | sed "s/^sentinel monitor main [^ ]* /sentinel monitor main $self /"; printf x)
 rewritten=${rewritten%x}
 printf '%ssentinel config-epoch main %d\nsentinel leader-epoch main %d\nsentinel current-epoch %d\n' "$rewritten" "$epoch" "$epoch" "$epoch" | write_file "$ROOT/sentinel/sentinel.conf" 600 true || true
 set_replica_of ''

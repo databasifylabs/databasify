@@ -10,6 +10,7 @@ use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Settings\SettingsCatalog;
 use App\Exceptions\Engines\EngineBusy;
 use App\Exceptions\Engines\InvalidEngineRequest;
+use Illuminate\Support\Str;
 
 final readonly class SentinelConfiguration
 {
@@ -19,7 +20,6 @@ final readonly class SentinelConfiguration
 
     public function __construct(
         private SentinelDriver $driver,
-        private SentinelScripts $scripts,
         private NodeState $state,
     ) {}
 
@@ -38,16 +38,16 @@ final readonly class SentinelConfiguration
         $effective = NodeState::withSettings($request, $catalog->effective($tuned, $request->settings));
         $primary = $this->primaryFor($request);
 
-        $this->scripts->run($this->driver, 'nodes.configure', [
-            'PASSWORD' => $request->secrets->admin,
-            'SERVER_CONF' => base64_encode(SentinelFiles::serverConfOf($engine, $effective, $primary)),
-            'SENTINEL_CONF' => $request->clustered ? base64_encode(SentinelFiles::sentinelConfOf($engine, $request, $primary)) : '',
-            'MANIFEST' => base64_encode(SentinelFiles::manifestOf($engine, $request)),
-            'REQUEST_JSON' => NodeState::requestJsonOf($request),
-            'TUNED_JSON' => $saved === null ? NodeState::tunedJsonOf($tuned) : '',
-            'GUARD_EMPTY_PRIMARY' => $request->clustered && ! $request->readOnly && ($primary === '' || $primary === $request->ip) ? 'true' : 'false',
-            'PERSISTENT' => SentinelFiles::persistent($request->settings) ? 'true' : 'false',
-            'PEERS' => $this->peersOf($request),
+        $this->driver->run('engines.sentinel.nodes.configure', [
+            'password' => $request->secrets->admin,
+            'serverConf' => SentinelFiles::serverConfOf($engine, $effective, $primary),
+            'sentinelConf' => $request->clustered ? SentinelFiles::sentinelConfOf($engine, $request, $primary) : null,
+            'manifest' => SentinelFiles::manifestOf($engine, $request),
+            'requestJson' => NodeState::requestJsonOf($request),
+            'tunedJson' => $saved === null ? NodeState::tunedJsonOf($tuned) : null,
+            'guardsEmptyPrimary' => $request->clustered && ! $request->readOnly && ($primary === '' || $primary === $request->ip),
+            'persistent' => SentinelFiles::persistent($request->settings),
+            'peers' => $this->peersOf($request),
         ], timeout: 300);
     }
 
@@ -85,11 +85,15 @@ final readonly class SentinelConfiguration
         return SentinelSettings::restartOnlyKeys($this->driver::flavor(), $this->driver->node->database->version_line);
     }
 
-    private function peersOf(NodeConfig $request): string
+    /**
+     * @return list<string>
+     */
+    private function peersOf(NodeConfig $request): array
     {
-        $peers = array_filter($request->members, fn (Member $member): bool => $member->ip !== $request->ip);
-
-        return implode(' ', array_map(fn (Member $member): string => $member->ip, $peers));
+        return array_values(collect($request->members)
+            ->reject(fn (Member $member): bool => $member->ip === $request->ip)
+            ->map(fn (Member $member): string => $member->ip)
+            ->all());
     }
 
     private function primaryFor(NodeConfig $request): string
@@ -98,8 +102,11 @@ final readonly class SentinelConfiguration
             return '';
         }
 
-        $reported = $this->scripts->read($this->driver, 'nodes.primary', ['PEERS' => $this->peersOf($request), 'CLI_SECRET' => (string) $request->secrets->admin])->string('primary');
+        $reply = $this->driver->read('engines.sentinel.nodes.primary', ['peers' => $this->peersOf($request)], ['CLI_SECRET' => (string) $request->secrets->admin]);
+        $reported = collect($reply->strings('answers'))
+            ->map(fn (string $answer): string => Str::before($answer, "\n"))
+            ->first(fn (string $address): bool => filter_var($address, FILTER_VALIDATE_IP) !== false);
 
-        return $reported !== '' ? $reported : ($request->primary ?? '');
+        return $reported ?? ($reply->string('configured') ?: ($request->primary ?? ''));
     }
 }

@@ -57,24 +57,6 @@ cli_try() {
     rm -f "$errors"
 }
 
-config_value() {
-    local reply
-    reply=$(local_cli CONFIG GET "$1"; printf x)
-    reply=${reply%x}
-    if [ "$(head -n 1 <<< "$reply")" != "$1" ]; then
-        databasify_fail internal "$FLAVOR has no setting named $1"
-    fi
-    if [[ $reply != *$'\n'* ]]; then
-        return 0
-    fi
-    reply=${reply#*$'\n'}
-    printf '%s' "${reply%$'\n'}"
-}
-
 info_field() {
     sed -n "s/^$2:\(.*\)$/\1/p" <<< "$1" | head -n 1
-}
-
-restarts() {
-    databasify ctl show -p NRestarts --value "$FLAVOR-server" 2> /dev/null || echo 0
 }

@@ -29,26 +29,34 @@ abstract readonly class SentinelDriver extends AbstractEngineDriver
 
     public function nodes(): SentinelNodes
     {
-        return new SentinelNodes($this, new SentinelScripts, $this->configuration());
+        return new SentinelNodes($this, $this->configuration());
     }
 
     public function cluster(): SentinelCluster
     {
-        return new SentinelCluster($this, new SentinelScripts, $this->configuration());
+        return new SentinelCluster($this, $this->configuration());
     }
 
     public function config(): SentinelConfig
     {
-        return new SentinelConfig($this, new SentinelScripts, $this->configuration(), new NodeState);
+        return new SentinelConfig($this, $this->configuration(), new NodeState);
     }
 
     public function migration(): SentinelMigration
     {
-        return new SentinelMigration($this, new SentinelScripts, $this->configuration());
+        return new SentinelMigration($this, $this->configuration());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function viewData(): array
+    {
+        return ['engine' => static::flavor()];
     }
 
     private function configuration(): SentinelConfiguration
     {
-        return new SentinelConfiguration($this, new SentinelScripts, new NodeState);
+        return new SentinelConfiguration($this, new NodeState);
     }
 }

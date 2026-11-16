@@ -8,7 +8,7 @@ drop_clients() {
     while IFS= read -r id; do
         [ -z "$id" ] && continue
         cli_try cli 127.0.0.1 "$port" CLIENT KILL ID "$id"
-    done < <(awk -v port="$port" -v keep=" $KEEP " '{
+    done < <(awk -v port="$port" -v keep={!! $sh->arg(' '.implode(' ', $keep).' ') !!} '{
         id = ""; addr = ""; laddr = ""
         for (i = 1; i <= NF; i++) {
             split($i, pair, "=")
@@ -31,11 +31,11 @@ peers_settled() {
     cli_try sentinel_cli SENTINEL SENTINELS main
     [ -z "$CLI_ERROR" ] || return 1
     seen=$(grep -cx 'flags' <<< "$CLI_OUTPUT" || true)
-    if [ "$seen" -gt "$PEERS" ]; then
+    if [ "$seen" -gt {{ $peers }} ]; then
         drop_removed
         return 1
     fi
-    [ "$seen" -ge "$PEERS" ]
+    [ "$seen" -ge {{ $peers }} ]
 }
 drop_removed
 wait_until 120 2 peers_settled || databasify_fail internal "$FLAVOR did not become ready within 2m0s"

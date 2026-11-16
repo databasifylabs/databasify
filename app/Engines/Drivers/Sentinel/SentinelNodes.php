@@ -14,6 +14,7 @@ use App\Engines\Data\Secrets;
 use App\Engines\Drivers\TlsPair;
 use App\Enums\Databases\NodeRole;
 use App\Exceptions\Engines\EngineBusy;
+use App\Exceptions\Engines\EngineUnavailable;
 
 final readonly class SentinelNodes implements Nodes
 {
@@ -21,7 +22,6 @@ final readonly class SentinelNodes implements Nodes
 
     public function __construct(
         private SentinelDriver $driver,
-        private SentinelScripts $scripts,
         private SentinelConfiguration $configuration,
     ) {}
 
@@ -34,25 +34,36 @@ final readonly class SentinelNodes implements Nodes
     {
         $request = $this->configuration->savedRequestOf();
 
-        $this->scripts->run($this->driver, 'nodes.start', [
-            'HOLDS' => $request->clustered && ! $request->readOnly ? 'true' : 'false',
-            'PERSISTENT' => SentinelFiles::persistent($request->settings) ? 'true' : 'false',
-        ], self::LIFECYCLE_TIMEOUT);
+        $this->driver->run('engines.sentinel.nodes.start', [
+            'holds' => $request->clustered && ! $request->readOnly,
+            'persistent' => SentinelFiles::persistent($request->settings),
+        ], timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function wake(bool $all): void
     {
-        $this->scripts->run($this->driver, 'nodes.wake', timeout: self::LIFECYCLE_TIMEOUT);
+        $this->driver->run('engines.sentinel.nodes.wake', timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function restart(): void
     {
-        $this->scripts->run($this->driver, 'nodes.restart', ['DIRECTIVES' => json_encode($this->restartDirectives(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)], self::LIFECYCLE_TIMEOUT);
+        try {
+            $effective = $this->configuration->effectiveOf($this->configuration->savedRequestOf());
+            $keys = $this->configuration->restartOnlyKeys();
+        } catch (EngineBusy) {
+            $effective = [];
+            $keys = [];
+        }
+
+        $this->driver->run('engines.sentinel.nodes.restart', [
+            'names' => array_map(SentinelFiles::configKeyOf(...), $keys),
+            'lines' => collect($effective)->only($keys)->map(fn (string $value, string $key): string => SentinelFiles::directiveOf($key, $value))->values()->all(),
+        ], timeout: self::LIFECYCLE_TIMEOUT);
     }
 
     public function reset(int $peers, array $hosts): void
     {
-        $this->scripts->run($this->driver, 'nodes.reset', ['PEERS' => (string) $peers, 'KEEP' => implode(' ', ['127.0.0.1', ...$hosts])], 180);
+        $this->driver->run('engines.sentinel.nodes.reset', ['peers' => $peers, 'keep' => ['127.0.0.1', ...$hosts]], timeout: 180);
     }
 
     public function bootstrap(Secrets $secrets, ?DefaultAccount $account): void {}
@@ -60,46 +71,47 @@ final readonly class SentinelNodes implements Nodes
     public function installTls(string $certificate, string $key, string $ca): void
     {
         TlsPair::checkPair($certificate, $key, $ca);
-        $this->scripts->run($this->driver, 'nodes.tls-install', ['PEM' => rtrim($certificate, "\n")."\n".$key, 'CA' => $ca]);
+        $this->driver->run('engines.sentinel.nodes.tls-install', ['pem' => rtrim($certificate, "\n")."\n".$key, 'ca' => $ca]);
     }
 
     public function ready(string $key, bool $expectPrimary): Operation
     {
         $saved = $this->configuration->savedRequestOf();
 
-        return $this->scripts->start($this->driver, $key, 'nodes.ready', [
-            'CLUSTERED' => $saved->clustered ? 'true' : 'false',
-            'READ_ONLY' => $saved->readOnly ? 'true' : 'false',
-            'SELF' => $saved->ip,
+        return $this->driver->task($key, 'engines.sentinel.nodes.ready', [
+            'clustered' => $saved->clustered,
+            'readOnly' => $saved->readOnly,
+            'self' => $saved->ip,
         ]);
     }
 
     public function status(): NodeStatus
     {
-        $reply = $this->scripts->read($this->driver, 'nodes.status');
+        try {
+            $reply = $this->driver->read('engines.sentinel.nodes.status');
+        } catch (EngineUnavailable) {
+            return NodeStatus::reported(NodeRole::Offline, null);
+        }
 
-        return NodeStatus::reported(NodeRole::from($reply->string('role')), $reply->nullableString('version'));
+        $replication = new SentinelReply($reply->string('replication'));
+        $version = (new SentinelReply($reply->string('server')))->fieldOf($this->driver::flavor()->versionField);
+
+        return NodeStatus::reported($this->roleIn($replication), $version === '' ? null : $version);
     }
 
     public function metrics(): NodeMetrics
     {
-        return NodeMetrics::fromPayload($this->scripts->read($this->driver, 'nodes.metrics'));
+        $info = new SentinelReply($this->driver->read('engines.sentinel.nodes.metrics')->string('info'));
+
+        return new NodeMetrics($info->intOf('connected_clients') ?? 0, $info->intOf('instantaneous_ops_per_sec') ?? 0, $info->megabytesOf('used_memory') ?? 0);
     }
 
-    /**
-     * @return list<array{name: string, line: string|null}>
-     */
-    private function restartDirectives(): array
+    private function roleIn(SentinelReply $replication): NodeRole
     {
-        try {
-            $effective = $this->configuration->effectiveOf($this->configuration->savedRequestOf());
-        } catch (EngineBusy) {
-            return [];
-        }
-
-        return array_map(
-            fn (string $key): array => ['name' => SentinelFiles::configKeyOf($key), 'line' => isset($effective[$key]) ? SentinelFiles::directiveOf($key, $effective[$key]) : null],
-            $this->configuration->restartOnlyKeys(),
-        );
+        return match ($replication->fieldOf('role')) {
+            'master' => NodeRole::Primary,
+            'slave' => $replication->fieldOf('master_link_status') === 'up' && $replication->fieldOf('master_sync_in_progress') === '0' ? NodeRole::Replica : NodeRole::Unknown,
+            default => NodeRole::Unknown,
+        };
     }
 }

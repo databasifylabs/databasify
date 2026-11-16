@@ -9,13 +9,15 @@ found() {
 }
 until_ok 120 2m0s found
 replicate=''
-if [ "$NEWEST_PRIMARY" != "$SELF" ]; then
+if [ "$NEWEST_PRIMARY" != {!! $sh->arg($self) !!} ]; then
     replicate=$NEWEST_PRIMARY
 fi
 set_replica_of "$replicate"
-if [ "$READ_ONLY" != true ] && restart_loses_data "$PERSISTENT"; then
+@if (! $readOnly)
+if restart_loses_data {{ $persistent ? 'true' : 'false' }}; then
     hold
 fi
+@endif
 echo 'Replicating from the primary…'
 if ! unit_active "$FLAVOR-server"; then
     unit_do start "$FLAVOR-server"
@@ -28,6 +30,8 @@ if [ -z "$replicate" ]; then
     exit 0
 fi
 until_ok 600 10m0s replica_synced
-if [ "$READ_ONLY" != true ] && holding; then
+@if (! $readOnly)
+if holding; then
     release
 fi
+@endif
