@@ -17,9 +17,7 @@ final readonly class ScriptView
      */
     public function render(DatabaseNode $node, string $script, array $data = []): string
     {
-        $database = $node->database;
-
-        return $this->views->make($this->viewOf($script), [...$data, 'line' => $database->version_line, 'sql' => $this->quotingFor($database->engine), 'sh' => new Shell])->render();
+        return $this->views->make($this->viewOf($script), [...$data, 'line' => $node->database->version_line, 'sh' => new Shell])->render();
     }
 
     /**
@@ -32,14 +30,5 @@ final readonly class ScriptView
         }
 
         return $script;
-    }
-
-    private function quotingFor(string $engine): MySqlSql|PostgresSql|null
-    {
-        return match ($engine) {
-            'postgres' => new PostgresSql,
-            'mysql', 'mariadb' => new MySqlSql,
-            default => null,
-        };
     }
 }

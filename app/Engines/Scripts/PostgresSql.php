@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Engines\Scripts;
 
-final readonly class PostgresSql
+use App\Engines\Contracts\SqlQuoting;
+
+final readonly class PostgresSql implements SqlQuoting
 {
     public function string(string $value): string
     {

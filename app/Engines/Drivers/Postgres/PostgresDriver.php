@@ -9,6 +9,7 @@ use App\Engines\Data\HostProfile;
 use App\Engines\Data\Ports;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Support\NodeState;
+use App\Engines\Scripts\PostgresSql;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
 
@@ -65,6 +66,11 @@ final readonly class PostgresDriver extends AbstractEngineDriver
     protected function queryRunner(): string
     {
         return 'engines.postgres._query';
+    }
+
+    protected function sqlQuoting(): PostgresSql
+    {
+        return new PostgresSql;
     }
 
     protected function viewData(): array

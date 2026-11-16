@@ -11,6 +11,7 @@ use App\Engines\Contracts\Archive;
 use App\Engines\Contracts\EngineDriver;
 use App\Engines\Contracts\Migration;
 use App\Engines\Contracts\Pools;
+use App\Engines\Contracts\SqlQuoting;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
 use App\Engines\Runtime\Runtime;
@@ -141,6 +142,11 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
         throw EngineUnsupported::command('query');
     }
 
+    protected function sqlQuoting(): ?SqlQuoting
+    {
+        return null;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -184,7 +190,7 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
      */
     private function withViewData(array $data): array
     {
-        return [...$this->viewData(), ...$data];
+        return [...$this->viewData(), 'sql' => $this->sqlQuoting(), ...$data];
     }
 
     private function logNameOf(DatabaseNode $node, string $script): string

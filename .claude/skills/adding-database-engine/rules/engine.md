@@ -43,7 +43,7 @@ $this->refuseReserved($this->driver->engine()->reservedUsers, $name);
 $this->scripts->query($this->driver, 'engines.mysql-family.accounts.set-password', ['name' => $name, 'identified' => $identified]);
 ```
 
-`query()` renders the view, base64-encodes it and pipes it through the engine's runner (`mysql-family/_query`, `postgres/_query`, `mongodb/_query`), which holds the client call, login, timeout and the mapping of client errors to `not_primary`, `already_exists`, `not_found` and `unavailable`. A new SQL or JavaScript engine adds one runner on its client partial; its views stay pure statements.
+`query()` renders the view, base64-encodes it and pipes it through the engine's runner (`mysql-family/_query`, `postgres/_query`, `mongodb/_query`), which holds the client call, login, timeout and the mapping of client errors to `not_primary`, `already_exists`, `not_found` and `unavailable`. A new SQL or JavaScript engine adds one runner on its client partial; its views stay pure statements. A SQL engine also returns its quoting from `sqlQuoting()`, a class implementing `App\Engines\Contracts\SqlQuoting`; that is the view's `$sql`. [`databasifylabs/plugin-example-database`](https://github.com/databasifylabs/plugin-example-database) is the smallest complete driver to copy.
 
 A **bash view** is for what a statement alone can't do: waits (`wait_until 60 2 <check> || databasify_fail unavailable '<message>'`, so the wait stays on the server), files, units, background jobs, and statements that must tolerate an error (`mysql-family/accounts/create-user` revokes grants that may not exist). Use one only for those, and for engines whose client can't stop on the first error from stdin (Redis and Valkey run every command through `cli`).
 
