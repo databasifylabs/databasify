@@ -6,6 +6,7 @@ namespace App\Http\Resources;
 
 use App\DTOs\Databases\ConfigField;
 use App\Engines\Engine;
+use App\Enums\Databases\PasswordEncryption;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Http\Request;
@@ -80,7 +81,7 @@ class DatabaseResource extends DatabaseListResource
             return [];
         }
 
-        return array_map(fn (string $encryption): array => ['value' => $encryption, 'label' => $encryption], $encryptions);
+        return array_map(fn (string $encryption): array => ['value' => $encryption, 'label' => PasswordEncryption::from($encryption)->label()], $encryptions);
     }
 
     private function networkOfNodes(): ?NetworkResource
