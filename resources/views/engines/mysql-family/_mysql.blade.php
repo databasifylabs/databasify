@@ -54,7 +54,7 @@ my_try() {
     errors=$(mktemp)
     MY_ERROR=''
     MY_ERROR_TEXT=''
-    MY_OUTPUT=$(my "$database" 3> "$errors") || {
+    MY_OUTPUT=$(my "$database" 3> "$errors" 2> /dev/null) || {
         MY_ERROR=$(head -n 1 "$errors" | sed 's/^DATABASIFY_ERROR //')
         MY_ERROR_TEXT=$(tail -n +2 "$errors")
     }

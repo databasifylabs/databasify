@@ -66,7 +66,7 @@ mongo_try() {
     errors=$(mktemp)
     MONGO_ERROR=''
     MONGO_ERROR_TEXT=''
-    MONGO_OUTPUT=$(mongo_js "$1" 3> "$errors") || {
+    MONGO_OUTPUT=$(mongo_js "$1" 3> "$errors" 2> /dev/null) || {
         MONGO_ERROR=$(head -n 1 "$errors" | sed 's/^DATABASIFY_ERROR //')
         MONGO_ERROR_TEXT=$(tail -n +2 "$errors")
     }

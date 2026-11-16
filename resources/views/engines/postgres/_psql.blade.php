@@ -43,7 +43,7 @@ pg_try() {
     errors=$(mktemp)
     PG_ERROR=''
     PG_ERROR_TEXT=''
-    PG_OUTPUT=$(pg "$database" 3>"$errors") || {
+    PG_OUTPUT=$(pg "$database" 3>"$errors" 2> /dev/null) || {
         PG_ERROR=$(head -n 1 "$errors" | sed 's/^DATABASIFY_ERROR //')
         PG_ERROR_TEXT=$(tail -n +2 "$errors")
     }

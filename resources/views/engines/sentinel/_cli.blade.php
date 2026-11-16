@@ -50,7 +50,7 @@ cli_try() {
     errors=$(mktemp)
     CLI_ERROR=''
     CLI_ERROR_TEXT=''
-    CLI_OUTPUT=$("$@" 3> "$errors") || {
+    CLI_OUTPUT=$("$@" 3> "$errors" 2> /dev/null) || {
         CLI_ERROR=$(head -n 1 "$errors" | sed 's/^DATABASIFY_ERROR //')
         CLI_ERROR_TEXT=$(tail -n +2 "$errors")
     }
