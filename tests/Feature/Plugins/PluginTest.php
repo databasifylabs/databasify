@@ -184,6 +184,27 @@ test('a plugin can be uninstalled', function () {
     expect(is_dir($plugin->directory()))->toBeFalse();
 });
 
+test('a plugin whose folder is gone can be uninstalled', function () {
+    $plugin = Plugin::factory()->create(['class' => 'Gone\\Folder\\GonePlugin']);
+
+    $this->actingAs(User::factory()->create())
+        ->delete(route('plugins.destroy', $plugin))
+        ->assertSessionHasNoErrors();
+
+    $this->assertModelMissing($plugin);
+});
+
+test('a plugin whose code is gone can be uninstalled', function () {
+    $plugin = withPluginFiles(Plugin::factory()->create(['class' => 'Gone\\Code\\GonePlugin']));
+
+    $this->actingAs(User::factory()->create())
+        ->delete(route('plugins.destroy', $plugin))
+        ->assertSessionHasNoErrors();
+
+    $this->assertModelMissing($plugin);
+    expect(is_dir($plugin->directory()))->toBeFalse();
+});
+
 test('plugin assets are served from the public folder only', function () {
     User::factory()->create();
     $plugin = withPluginFiles(Plugin::factory()->create());
