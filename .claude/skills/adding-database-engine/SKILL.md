@@ -36,7 +36,7 @@ Do the phases in order. Read the rule file for a phase before starting it, and [
 | 3     | App registration: catalog entry, connection profile, icon                  | [rules/registration.md](rules/registration.md) |
 | 4     | Pest tests, PHPStan, Pint, frontend checks, then a live e2e on three servers | [rules/testing.md](rules/testing.md)         |
 
-A new **version line** of an existing engine is phase 2 (a `versions.json` entry), any line-specific branch in the driver or its scripts (`$line` in views, `DATABASIFY_LINE` in scripts), and one more line in the app's `versions()` registration.
+A new **version line** of an existing engine is phase 2 (a `versions.json` entry), any line-specific branch in the driver or its views (`$line`), and one more line in the app's `versions()` registration.
 
 ## Use the closest engine as the template
 
@@ -54,7 +54,7 @@ Pick the driver whose replication model matches and copy its shape, not its text
 - Every node of a database runs the exact same image: the database stores it in its `image` column (`EngineImage`: repository, digest, release, SDK) on create (`ImageResolver` picks the newest exact `<line>.x` tag), and `host deploy` runs every node from that digest. Upgrades roll node by node and store the new image only after the rollout succeeds.
 - The image's `io.databasify.engine` label names the container (`databasify-<engine>`) and its data root (`/srv/<engine>`, bind-mounted at the same path). The engine user is UID/GID **64999**.
 - Updates ship only as images. The binary inside the image is the one that runs, and the app moves each database to the newest image of its line in its weekly maintenance window. Every image carries `io.databasify.sdk`, and the app refuses images built on an SDK outside `databasify.require.engine-sdk` (ADR 0003); databases on a dropped SDK run read-only (ADR 0003). On the server, only the official host binary that the app pins runs: the newest `<databasify.registry>/engine-sdk` release inside `databasify.require.engine-sdk`, pinned by digest (`HostBinaryResolver`).
-- Every feature is a driver group method backed by one reviewed Blade script; values reach scripts only through env or the view's quoting helpers, never in argv. Only `App\Engines\Runtime\Runtime` builds `databasify` command lines (`EngineModuleTest` enforces it).
+- Every feature is a driver group method backed by one reviewed Blade view: a query view (only SQL or JavaScript) run through `query()` where the engine has a runner, a short bash view otherwise. Decisions stay in PHP; values are rendered through the view's quoting helpers, never in argv. Only `App\Engines\Runtime\Runtime` builds `databasify` command lines (`EngineModuleTest` enforces it).
 - The user-editable settings mirror what DigitalOcean offers for that engine, no more and no fewer. Tuned values (memory, connections) stay automatic.
-- Follow `~/.claude/CLAUDE.md` and `AGENTS.md`: Action pattern, final readonly DTOs with named constructors, collections first, early returns, no comments except PHPStan types, PHPStan max with no ignores.
+- Follow `AGENTS.md` and the project's coding standards: Action pattern, final readonly DTOs with named constructors, collections first, early returns, no comments except PHPStan types, PHPStan max with no ignores.
 - Drive e2e only through the app's actions; never repair a server by hand. Use your own provider account and domain for it, destroy test servers afterwards, and get the go-ahead of whoever runs the session before creating public DNS records or ordering or destroying servers.

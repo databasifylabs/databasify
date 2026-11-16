@@ -2,18 +2,9 @@
 
 ## Pest
 
-Flows and actions run for any engine against a recording driver; the driver and its scripts get their own tests (rules/engine.md). Registering one more engine breaks the tests that pin the engine list:
+Actions and flows run for any engine against `Tests\Support\RecordingDriver::fake()`, which binds every registered driver class to a recording stand-in and returns an `EngineRecording`: answer a read with `on('<group>.<method>', $reply)`, then assert with `callsOf()`, `called()` and `changedNothing()`. SSH goes through `Tests\Support\FakeServerConnection` (`$this->ssh()`). Registering one more engine needs no change to existing tests.
 
-| Test                                                    | Change                                                                       |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `tests/Feature/Engines/EngineCatalogTest.php`           | The engine ids and labels, plus a line asserting the new entry's settings.   |
-| `tests/Feature/Plugins/PluginLoaderTest.php`            | `Database::engines()`.                                                       |
-| `tests/Feature/Databases/Lifecycle/CreateDatabaseTest.php` | `->has('engines', N)`.                                                    |
-| `tests/Pest.php`                                        | `useRecordingDrivers()`: add the driver class to the list it binds.          |
-
-Then add tests for what the registration changes: the connection details the engine shows (URI, CLI command, `.env` keys, the public-certificate and service variants), the migration source form, and a version line with `'recovery' => false` hiding backups. Use `createThroughFlow('<engine>', 3)` in `CreateDatabaseFlowTest` to run the create flow against `fakeEngine()`.
-
-Helpers in `tests/Pest.php`: `fakeSsh()`, `fakeEngine()` (binds the recording driver and answers the runtime's host commands), `recordedCalls()`, `recordedArgs()`, `answerRead()`, `engineCommandsIn()` (runtime commands and driver calls in order), `answerNodeStatus()`, `fakeScripts()`, `localScripts()`, `idleDatabase()`, `advanceFlows()`, `inProjectDuring()`.
+Add feature tests for what the registration changes: the connection details the engine shows (URI, CLI command, `.env` keys, the public-certificate and service variants), the migration source form, and a version line with `'recovery' => false` hiding backups. Engine scripts are checked in the live e2e below.
 
 Checks before committing:
 
@@ -22,7 +13,7 @@ php artisan test --compact --parallel
 vendor/bin/phpstan analyse --memory-limit=2G
 vendor/bin/pint --dirty --format agent
 npm run check
-npx tsc --noEmit
+npm run types:check
 ```
 
 Tests with fixed dates rot (restore targets fall out of the restorable window); pin time with `$this->travelTo(...)`.

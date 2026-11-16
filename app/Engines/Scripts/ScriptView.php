@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Engines\Scripts;
 
-use App\Contracts\Engines\SqlQuoting;
 use App\Models\DatabaseNode;
 use Illuminate\Contracts\View\Factory;
 use InvalidArgumentException;
@@ -35,12 +34,12 @@ final readonly class ScriptView
         return $script;
     }
 
-    private function quotingFor(string $engine): SqlQuoting
+    private function quotingFor(string $engine): MySqlSql|PostgresSql|null
     {
         return match ($engine) {
             'postgres' => new PostgresSql,
             'mysql', 'mariadb' => new MySqlSql,
-            default => new EnvOnlyQuoting,
+            default => null,
         };
     }
 }

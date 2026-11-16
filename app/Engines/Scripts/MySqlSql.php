@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Scripts;
 
-use App\Contracts\Engines\SqlQuoting;
-
-final readonly class MySqlSql implements SqlQuoting
+final readonly class MySqlSql
 {
     private const array ESCAPES = ['\\' => '\\\\', "'" => "\\'", '"' => '\\"', "\n" => '\\n', "\r" => '\\r', "\x1a" => '\\Z'];
 

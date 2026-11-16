@@ -44,9 +44,4 @@ final readonly class SentinelFamilyEngine
     {
         return "{$this->id}-migration";
     }
-
-    public function confPath(): string
-    {
-        return "conf/{$this->id}.conf";
-    }
 }

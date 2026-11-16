@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Engines\Drivers\Support;
 
 use App\Engines\Data\ArchiveSettings;
-use App\Engines\Data\ConfigFile;
 use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Secrets;
@@ -106,14 +105,6 @@ final readonly class NodeState
         ksort($settings, SORT_STRING);
 
         return json_encode([...$request->toPayload(), 'settings' => (object) $settings], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-    }
-
-    /**
-     * @param  list<ConfigFile>  $files
-     */
-    public static function filesJsonOf(array $files): string
-    {
-        return json_encode(array_map(fn (ConfigFile $file): array => ['path' => $file->path, 'mode' => decoct($file->mode), 'content' => base64_encode($file->content)], $files), JSON_THROW_ON_ERROR);
     }
 
     private function requestFrom(Payload $saved): NodeConfig
