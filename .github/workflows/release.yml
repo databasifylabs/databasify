@@ -126,13 +126,14 @@ jobs:
             | jq --arg version "$GITHUB_REF_NAME" '{version: $version, published_at: .publishedAt, url: .url, notes: .body}' > "$RUNNER_TEMP/version.json"
           gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/version.json" --clobber
 
-      - name: Commit the released version to 0.x
+      - name: Commit the released version to its release branch
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          current=$(gh api "repos/$GH_REPO/contents/config/app.php?ref=0.x")
+          branch="${GITHUB_REF_NAME%%.*}.x"
+          current=$(gh api "repos/$GH_REPO/contents/config/app.php?ref=$branch")
           content=$(jq -r .content <<< "$current" | base64 -d)
           bumped=$(sed "s/'version' => '[^']*'/'version' => '${GITHUB_REF_NAME}'/" <<< "$content")
           [ "$bumped" != "$content" ] || exit 0
-          gh api -X PUT "repos/$GH_REPO/contents/config/app.php" -f message="chore: bump version to ${GITHUB_REF_NAME}" -f content="$(base64 -w0 <<< "$bumped")" -f sha="$(jq -r .sha <<< "$current")" -f branch=0.x > /dev/null
+          gh api -X PUT "repos/$GH_REPO/contents/config/app.php" -f message="chore: bump version to ${GITHUB_REF_NAME}" -f content="$(base64 -w0 <<< "$bumped")" -f sha="$(jq -r .sha <<< "$current")" -f branch="$branch" > /dev/null
