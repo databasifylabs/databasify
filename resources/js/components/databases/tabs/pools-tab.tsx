@@ -257,7 +257,7 @@ export default function PoolsTab({
                     <CardTitle>Add a connection pool</CardTitle>
                     <CardDescription>
                         Clients connect with their own database user and
-                        password, with TLS required.
+                        password, with TLS when the client asks for it.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
