@@ -2,9 +2,11 @@ set -euo pipefail
 @include('engines.mysql-family._mysql')
 @include('engines.mysql-family._files')
 @include('engines.mysql-family._rclone')
+@include('engines.mysql-family._writer')
 BINLOGS="$ROOT/archive/binlogs"
 MARK="$ROOT/state/binlog-rotated"
 ROTATE_WAIT=30
+IDLE_ROTATE_SECONDS=300
 
 local_binlogs() {
     local file
@@ -32,8 +34,12 @@ open_binlog() {
     printf '%s %s' "$name" "$(wc -c < "$BINLOGS/$name" | tr -d ' ')"
 }
 
+idle_too_long() {
+    [ -f "$MARK" ] && [ $(( $(date +%s) - $(stat -c %Y "$MARK") )) -ge "$IDLE_ROTATE_SECONDS" ] && is_writer
+}
+
 rotation_error=''
-if open=$(open_binlog) && [ "$(cat "$MARK" 2> /dev/null || true)" != "$open" ]; then
+if open=$(open_binlog) && { [ "$(cat "$MARK" 2> /dev/null || true)" != "$open" ] || idle_too_long; }; then
     my_try '' <<< 'FLUSH BINARY LOGS'
     if [ -n "$MY_ERROR" ]; then
         rotation_error=$MY_ERROR_TEXT
@@ -78,5 +84,6 @@ for name in $closed; do
 done
 
 if [ -n "$rotation_error" ]; then
+    [ ! -f "$MARK" ] || touch "$MARK"
     fail_task "$rotation_error"
 fi
