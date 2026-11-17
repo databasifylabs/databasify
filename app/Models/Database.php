@@ -215,6 +215,11 @@ class Database extends Model implements Movable
         return $this->nodes()->whereKeyNot($node->id)->get();
     }
 
+    public function runsEngineTask(): bool
+    {
+        return $this->nodes->contains(fn (DatabaseNode $node): bool => $node->runsTaskForDatabase());
+    }
+
     public function readOnlyNodes(): DatabaseNodeCollection
     {
         return $this->nodes()->readOnly()->get();

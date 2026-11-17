@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ConnectionPoolController from '@/actions/App/Http/Controllers/Databases/ConnectionPoolController';
 import DatabaseController from '@/actions/App/Http/Controllers/Databases/DatabaseController';
+import DatabaseOperationController from '@/actions/App/Http/Controllers/Databases/DatabaseOperationController';
 import TrustedSourceController from '@/actions/App/Http/Controllers/Databases/TrustedSourceController';
 import DatabaseActions from '@/components/databases/actions/database-actions';
 import {
@@ -27,6 +28,7 @@ import BrandIcon from '@/components/brand-icon';
 import CommunityBadge from '@/components/community-badge';
 import StatusDot from '@/components/status-dot';
 import OperationLabel from '@/components/databases/operation-label';
+import StopOperationButton from '@/components/databases/stop-operation-button';
 import UnsupportedSdkAlert from '@/components/databases/unsupported-sdk-alert';
 import type { UnsupportedSdk } from '@/components/databases/unsupported-sdk-alert';
 import StatusBadge from '@/components/status-badge';
@@ -153,6 +155,14 @@ export default function ShowDatabase({
                                         <OperationLabel
                                             operation={operation}
                                             className="text-sm"
+                                        />
+                                        <StopOperationButton
+                                            route={DatabaseOperationController.stop(
+                                                { database: database.id },
+                                            )}
+                                            name={database.name}
+                                            status={database.status}
+                                            runningTask={database.running_task}
                                         />
                                     </>
                                 )}

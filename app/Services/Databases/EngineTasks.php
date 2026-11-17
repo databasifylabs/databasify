@@ -123,6 +123,20 @@ final readonly class EngineTasks
         });
     }
 
+    public function cancel(Database|DatabaseNode $scope): void
+    {
+        $this->nodesWithTasksIn($scope)->each(function (DatabaseNode $node): void {
+            $key = $node->task_key;
+
+            if ($key === null) {
+                return;
+            }
+
+            $node->driver()->stopTask($key);
+            $node->update(['task_key' => null]);
+        });
+    }
+
     private function nodesWithTasksIn(Database|DatabaseNode $scope): DatabaseNodeCollection
     {
         if ($scope instanceof DatabaseNode) {
@@ -130,7 +144,7 @@ final readonly class EngineTasks
         }
 
         return $scope->nodes()->runningTask()->with('server', 'database')->get()
-            ->filter(fn (DatabaseNode $node): bool => ! $node->isReadOnly() || $node->isClaimedByDatabase())
+            ->filter(fn (DatabaseNode $node): bool => $node->runsTaskForDatabase())
             ->values();
     }
 
@@ -152,6 +166,10 @@ final readonly class EngineTasks
 
     private function failureOf(Operation $operation): EngineError
     {
+        if ($operation->state === OperationState::Cancelled) {
+            return new EngineError('Stopped by you.');
+        }
+
         return new EngineError($operation->error ?? "{$operation->kind} was {$operation->state->value}.");
     }
 }
