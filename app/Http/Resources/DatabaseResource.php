@@ -34,6 +34,7 @@ class DatabaseResource extends DatabaseListResource
             'engine_community' => $engine->isCommunity(),
             'engine_author' => $engine->author,
             'retune_needed' => $this->retune_needed_at !== null,
+            'running_task' => $this->runsEngineTask(),
             'maintenance' => $this->maintenanceWindow()->toArray(now()),
             'domain' => $this->hostnames()?->primary->public,
             'ca_certificate' => $this->clientCaCertificate(),

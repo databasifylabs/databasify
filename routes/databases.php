@@ -27,6 +27,7 @@ Route::project()->group(function () {
     Route::post('databases/{database}/retune', [DatabaseOperationController::class, 'retune'])->name('databases.retune');
     Route::post('databases/{database}/reboot', [DatabaseOperationController::class, 'reboot'])->name('databases.reboot');
     Route::post('databases/{database}/retry-setup', [DatabaseOperationController::class, 'retrySetup'])->name('databases.retry-setup');
+    Route::post('databases/{database}/stop', [DatabaseOperationController::class, 'stop'])->name('databases.stop');
     Route::put('databases/{database}/domain', [DatabaseSettingsController::class, 'domain'])->name('databases.domain');
     Route::put('databases/{database}/config', [DatabaseSettingsController::class, 'config'])->name('databases.config');
     Route::put('databases/{database}/persistence', [DatabaseSettingsController::class, 'persistence'])->name('databases.persistence');
@@ -45,6 +46,7 @@ Route::project()->group(function () {
         Route::put('databases/{database}/nodes/{node}', [DatabaseNodeController::class, 'update'])->name('databases.nodes.update');
         Route::put('databases/{database}/nodes/{node}/config', [DatabaseNodeController::class, 'config'])->name('databases.nodes.config');
         Route::post('databases/{database}/nodes/{node}/reboot', [DatabaseNodeController::class, 'reboot'])->name('databases.nodes.reboot');
+        Route::post('databases/{database}/nodes/{node}/stop', [DatabaseNodeController::class, 'stop'])->name('databases.nodes.stop');
         Route::post('databases/{database}/nodes/{node}/retune', [DatabaseNodeController::class, 'retune'])->name('databases.nodes.retune');
         Route::delete('databases/{database}/nodes/{node}', [DatabaseNodeController::class, 'destroy'])->name('databases.nodes.destroy');
         Route::get('databases/{database}/nodes/{node}/logs', [DatabaseInsightsController::class, 'logs'])->name('databases.nodes.logs');

@@ -224,6 +224,16 @@ class DatabaseNode extends Model
         return $this->isReadOnly() && $database->status->claimsReadOnlyNodes() && $this->status === $database->status;
     }
 
+    public function runsTaskForDatabase(): bool
+    {
+        return $this->task_key !== null && (! $this->isReadOnly() || $this->isClaimedByDatabase());
+    }
+
+    public function runsItsOwnTask(): bool
+    {
+        return $this->task_key !== null && $this->isReadOnly() && ! $this->isClaimedByDatabase();
+    }
+
     public function ensureReadOnly(): void
     {
         if (! $this->isReadOnly()) {

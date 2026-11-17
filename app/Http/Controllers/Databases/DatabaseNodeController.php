@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Databases;
 
 use App\Actions\Databases\Configuration\RetuneNode;
 use App\Actions\Databases\Configuration\UpdateNodeConfig;
+use App\Actions\Databases\Lifecycle\StopOperation;
 use App\Actions\Databases\Nodes\AddDatabaseNode;
 use App\Actions\Databases\Nodes\RebootNode;
 use App\Actions\Databases\Nodes\RemoveDatabaseNode;
@@ -65,6 +66,13 @@ class DatabaseNodeController extends Controller
     public function reboot(Database $database, DatabaseNode $node, RebootNode $rebootNode): RedirectResponse
     {
         $rebootNode->handle($node);
+
+        return back();
+    }
+
+    public function stop(Database $database, DatabaseNode $node, StopOperation $stop): RedirectResponse
+    {
+        $stop->handle($node);
 
         return back();
     }

@@ -18,6 +18,7 @@ import NodeTrustedSourceController from '@/actions/App/Http/Controllers/Database
 import ConnectionDetails from '@/components/databases/connection/connection-details';
 import BrandIcon from '@/components/brand-icon';
 import OperationLabel from '@/components/databases/operation-label';
+import StopOperationButton from '@/components/databases/stop-operation-button';
 import NodeSettingsTab from '@/components/databases/nodes/node-settings-tab';
 import { roleOf } from '@/components/databases/nodes/node-dots';
 import InsightsTab from '@/components/databases/tabs/insights-tab';
@@ -188,6 +189,15 @@ export default function ShowNode({
                                     <OperationLabel
                                         operation={operation}
                                         className="text-sm"
+                                    />
+                                    <StopOperationButton
+                                        route={DatabaseNodeController.stop({
+                                            database: database.id,
+                                            node: node.id,
+                                        })}
+                                        name={node.name}
+                                        status={node.status ?? 'ready'}
+                                        runningTask={node.running_task}
                                     />
                                 </>
                             )}

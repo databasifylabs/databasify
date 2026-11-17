@@ -36,6 +36,7 @@ class DatabaseNodeResource extends JsonResource
             'disk_gb' => $this->server->disk_gb,
             'created_at' => $this->created_at?->toIso8601String(),
             'status' => $this->status?->value,
+            'running_task' => $this->runsItsOwnTask(),
         ];
 
         if (! $this->isReadOnly()) {

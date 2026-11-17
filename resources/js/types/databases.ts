@@ -19,6 +19,7 @@ export type DatabaseNode = {
     disk_gb: number | null;
     created_at: string | null;
     status: string | null;
+    running_task: boolean;
     trusted_sources?: TrustedSource[];
     pools?: ConnectionPool[];
     config?: Record<string, string>;
@@ -201,6 +202,7 @@ export type Database = {
     available_version: string | null;
     available_update_refreshes_image: boolean;
     retune_needed: boolean;
+    running_task: boolean;
     maintenance: MaintenanceWindow;
     created_at: string | null;
     domain: string | null;

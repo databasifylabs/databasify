@@ -10,7 +10,7 @@ Cluster operations take seconds to days and touch several nodes. Two operations 
 ## Decision
 
 - **Status is the operation.** `DatabaseStatus` names the running work (`creating`, `upgrading`, `scaling`…) or `ready`/`failed`. Health is not stored; it is read from the node roles the status poll records (`DatabaseNodeCollection::health()`).
-- **Action, then job.** A controller validates and calls one action. The action checks, then claims the database with `markBusy()`, which reloads the row with `refreshForUpdate()` inside a transaction and refuses while another operation runs, and dispatches one job on the `databases` queue. The job's `handle()` calls exactly one action. There is no Stop: an operation runs until it finishes or fails.
+- **Action, then job.** A controller validates and calls one action. The action checks, then claims the database with `markBusy()`, which reloads the row with `refreshForUpdate()` inside a transaction and refuses while another operation runs, and dispatches one job on the `databases` queue. The job's `handle()` calls exactly one action. Stop cancels the running engine task (`StopOperation`); the job then fails with "Stopped by you." and its normal cleanup runs. Failover, recovery, migrations and delete cannot be stopped.
 - **Read-only nodes run their own operations.** `Database` and `DatabaseNode` share `RunsOperations`. Upgrade, redeploy-all, delete and scaling claim the database and every read-only node at once (`markBusyWithReadOnly()`); failover and recovery claim the members only; a read-only node's own config, pools, trusted sources, reboot and redeploy claim that node only.
 - **Engine tasks run off the worker.** Each operation job carries a run id; every engine task key is `{run}.{node_id}.{step}`, saved in `database_nodes.task_key`. `EngineTasks::await()` waits up to 60 s, then the job releases itself (`release(30)`). Operation jobs are `#[Tries(0)]`, `#[MaxExceptions(1)]`, `#[Timeout(3600)]`, with `retryUntil()` seven days out. A resumed job runs its action again from the top; started tasks return at once and steps that must not repeat are skipped (`EngineTasks::started()`, `RollingNodes`).
 - **Failure and restart.** A job's `failed()` calls `EndFailedOperation` (or `EndFailedNodeOperation`), which stops running tasks first, fails running logs, raises an alert and ends the operation: a failed create erases its setup and marks the database `failed`, a failed add removes its node, anything else returns to `ready`. When Horizon starts, `ResumeJobsWhenHorizonStarts` puts every reserved job back on its queue, so operations resume after a restart.
@@ -35,6 +35,7 @@ Cluster operations take seconds to days and touch several nodes. Two operations 
 
 ## Evidence
 
+- `app/Actions/Databases/Lifecycle/StopOperation.php`
 - `app/Enums/Databases/DatabaseStatus.php`
 - `app/Models/Concerns/RunsOperations.php`
 - `app/Models/Database.php`

@@ -9,6 +9,7 @@ use App\Actions\Databases\Failover\FailoverDatabase;
 use App\Actions\Databases\Failover\RecoverDatabase;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Lifecycle\RetryDatabaseSetup;
+use App\Actions\Databases\Lifecycle\StopOperation;
 use App\Actions\Databases\Nodes\RebootDatabase;
 use App\Actions\Databases\Upgrades\CheckDatabaseUpgrade;
 use App\Actions\Databases\Upgrades\UpgradeDatabase;
@@ -71,6 +72,13 @@ class DatabaseOperationController extends Controller
     public function retrySetup(Database $database, RetryDatabaseSetup $retry): RedirectResponse
     {
         $retry->handle($database);
+
+        return back();
+    }
+
+    public function stop(Database $database, StopOperation $stop): RedirectResponse
+    {
+        $stop->handle($database);
 
         return back();
     }
