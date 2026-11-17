@@ -1,1 +1,1 @@
-ALTER USER {!! $sql->string($name) !!}@'%' {!! $identified !!};
+ALTER USER {!! $sql->string($name) !!}@'%' {!! $identified !!} REQUIRE NONE;

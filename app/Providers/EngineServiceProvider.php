@@ -23,7 +23,7 @@ class EngineServiceProvider extends ServiceProvider
 
     private const array SQL_ENV_KEYS = ['host' => 'DB_HOST', 'port' => 'DB_PORT', 'username' => 'DB_USERNAME', 'password' => 'DB_PASSWORD', 'database' => 'DB_DATABASE'];
 
-    private const string MYSQL_ENV_NOTE = "Laravel connects without TLS unless MYSQL_ATTR_SSL_CA is set. To encrypt without the CA, set 'options' => [Mysql::ATTR_SSL_CIPHER => 'DEFAULT', Mysql::ATTR_SSL_VERIFY_SERVER_CERT => false] on the connection in config/database.php. To verify the server, download the CA certificate and add MYSQL_ATTR_SSL_CA=/path/to/{ca}.";
+    private const string MYSQL_ENV_NOTE = "Laravel connects without TLS unless MYSQL_ATTR_SSL_CA is set, which this database accepts. To encrypt without the CA, set 'options' => [Mysql::ATTR_SSL_CIPHER => 'DEFAULT', Mysql::ATTR_SSL_VERIFY_SERVER_CERT => false] on the connection in config/database.php. To verify the server, download the CA certificate and add MYSQL_ATTR_SSL_CA=/path/to/{ca}.";
 
     private const string MONGODB_VERIFY_NOTE = 'To verify the server, download the CA certificate and replace tlsAllowInvalidCertificates=true with tlsCAFile=/path/to/{ca}.';
 

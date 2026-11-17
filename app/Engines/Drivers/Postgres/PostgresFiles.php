@@ -36,7 +36,7 @@ final readonly class PostgresFiles
         'host replication replicator 127.0.0.1/32 scram-sha-256',
         'host replication replicator ::1/128 scram-sha-256',
         'hostssl replication replicator 0.0.0.0/0 scram-sha-256',
-        'hostssl all all 0.0.0.0/0 scram-sha-256',
+        'host all all 0.0.0.0/0 scram-sha-256',
     ];
 
     private const array REPLICATION_PARAMETERS = [
