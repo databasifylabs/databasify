@@ -85,6 +85,11 @@ final readonly class SetUpDatabase
             $nodes->each(fn (DatabaseNode $node) => $this->tasks->await($node, $run, 'join', 'joining the cluster', fn (string $key): Operation => $node->driver()->cluster()->enable($key)));
         }
 
+        if ($source !== null && $database->pointInTimeRecovery !== null) {
+            $database->disableRecovery();
+            $nodes->each(fn (DatabaseNode $node) => $node->driver()->nodes()->configure($this->nodeConfig->handle($database, $node)));
+        }
+
         rescue(fn () => $this->logUnits->handle($database, $database->seed()));
         $this->refresh->handle($database);
         $database->markReady();

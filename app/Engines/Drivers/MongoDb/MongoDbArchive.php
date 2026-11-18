@@ -72,7 +72,6 @@ final readonly class MongoDbArchive implements Archive
         ], [
             'PBM_MONGODB_URI' => MongoDbFiles::pbmUriOf($saved->secrets->agent),
             'RESTORE_CONFIG' => MongoDbFiles::pbmConfigOf($storage, false),
-            'SAVED_CONFIG' => MongoDbFiles::pbmConfigOf($saved->archive->storage, false),
             ...($admin === null ? [] : ['ADMIN_PASSWORD' => $admin, 'AGENT_PASSWORD' => $saved->secrets->agent]),
         ]);
     }

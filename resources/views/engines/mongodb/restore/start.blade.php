@@ -47,7 +47,3 @@ main(() => {
 });
 JS
 @endif
-echo 'Backing up…'
-sync_storage "$SAVED_CONFIG"
-pbm_locked backup --compression=zstd --wait || fail_task "$PBM_ERROR"
-pbm_locked config --set pitr.enabled=true || fail_task "$PBM_ERROR"
