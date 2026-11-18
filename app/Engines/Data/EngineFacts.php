@@ -24,6 +24,7 @@ final readonly class EngineFacts
         public HostProfile $hostProfile,
         public array $primaryControlledSettings = [],
         public bool $seedClustersFirst = false,
+        public bool $restoreNeedsOwnArchive = false,
         public array $passwordEncryptions = [],
         public ?PasswordEncryption $defaultPasswordEncryption = null,
     ) {}

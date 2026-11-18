@@ -25,6 +25,7 @@ final readonly class MongoDbDriver extends AbstractEngineDriver
             reservedDatabases: ['admin', 'local', 'config'],
             ports: new Ports(ClientPorts::CLIENT, null, []),
             hostProfile: new HostProfile(['net.core.somaxconn' => '4096', 'net.ipv4.tcp_keepalive_intvl' => '10', 'net.ipv4.tcp_keepalive_probes' => '6', 'net.ipv4.tcp_keepalive_time' => '120', 'vm.swappiness' => '1'], floors: ['vm.max_map_count' => 262144]),
+            restoreNeedsOwnArchive: true,
         );
     }
 

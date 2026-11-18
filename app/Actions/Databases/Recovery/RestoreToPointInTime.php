@@ -40,7 +40,7 @@ final readonly class RestoreToPointInTime
             persistence: $source->settings->persistence,
             image: $source->runsSupportedSdk() ? $source->image() : null,
             accountsFrom: $source,
-            recovery: $recovery->settings(),
+            recovery: $source->facts()->restoreNeedsOwnArchive ? $recovery->settings() : null,
         ));
     }
 }

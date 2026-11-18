@@ -144,8 +144,24 @@ test('a database can be restored to a point in time as a new database', function
         ->and($restored->settings->restore->target->equalTo($target))->toBeTrue()
         ->and($restored->image->release)->toBe($source->image->release)
         ->and($restored->users()->pluck('name')->all())->toBe(['app'])
-        ->and($restored->pointInTimeRecovery)->not->toBeNull();
+        ->and($restored->pointInTimeRecovery)->toBeNull();
     Queue::assertPushed(CreateDatabaseJob::class);
+});
+
+test('a restored mongodb database gets its own point-in-time recovery to restore through', function () {
+    $this->freezeTime();
+    Queue::fake([CreateDatabaseJob::class]);
+    $source = Database::factory()->engine('mongodb', '8.0')->create(['name' => 'events']);
+    $archive = PointInTimeRecovery::factory()->restorable()->for($source)->create();
+    $server = Server::factory()->ready()->for($source->project)->create();
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('databases.recovery.restore', [$source->project_id, $source]), ['name' => 'events-restored', 'server_id' => $server->id, 'target' => now()->subDay()->toIso8601String()])
+        ->assertSessionHasNoErrors();
+
+    expect(Database::query()->where('name', 'events-restored')->sole()->pointInTimeRecovery)
+        ->storage_provider_id->toBe($archive->storage_provider_id)
+        ->path->not->toBe($archive->path);
 });
 
 test('a point outside the restorable window is refused', function () {
