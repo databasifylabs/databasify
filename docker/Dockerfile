@@ -1,12 +1,33 @@
-FROM ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c AS base
+# https://www.php.net/releases/
+ARG PHP_VERSION=8.5.13
+# https://nginx.org/packages/mainline/debian/pool/nginx/n/nginx/
+ARG NGINX_VERSION=1.31.9
+# https://hub.docker.com/_/redis/tags?name=-trixie
+ARG REDIS_VERSION=8.8.4
 
+FROM redis:${REDIS_VERSION}-trixie AS redis
+
+FROM php:${PHP_VERSION}-fpm-trixie AS base
+
+ARG NGINX_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 
+COPY --from=mlocati/php-extension-installer:2.13.2 /usr/bin/install-php-extensions /usr/local/bin/
+
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl nginx redis-server supervisor unzip \
-        php8.5-cli php8.5-fpm php8.5-bcmath php8.5-curl php8.5-gmp php8.5-intl php8.5-mbstring \
-        php8.5-mysql php8.5-pgsql php8.5-redis php8.5-sqlite3 php8.5-xml php8.5-zip \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends ca-certificates curl gpg \
+    && curl -fsSL https://nginx.org/keys/nginx_signing.key -o /tmp/nginx_signing.key \
+    && gpg --show-keys --with-colons /tmp/nginx_signing.key | grep -q '^fpr:::::::::573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62:$' \
+    && gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg /tmp/nginx_signing.key \
+    && rm /tmp/nginx_signing.key \
+    && echo 'deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/debian trixie nginx' > /etc/apt/sources.list.d/nginx.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends "nginx=${NGINX_VERSION}-*" supervisor unzip \
+    && install-php-extensions bcmath gmp intl mysqli pcntl pdo_mysql pdo_pgsql pgsql redis sockets zip \
+    && apt-get purge -y --auto-remove gpg \
+    && rm -rf /var/lib/apt/lists/* /etc/nginx/conf.d/default.conf /usr/local/etc/php-fpm.d/* \
+    && cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini \
+    && nginx -v
 
 WORKDIR /app
 
@@ -18,7 +39,8 @@ RUN --mount=type=secret,id=composer_auth \
     COMPOSER_AUTH="$(cat /run/secrets/composer_auth 2>/dev/null)" \
     composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --no-progress
 COPY . .
-RUN composer dump-autoload --optimize --no-dev \
+RUN composer check-platform-reqs --no-dev \
+    && composer dump-autoload --optimize --no-dev \
     && php artisan package:discover --ansi
 
 FROM vendor AS assets
@@ -36,15 +58,18 @@ FROM base
 
 COPY --from=vendor /app /app
 COPY --from=assets /app/public/build /app/public/build
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-COPY docker/php-fpm.conf /etc/php/8.5/fpm/pool.d/www.conf
-COPY docker/php.ini /etc/php/8.5/fpm/conf.d/99-databasify.ini
+COPY --from=redis /usr/local/bin/redis-server /usr/local/bin/redis-cli /usr/local/bin/
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+COPY docker/php.ini /usr/local/etc/php/conf.d/99-databasify.ini
 COPY docker/supervisord.conf /etc/supervisor/databasify.conf
 COPY docker/redis.conf /etc/redis/databasify.conf
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/databasify
 
 RUN rm -rf node_modules tests docker .github \
-    && mkdir -p /run/php \
+    && useradd --system --user-group --home-dir /var/lib/redis --no-create-home --shell /usr/sbin/nologin redis \
+    && mkdir -p /run/php /var/lib/redis \
+    && chown redis:redis /var/lib/redis \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
     && ln -sf /dev/stderr /var/log/nginx/error.log \
     && chown -R www-data:www-data /app/storage /app/bootstrap/cache
