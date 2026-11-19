@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Console\Commands\Databases\ApplyMaintenanceCommand;
 use App\Console\Commands\Databases\CheckDatabaseUpgradesCommand;
+use App\Console\Commands\Databases\QueueFileBackupsCommand;
 use App\Console\Commands\Databases\RecordDatabaseMetricsCommand;
 use App\Console\Commands\Databases\RefreshDatabaseStatusCommand;
 use App\Console\Commands\Databases\RefreshMigrationsCommand;
@@ -16,6 +17,7 @@ use App\Models\ServerLog;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::onOneServer()->group(function () {
+    Schedule::command(QueueFileBackupsCommand::class)->everyMinute()->withoutOverlapping(5);
     Schedule::command(RefreshDatabaseStatusCommand::class)->everyMinute()->withoutOverlapping(5);
     Schedule::command(RecordDatabaseMetricsCommand::class)->everyMinute()->withoutOverlapping(5);
     Schedule::command(RefreshMigrationsCommand::class)->everyMinute()->withoutOverlapping(5);

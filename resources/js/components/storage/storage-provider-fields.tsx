@@ -5,6 +5,15 @@ import Field from '@/components/form/field';
 import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { storagePresets } from '@/lib/storage-presets';
+import type { StoragePreset } from '@/lib/storage-presets';
 import type { StorageProvider } from '@/types';
 
 export default function StorageProviderFields({
@@ -17,7 +26,23 @@ export default function StorageProviderFields({
     onBucket?: (bucket: string) => void;
 }) {
     const [pathStyle, setPathStyle] = useState(provider?.path_style ?? false);
+    const [preset, setPreset] = useState<StoragePreset>('custom');
+    const [region, setRegion] = useState(provider?.region ?? '');
     const inUse = (provider?.databases ?? []).length > 0;
+
+    const selectPreset = (value: string) => {
+        if (!(value in storagePresets) || inUse) return;
+        const selected = value as StoragePreset;
+        setPreset(selected);
+        if (!provider) {
+            setRegion((current) =>
+                current === '' || current === storagePresets[preset].region
+                    ? storagePresets[selected].region
+                    : current,
+            );
+            setPathStyle(storagePresets[selected].pathStyle);
+        }
+    };
 
     return (
         <>
@@ -30,6 +55,33 @@ export default function StorageProviderFields({
                 title="Bucket"
                 description="Any S3-compatible storage: AWS S3, Cloudflare R2, DigitalOcean Spaces, Backblaze B2, Wasabi, MinIO."
             >
+                <Field
+                    id="storage-preset"
+                    label="Storage service"
+                    hint="Choose setup guidance. Your endpoint, bucket and credentials stay manually configurable."
+                >
+                    <Select
+                        value={preset}
+                        onValueChange={selectPreset}
+                        disabled={inUse}
+                    >
+                        <SelectTrigger id="storage-preset" className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Object.entries(storagePresets).map(
+                                ([value, item]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {item.label}
+                                    </SelectItem>
+                                ),
+                            )}
+                        </SelectContent>
+                    </Select>
+                </Field>
+                <p className="text-sm text-muted-foreground" role="status">
+                    {storagePresets[preset].hint}
+                </p>
                 {inUse && (
                     <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
                         A database archives here, so the endpoint, bucket and
@@ -49,7 +101,7 @@ export default function StorageProviderFields({
                             name="endpoint"
                             defaultValue={provider?.endpoint}
                             readOnly={inUse}
-                            placeholder="https://s3.us-east-1.amazonaws.com"
+                            placeholder={storagePresets[preset].endpoint}
                         />
                     </Field>
                     <Field
@@ -61,9 +113,13 @@ export default function StorageProviderFields({
                         <Input
                             id="region"
                             name="region"
-                            defaultValue={provider?.region}
+                            value={region}
+                            onChange={(event) => setRegion(event.target.value)}
                             readOnly={inUse}
-                            placeholder="us-east-1"
+                            placeholder={
+                                storagePresets[preset].region ||
+                                'Signing region'
+                            }
                         />
                     </Field>
                     <Field id="bucket" label="Bucket" error={errors.bucket}>

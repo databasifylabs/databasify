@@ -462,6 +462,12 @@ class Database extends Model implements Movable
         return $this->hasMany(ServerLog::class);
     }
 
+    /** @return HasMany<FileBackupDestination, $this> */
+    public function fileBackupDestinations(): HasMany
+    {
+        return $this->hasMany(FileBackupDestination::class)->withoutProject();
+    }
+
     public function ensureIdle(): void
     {
         $this->ensureNotBusy();

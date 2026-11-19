@@ -425,6 +425,12 @@ function ArchiveStatus({
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Archive checks confirm backup metadata and recovery
+                    coverage. They do not run a test restore. Restore into a
+                    separate database to verify that your backup can recover
+                    your data.
+                </p>
                 {recovery.problem && (
                     <div className="flex gap-2.5 rounded-lg border border-red-600/20 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-400">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0" />

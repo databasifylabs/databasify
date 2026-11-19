@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { HardDrive, Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import StorageProviderController from '@/actions/App/Http/Controllers/Storage/StorageProviderController';
+import FileBackupController from '@/actions/App/Http/Controllers/Storage/FileBackupController';
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
@@ -139,6 +140,11 @@ export default function StorageIndex({
                         title="Storage"
                         description="S3-compatible buckets that databases archive to for point-in-time recovery."
                     />
+                    <Button asChild variant="outline">
+                        <Link href={FileBackupController.index()}>
+                            FTP / SFTP backups
+                        </Link>
+                    </Button>
                     <Button asChild>
                         <Link href={StorageProviderController.create()}>
                             <Plus /> Add storage

@@ -14,6 +14,8 @@ final readonly class ArchiveStatus
 {
     public const int STALE_AFTER_MINUTES = 15;
 
+    public const int BACKUP_OVERDUE_HOURS = 26;
+
     public function __construct(
         public int $backups,
         public ?CarbonImmutable $earliest,
@@ -67,6 +69,21 @@ final readonly class ArchiveStatus
         }
 
         return $this->backups === 0 ? ArchiveHealth::Pending : ArchiveHealth::Healthy;
+    }
+
+    public function checkingDailyBackupAt(CarbonInterface $now, ?CarbonInterface $enabledAt): self
+    {
+        if ($this->problem !== null) {
+            return $this;
+        }
+
+        $since = $this->lastBackup ?? $enabledAt;
+
+        if ($since === null || $since->greaterThanOrEqualTo($now->toImmutable()->subHours(self::BACKUP_OVERDUE_HOURS))) {
+            return $this;
+        }
+
+        return clone ($this, ['problem' => 'No completed base backup in the last '.self::BACKUP_OVERDUE_HOURS.' hours. Check the daily backup job.']);
     }
 
     /**

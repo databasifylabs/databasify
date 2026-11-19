@@ -87,9 +87,15 @@ class Project extends Model
         return $this->hasMany(User::class, 'last_project_id');
     }
 
+    /** @return HasMany<FileBackupDestination, $this> */
+    public function fileBackupDestinations(): HasMany
+    {
+        return $this->hasMany(FileBackupDestination::class)->withoutProject();
+    }
+
     public function isEmpty(): bool
     {
-        return collect([$this->servers(), $this->databases(), $this->networks(), $this->serverProviders(), $this->dnsProviders(), $this->storageProviders()])
+        return collect([$this->servers(), $this->databases(), $this->networks(), $this->serverProviders(), $this->dnsProviders(), $this->storageProviders(), $this->fileBackupDestinations()])
             ->doesntContain(fn (HasMany $resources): bool => $resources->exists());
     }
 

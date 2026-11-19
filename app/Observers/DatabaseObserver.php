@@ -21,7 +21,15 @@ final readonly class DatabaseObserver
             $database->trustedSources(),
             $database->connectionPools(),
             $database->pointInTimeRecovery(),
+            $database->fileBackupDestinations(),
         );
         $database->serverLogs()->update(['database_id' => null]);
+    }
+
+    public function updated(Database $database): void
+    {
+        if ($database->wasChanged('project_id')) {
+            $database->fileBackupDestinations()->update(['project_id' => $database->project_id]);
+        }
     }
 }
