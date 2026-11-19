@@ -1,4 +1,7 @@
 import { ArrowDownToLine } from 'lucide-react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { remarkAlert } from 'remark-github-blockquote-alert';
 import UpdateController from '@/actions/App/Http/Controllers/Updates/UpdateController';
 import ConfirmDialog from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -89,10 +92,11 @@ export default function UpdateAvailable({
                         </a>
                     </div>
                 </div>
-                <div
-                    className="release-notes mt-2 text-sm text-muted-foreground [&_h2]:mt-3 [&_h2]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-foreground [&_li]:my-0.5 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
-                    dangerouslySetInnerHTML={{ __html: release.notesHtml }}
-                />
+                <div className="release-notes mt-2">
+                    <Markdown remarkPlugins={[remarkGfm, remarkAlert]}>
+                        {release.notes}
+                    </Markdown>
+                </div>
             </div>
         </div>
     );

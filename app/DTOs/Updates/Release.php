@@ -6,7 +6,6 @@ namespace App\DTOs\Updates;
 
 use App\Services\Http\Payload;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
 use UnexpectedValueException;
 
 final readonly class Release
@@ -49,11 +48,6 @@ final readonly class Release
             'url' => $this->url,
             'notes' => $this->notes,
         ], JSON_THROW_ON_ERROR);
-    }
-
-    public function notesHtml(): string
-    {
-        return Str::markdown($this->notes, ['html_input' => 'strip', 'allow_unsafe_links' => false]);
     }
 
     public function isNewerThan(string $version): bool

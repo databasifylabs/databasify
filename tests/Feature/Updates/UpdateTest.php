@@ -30,13 +30,13 @@ function installUpdater(): string
     return $path;
 }
 
-function rememberRelease(string $version): void
+function rememberRelease(string $version, string $notes = 'Fixes'): void
 {
     Setting::query()->create(['name' => 'latest_release', 'value' => json_encode([
         'version' => $version,
         'published_at' => '2026-11-01T00:00:00Z',
         'url' => "https://github.com/databasifylabs/databasify/releases/tag/v{$version}",
-        'notes' => 'Fixes',
+        'notes' => $notes,
     ])]);
 }
 
@@ -53,6 +53,15 @@ test('updates page is displayed', function () {
         ->get(route('updates.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('updates/index'));
+});
+
+test('release notes reach the page as markdown', function () {
+    installUpdater();
+    rememberRelease('9.0.0', "> [!WARNING]\n> Back up first.");
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('updates.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('release.notes', "> [!WARNING]\n> Back up first."));
 });
 
 test('checking for a release remembers the latest version', function () {

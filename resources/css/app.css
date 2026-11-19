@@ -152,3 +152,92 @@
         @apply bg-background text-foreground;
     }
 }
+
+@layer components {
+    .release-notes {
+        @apply text-sm text-muted-foreground;
+
+        h2,
+        h3 {
+            @apply mt-3 mb-1 text-sm font-semibold text-foreground;
+        }
+
+        p {
+            @apply my-2;
+        }
+
+        ul {
+            @apply list-disc pl-5;
+        }
+
+        li {
+            @apply my-0.5;
+        }
+
+        table {
+            @apply my-3 block w-full border-collapse overflow-x-auto text-left;
+        }
+
+        th,
+        td {
+            @apply border px-3 py-1.5 whitespace-nowrap;
+        }
+
+        th {
+            @apply bg-muted font-medium text-foreground;
+        }
+
+        blockquote,
+        .markdown-alert {
+            @apply my-3 border-l-4 pl-4;
+        }
+
+        .markdown-alert-title {
+            @apply mb-1 flex items-center gap-2 font-semibold;
+
+            svg {
+                @apply size-4 fill-current;
+            }
+        }
+
+        .markdown-alert-note {
+            @apply border-l-blue-500;
+
+            .markdown-alert-title {
+                @apply text-blue-600 dark:text-blue-400;
+            }
+        }
+
+        .markdown-alert-tip {
+            @apply border-l-green-500;
+
+            .markdown-alert-title {
+                @apply text-green-600 dark:text-green-400;
+            }
+        }
+
+        .markdown-alert-important {
+            @apply border-l-violet-500;
+
+            .markdown-alert-title {
+                @apply text-violet-600 dark:text-violet-400;
+            }
+        }
+
+        .markdown-alert-warning {
+            @apply border-l-amber-500;
+
+            .markdown-alert-title {
+                @apply text-amber-600 dark:text-amber-400;
+            }
+        }
+
+        .markdown-alert-caution {
+            @apply border-l-red-500;
+
+            .markdown-alert-title {
+                @apply text-red-600 dark:text-red-400;
+            }
+        }
+    }
+}

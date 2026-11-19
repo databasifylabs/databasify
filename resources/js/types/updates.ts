@@ -2,7 +2,7 @@ export type UpdateRelease = {
     version: string;
     publishedAt: string;
     url: string;
-    notesHtml: string;
+    notes: string;
 };
 
 export type UpdateStepState =
