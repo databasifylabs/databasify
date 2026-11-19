@@ -104,12 +104,12 @@ class PointInTimeRecovery extends Model
 
         try {
             return $primary->driver()->archive()->status($backUpNow);
+        } catch (EngineError|SshConnectionFailed|SshAccessDenied $exception) {
+            return ArchiveStatus::unreadable("Could not read the archive on {$primary->server->name}: {$exception->getMessage()}");
         } catch (Throwable $exception) {
-            if (! $exception instanceof EngineError && ! $exception instanceof SshConnectionFailed && ! $exception instanceof SshAccessDenied) {
-                report($exception);
-            }
+            report($exception);
 
-            return ArchiveStatus::unreadable("Could not reach {$primary->server->name} to read the archive.");
+            return ArchiveStatus::unreadable("Could not read the archive on {$primary->server->name}.");
         }
     }
 
