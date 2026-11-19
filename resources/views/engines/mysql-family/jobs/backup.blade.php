@@ -6,6 +6,7 @@ set -euo pipefail
 BASE_SUFFIX={!! $sh->arg($engine->baseSuffix()) !!}
 BACKUP_TMP="$ROOT/backup/tmp"
 BACKUP_META="$ROOT/backup/meta"
+BINLOG_MARGIN_SECONDS=86400
 
 is_writer || exit 0
 rm -rf "$BACKUP_TMP" "$BACKUP_META"
@@ -31,7 +32,7 @@ rclone copyto "$info" "$(remote_of "base/$stamp.binlog-info")"
 
 listing=$(rclone_list base) || fail_task "$RCLONE_ERROR"
 @verbatim
-expired=$(jq -r --arg suffix "$BASE_SUFFIX" --argjson days "$RETENTION_DAYS" --argjson now "$(date +%s)" '
+retention=$(jq -c --arg suffix "$BASE_SUFFIX" --argjson days "$RETENTION_DAYS" --argjson now "$(date +%s)" '
     [.[].Path] as $paths
     | [.[].Path
         | select(endswith($suffix))
@@ -41,10 +42,13 @@ expired=$(jq -r --arg suffix "$BASE_SUFFIX" --argjson days "$RETENTION_DAYS" --a
         | select(.at != null)]
     | sort_by(.at) as $bases
     | ([range(0; $bases | length) | select($bases[.].at < ($now - $days * 86400))] | last // 0) as $keep
-    | $bases[:$keep][]
-    | .name' <<< "$listing")
+    | {expired: [$bases[:$keep][] | .name], oldestKept: $bases[$keep].at}' <<< "$listing")
 @endverbatim
-for name in $expired; do
+for name in $(jq -r '.expired[]' <<< "$retention"); do
     rclone deletefile "$(remote_of "base/$name$BASE_SUFFIX")"
     rclone deletefile "$(remote_of "base/$name.binlog-info")"
 done
+oldest_kept=$(jq -r '.oldestKept // empty' <<< "$retention")
+if [ -n "$oldest_kept" ]; then
+    rclone delete --use-server-modtime --min-age "$(( $(date +%s) - oldest_kept + BINLOG_MARGIN_SECONDS ))s" "$(remote_of binlogs)"
+fi
