@@ -19,3 +19,11 @@ test('ftps probes require explicit tls and certificate checking', function () {
 
     expect($script)->toContain('RCLONE_CONFIG_TARGET_EXPLICIT_TLS=true', 'RCLONE_CONFIG_TARGET_NO_CHECK_CERTIFICATE=false', 'cmp "$WORK/probe" "$WORK/read"', 'cleanup_probe');
 });
+
+test('sftp uses the supplied host key algorithm and never disables key validation', function () {
+    $destination = new FileBackupDestination(['id' => 'backup-test', 'protocol' => 'sftp', 'host' => 'backup.example.com', 'port' => 22, 'username' => 'backup', 'path' => '/backups', 'host_key' => 'ssh-ed25519 AAAA', 'credentials' => ['password' => 'secret']]);
+    $script = view('ssh.backups.probe', ['destination' => $destination, 'probe' => 'test123', 'sh' => new Shell])->render();
+
+    expect($script)->toContain("KEY_ALGORITHMS='ssh-ed25519'", '--sftp-known-hosts-file', '--sftp-host-key-algorithms')
+        ->not->toContain('known_hosts_file=none', '--sftp-pin-host-key');
+});

@@ -20,14 +20,22 @@ export default function StorageProviderFields({
     provider,
     errors,
     onBucket,
+    initialPreset = 'custom',
+    showPresetSelector = true,
 }: {
     provider?: StorageProvider;
     errors: Partial<Record<string, string>>;
     onBucket?: (bucket: string) => void;
+    initialPreset?: StoragePreset;
+    showPresetSelector?: boolean;
 }) {
-    const [pathStyle, setPathStyle] = useState(provider?.path_style ?? false);
-    const [preset, setPreset] = useState<StoragePreset>('custom');
-    const [region, setRegion] = useState(provider?.region ?? '');
+    const [pathStyle, setPathStyle] = useState(
+        provider?.path_style ?? storagePresets[initialPreset].pathStyle,
+    );
+    const [preset, setPreset] = useState<StoragePreset>(initialPreset);
+    const [region, setRegion] = useState(
+        provider?.region ?? storagePresets[initialPreset].region,
+    );
     const inUse = (provider?.databases ?? []).length > 0;
 
     const selectPreset = (value: string) => {
@@ -55,30 +63,35 @@ export default function StorageProviderFields({
                 title="Bucket"
                 description="Any S3-compatible storage: AWS S3, Cloudflare R2, DigitalOcean Spaces, Backblaze B2, Wasabi, MinIO."
             >
-                <Field
-                    id="storage-preset"
-                    label="Storage service"
-                    hint="Choose setup guidance. Your endpoint, bucket and credentials stay manually configurable."
-                >
-                    <Select
-                        value={preset}
-                        onValueChange={selectPreset}
-                        disabled={inUse}
+                {showPresetSelector && (
+                    <Field
+                        id="storage-preset"
+                        label="Storage service"
+                        hint="Choose setup guidance. Your endpoint, bucket and credentials stay manually configurable."
                     >
-                        <SelectTrigger id="storage-preset" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(storagePresets).map(
-                                ([value, item]) => (
-                                    <SelectItem key={value} value={value}>
-                                        {item.label}
-                                    </SelectItem>
-                                ),
-                            )}
-                        </SelectContent>
-                    </Select>
-                </Field>
+                        <Select
+                            value={preset}
+                            onValueChange={selectPreset}
+                            disabled={inUse}
+                        >
+                            <SelectTrigger
+                                id="storage-preset"
+                                className="w-full"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(storagePresets).map(
+                                    ([value, item]) => (
+                                        <SelectItem key={value} value={value}>
+                                            {item.label}
+                                        </SelectItem>
+                                    ),
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
                 <p className="text-sm text-muted-foreground" role="status">
                     {storagePresets[preset].hint}
                 </p>

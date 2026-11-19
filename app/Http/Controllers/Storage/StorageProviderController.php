@@ -11,7 +11,10 @@ use App\Actions\Storage\UpdateStorageProvider;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Storage\StoreStorageProviderRequest;
 use App\Http\Requests\Storage\UpdateStorageProviderRequest;
+use App\Http\Resources\FileBackupDestinationResource;
 use App\Http\Resources\StorageProviderResource;
+use App\Models\Database;
+use App\Models\FileBackupDestination;
 use App\Models\StorageProvider;
 use App\Queries\Storage\StorageProviderQuery;
 use Illuminate\Http\RedirectResponse;
@@ -24,12 +27,16 @@ class StorageProviderController extends Controller
     {
         return Inertia::render('storage/index', [
             'providers' => StorageProviderResource::collection(StorageProviderQuery::withRecoveries()->get())->resolve(),
+            'destinations' => FileBackupDestinationResource::collection(FileBackupDestination::query()->with('database')->orderBy('name')->get())->resolve(),
+            'databases' => Database::query()->whereIn('engine', ['postgres', 'mysql', 'mariadb'])->orderBy('name')->get(['id', 'name', 'engine'])->toArray(),
         ]);
     }
 
     public function create(): Response
     {
-        return Inertia::render('storage/create');
+        return Inertia::render('storage/create', [
+            'databases' => Database::query()->whereIn('engine', ['postgres', 'mysql', 'mariadb'])->orderBy('name')->get(['id', 'name', 'engine'])->toArray(),
+        ]);
     }
 
     public function store(StoreStorageProviderRequest $request, AddStorageProvider $add): RedirectResponse

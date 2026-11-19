@@ -29,4 +29,28 @@ Use the existing restore flow to create a separate database and verify its conte
 
 ## FTP, FTPS and SFTP
 
-Direct file-transfer destinations are not implemented by this change. They cannot be supplied as S3 endpoints. pgBackRest, MongoDB PBM and other engine-native archive tools have storage requirements beyond a generic upload operation. Before adding file-transfer options, agree on supported secondary-copy or export semantics and test real restore paths for every supported engine. The upstream issue proposal tracks this separately.
+Open **Storage → Add storage** and select the FTP, FTPS or SFTP service card. Cloud buckets and file servers share this single setup entry point and appear together in the Storage list. Old file-backup links redirect to Storage. S3 is not required for file servers. PostgreSQL, MySQL and MariaDB are supported as logical SQL export sources. MongoDB, Redis, Valkey and community engines are not offered by this export mode.
+
+Enter the file server address, port, username, password and directory. For SFTP, also supply the verified server public host key (algorithm plus base64 key, without hostname or comment). FTPS means explicit TLS, normally on port 21, with certificate verification enabled. Plain FTP requires acknowledgement because it exposes connection credentials and traffic even though the exported backup file is encrypted.
+
+The database host must have `rclone` and GnuPG installed. SFTP requires a version offering `--sftp-host-key-algorithms`; older distribution packages can lack this capability and the connection probe will refuse them. Use an up-to-date official rclone release with verified checksums when necessary. New Debian/Ubuntu provisioning includes the distribution rclone package; existing hosts can install tools with `sudo apt-get install rclone gnupg` and check `rclone help flags` for the required SFTP option. On other distributions, install these tools from trusted repositories or their official distribution channels before configuring a destination. The connection is tested from the database host with a unique write/read/delete probe.
+
+Choose a daily UTC hour and a backup encryption passphrase of at least 16 characters. Keep that passphrase somewhere independent of Databasify. An app database backup alone is insufficient if the app encryption key is lost. When rotating an encryption passphrase, keep every older passphrase needed for retained files.
+
+Each run creates a native SQL export on the database host, compresses it and encrypts it with GnuPG AES-256. The encrypted file is uploaded as `.part`, downloaded as a stream for SHA-256 verification, then renamed to its final name. A checksum sidecar and `.complete.json` manifest are uploaded last. A run succeeds only after all steps finish. Interrupted runs can leave partial files; only runs with the completion manifest should be considered completed.
+
+Files are kept under `<directory>/databasify/<destination-id>/`. No remote retention or deletion is performed by this version. Removing the destination removes its local history and stored credentials; remote files remain. Locations with completed backups cannot be changed: create another destination instead. The UI lists the latest ten runs per destination. Keep an independent record of encryption passphrases and file locations.
+
+The Laravel scheduler must run each minute and the `databases` queue needs a worker. A backup may run for up to approximately one hour; use the production Redis/Horizon queue configuration with its existing 3900-second retry period. A Windows web preview does not supply the production Linux queue runtime. Failures generate the existing database email notifications when mail delivery is configured.
+
+These SQL exports are separate from S3 point-in-time recovery. They do not include continuous WAL/binlog coverage, app settings, SSH keys or the Databasify `APP_KEY`. MySQL/MariaDB consistency requires transactional tables and no concurrent schema changes; PostgreSQL exports are consistent per database, not a single cross-database transaction.
+
+### Restore a file export
+
+1. Copy the encrypted file and checksum sidecar to a trusted machine and run `sha256sum -c <file>.sha256`.
+2. Run `gpg --output backup.sql.gz --decrypt <file>.sql.gz.gpg`; enter the matching encryption passphrase interactively.
+3. Decompress with `gzip -d backup.sql.gz`.
+4. Restore into a **separate, isolated database server** using the matching database engine and supported version. PostgreSQL uses `psql`, MySQL uses `mysql` and MariaDB uses `mariadb`. Whole-server exports include database and role/account definitions: review conflicts before importing into any existing cluster.
+5. Check schemas, row counts and representative application queries before using the restored server.
+
+The application verifies uploads but does not automatically run this restore procedure. Do not import a whole-server SQL export into a live production server merely to test it.

@@ -7,6 +7,7 @@ import Heading from '@/components/heading';
 import StorageProviderFields from '@/components/storage/storage-provider-fields';
 import type { StorageProvider } from '@/types';
 import type { RouteFormDefinition } from '@/wayfinder';
+import type { StoragePreset } from '@/lib/storage-presets';
 
 function missingOf(
     name: string,
@@ -26,12 +27,16 @@ export default function StorageProviderForm({
     provider,
     action,
     icon,
+    initialPreset = 'custom',
+    embedded = false,
 }: {
     title: string;
     form: RouteFormDefinition<'post'>;
     provider?: StorageProvider;
     action: string;
     icon: LucideIcon;
+    initialPreset?: StoragePreset;
+    embedded?: boolean;
 }) {
     const creating = provider === undefined;
     const [name, setName] = useState(provider?.name ?? '');
@@ -39,18 +44,24 @@ export default function StorageProviderForm({
 
     return (
         <>
-            <Head title={title} />
+            {!embedded && <Head title={title} />}
             <Form
                 {...form}
-                className="mx-auto w-full max-w-5xl space-y-5 p-4 pb-10 md:p-6"
+                className={
+                    embedded
+                        ? 'space-y-5'
+                        : 'mx-auto w-full max-w-5xl space-y-5 p-4 pb-10 md:p-6'
+                }
             >
                 {({ processing, errors }) => (
                     <>
-                        <Heading title={title} />
+                        {!embedded && <Heading title={title} />}
                         <StorageProviderFields
                             provider={provider}
                             errors={errors}
                             onBucket={setBucket}
+                            initialPreset={initialPreset}
+                            showPresetSelector={!embedded}
                         />
                         <SubmitPanel
                             name={name}

@@ -1,8 +1,12 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePoll } from '@inertiajs/react';
 import { HardDrive, Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import StorageProviderController from '@/actions/App/Http/Controllers/Storage/StorageProviderController';
-import FileBackupController from '@/actions/App/Http/Controllers/Storage/FileBackupController';
+import { FileBackupCard } from '@/components/storage/file-backup';
+import type {
+    Destination,
+    DatabaseOption,
+} from '@/components/storage/file-backup';
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
@@ -42,7 +46,10 @@ function Provider({ provider }: { provider: StorageProvider }) {
                         <HardDrive className="size-4 text-muted-foreground" />
                     </div>
                     <div className="min-w-0">
-                        <div className="font-medium">{provider.name}</div>
+                        <div className="flex items-center gap-2 font-medium">
+                            {provider.name}
+                            <Badge variant="outline">S3</Badge>
+                        </div>
                         <div className="truncate font-mono text-xs text-muted-foreground">
                             {locationOf(provider)}
                         </div>
@@ -128,9 +135,14 @@ function Provider({ provider }: { provider: StorageProvider }) {
 
 export default function StorageIndex({
     providers,
+    destinations,
+    databases,
 }: {
     providers: StorageProvider[];
+    destinations: Destination[];
+    databases: DatabaseOption[];
 }) {
+    usePoll(10000, { only: ['destinations'] });
     return (
         <>
             <Head title="Storage" />
@@ -138,13 +150,8 @@ export default function StorageIndex({
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <Heading
                         title="Storage"
-                        description="S3-compatible buckets that databases archive to for point-in-time recovery."
+                        description="Manage cloud buckets and FTP, FTPS or SFTP destinations in one place."
                     />
-                    <Button asChild variant="outline">
-                        <Link href={FileBackupController.index()}>
-                            FTP / SFTP backups
-                        </Link>
-                    </Button>
                     <Button asChild>
                         <Link href={StorageProviderController.create()}>
                             <Plus /> Add storage
@@ -152,11 +159,11 @@ export default function StorageIndex({
                     </Button>
                 </div>
 
-                {providers.length === 0 ? (
+                {providers.length === 0 && destinations.length === 0 ? (
                     <EmptyState
                         icon={HardDrive}
                         title="No storage yet"
-                        description="Add a bucket once, then pick it on any database to turn on point-in-time recovery."
+                        description="Choose a cloud service or your own file server to add your first storage."
                     >
                         <Button asChild>
                             <Link href={StorageProviderController.create()}>
@@ -168,6 +175,13 @@ export default function StorageIndex({
                     <div className="space-y-3">
                         {providers.map((provider) => (
                             <Provider key={provider.id} provider={provider} />
+                        ))}
+                        {destinations.map((destination) => (
+                            <FileBackupCard
+                                key={destination.id}
+                                destination={destination}
+                                databases={databases}
+                            />
                         ))}
                     </div>
                 )}

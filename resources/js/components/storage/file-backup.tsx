@@ -1,10 +1,8 @@
-import { Form, Head, Link, usePoll } from '@inertiajs/react';
+import { Form } from '@inertiajs/react';
 import { useState } from 'react';
 import FileBackupController from '@/actions/App/Http/Controllers/Storage/FileBackupController';
-import StorageProviderController from '@/actions/App/Http/Controllers/Storage/StorageProviderController';
 import { FormSection } from '@/components/form/choice';
 import Field from '@/components/form/field';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import ConfirmDialog from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -19,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { runAction } from '@/lib/run-action';
 
-type Destination = {
+export type Destination = {
     id: string;
     name: string;
     database_id: string;
@@ -43,19 +41,166 @@ type Destination = {
         finished_at: string | null;
     }[];
 };
-type DatabaseOption = { id: string; name: string; engine: string };
+export type DatabaseOption = { id: string; name: string; engine: string };
 
-function DestinationForm({
+export function FileBackupCard({
+    destination,
+    databases,
+}: {
+    destination: Destination;
+    databases: DatabaseOption[];
+}) {
+    const [editing, setEditing] = useState(false);
+    const active = destination.runs.some(
+        (run) => run.status === 'queued' || run.status === 'running',
+    );
+    return (
+        <section className="space-y-4 rounded-xl border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <h2 className="font-medium">{destination.name}</h2>
+                        <span className="rounded-md border px-2 py-0.5 text-xs font-medium">
+                            {destination.protocol.toUpperCase()}
+                        </span>
+                    </div>
+                    <p className="font-mono text-xs break-all text-muted-foreground">
+                        {destination.host}:{destination.port}
+                        {destination.path}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        {destination.database_name} |{' '}
+                        {destination.enabled
+                            ? `Daily at ${String(destination.backup_hour).padStart(2, '0')}:00 UTC`
+                            : 'Schedule paused'}{' '}
+                        |{' '}
+                        {destination.verified_at
+                            ? 'Connection tested'
+                            : 'Not tested'}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={active}
+                        onClick={() =>
+                            runAction(
+                                FileBackupController.backup({
+                                    destination: destination.id,
+                                }),
+                                { success: 'Backup queued' },
+                            )
+                        }
+                    >
+                        {active ? 'Backup in progress' : 'Back up now'}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={active}
+                        onClick={() => setEditing(!editing)}
+                    >
+                        Edit
+                    </Button>
+                    <ConfirmDialog
+                        trigger={
+                            <Button size="sm" variant="ghost" disabled={active}>
+                                Remove
+                            </Button>
+                        }
+                        title={`Remove ${destination.name}?`}
+                        description="Local history and saved credentials are removed. Files already on your server remain."
+                        confirmLabel="Remove storage"
+                        destructive
+                        onConfirm={() =>
+                            runAction(
+                                FileBackupController.destroy({
+                                    destination: destination.id,
+                                }),
+                                { success: 'Storage removed' },
+                            )
+                        }
+                    />
+                </div>
+            </div>
+            {editing && (
+                <DestinationForm
+                    destination={destination}
+                    databases={databases}
+                    onClose={() => setEditing(false)}
+                />
+            )}
+            <details className="border-t pt-3 text-sm">
+                <summary className="cursor-pointer text-muted-foreground">
+                    Backup history ({destination.runs.length} recent runs)
+                </summary>
+                {destination.runs.length === 0 ? (
+                    <p className="pt-3 text-muted-foreground">
+                        No backups yet. Use Back up now to create the first
+                        export.
+                    </p>
+                ) : (
+                    <div className="space-y-3 pt-3">
+                        {destination.runs.map((run) => (
+                            <div
+                                key={run.id}
+                                className="space-y-1 rounded-lg bg-muted/40 p-3"
+                            >
+                                <div className="flex flex-wrap justify-between gap-2">
+                                    <strong className="capitalize">
+                                        {run.status}
+                                    </strong>
+                                    <time>
+                                        {run.finished_at ??
+                                            run.started_at ??
+                                            'Waiting for a worker'}
+                                    </time>
+                                </div>
+                                {run.remote_file && (
+                                    <p className="font-mono text-xs break-all">
+                                        {run.remote_file}
+                                    </p>
+                                )}
+                                {run.problem && (
+                                    <p className="text-destructive">
+                                        {run.problem}
+                                    </p>
+                                )}
+                                {run.status === 'succeeded' && (
+                                    <p className="text-muted-foreground">
+                                        Encrypted upload verified. Restore not
+                                        yet tested.
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </details>
+        </section>
+    );
+}
+
+export function DestinationForm({
     databases,
     destination,
     onClose,
+    initialProtocol = 'sftp',
+    fixedProtocol = false,
 }: {
     databases: DatabaseOption[];
     destination?: Destination;
     onClose?: () => void;
+    initialProtocol?: string;
+    fixedProtocol?: boolean;
 }) {
-    const [protocol, setProtocol] = useState(destination?.protocol ?? 'sftp');
-    const [port, setPort] = useState(String(destination?.port ?? 22));
+    const [protocol, setProtocol] = useState(
+        destination?.protocol ?? initialProtocol,
+    );
+    const [port, setPort] = useState(
+        String(destination?.port ?? (initialProtocol === 'sftp' ? 22 : 21)),
+    );
     const form = destination
         ? FileBackupController.update.form({ destination: destination.id })
         : FileBackupController.store.form();
@@ -107,7 +252,7 @@ function DestinationForm({
                                                 value={database.id}
                                                 key={database.id}
                                             >
-                                                {database.name} Â·{' '}
+                                                {database.name} |{' '}
                                                 {database.engine}
                                             </SelectItem>
                                         ))}
@@ -119,32 +264,49 @@ function DestinationForm({
                                 label="Protocol"
                                 error={errors.protocol}
                             >
-                                <Select
-                                    name="protocol"
-                                    value={protocol}
-                                    onValueChange={(value) => {
-                                        setProtocol(value);
-                                        setPort(value === 'sftp' ? '22' : '21');
-                                    }}
-                                >
-                                    <SelectTrigger
-                                        id="protocol"
-                                        className="w-full"
+                                {fixedProtocol ? (
+                                    <>
+                                        <input
+                                            type="hidden"
+                                            name="protocol"
+                                            value={protocol}
+                                        />
+                                        <Input
+                                            id="protocol"
+                                            value={protocol.toUpperCase()}
+                                            readOnly
+                                        />
+                                    </>
+                                ) : (
+                                    <Select
+                                        name="protocol"
+                                        value={protocol}
+                                        onValueChange={(value) => {
+                                            setProtocol(value);
+                                            setPort(
+                                                value === 'sftp' ? '22' : '21',
+                                            );
+                                        }}
                                     >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="sftp">
-                                            SFTP (SSH)
-                                        </SelectItem>
-                                        <SelectItem value="ftps">
-                                            FTPS (explicit TLS)
-                                        </SelectItem>
-                                        <SelectItem value="ftp">
-                                            FTP (unencrypted transport)
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                        <SelectTrigger
+                                            id="protocol"
+                                            className="w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="sftp">
+                                                SFTP (SSH)
+                                            </SelectItem>
+                                            <SelectItem value="ftps">
+                                                FTPS (explicit TLS)
+                                            </SelectItem>
+                                            <SelectItem value="ftp">
+                                                FTP (unencrypted transport)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </Field>
                             <Field
                                 id="host"
@@ -259,7 +421,7 @@ function DestinationForm({
                                 id="host_key"
                                 label="Verified SSH server public key"
                                 error={errors.host_key}
-                                hint="Paste the verified key type and key, for example ssh-ed25519 AAAAâ€¦; omit the hostname and comment."
+                                hint="Paste the verified key type and key, for example ssh-ed25519 AAAA...; omit the hostname and comment."
                             >
                                 <Input
                                     id="host_key"
@@ -311,7 +473,7 @@ function DestinationForm({
                                 disabled={processing || databases.length === 0}
                             >
                                 {processing
-                                    ? 'Testing connectionâ€¦'
+                                    ? 'Testing connection...'
                                     : 'Test connection and save'}
                             </Button>
                             {onClose && (
@@ -330,190 +492,3 @@ function DestinationForm({
         </Form>
     );
 }
-
-export default function FileBackups({
-    destinations,
-    databases,
-}: {
-    destinations: Destination[];
-    databases: DatabaseOption[];
-}) {
-    const [editing, setEditing] = useState<string | null>(null);
-    usePoll(10000, { only: ['destinations'] });
-
-    return (
-        <>
-            <Head title="File backups" />
-            <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <Heading
-                        title="File backups"
-                        description="Direct FTP, FTPS and SFTP backups, with encryption and upload verification."
-                    />
-                    <Button variant="outline" asChild>
-                        <Link href={StorageProviderController.index()}>
-                            S3 storage
-                        </Link>
-                    </Button>
-                </div>
-                {databases.length === 0 && (
-                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-                        Create a PostgreSQL, MySQL or MariaDB database first,
-                        then add its backup destination here.
-                    </p>
-                )}
-                {destinations.map((destination) => {
-                    const active = destination.runs.some(
-                        (run) =>
-                            run.status === 'queued' || run.status === 'running',
-                    );
-                    return (
-                        <section
-                            key={destination.id}
-                            className="space-y-4 rounded-xl border p-5"
-                        >
-                            <div className="flex flex-wrap justify-between gap-3">
-                                <div>
-                                    <h2 className="font-semibold">
-                                        {destination.name}
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        {destination.database_name} Â·{' '}
-                                        {destination.protocol.toUpperCase()} Â·{' '}
-                                        {destination.host}:{destination.port}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {destination.enabled
-                                            ? `Daily at ${String(destination.backup_hour).padStart(2, '0')}:00 UTC`
-                                            : 'Schedule paused'}{' '}
-                                        Â·{' '}
-                                        {destination.verified_at
-                                            ? 'Connection tested'
-                                            : 'Connection not tested'}
-                                    </p>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        size="sm"
-                                        disabled={active}
-                                        onClick={() =>
-                                            runAction(
-                                                FileBackupController.backup(
-                                                    destination.id,
-                                                ),
-                                                { success: 'Backup queued' },
-                                            )
-                                        }
-                                    >
-                                        {active
-                                            ? 'Backup in progress'
-                                            : 'Back up now'}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={active}
-                                        onClick={() =>
-                                            setEditing(
-                                                editing === destination.id
-                                                    ? null
-                                                    : destination.id,
-                                            )
-                                        }
-                                    >
-                                        Edit
-                                    </Button>
-                                    <ConfirmDialog
-                                        trigger={
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                disabled={active}
-                                            >
-                                                Remove
-                                            </Button>
-                                        }
-                                        title={`Remove ${destination.name}?`}
-                                        description="The destination and local run history will be removed. Remote backups stay on your file server."
-                                        confirmLabel="Remove destination"
-                                        destructive
-                                        onConfirm={() =>
-                                            runAction(
-                                                FileBackupController.destroy(
-                                                    destination.id,
-                                                ),
-                                                {
-                                                    success:
-                                                        'Destination removed',
-                                                },
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            {editing === destination.id && (
-                                <DestinationForm
-                                    key={destination.id}
-                                    destination={destination}
-                                    databases={databases}
-                                    onClose={() => setEditing(null)}
-                                />
-                            )}
-                            {destination.runs.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No backups yet. Run the first backup to
-                                    verify the export and upload.
-                                </p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {destination.runs.map((run) => (
-                                        <div
-                                            key={run.id}
-                                            className="space-y-1 border-t pt-3 text-sm"
-                                        >
-                                            <div className="flex flex-wrap justify-between gap-2">
-                                                <strong className="capitalize">
-                                                    {run.status}
-                                                </strong>
-                                                <time>
-                                                    {run.finished_at ??
-                                                        run.started_at ??
-                                                        'Waiting for a worker'}
-                                                </time>
-                                            </div>
-                                            {run.remote_file && (
-                                                <p className="font-mono text-xs break-all">
-                                                    {run.remote_file}
-                                                </p>
-                                            )}
-                                            {run.problem && (
-                                                <p className="text-destructive">
-                                                    {run.problem}
-                                                </p>
-                                            )}
-                                            {run.status === 'succeeded' && (
-                                                <p className="text-muted-foreground">
-                                                    Encrypted file uploaded;
-                                                    read-back checksum verified.
-                                                    Restore not yet tested.
-                                                </p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
-                    );
-                })}
-                <DestinationForm databases={databases} />
-            </div>
-        </>
-    );
-}
-
-FileBackups.layout = () => ({
-    breadcrumbs: [
-        { title: 'Storage', href: StorageProviderController.index() },
-        { title: 'File backups', href: FileBackupController.index() },
-    ],
-});

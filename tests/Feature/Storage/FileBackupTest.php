@@ -79,7 +79,19 @@ test('destination pages never include saved passwords or encryption passphrases'
     $database = Database::factory()->create();
     createFileBackup($database);
 
-    $this->actingAs(User::factory()->create())->get(route('file-backups.index', $database->project_id))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('storage/file-backups')->has('destinations', 1)->missing('destinations.0.credentials')->missing('destinations.0.password')->missing('destinations.0.encryption_password'));
+    $this->actingAs(User::factory()->create())->get(route('storage-providers.index', $database->project_id))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('storage/index')->has('destinations', 1)->missing('destinations.0.credentials')->missing('destinations.0.password')->missing('destinations.0.encryption_password'));
+});
+
+test('old file backup links redirect to the unified storage page', function () {
+    $database = Database::factory()->create();
+    $this->actingAs(User::factory()->create())->get(route('file-backups.index', $database->project_id))->assertRedirect(route('storage-providers.index', $database->project_id));
+});
+
+test('the unified add storage page includes eligible databases and file destinations save back to storage', function () {
+    $database = Database::factory()->create();
+    DatabaseNode::factory()->for($database)->create();
+    $this->actingAs(User::factory()->create())->get(route('storage-providers.create', $database->project_id))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('storage/create')->has('databases', 1)->where('databases.0.id', $database->id));
+    $this->post(route('file-backups.store', $database->project_id), fileBackupInput($database))->assertSessionHasNoErrors()->assertRedirect(route('storage-providers.index', $database->project_id));
 });
 
 test('queueing twice does not create overlapping backups', function () {
@@ -153,4 +165,101 @@ test('busy sources fail before an export starts', function () {
 
     expect(fn () => app(RunFileBackup::class)->handle($run))->toThrow(ValidationException::class);
     expect($this->ssh()->ranNothing())->toBeTrue();
+});
+
+test('editing a destination preserves both secrets when password fields are blank', function () {
+    $database = Database::factory()->create();
+    DatabaseNode::factory()->for($database)->create();
+    $destination = createFileBackup($database);
+
+    $this->actingAs(User::factory()->create())->put(route('file-backups.update', [$database->project_id, $destination]), [...fileBackupInput($database), 'name' => 'Renamed backup', 'password' => '', 'encryption_password' => '', 'enabled' => false])->assertSessionHasNoErrors();
+
+    expect($destination->refresh()->name)->toBe('Renamed backup')
+        ->and($destination->enabled)->toBeFalse()
+        ->and($destination->credentials)->toBe(['password' => 'file-server-secret', 'encryption_password' => 'offline-encryption-secret']);
+});
+
+test('editing while a backup is queued cannot replace its credentials or location', function () {
+    $database = Database::factory()->create();
+    DatabaseNode::factory()->for($database)->create();
+    $destination = createFileBackup($database);
+    $destination->runs()->create(['status' => 'queued']);
+
+    $this->actingAs(User::factory()->create())->put(route('file-backups.update', [$database->project_id, $destination]), [...fileBackupInput($database), 'password' => 'replacement-password', 'path' => '/other'])->assertSessionHasErrors('storage');
+
+    expect($destination->refresh()->path)->toBe('/backups')->and($destination->credentials['password'])->toBe('file-server-secret');
+});
+
+test('a completed destination cannot be redirected to a different storage location', function () {
+    $database = Database::factory()->create();
+    DatabaseNode::factory()->for($database)->create();
+    $destination = createFileBackup($database);
+    $destination->runs()->create(['status' => 'succeeded']);
+
+    $this->actingAs(User::factory()->create())->put(route('file-backups.update', [$database->project_id, $destination]), [...fileBackupInput($database), 'host' => 'another.example.com'])->assertSessionHasErrors('storage');
+
+    expect($destination->refresh()->host)->toBe('backup.example.com');
+});
+
+test('destination routes reject resources from another project', function () {
+    $database = Database::factory()->create();
+    $foreign = Database::factory()->for(Project::factory())->create();
+    $destination = createFileBackup($foreign);
+
+    $this->actingAs(User::factory()->create())->post(route('file-backups.backup', [$database->project_id, $destination]))->assertNotFound();
+    $this->delete(route('file-backups.destroy', [$database->project_id, $destination]))->assertNotFound();
+    $this->assertModelExists($destination);
+});
+
+test('a failed backup can be manually retried with a new run', function () {
+    Queue::fake([RunFileBackupJob::class]);
+    $database = Database::factory()->create();
+    $destination = createFileBackup($database);
+    $failed = $destination->runs()->create(['status' => 'failed']);
+
+    $run = app(QueueFileBackup::class)->handle($destination);
+
+    expect($run)->not->toBeNull()->and($run->id)->not->toBe($failed->id)
+        ->and($failed->refresh()->status)->toBe('failed');
+    Queue::assertPushed(RunFileBackupJob::class, 1);
+});
+
+test('a completed run is not exported twice if its job is delivered again', function () {
+    $database = Database::factory()->create();
+    $destination = createFileBackup($database);
+    $run = $destination->runs()->create(['status' => 'succeeded']);
+
+    app(RunFileBackup::class)->handle($run);
+
+    expect($this->ssh()->ranNothing())->toBeTrue()->and($run->refresh()->status)->toBe('succeeded');
+});
+
+test('future schedules remain untouched and the next backup hour uses UTC', function () {
+    $this->travelTo(now()->utc()->setTime(4, 0));
+    Queue::fake([RunFileBackupJob::class]);
+    $database = Database::factory()->create();
+    $destination = createFileBackup($database);
+    $destination->update(['next_backup_at' => now()->addDay()]);
+
+    $this->artisan('databases:file-backups')->assertSuccessful();
+
+    Queue::assertNotPushed(RunFileBackupJob::class);
+    expect($destination->nextBackup()->format('Y-m-d H:i'))->toBe(now()->utc()->addDay()->setTime(3, 0)->format('Y-m-d H:i'));
+});
+
+test('short encryption passphrases and shell-shaped hosts are rejected before ssh', function () {
+    $database = Database::factory()->create();
+
+    $this->actingAs(User::factory()->create())->post(route('file-backups.store', $database->project_id), [...fileBackupInput($database), 'encryption_password' => 'short', 'host' => 'host; touch /tmp/pwned'])->assertSessionHasErrors(['encryption_password', 'host']);
+    expect($this->ssh()->ranNothing())->toBeTrue();
+});
+
+test('moving a database moves its backup configuration to the same project', function () {
+    $database = Database::factory()->create();
+    $destination = createFileBackup($database);
+    $target = Project::factory()->create();
+
+    $database->update(['project_id' => $target->id]);
+
+    expect($destination->refresh()->project_id)->toBe($target->id);
 });
