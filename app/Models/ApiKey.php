@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Database\Factories\ApiKeyFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laravel\Passport\Token;
 
@@ -21,8 +24,12 @@ use Laravel\Passport\Token;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
+#[UseFactory(ApiKeyFactory::class)]
 class ApiKey extends Token
 {
+    /** @use HasFactory<ApiKeyFactory> */
+    use HasFactory;
+
     /**
      * @return BelongsToMany<Project, $this>
      */

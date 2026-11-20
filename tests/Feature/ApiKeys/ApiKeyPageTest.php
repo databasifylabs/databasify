@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Api\CreateApiKey;
-use App\DTOs\Api\NewApiKey;
-use App\Enums\Api\ApiKeyExpiry;
 use App\Models\ApiKey;
 use App\Models\Project;
 use App\Models\User;
@@ -33,7 +30,7 @@ test('the api keys page asks for the password first', function () {
 test('the page lists the owner keys with their access', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->create(['name' => 'Staging']);
-    app(CreateApiKey::class)->handle($owner, new NewApiKey('staging-ci', ApiKeyExpiry::Days90, ['databases:write', 'servers:read'], [$project->id]));
+    ApiKey::factory()->ownedBy($owner)->withScopes('databases:write', 'servers:read')->limitedTo($project)->create(['name' => 'staging-ci']);
 
     $this->actingAs($owner)
         ->withSession(['auth.password_confirmed_at' => time()])
@@ -91,19 +88,19 @@ test('a key needs at least one area', function () {
 
 test('a key can be revoked from the page', function () {
     $owner = User::factory()->create();
-    $created = app(CreateApiKey::class)->handle($owner, new NewApiKey('ci', ApiKeyExpiry::Days30, ['servers:read'], null));
+    $key = ApiKey::factory()->ownedBy($owner)->create();
 
     $this->actingAs($owner)
-        ->delete(route('api-keys.destroy', $created->key))
+        ->delete(route('api-keys.destroy', $key))
         ->assertRedirect(route('api-keys.index'));
 
-    expect($created->key->refresh()->revoked)->toBeTrue();
+    expect($key->refresh()->revoked)->toBeTrue();
 });
 
 test('another user key cannot be revoked', function () {
-    $created = app(CreateApiKey::class)->handle(User::factory()->create(), new NewApiKey('ci', ApiKeyExpiry::Days30, ['servers:read'], null));
+    $key = ApiKey::factory()->create();
 
     $this->actingAs(User::factory()->create())
-        ->delete(route('api-keys.destroy', $created->key))
+        ->delete(route('api-keys.destroy', $key))
         ->assertNotFound();
 });
