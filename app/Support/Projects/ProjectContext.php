@@ -10,6 +10,9 @@ final class ProjectContext
 {
     private ?Project $project = null;
 
+    /** @var list<string>|null */
+    private ?array $allowedIds = null;
+
     public static function current(): self
     {
         return resolve(self::class);
@@ -20,9 +23,18 @@ final class ProjectContext
         $this->project = $project;
     }
 
+    /**
+     * @param  list<string>|null  $projectIds
+     */
+    public function limitTo(?array $projectIds): void
+    {
+        $this->allowedIds = $projectIds;
+    }
+
     public function terminate(): void
     {
         $this->project = null;
+        $this->allowedIds = null;
     }
 
     public function project(): ?Project
@@ -33,5 +45,23 @@ final class ProjectContext
     public function id(): ?string
     {
         return $this->project?->id;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    public function allowedIds(): ?array
+    {
+        return $this->allowedIds;
+    }
+
+    public function isLimited(): bool
+    {
+        return $this->allowedIds !== null;
+    }
+
+    public function allows(string $projectId): bool
+    {
+        return $this->allowedIds === null || in_array($projectId, $this->allowedIds, true);
     }
 }

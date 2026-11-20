@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -77,6 +78,14 @@ class Project extends Model
     public function storageProviders(): HasMany
     {
         return $this->hasMany(StorageProvider::class)->withoutProject();
+    }
+
+    /**
+     * @return BelongsToMany<ApiKey, $this>
+     */
+    public function apiKeys(): BelongsToMany
+    {
+        return $this->belongsToMany(ApiKey::class, 'api_key_project', 'project_id', 'token_id');
     }
 
     /**

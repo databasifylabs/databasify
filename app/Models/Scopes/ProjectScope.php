@@ -19,12 +19,19 @@ final class ProjectScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $projectId = ProjectContext::current()->id();
+        $context = ProjectContext::current();
+        $projectId = $context->id();
 
-        if ($projectId === null) {
+        if ($projectId !== null) {
+            $builder->where($model->qualifyColumn('project_id'), $projectId);
+
             return;
         }
 
-        $builder->where($model->qualifyColumn('project_id'), $projectId);
+        $allowedIds = $context->allowedIds();
+
+        if ($allowedIds !== null) {
+            $builder->whereIn($model->qualifyColumn('project_id'), $allowedIds);
+        }
     }
 }

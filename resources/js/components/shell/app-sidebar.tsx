@@ -6,6 +6,7 @@ import {
     FolderKanban,
     Globe,
     HardDrive,
+    KeyRound,
     LayoutGrid,
     ListEnd,
     Puzzle,
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/sidebar';
 import { documentationUrl } from '@/lib/repository';
 import { dashboard } from '@/routes';
+import { index as apiKeysIndex } from '@/routes/api-keys';
 import { index as databasesIndex } from '@/routes/databases';
 import { index as dnsIndex } from '@/routes/dns';
 import { index as pluginsIndex } from '@/routes/plugins';
@@ -74,6 +76,7 @@ function globalNavItems(
     return [
         { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
         { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
+        { title: 'API keys', href: apiKeysIndex(), icon: KeyRound },
         ...updates,
         ...(horizonUrl
             ? [

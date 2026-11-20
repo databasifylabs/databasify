@@ -1,5 +1,7 @@
+import type { CreatedApiKeyFlash } from '@/types/api-keys';
 import type { Auth } from '@/types/auth';
 import type { Project } from '@/types/projects';
+import type { FlashToast } from '@/types/ui';
 
 declare module 'react' {
     interface InputHTMLAttributes<T> {
@@ -20,6 +22,10 @@ declare module '@inertiajs/core' {
             updatesEnabled: boolean;
             updateAvailable: boolean;
             [key: string]: unknown;
+        };
+        flashDataType: {
+            toast?: FlashToast;
+            apiKey?: CreatedApiKeyFlash;
         };
     }
 }
