@@ -1,6 +1,6 @@
 {
-  "version": "0.2.5",
-  "published_at": "2026-11-19T18:52:45Z",
-  "url": "https://github.com/databasifylabs/databasify/releases/tag/0.2.5",
-  "notes": "> [!IMPORTANT]\r\n> PHP 8.5.13 fixed several serious security holes, including remote code execution and PHP-FPM request smuggling.\r\n\r\n## What changed in the image\r\n\r\nDatabasify now runs on the official PHP image (Debian 13) instead of Ubuntu 26.04 packages. PHP, nginx and Redis are pinned to exact upstream versions, so new security releases reach you as soon as we publish them.\r\n\r\n| | 0.2.3 | This release |\r\n|---|---|---|\r\n| PHP | 8.5.4 (Ubuntu backports) | 8.5.13 |\r\n| nginx | 1.28.3 (Ubuntu backports) | 1.31.9 (nginx.org mainline) |\r\n| Redis | 8.0.5 | 8.8.4 |\r\n\r\nYour data, settings and queued jobs carry over. Redis 8.8 reads the data written by 8.0.\r\n\r\n## Also updated\r\n\r\nLaravel 13.43, Horizon 5.52, Reverb 1.14, Fortify 1.43, Passkeys 0.3 and vite-plus 1.7."
+    "version": "0.2.5",
+    "published_at": "2026-11-19T18:52:45Z",
+    "url": "https://github.com/databasifylabs/databasify/releases/tag/0.2.5",
+    "notes": "> [!IMPORTANT]\r\n> PHP 8.5.13 fixed several serious security holes, including remote code execution and PHP-FPM request smuggling.\r\n\r\n## What changed in the image\r\n\r\nDatabasify now runs on the official PHP image (Debian 13) instead of Ubuntu 26.04 packages. PHP, nginx and Redis are pinned to exact upstream versions, so new security releases reach you as soon as we publish them.\r\n\r\n| | 0.2.3 | This release |\r\n|---|---|---|\r\n| PHP | 8.5.4 (Ubuntu backports) | 8.5.13 |\r\n| nginx | 1.28.3 (Ubuntu backports) | 1.31.9 (nginx.org mainline) |\r\n| Redis | 8.0.5 | 8.8.4 |\r\n\r\nYour data, settings and queued jobs carry over. Redis 8.8 reads the data written by 8.0.\r\n\r\n## Also updated\r\n\r\nLaravel 13.43, Horizon 5.52, Reverb 1.14, Fortify 1.43, Passkeys 0.3 and vite-plus 1.7."
 }
