@@ -12,7 +12,8 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
 - **Code shape.** Business logic lives in single-purpose `final readonly` Action classes with one `handle()` method; controllers validate, call an action and respond. Arrays crossing boundaries become `final readonly` DTOs. Read models are Query objects. Primary keys are UUIDs. PHPStan runs at max level with full type coverage. Model defaults come from `nunomaduro/essentials` (`config/essentials.php`): strict, unguarded models with automatic eager loading and immutable dates, so models only ever receive validated or DTO data.
 - **One owner.** Auth uses Fortify. There is no public registration: the single owner and a `Default` project come from the first visit to `/setup`, or from `php artisan setup:owner` when the installer is given `DATABASIFY_OWNER_*` settings, in which case `/setup` never opens. Owner creation runs under one cache lock, so two setups can never both create an owner. Projects organise resources but are not an authorization boundary ([0012](0012-projects-as-a-global-scope.md)).
 - **Plugins** are Laravel service providers (`AbstractPlugin`) loaded from `storage/plugins` without Composer. They register database, DNS and server providers through the same builders the built-in providers use; their engines are community engines ([0004](0004-engine-drivers-and-blade-scripts.md)).
-- **Live UI by polling.** Pages refresh with Inertia `usePoll` partial reloads. Reverb carries only byte streams (server log and terminal output); there are no model-change broadcasts. All endpoints are Inertia routes reached through Wayfinder; there is no public API.
+- **Live UI by polling.** Pages refresh with Inertia `usePoll` partial reloads. Reverb carries only byte streams (server log and terminal output); there are no model-change broadcasts. UI endpoints are Inertia routes reached through Wayfinder.
+- **Public API.** A JSON API lives under `/api/v1` with its own `Api\V1` controllers and resources, so the UI can change without breaking scripts; the controllers reuse the UI's actions, queries and form requests. It authenticates with Laravel Passport personal access tokens, shown to the owner as API keys at `/api-keys` (password confirmation, shown once on creation). Each key gets a read or write scope per area (`ApiArea`: projects, server, DNS and storage providers, servers, databases, and read-only system), where write includes read, an expiry, and either all projects or a selected set ([0012](0012-projects-as-a-global-scope.md)). Requests are limited to 120 a minute per key. The interactive terminal, plugin changes, self-update and account security stay UI only. Passport's OAuth routes stay off until an MCP server reuses the same Passport install.
 - **Tests fake the boundaries.** Outside systems sit behind contracts bound with `#[Bind]` (`ServerConnection`, `ImageRegistry`, `CertificateAuthority`, `PortProbe`) and feature tests replace them with hand-written fakes from `tests/Support`; provider and DNS APIs use `Http::fake`. Scripts are tested as rendered text. Real servers are tested by an end-to-end run outside CI.
 - **Delete rules live in the app, not the schema.** Migrations declare relationship columns without `constrained()`. A delete action refuses while dependants exist (`ensureDeletable()`, counting every project). Owned children are deleted or nulled out by one observer per parent model (`#[ObservedBy]`, children one by one through `DeleteChildren`), inside the action's transaction.
 
@@ -20,7 +21,9 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
 
 - The single-owner model keeps authorization simple; adding users means revisiting the shared channels and the terminal.
 - Plugins run arbitrary PHP inside the app with no signature check.
-- New live status in the UI is a new polled prop, not a broadcast event; automation has no stable API yet.
+- New live status in the UI is a new polled prop, not a broadcast event.
+- A new UI feature that should be scriptable needs its own `Api\V1` route, resource and scope area; database passwords appear only in write responses.
+- Passport needs phpseclib 4, which only accepts whole-second SSH timeouts, so the terminal polls once a second.
 - A new outside dependency needs a contract and a fake. A script can render correctly and still be wrong on a server; only the end-to-end run catches that.
 - A plain `->delete()` or a query-builder delete skips the refusals or the observers, so deleting code goes through the actions. A new relationship needs its rule added to the parent's observer.
 
@@ -38,6 +41,10 @@ Databasify is a self-hosted, open-source Laravel app maintained by a small team 
 - `app/Queries/`
 - `config/essentials.php`
 - `app/Actions/Setup/CreateOwnerAccount.php`
+- `routes/api.php`
+- `app/Enums/Api/ApiArea.php`
+- `app/Models/ApiKey.php`
+- `app/Actions/Api/CreateApiKey.php`
 - `app/Console/Commands/Setup/CreateOwnerCommand.php`
 - `app/Plugins/AbstractPlugin.php`
 - `app/Services/Plugins/PluginLoader.php`
