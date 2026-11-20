@@ -7,7 +7,7 @@ namespace App\Services\Ssh;
 use App\Models\Server;
 use Closure;
 use Illuminate\Container\Attributes\Scoped;
-use phpseclib3\Net\SFTP;
+use phpseclib4\Net\SFTP;
 
 #[Scoped]
 final class SshSessions
