@@ -11,11 +11,13 @@ use App\Models\Server;
 use App\Support\Ssh\Fingerprint;
 use Closure;
 use Illuminate\Support\Str;
-use phpseclib3\Crypt\PublicKeyLoader;
-use phpseclib3\Exception\ConnectionClosedException;
-use phpseclib3\Exception\TimeoutException;
-use phpseclib3\Exception\UnableToConnectException;
-use phpseclib3\Net\SFTP;
+use phpseclib4\Crypt\PublicKeyLoader;
+use phpseclib4\Exception\ConnectionClosedException;
+use phpseclib4\Exception\FileSystemException;
+use phpseclib4\Exception\ServiceUnavailableException;
+use phpseclib4\Exception\TimeoutException;
+use phpseclib4\Net\SFTP;
+use phpseclib4\Net\SSH2;
 use Throwable;
 
 final readonly class PhpseclibConnection implements ServerConnection
@@ -32,7 +34,7 @@ final readonly class PhpseclibConnection implements ServerConnection
 
     private const int RETRY_DELAY_MILLISECONDS = 3000;
 
-    private const float SHELL_POLL_SECONDS = 0.05;
+    private const int SHELL_POLL_SECONDS = 1;
 
     private const string TERMINAL = 'xterm-256color';
 
@@ -46,17 +48,17 @@ final readonly class PhpseclibConnection implements ServerConnection
         [$ssh, $path] = $this->retrying(fn (): array => $this->connectAndUpload($server, $script));
         $ssh->setTimeout($timeout);
         $ssh->setKeepAlive(self::KEEP_ALIVE_SECONDS);
-        $ssh->exec($this->commandFor($server, $path), function (string $chunk) use ($onOutput): void {
-            $onOutput($chunk);
-        });
-        $timedOut = $ssh->isTimeout();
-        $exitCode = $ssh->getExitStatus();
-
-        if ($timedOut) {
+        try {
+            $ssh->exec($this->commandFor($server, $path), function (string $chunk) use ($onOutput): void {
+                $onOutput($chunk);
+            });
+        } catch (TimeoutException) {
             $this->sessions->forget($server);
 
             throw SshConnectionFailed::onServer($server, "No result from {$server->address()} within {$timeout} seconds, the connection was lost or the script hung.");
         }
+
+        $exitCode = $ssh->getExitStatus();
 
         if (! is_int($exitCode)) {
             $this->sessions->forget($server);
@@ -85,14 +87,25 @@ final readonly class PhpseclibConnection implements ServerConnection
                 $ssh->write($input);
             }
 
-            $output = $ssh->read();
+            $output = $this->pollShellOf($ssh);
 
-            if (is_string($output) && $output !== '') {
+            if ($output !== '') {
                 $onOutput($output);
             }
         }
 
         $ssh->disconnect();
+    }
+
+    private function pollShellOf(SFTP $ssh): string
+    {
+        try {
+            $output = $ssh->read('', SSH2::READ_NEXT);
+        } catch (TimeoutException) {
+            return '';
+        }
+
+        return is_string($output) ? $output : '';
     }
 
     /**
@@ -119,11 +132,15 @@ final readonly class PhpseclibConnection implements ServerConnection
         try {
             $ssh = $this->sessions->sessionFor($server, fn (): SFTP => $this->connectTo($server));
 
-            return [$ssh, $this->upload($ssh, $server, $script)];
-        } catch (ConnectionClosedException|TimeoutException|UnableToConnectException $exception) {
+            return [$ssh, $this->upload($ssh, $script)];
+        } catch (ConnectionClosedException|TimeoutException|ServiceUnavailableException $exception) {
             $this->sessions->forget($server);
 
             throw SshConnectionFailed::onServer($server, "Could not connect to {$server->address()}:{$server->ssh_port}: {$exception->getMessage()}");
+        } catch (FileSystemException $exception) {
+            $this->sessions->forget($server);
+
+            throw SshConnectionFailed::onServer($server, "Could not upload the remote script: {$exception->getMessage()}");
         } catch (Throwable $exception) {
             $this->sessions->forget($server);
 
@@ -131,26 +148,17 @@ final readonly class PhpseclibConnection implements ServerConnection
         }
     }
 
-    private function upload(SFTP $sftp, Server $server, string $script): string
+    private function upload(SFTP $sftp, string $script): string
     {
-        $home = $sftp->realpath('.');
+        $directory = $sftp->realpath('.').'/'.self::SCRIPT_DIRECTORY;
 
-        if (! is_string($home)) {
-            throw SshConnectionFailed::onServer($server, 'Could not find the home directory for remote scripts.');
+        if (! $sftp->is_dir($directory)) {
+            $sftp->mkdir($directory, 0700);
         }
 
-        $directory = "{$home}/".self::SCRIPT_DIRECTORY;
-
-        if (! $sftp->is_dir($directory) && ! $sftp->mkdir($directory, 0700)) {
-            throw SshConnectionFailed::onServer($server, "Could not create {$directory} for remote scripts.");
-        }
-
-        $sftp->chmod(0700, $directory);
+        $sftp->chmod($directory, 0700);
         $path = "{$directory}/".Str::random(32).'.sh';
-
-        if (! $sftp->put($path, $script)) {
-            throw SshConnectionFailed::onServer($server, "Could not upload the script to {$path}.");
-        }
+        $sftp->put($path, $script);
 
         return $path;
     }

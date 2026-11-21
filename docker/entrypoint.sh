@@ -20,6 +20,11 @@ own_storage() {
     chown -R www-data:www-data /app/storage /app/bootstrap/cache
 }
 
+ensure_passport_keys() {
+    [ -f /app/storage/oauth-private.key ] && return 0
+    (as_app php artisan passport:keys --no-interaction) > /dev/null
+}
+
 prepare_database() {
     if [ "${DB_CONNECTION:-sqlite}" = sqlite ]; then
         (as_app touch "${DB_DATABASE:-/app/storage/database.sqlite}")
@@ -65,6 +70,7 @@ case "$role" in
     start)
         require_app_key
         own_storage
+        ensure_passport_keys
         prepare_database
         cache_config
         run_processes

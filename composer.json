@@ -27,11 +27,12 @@
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
         "laravel/horizon": "^5.50",
+        "laravel/passport": "^13.12",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
         "nunomaduro/essentials": "^1.2",
-        "phpseclib/phpseclib": "^3.0"
+        "phpseclib/phpseclib": "^4.0"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.7",
@@ -71,6 +72,7 @@
             "@php -r \"is_dir('storage/updater/request') || mkdir('storage/updater/request', 0755, true); touch('storage/updater/installed');\"",
             "@php -r \"str_contains(file_get_contents('.env'), 'DATABASIFY_UPDATER_PATH=') || file_put_contents('.env', PHP_EOL.'DATABASIFY_UPDATER_PATH='.getcwd().'/storage/updater'.PHP_EOL, FILE_APPEND);\"",
             "@php artisan key:generate",
+            "@php artisan passport:keys --no-interaction 2>/dev/null || test -f storage/oauth-private.key",
             "@php artisan migrate --force",
             "npm install",
             "npm run build"

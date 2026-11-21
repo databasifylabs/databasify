@@ -28,7 +28,7 @@ final class ProviderRequestFailed extends RuntimeException
 
     public function render(Request $request): JsonResponse|RedirectResponse
     {
-        if ($request->expectsJson() && ! $request->inertia()) {
+        if (($request->expectsJson() || $request->is('api/*')) && ! $request->inertia()) {
             return response()->json(['message' => $this->getMessage()], 422);
         }
 

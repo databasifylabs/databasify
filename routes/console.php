@@ -26,5 +26,6 @@ Schedule::onOneServer()->group(function () {
     Schedule::command(CheckForReleaseCommand::class)->daily();
     Schedule::command(RenewCertificatesCommand::class)->dailyAt('02:00')->withoutOverlapping(240);
     Schedule::command('horizon:snapshot')->everyFiveMinutes();
+    Schedule::command('passport:purge')->daily();
     Schedule::command('model:prune', ['--model' => [NodeMetricSample::class, ServerLog::class]])->daily();
 });

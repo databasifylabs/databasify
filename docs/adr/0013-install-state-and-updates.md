@@ -16,7 +16,7 @@ The app installs on one small server and must be easy to back up, update and rol
 
 ## Consequences
 
-- A backup is the storage volume plus `/opt/databasify/.env`, which holds `APP_KEY` ([0009](0009-secrets-and-ssh-keys.md)). The storage volume must be on a local filesystem, because WAL needs shared memory.
+- A backup is the storage volume plus `/opt/databasify/.env`, which holds `APP_KEY` ([0009](0009-secrets-and-ssh-keys.md)). The Passport signing keys live in the storage volume (`storage/oauth-*.key`); the entrypoint creates them only when they are missing, so API keys survive restarts, updates and restores. The storage volume must be on a local filesystem, because WAL needs shared memory.
 - All workers write to one SQLite file, so transactions stay short and never wrap SSH or HTTP calls.
 - Losing Redis data loses queued jobs, sessions and locks.
 - Restarting the container restarts web, queue, scheduler and websockets together.
