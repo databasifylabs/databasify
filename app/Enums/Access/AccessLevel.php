@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Enums\Api;
+namespace App\Enums\Access;
 
 enum AccessLevel: string
 {

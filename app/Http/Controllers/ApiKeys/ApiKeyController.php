@@ -6,7 +6,7 @@ namespace App\Http\Controllers\ApiKeys;
 
 use App\Actions\Api\CreateApiKey;
 use App\Actions\Api\RevokeApiKey;
-use App\Enums\Api\ApiArea;
+use App\Enums\Access\AccessArea;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApiKeys\StoreApiKeyRequest;
 use App\Http\Resources\ApiKeyResource;
@@ -24,7 +24,7 @@ class ApiKeyController extends Controller
     {
         return Inertia::render('api-keys/index', [
             'apiKeys' => ApiKeyResource::collection(ApiKeyQuery::of($user)->get())->resolve(),
-            'areas' => ApiArea::options(),
+            'areas' => AccessArea::options(),
             'projects' => ProjectQuery::links()->get()->map->only(['id', 'name'])->all(),
         ]);
     }

@@ -27,24 +27,24 @@ class StorageProviderController extends Controller
 
     public function store(StoreStorageProviderRequest $request, AddStorageProvider $add): JsonResponse
     {
-        return $this->resourceOf($add->handle($request->toProvider()))->response()->setStatusCode(201);
+        return StorageProviderResource::loaded($add->handle($request->toProvider()))->response()->setStatusCode(201);
     }
 
     public function show(StorageProvider $provider): StorageProviderResource
     {
-        return $this->resourceOf($provider);
+        return StorageProviderResource::loaded($provider);
     }
 
     public function update(UpdateStorageProviderRequest $request, StorageProvider $provider, UpdateStorageProvider $update): StorageProviderResource
     {
-        return $this->resourceOf($update->handle($provider, $request->toProvider($provider)));
+        return StorageProviderResource::loaded($update->handle($provider, $request->toProvider($provider)));
     }
 
     public function test(StorageProvider $provider, TestStorageProvider $test): StorageProviderResource
     {
         $test->handle($provider);
 
-        return $this->resourceOf($provider);
+        return StorageProviderResource::loaded($provider);
     }
 
     public function destroy(StorageProvider $provider, DeleteStorageProvider $delete): Response
@@ -52,10 +52,5 @@ class StorageProviderController extends Controller
         $delete->handle($provider);
 
         return response()->noContent();
-    }
-
-    private function resourceOf(StorageProvider $provider): StorageProviderResource
-    {
-        return new StorageProviderResource($provider->load('recoveries'));
     }
 }

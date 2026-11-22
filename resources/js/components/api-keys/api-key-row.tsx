@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/tooltip';
 import { runAction } from '@/lib/run-action';
 import { cn } from '@/lib/utils';
-import type { ApiAreaOption, ApiKey } from '@/types';
+import type { AccessAreaOption, ApiKey } from '@/types';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 const relativeFormat = new Intl.RelativeTimeFormat(undefined, {
@@ -51,7 +51,7 @@ export default function ApiKeyRow({
     areas,
 }: {
     apiKey: ApiKey;
-    areas: ApiAreaOption[];
+    areas: AccessAreaOption[];
 }) {
     const usage = apiKey.last_used_at
         ? `Last used ${relativeTo(apiKey.last_used_at)}`

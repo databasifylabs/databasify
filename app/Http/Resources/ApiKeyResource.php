@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
-use App\Enums\Api\ApiArea;
+use App\Enums\Access\AccessArea;
 use App\Models\ApiKey;
 use App\Models\Project;
 use Illuminate\Http\Request;
@@ -23,7 +23,7 @@ class ApiKeyResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'levels' => collect(ApiArea::cases())->mapWithKeys(fn (ApiArea $area): array => [$area->value => $area->levelIn($this->scopes)->value])->all(),
+            'levels' => collect(AccessArea::cases())->mapWithKeys(fn (AccessArea $area): array => [$area->value => $area->levelIn($this->scopes)->value])->all(),
             'all_projects' => $this->all_projects,
             'projects' => $this->projects->map(fn (Project $project): array => ['id' => $project->id, 'name' => $project->name])->all(),
             'expires_at' => $this->expires_at?->toIso8601String(),

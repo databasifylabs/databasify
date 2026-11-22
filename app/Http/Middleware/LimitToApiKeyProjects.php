@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\Project;
 use App\Queries\ApiKeys\CurrentApiKeyQuery;
 use App\Support\Projects\ProjectContext;
 use Closure;
@@ -39,12 +38,9 @@ final readonly class LimitToApiKeyProjects
 
     private function enterProjectOf(Route $route): void
     {
-        $projectId = $route->originalParameter('project');
+        $project = $this->context->initialize($route->originalParameter('project'));
 
-        abort_unless(is_string($projectId) && $this->context->allows($projectId), 404);
-
-        $project = Project::query()->whereKey($projectId)->firstOrFail();
-        $this->context->initialize($project);
+        abort_if($project === null, 404);
         URL::defaults(['project' => $project->id]);
     }
 }

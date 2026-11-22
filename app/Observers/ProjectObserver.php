@@ -12,5 +12,6 @@ final readonly class ProjectObserver
     {
         $project->lastVisitors()->update(['last_project_id' => null]);
         $project->apiKeys()->detach();
+        $project->oauthClients()->detach();
     }
 }

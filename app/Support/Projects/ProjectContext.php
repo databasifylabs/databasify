@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Projects;
 
 use App\Models\Project;
+use Illuminate\Database\Eloquent\Model;
 
 final class ProjectContext
 {
@@ -18,9 +19,15 @@ final class ProjectContext
         return resolve(self::class);
     }
 
-    public function initialize(Project $project): void
+    public function initialize(Model|string|null $source): ?Project
     {
-        $this->project = $project;
+        $project = $this->projectFrom($source);
+
+        if ($project === null || ! $this->allows($project->id)) {
+            return null;
+        }
+
+        return $this->project = $project;
     }
 
     /**
@@ -31,10 +38,13 @@ final class ProjectContext
         $this->allowedIds = $projectIds;
     }
 
-    public function terminate(): void
+    public function terminate(bool $keepAllowedProjects = false): void
     {
         $this->project = null;
-        $this->allowedIds = null;
+
+        if (! $keepAllowedProjects) {
+            $this->allowedIds = null;
+        }
     }
 
     public function project(): ?Project
@@ -63,5 +73,16 @@ final class ProjectContext
     public function allows(string $projectId): bool
     {
         return $this->allowedIds === null || in_array($projectId, $this->allowedIds, true);
+    }
+
+    private function projectFrom(Model|string|null $source): ?Project
+    {
+        if ($source === null || $source instanceof Project) {
+            return $source;
+        }
+
+        $projectId = is_string($source) ? $source : ($source->getAttributes()['project_id'] ?? null);
+
+        return is_string($projectId) ? Project::query()->find($projectId) : null;
     }
 }

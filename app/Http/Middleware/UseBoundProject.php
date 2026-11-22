@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\Project;
 use App\Support\Projects\ProjectContext;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -27,13 +26,9 @@ final readonly class UseBoundProject
             return $next($request);
         }
 
-        $projectId = collect($route->parameters())
-            ->map(fn (mixed $parameter): mixed => $parameter instanceof Model ? ($parameter->getAttributes()['project_id'] ?? null) : null)
-            ->first(fn (mixed $id): bool => is_string($id));
-
-        if (is_string($projectId)) {
-            $this->context->initialize(Project::query()->findOrFail($projectId));
-        }
+        $this->context->initialize(collect($route->parameters())
+            ->whereInstanceOf(Model::class)
+            ->first(fn (Model $parameter): bool => is_string($parameter->getAttributes()['project_id'] ?? null)));
 
         return $next($request);
     }

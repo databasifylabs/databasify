@@ -18,7 +18,10 @@ return new class extends Migration
             $table->string('provider')->nullable();
             $table->text('redirect_uris');
             $table->text('grant_types');
+            $table->json('scopes')->nullable();
             $table->boolean('revoked');
+            $table->boolean('all_projects')->default(true);
+            $table->timestamp('approved_at')->nullable();
             $table->timestamps();
         });
     }

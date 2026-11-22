@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Enums\Api;
+namespace App\Enums\Access;
 
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Http\Middleware\CheckTokenForAnyScope;
 
-enum ApiArea: string
+enum AccessArea: string
 {
     case Projects = 'projects';
     case ServerProviders = 'server-providers';
@@ -53,11 +53,17 @@ enum ApiArea: string
         return $this === self::System;
     }
 
+    /**
+     * @return non-empty-string
+     */
     public function readScope(): string
     {
         return "{$this->value}:read";
     }
 
+    /**
+     * @return non-empty-string
+     */
     public function writeScope(): string
     {
         return "{$this->value}:write";

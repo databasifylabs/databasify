@@ -14,6 +14,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class StorageProviderResource extends JsonResource
 {
+    public static function loaded(StorageProvider $provider): self
+    {
+        return new self($provider->load('recoveries'));
+    }
+
     /**
      * @return array<string, mixed>
      */

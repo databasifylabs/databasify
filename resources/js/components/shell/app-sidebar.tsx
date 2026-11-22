@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    Bot,
     Cloud,
     DatabaseIcon,
     FolderKanban,
@@ -30,6 +31,7 @@ import {
 import { documentationUrl } from '@/lib/repository';
 import { dashboard } from '@/routes';
 import { index as apiKeysIndex } from '@/routes/api-keys';
+import { index as connectedAppsIndex } from '@/routes/connected-apps';
 import { index as databasesIndex } from '@/routes/databases';
 import { index as dnsIndex } from '@/routes/dns';
 import { index as pluginsIndex } from '@/routes/plugins';
@@ -77,6 +79,7 @@ function globalNavItems(
         { title: 'Projects', href: projectsIndex(), icon: FolderKanban },
         { title: 'Plugins', href: pluginsIndex(), icon: Puzzle },
         { title: 'API keys', href: apiKeysIndex(), icon: KeyRound },
+        { title: 'Connected apps', href: connectedAppsIndex(), icon: Bot },
         ...updates,
         ...(horizonUrl
             ? [

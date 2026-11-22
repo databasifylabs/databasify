@@ -36,7 +36,7 @@ class ServerProviderController extends Controller
 
     public function show(ServerProvider $provider): ServerProviderResource
     {
-        return new ServerProviderResource($provider->loadCount(['servers', 'networks']));
+        return ServerProviderResource::loaded($provider);
     }
 
     public function update(UpdateServerProviderRequest $request, ServerProvider $provider, UpdateServerProvider $update): ServerProviderResource

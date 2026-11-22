@@ -24,9 +24,8 @@ final readonly class SetCurrentProject
     public function handle(Request $request, Closure $next): Response
     {
         $route = $this->routeOf($request);
-        $project = Project::query()->whereKey($route->originalParameter('project'))->firstOrFail();
+        $project = $this->context->initialize($route->originalParameter('project')) ?? abort(404);
 
-        $this->context->initialize($project);
         URL::defaults(['project' => $project->id]);
         $this->rememberFor($request->user(), $project);
         $route->forgetParameter('project');
