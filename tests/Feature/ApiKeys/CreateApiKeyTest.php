@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Actions\Api\CreateApiKey;
 use App\Actions\Api\RevokeApiKey;
 use App\DTOs\Api\NewApiKey;
-use App\Enums\Api\ApiArea;
+use App\Enums\Access\AccessArea;
 use App\Enums\Api\ApiKeyExpiry;
 use App\Models\Project;
 use App\Models\User;
@@ -58,6 +58,6 @@ test('revoking a key marks it revoked', function () {
 });
 
 test('the api areas register 13 scopes without system:write', function () {
-    expect(ApiArea::scopes())->toHaveCount(13)->not->toHaveKey('system:write')
-        ->and(Passport::scopeIds())->toContain(...array_keys(ApiArea::scopes()));
+    expect(AccessArea::scopes())->toHaveCount(13)->not->toHaveKey('system:write')
+        ->and(Passport::scopeIds())->toContain(...array_keys(AccessArea::scopes()));
 });

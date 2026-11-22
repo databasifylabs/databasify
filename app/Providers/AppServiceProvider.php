@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Enums\Api\ApiArea;
+use App\Enums\Access\AccessArea;
+use App\Http\Controllers\ConnectedApps\AuthorizeConnectedAppController;
 use App\Models\ApiKey;
 use App\Models\Database;
 use App\Models\DnsProvider;
 use App\Models\Network;
+use App\Models\OAuthClient;
 use App\Models\Passkey;
 use App\Models\Server;
 use App\Models\ServerProvider;
 use App\Models\StorageProvider;
+use App\Models\User;
 use App\Queries\ApiKeys\CurrentApiKeyQuery;
 use App\Support\Projects\ProjectContext;
+use Carbon\CarbonInterval;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\DevCommands;
@@ -32,14 +36,18 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(ProjectContext::class);
 
-        Passport::ignoreRoutes();
+        Passport::$deviceCodeGrantEnabled = false;
     }
 
     public function boot(): void
     {
         Passkeys::usePasskeyModel(Passkey::class);
         Passport::useTokenModel(ApiKey::class);
-        Passport::tokensCan(ApiArea::scopes());
+        Passport::useClientModel(OAuthClient::class);
+        Passport::tokensCan(AccessArea::scopes());
+        Passport::tokensExpireIn(CarbonInterval::hour());
+        Passport::refreshTokensExpireIn(CarbonInterval::days(30));
+        Passport::authorizationView(AuthorizeConnectedAppController::page(...));
 
         Relation::enforceMorphMap([
             'server' => Server::class,
@@ -48,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
             'server-provider' => ServerProvider::class,
             'dns-provider' => DnsProvider::class,
             'storage-provider' => StorageProvider::class,
+            'user' => User::class,
         ]);
 
         RateLimiter::for('api', fn (Request $request): Limit => Limit::perMinute(120)->by(

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Api\ApiArea;
+use App\Enums\Access\AccessArea;
 use App\Http\Controllers\Api\V1\ConnectionPoolController;
 use App\Http\Controllers\Api\V1\DatabaseController;
 use App\Http\Controllers\Api\V1\DatabaseInsightsController;
@@ -33,21 +33,21 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function () {
     Route::get('system', SystemController::class)
-        ->middleware(ApiArea::System->readMiddleware())
+        ->middleware(AccessArea::System->readMiddleware())
         ->name('system');
 
     Route::get('projects', [ProjectController::class, 'index'])
-        ->middleware(ApiArea::Projects->readMiddleware())
+        ->middleware(AccessArea::Projects->readMiddleware())
         ->name('projects.index');
 
-    Route::middleware(ApiArea::Projects->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::Projects->writeMiddleware())->group(function () {
         Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
         Route::patch('projects/{project}', [ProjectController::class, 'update'])->whereUuid('project')->name('projects.update');
         Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->whereUuid('project')->name('projects.destroy');
         Route::post('projects/{project}/moves', MoveController::class)->whereUuid('project')->name('moves.store');
     });
 
-    Route::middleware(ApiArea::ServerProviders->readMiddleware())->group(function () {
+    Route::middleware(AccessArea::ServerProviders->readMiddleware())->group(function () {
         Route::get('server-providers', [ServerProviderController::class, 'index'])->name('server-providers.index');
         Route::get('projects/{project}/server-providers', [ServerProviderController::class, 'index'])->whereUuid('project')->name('projects.server-providers.index');
         Route::get('server-providers/types', [ServerProviderController::class, 'types'])->name('server-providers.types');
@@ -59,7 +59,7 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
         Route::get('projects/{project}/networks', [NetworkController::class, 'index'])->whereUuid('project')->name('projects.networks.index');
     });
 
-    Route::middleware(ApiArea::ServerProviders->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::ServerProviders->writeMiddleware())->group(function () {
         Route::post('projects/{project}/server-providers', [ServerProviderController::class, 'store'])->whereUuid('project')->name('server-providers.store');
         Route::put('server-providers/{provider}', [ServerProviderController::class, 'update'])->whereUuid('provider')->name('server-providers.update');
         Route::delete('server-providers/{provider}', [ServerProviderController::class, 'destroy'])->whereUuid('provider')->name('server-providers.destroy');
@@ -67,34 +67,34 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
         Route::post('server-providers/{provider}/servers', ProviderServerController::class)->whereUuid('provider')->name('server-providers.servers.store');
     });
 
-    Route::middleware(ApiArea::DnsProviders->readMiddleware())->group(function () {
+    Route::middleware(AccessArea::DnsProviders->readMiddleware())->group(function () {
         Route::get('dns-providers', [DnsProviderController::class, 'index'])->name('dns-providers.index');
         Route::get('projects/{project}/dns-providers', [DnsProviderController::class, 'index'])->whereUuid('project')->name('projects.dns-providers.index');
         Route::get('dns-providers/types', [DnsProviderController::class, 'types'])->name('dns-providers.types');
         Route::get('dns-providers/{provider}', [DnsProviderController::class, 'show'])->whereUuid('provider')->name('dns-providers.show');
     });
 
-    Route::middleware(ApiArea::DnsProviders->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::DnsProviders->writeMiddleware())->group(function () {
         Route::post('projects/{project}/dns-providers', [DnsProviderController::class, 'store'])->whereUuid('project')->name('dns-providers.store');
         Route::put('dns-providers/{provider}', [DnsProviderController::class, 'update'])->whereUuid('provider')->name('dns-providers.update');
         Route::post('dns-providers/{provider}/refresh', [DnsProviderController::class, 'refresh'])->whereUuid('provider')->name('dns-providers.refresh');
         Route::delete('dns-providers/{provider}', [DnsProviderController::class, 'destroy'])->whereUuid('provider')->name('dns-providers.destroy');
     });
 
-    Route::middleware(ApiArea::StorageProviders->readMiddleware())->group(function () {
+    Route::middleware(AccessArea::StorageProviders->readMiddleware())->group(function () {
         Route::get('storage-providers', [StorageProviderController::class, 'index'])->name('storage-providers.index');
         Route::get('projects/{project}/storage-providers', [StorageProviderController::class, 'index'])->whereUuid('project')->name('projects.storage-providers.index');
         Route::get('storage-providers/{provider}', [StorageProviderController::class, 'show'])->whereUuid('provider')->name('storage-providers.show');
     });
 
-    Route::middleware(ApiArea::StorageProviders->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::StorageProviders->writeMiddleware())->group(function () {
         Route::post('projects/{project}/storage-providers', [StorageProviderController::class, 'store'])->whereUuid('project')->name('storage-providers.store');
         Route::put('storage-providers/{provider}', [StorageProviderController::class, 'update'])->whereUuid('provider')->name('storage-providers.update');
         Route::post('storage-providers/{provider}/test', [StorageProviderController::class, 'test'])->whereUuid('provider')->name('storage-providers.test');
         Route::delete('storage-providers/{provider}', [StorageProviderController::class, 'destroy'])->whereUuid('provider')->name('storage-providers.destroy');
     });
 
-    Route::middleware(ApiArea::Servers->readMiddleware())->group(function () {
+    Route::middleware(AccessArea::Servers->readMiddleware())->group(function () {
         Route::get('servers', [ServerController::class, 'index'])->name('servers.index');
         Route::get('projects/{project}/servers', [ServerController::class, 'index'])->whereUuid('project')->name('projects.servers.index');
         Route::get('servers/ssh-key', [ServerController::class, 'sshKey'])->name('servers.ssh-key');
@@ -104,7 +104,7 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
         Route::get('servers/{server}/logs/{log}', [ServerLogController::class, 'show'])->whereUuid(['server', 'log'])->name('servers.logs.show');
     });
 
-    Route::middleware(ApiArea::Servers->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::Servers->writeMiddleware())->group(function () {
         Route::post('projects/{project}/servers', [ServerController::class, 'store'])->whereUuid('project')->name('servers.store');
         Route::delete('servers/{server}', [ServerController::class, 'destroy'])->whereUuid('server')->name('servers.destroy');
         Route::post('servers/{server}/operations/{operation}', [ServerOperationController::class, 'run'])->whereUuid('server')->name('servers.operations.store');
@@ -115,7 +115,7 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
         Route::delete('servers/{server}/users/{user}', [ServerUserController::class, 'destroy'])->whereUuid(['server', 'user'])->scopeBindings()->name('servers.users.destroy');
     });
 
-    Route::middleware(ApiArea::Databases->readMiddleware())->group(function () {
+    Route::middleware(AccessArea::Databases->readMiddleware())->group(function () {
         Route::get('databases', [DatabaseController::class, 'index'])->name('databases.index');
         Route::get('projects/{project}/databases', [DatabaseController::class, 'index'])->whereUuid('project')->name('projects.databases.index');
         Route::get('databases/engines', [DatabaseController::class, 'engines'])->name('databases.engines');
@@ -140,7 +140,7 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
         });
     });
 
-    Route::middleware(ApiArea::Databases->writeMiddleware())->group(function () {
+    Route::middleware(AccessArea::Databases->writeMiddleware())->group(function () {
         Route::post('projects/{project}/databases', [DatabaseController::class, 'store'])->whereUuid('project')->name('databases.store');
         Route::delete('databases/{database}', [DatabaseController::class, 'destroy'])->whereUuid('database')->name('databases.destroy');
 

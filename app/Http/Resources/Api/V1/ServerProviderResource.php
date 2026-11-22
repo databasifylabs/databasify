@@ -13,6 +13,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class ServerProviderResource extends JsonResource
 {
+    public static function loaded(ServerProvider $provider): self
+    {
+        return new self($provider->loadCount(['servers', 'networks']));
+    }
+
     /**
      * @return array<string, mixed>
      */

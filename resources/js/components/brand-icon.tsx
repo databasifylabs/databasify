@@ -1,4 +1,4 @@
-import { Cloud, Database, Globe, Puzzle, Server } from 'lucide-react';
+import { Bot, Cloud, Database, Globe, Puzzle, Server } from 'lucide-react';
 import BrandMark from '@/components/brand-mark';
 import type { MarkSize } from '@/components/brand-mark';
 
@@ -8,6 +8,7 @@ const fallbacks = {
     'database-providers': Database,
     os: Server,
     plugins: Puzzle,
+    'ai-agents': Bot,
 };
 
 export type IconGroup = keyof typeof fallbacks;

@@ -8,7 +8,7 @@ import NewApiKeyBanner from '@/components/api-keys/new-api-key-banner';
 import EmptyState from '@/components/empty-state';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
-import type { ApiAreaOption, ApiKey } from '@/types';
+import type { AccessAreaOption, ApiKey } from '@/types';
 
 export default function ApiKeysIndex({
     apiKeys,
@@ -16,7 +16,7 @@ export default function ApiKeysIndex({
     projects,
 }: {
     apiKeys: ApiKey[];
-    areas: ApiAreaOption[];
+    areas: AccessAreaOption[];
     projects: { id: string; name: string }[];
 }) {
     const created = usePage().flash.apiKey;

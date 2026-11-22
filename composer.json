@@ -27,6 +27,7 @@
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
         "laravel/horizon": "^5.50",
+        "laravel/mcp": "^1.2",
         "laravel/passport": "^13.12",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^3.0",

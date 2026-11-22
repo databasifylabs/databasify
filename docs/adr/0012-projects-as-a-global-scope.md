@@ -11,7 +11,7 @@ The owner wants to group servers, databases and providers into projects, with a 
 
 - **URL shape.** Resource routes sit under `/{project}` through the `Route::project()` macro, which applies `auth`, `verified`, the `SetCurrentProject` middleware, the prefix and a UUID constraint. Route names stay unprefixed. Projects, plugins, settings, setup and Horizon stay global.
 - **Context and scope.** `SetCurrentProject` runs before route-model binding and initializes `ProjectContext`. `ProjectScope` filters on `project_id` only while the context is initialized, and `BelongsToProject` adds it to `Server`, `Database`, `Network`, `ServerProvider`, `DnsProvider` and `StorageProvider` and fills `project_id` on create. Child models have no project column and are reached through their parent.
-- **API keys.** An API key reaches all projects or a selected set (`all_projects` plus `api_key_project`). `LimitToApiKeyProjects` gives `ProjectContext` that allowed set, and `ProjectScope` filters with it when no single project is set; a `{project}` outside the set answers 404, as does any resource outside it. On item routes `UseBoundProject` sets the context to the bound item's project, so `ExistsInProject` works as in the UI. API calls never remember a project for the sidebar. A limited key cannot create or delete projects or move resources out of its set.
+- **API keys.** An API key reaches all projects or a selected set (`all_projects` plus `api_key_project`). `LimitToApiKeyProjects` gives `ProjectContext` that allowed set, and `ProjectScope` filters with it when no single project is set; a `{project}` outside the set answers 404, as does any resource outside it. On item routes `UseBoundProject` sets the context to the bound item's project, so `ExistsInProject` works as in the UI. API calls never remember a project for the sidebar. A limited key cannot create or delete projects or move resources out of its set. An MCP agent's OAuth client carries the same choice (`oauth_clients.all_projects` plus `oauth_client_project`), and every token it issues, on sign-in or refresh, gets a copy, so the same middleware limits it. MCP tools bind their models from the tool arguments with Laravel's implicit route binding, scoped like the API routes, so items load through the scoped models; they then set the context with `ProjectContext::initialize()`, which takes a project, its id or any item with a `project_id` and refuses a project outside the allowed set, resetting it before each tool call.
 - **What stays global.** Queued jobs, scheduled commands and Horizon never initialize the context, so they see every project. Names that feed DNS hostnames and the WireGuard pool are unique across projects. Relations between a resource and the resources it depends on drop the scope, so links survive a move and deletion guards count every project.
 - **Providers are strictly per project**; ids sent in a request are checked with `ExistsInProject`.
 - **Moving.** `MoveToProject` moves a server, network or provider alone; a database moves with every server behind its nodes (`Movable`).
@@ -36,6 +36,8 @@ The owner wants to group servers, databases and providers into projects, with a 
 - `app/Http/Middleware/SetCurrentProject.php`
 - `app/Http/Middleware/LimitToApiKeyProjects.php`
 - `app/Http/Middleware/UseBoundProject.php`
+- `app/Listeners/CopyClientAccessToToken.php`
+- `app/Mcp/Tools/McpTool.php`
 - `app/Providers/AppServiceProvider.php`
 - `app/Rules/ExistsInProject.php`
 - `app/Actions/Projects/MoveToProject.php`

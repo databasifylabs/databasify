@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1;
 
 use App\Models\DnsProvider;
 use App\Models\DnsZone;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,6 +15,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class DnsProviderResource extends JsonResource
 {
+    public static function loaded(DnsProvider $provider): self
+    {
+        return new self($provider->load(['zones' => fn (HasMany $zones) => $zones->withCount('databases')]));
+    }
+
     /**
      * @return array<string, mixed>
      */

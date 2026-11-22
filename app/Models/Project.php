@@ -89,6 +89,14 @@ class Project extends Model
     }
 
     /**
+     * @return BelongsToMany<OAuthClient, $this>
+     */
+    public function oauthClients(): BelongsToMany
+    {
+        return $this->belongsToMany(OAuthClient::class, 'oauth_client_project', 'project_id', 'client_id');
+    }
+
+    /**
      * @return HasMany<User, $this>
      */
     public function lastVisitors(): HasMany
