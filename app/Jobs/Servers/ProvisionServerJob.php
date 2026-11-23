@@ -7,6 +7,7 @@ namespace App\Jobs\Servers;
 use App\Actions\Servers\ProvisionServer;
 use App\Enums\Queues\QueueGroup;
 use App\Models\Server;
+use App\Support\Servers\ProvisionSteps;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
@@ -31,6 +32,6 @@ final class ProvisionServerJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $this->server->failSetup();
-        $this->server->failRunningLogs(ProvisionServer::logNames($this->disablePasswordLogin), $exception);
+        $this->server->failRunningLogs(ProvisionSteps::logNames($this->disablePasswordLogin), $exception);
     }
 }

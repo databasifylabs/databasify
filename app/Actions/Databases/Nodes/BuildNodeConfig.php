@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Nodes;
 
 use App\Engines\Data\ArchiveSettings;
-use App\Engines\Data\Member;
 use App\Engines\Data\NodeConfig;
 use App\Engines\Data\Secrets;
 use App\Models\Database;
@@ -29,13 +28,5 @@ final readonly class BuildNodeConfig
             archive: $database->pointInTimeRecovery === null ? null : ArchiveSettings::of($database->pointInTimeRecovery),
             primary: $primary->privateIp(),
         );
-    }
-
-    /**
-     * @return list<Member>
-     */
-    public function membersOf(Database $database, ?DatabaseNode $without = null): array
-    {
-        return $database->orderedNodesWithout($without)->toMembers();
     }
 }

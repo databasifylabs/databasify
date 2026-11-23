@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Actions\Networks\JoinWireguardNetwork;
-use App\Enums\Servers\OsFamily;
 use App\Models\Server;
 use App\Services\Ssh\AppSshKey;
+use App\Support\Servers\ProvisionSteps;
 
 final readonly class ProvisionServer
 {
@@ -16,14 +16,6 @@ final readonly class ProvisionServer
         private ReadServerFacts $facts,
         private JoinWireguardNetwork $wireguard,
     ) {}
-
-    /**
-     * @return list<string>
-     */
-    public static function logNames(bool $disablePasswordLogin): array
-    {
-        return [ReadServerFacts::LOG_NAME, ...array_keys(self::stepsFor(OsFamily::Debian, $disablePasswordLogin)), JoinWireguardNetwork::LOG_NAME];
-    }
 
     public function handle(Server $server, bool $disablePasswordLogin): void
     {
@@ -41,29 +33,12 @@ final readonly class ProvisionServer
             'containerdVersion' => config()->string('databasify.docker.containerd'),
         ];
 
-        collect(self::stepsFor($family, $disablePasswordLogin))->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
+        collect(ProvisionSteps::for($family, $disablePasswordLogin))->each(fn (string $view, string $name) => $server->ssh()->exec($view, $data, $name));
 
         if ($network !== null) {
             $this->wireguard->handle($server, $network);
         }
 
         $server->markProvisioned();
-    }
-
-    /**
-     * @return array<string, view-string>
-     */
-    private static function stepsFor(OsFamily $family, bool $disablePasswordLogin): array
-    {
-        $steps = [
-            'Checking the system' => 'ssh.servers.provision.require-private-ip',
-            'Installing the Databasify key' => 'ssh.servers.users.install-key',
-            'Updating packages' => 'ssh.servers.os.update-packages',
-            'Installing base tools' => "ssh.servers.os.{$family->value}.install-base-tools",
-            'Installing Docker' => "ssh.servers.os.{$family->value}.install-docker",
-            'Adding swap' => 'ssh.servers.os.swap',
-        ];
-
-        return $disablePasswordLogin ? [...$steps, 'Turning off password login' => 'ssh.servers.users.disable-password-login'] : $steps;
     }
 }

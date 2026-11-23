@@ -77,7 +77,7 @@ final readonly class TakeNodeOut
                     $peer->driver()->nodes()->reset($remaining->count() - 1, $hosts);
                 }
 
-                $peer->driver()->cluster()->membership($this->nodeConfig->membersOf($database, without: $leaving));
+                $peer->driver()->cluster()->membership($database->orderedNodesWithout($leaving)->toMembers());
             } catch (Throwable $failure) {
                 throw $remaining->hasSole() ? LastNodeDown::after($peer, $failure) : $failure;
             }

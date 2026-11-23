@@ -8,6 +8,7 @@ use App\DTOs\Providers\NewProviderServer;
 use App\Models\Server;
 use App\Models\ServerProvider;
 use App\Services\Ssh\AppSshKey;
+use App\Support\Providers\ProviderLogNames;
 use RuntimeException;
 
 final readonly class OrderProviderInstance
@@ -16,7 +17,7 @@ final readonly class OrderProviderInstance
 
     public function handle(Server $server, ServerProvider $provider): string
     {
-        $log = $server->startLog(self::logNameFor($provider));
+        $log = $server->startLog(ProviderLogNames::order($provider));
         $driver = $provider->provider();
         $publicKey = $this->appKey->get()->public_key;
         $os = $server->image ?? throw new RuntimeException("{$server->name} has no operating system.");
@@ -37,10 +38,5 @@ final readonly class OrderProviderInstance
         $log->finish(0);
 
         return $id;
-    }
-
-    public static function logNameFor(ServerProvider $provider): string
-    {
-        return "Order server from {$provider->label()}";
     }
 }

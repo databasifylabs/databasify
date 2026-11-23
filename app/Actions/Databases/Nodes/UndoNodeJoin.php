@@ -44,7 +44,7 @@ final readonly class UndoNodeJoin
         $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $peer->driver()->nodes()->configure($this->nodeConfig->handle($database, $peer))));
 
         if ($remaining->hasMany()) {
-            $members = $this->nodeConfig->membersOf($database);
+            $members = $database->orderedNodesWithout()->toMembers();
             $remaining->each(fn (DatabaseNode $peer) => rescue(fn () => $peer->driver()->cluster()->membership($members)));
         }
     }

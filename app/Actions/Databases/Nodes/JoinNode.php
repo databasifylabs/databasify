@@ -51,7 +51,7 @@ final readonly class JoinNode
         $existing->each($configure);
 
         if ($existing->hasMany()) {
-            $members = $this->nodeConfig->membersOf($database);
+            $members = $database->orderedNodesWithout()->toMembers();
             $existing->each(fn (DatabaseNode $member) => $member->driver()->cluster()->membership($members));
         }
 

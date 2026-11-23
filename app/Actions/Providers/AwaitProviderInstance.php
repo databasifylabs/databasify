@@ -7,13 +7,14 @@ namespace App\Actions\Providers;
 use App\Models\Server;
 use App\Models\ServerProvider;
 use App\Support\Providers\LaunchPolls;
+use App\Support\Providers\ProviderLogNames;
 use RuntimeException;
 
 final readonly class AwaitProviderInstance
 {
     public function handle(Server $server, ServerProvider $provider, string $id): void
     {
-        $log = $server->startLog(self::logNameFor($provider));
+        $log = $server->startLog(ProviderLogNames::await($provider));
 
         for ($poll = 1; $poll <= LaunchPolls::MAX; $poll++) {
             $instance = $provider->provider()->findServer($id);
@@ -35,10 +36,5 @@ final readonly class AwaitProviderInstance
         }
 
         throw new RuntimeException('It did not start within '.LaunchPolls::limit().'.');
-    }
-
-    public static function logNameFor(ServerProvider $provider): string
-    {
-        return "Wait for {$provider->label()} to start the server";
     }
 }

@@ -6,7 +6,6 @@ namespace App\Actions\Providers;
 
 use App\Actions\Servers\QueueProvisioning;
 use App\Models\Server;
-use App\Models\ServerProvider;
 use RuntimeException;
 
 final readonly class LaunchProviderServer
@@ -27,13 +26,5 @@ final readonly class LaunchProviderServer
         $this->ssh->handle($server);
 
         $this->provisioning->handle($server, disablePasswordLogin: true);
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function logNamesFor(ServerProvider $provider): array
-    {
-        return [OrderProviderInstance::logNameFor($provider), AwaitProviderInstance::logNameFor($provider), AwaitServerSsh::LOG_NAME];
     }
 }

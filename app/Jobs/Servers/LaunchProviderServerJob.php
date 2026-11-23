@@ -7,6 +7,7 @@ namespace App\Jobs\Servers;
 use App\Actions\Providers\LaunchProviderServer;
 use App\Enums\Queues\QueueGroup;
 use App\Models\Server;
+use App\Support\Providers\ProviderLogNames;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Queue;
@@ -31,6 +32,6 @@ final class LaunchProviderServerJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $this->server->failSetup();
-        $this->server->failRunningLogs($this->server->serverProvider === null ? [] : LaunchProviderServer::logNamesFor($this->server->serverProvider), $exception);
+        $this->server->failRunningLogs($this->server->serverProvider === null ? [] : ProviderLogNames::launch($this->server->serverProvider), $exception);
     }
 }
