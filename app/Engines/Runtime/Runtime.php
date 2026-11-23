@@ -8,6 +8,7 @@ use App\Contracts\Ssh\ServerConnection;
 use App\Engines\Data\HostProfile;
 use App\Engines\Data\Operation;
 use App\Engines\Payload;
+use App\Engines\Scripts\Shell;
 use App\Exceptions\Engines\EngineError;
 use App\Exceptions\Engines\EngineNotRunning;
 use App\Exceptions\Engines\InvalidEngineRequest;
@@ -107,7 +108,7 @@ final readonly class Runtime
     {
         $json = json_encode((object) $payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $output = '';
-        $exitCode = $this->ssh->run($node->server, sprintf("printf '%%s' '%s' | base64 -d | databasify %s 2>/dev/null\n", base64_encode($json), $command), function (string $chunk) use (&$output): void {
+        $exitCode = $this->ssh->run($node->server, view('ssh.databases.runtime', ['sh' => new Shell, 'payload' => base64_encode($json), 'command' => $command])->render(), function (string $chunk) use (&$output): void {
             $output .= $chunk;
         }, $timeout);
 

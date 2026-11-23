@@ -12,5 +12,5 @@ test('only the runtime builds a databasify command line', function () {
         ->values()
         ->all();
 
-    expect($builders)->toBe(['app/Engines/Runtime/Runtime.php']);
+    expect($builders)->toBe(['resources/views/ssh/databases/runtime.blade.php']);
 });

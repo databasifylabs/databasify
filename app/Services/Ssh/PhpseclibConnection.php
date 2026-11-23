@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ssh;
 
 use App\Contracts\Ssh\ServerConnection;
+use App\Engines\Scripts\Shell;
 use App\Exceptions\Ssh\SshAccessDenied;
 use App\Exceptions\Ssh\SshConnectionFailed;
 use App\Models\Server;
@@ -202,9 +203,6 @@ final readonly class PhpseclibConnection implements ServerConnection
 
     private function commandFor(Server $server, string $path): string
     {
-        $script = escapeshellarg($path);
-        $command = 'bash -c '.escapeshellarg("bash {$script}; status=\$?; rm -f {$script}; exit \$status");
-
-        return $server->ssh_user === 'root' ? $command : 'sudo -n '.$command;
+        return trim(view('ssh.servers.run-script', ['sh' => new Shell, 'path' => $path, 'sudo' => $server->ssh_user !== 'root'])->render());
     }
 }
