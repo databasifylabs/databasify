@@ -19,4 +19,13 @@ final readonly class ImageCache
     {
         return Cache::remember("host-binary.{$constraint}", self::HOST_BINARY_SECONDS, $resolve);
     }
+
+    /**
+     * @param  Closure(): array<string, string>  $read
+     * @return array<string, string>
+     */
+    public function extensionsOf(string $digest, Closure $read): array
+    {
+        return Cache::rememberForever("image-extensions.{$digest}", $read);
+    }
 }

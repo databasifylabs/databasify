@@ -32,7 +32,7 @@ pg_failed() {
             if [[ $message =~ (ERROR|FATAL):\ +((role|database)\ \"[^\"]*\"\ does\ not\ exist) ]]; then
                 databasify_fail not_found "${BASH_REMATCH[2]}"
             fi
-            databasify_fail sql "$message"
+            databasify_fail sql "$(sed -E -e 's/^psql:<stdin>:[0-9]+: //' -e 's/^(ERROR|FATAL): +//' <<< "$message")"
             ;;
         *) databasify_fail internal "psql exited $1: $message" ;;
     esac

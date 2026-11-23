@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\DTOs\Databases\ExtensionLibraries;
 use App\Engines\Data\ConfigFile;
 use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\Member;
@@ -33,7 +34,7 @@ final readonly class PostgresConfiguration
         $this->catalog()->check($config->settings);
         $saved = $this->savedTuned();
         $tuned = $saved ?? $this->catalog()->tuned(NodeState::selfOf($config));
-        $files = $this->files->of($this->effectiveOf($config, $tuned), $this->driver->node->database->version_line, $this->poolSizeOf($config));
+        $files = $this->files->of($this->effectiveOf($config, $tuned), $this->driver->node->database->version_line, $this->poolSizeOf($config), $this->extensionLibraries(), $this->driver->extensions()->allowlistModuleInstalled());
 
         $this->driver->run('engines.postgres.nodes.configure', [
             'config' => $config,
@@ -54,6 +55,11 @@ final readonly class PostgresConfiguration
     public function effectiveOf(NodeConfig $config, array $tuned): NodeConfig
     {
         return NodeState::withSettings($config, $this->catalog()->effective($tuned, $config->settings));
+    }
+
+    public function extensionLibraries(): ExtensionLibraries
+    {
+        return $this->driver->node->database->settings->extensions;
     }
 
     public function savedRequestOf(): NodeConfig

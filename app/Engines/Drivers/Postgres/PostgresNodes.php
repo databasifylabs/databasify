@@ -67,6 +67,7 @@ final readonly class PostgresNodes implements Nodes
             'account' => $account,
             'grants' => $account === null ? [] : [new Grant($account->database, GrantAccess::Write)],
             'managed' => [],
+            'allowlist' => PostgresExtensionCatalog::allowlistFor($this->driver->node->database),
         ]);
     }
 

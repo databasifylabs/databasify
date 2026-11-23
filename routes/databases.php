@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Databases\ConnectionPoolController;
 use App\Http\Controllers\Databases\DatabaseController;
+use App\Http\Controllers\Databases\DatabaseExtensionController;
 use App\Http\Controllers\Databases\DatabaseInsightsController;
 use App\Http\Controllers\Databases\DatabaseMigrationController;
 use App\Http\Controllers\Databases\DatabaseNodeController;
@@ -65,6 +66,11 @@ Route::project()->group(function () {
         Route::delete('databases/{database}/pools/{connectionPool}', [ConnectionPoolController::class, 'destroy'])->name('databases.pools.destroy');
         Route::post('databases/{database}/nodes/{node}/pools', [NodeConnectionPoolController::class, 'store'])->name('databases.nodes.pools.store');
         Route::delete('databases/{database}/nodes/{node}/pools/{connectionPool}', [NodeConnectionPoolController::class, 'destroy'])->name('databases.nodes.pools.destroy');
+        Route::get('databases/{database}/extensions', [DatabaseExtensionController::class, 'available'])->name('databases.extensions.available');
+        Route::get('databases/{database}/schemas/{schema}/extensions', [DatabaseExtensionController::class, 'index'])->name('databases.schemas.extensions.index');
+        Route::post('databases/{database}/schemas/{schema}/extensions', [DatabaseExtensionController::class, 'store'])->name('databases.schemas.extensions.store');
+        Route::post('databases/{database}/schemas/{schema}/extensions/{extension}/update', [DatabaseExtensionController::class, 'update'])->name('databases.schemas.extensions.update');
+        Route::delete('databases/{database}/schemas/{schema}/extensions/{extension}', [DatabaseExtensionController::class, 'destroy'])->name('databases.schemas.extensions.destroy');
         Route::post('databases/{database}/trusted-sources', [TrustedSourceController::class, 'store'])->name('databases.trusted-sources.store');
         Route::delete('databases/{database}/trusted-sources/{trustedSource}', [TrustedSourceController::class, 'destroy'])->name('databases.trusted-sources.destroy');
         Route::post('databases/{database}/nodes/{node}/trusted-sources', [NodeTrustedSourceController::class, 'store'])->name('databases.nodes.trusted-sources.store');

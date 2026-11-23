@@ -58,6 +58,30 @@ export type Schema = {
     is_default: boolean;
 };
 
+export type AvailableExtension = {
+    name: string;
+    label: string;
+    description: string;
+    group: string;
+    group_label: string;
+    default_version: string;
+    needs_restart: boolean;
+};
+
+export type ExtensionChange = {
+    schema: string | null;
+    name: string;
+    action: 'adding' | 'updating' | 'removing';
+    target_version: string | null;
+};
+
+export type InstalledExtension = {
+    name: string;
+    version: string;
+    default_version: string;
+    has_update: boolean;
+};
+
 export type TrustedSource = {
     id: string;
     cidr: string;
@@ -211,6 +235,7 @@ export type Database = {
     pool_port: number | null;
     pools: ConnectionPool[];
     supports_users: boolean;
+    supports_extensions: boolean;
     password_encryptions: PasswordEncryptionOption[];
     connection: ConnectionProfile;
     migration_source: MigrationSourceForm;

@@ -9,6 +9,7 @@ use App\Contracts\Engines\EngineScripts;
 use App\Engines\Contracts\Accounts;
 use App\Engines\Contracts\Archive;
 use App\Engines\Contracts\EngineDriver;
+use App\Engines\Contracts\Extensions;
 use App\Engines\Contracts\Migration;
 use App\Engines\Contracts\Pools;
 use App\Engines\Contracts\SqlQuoting;
@@ -135,6 +136,11 @@ abstract readonly class AbstractEngineDriver implements EngineDriver
     public function pools(): Pools
     {
         throw EngineUnsupported::command('pool list');
+    }
+
+    public function extensions(): Extensions
+    {
+        throw EngineUnsupported::command('extension list');
     }
 
     protected function queryRunner(): string

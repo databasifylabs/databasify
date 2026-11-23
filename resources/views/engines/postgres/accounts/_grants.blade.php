@@ -19,6 +19,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO {!! $role !!};
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {!! $role !!};
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT ALL ON TABLES TO {!! $role !!};
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT ALL ON SEQUENCES TO {!! $role !!};
+@include('engines.postgres.extensions._usage', ['role' => $name])
 @else
 GRANT CONNECT ON DATABASE {!! $sql->name($grant->database) !!} TO {!! $role !!};
 GRANT USAGE ON SCHEMA public TO {!! $role !!};
@@ -28,3 +29,4 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT SELECT ON TABL
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public GRANT SELECT ON SEQUENCES TO {!! $role !!};
 @endif
 @endforeach
+@include('engines.postgres.extensions._allowlist', ['role' => $name])

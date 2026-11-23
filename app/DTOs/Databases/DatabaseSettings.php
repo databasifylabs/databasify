@@ -20,6 +20,7 @@ final readonly class DatabaseSettings
         public array $config = [],
         public Persistence $persistence = Persistence::Snapshots,
         public ?RecoverySource $restore = null,
+        public ExtensionLibraries $extensions = new ExtensionLibraries,
     ) {}
 
     /**
@@ -33,11 +34,12 @@ final readonly class DatabaseSettings
             config: self::stringMap($data['config'] ?? []),
             persistence: Persistence::tryFrom(self::stringOrNull($data['persistence'] ?? null) ?? '') ?? Persistence::Snapshots,
             restore: is_array($data['restore'] ?? null) ? RecoverySource::fromArray($data['restore']) : null,
+            extensions: is_array($data['extensions'] ?? null) ? ExtensionLibraries::fromArray($data['extensions']) : new ExtensionLibraries,
         );
     }
 
     /**
-     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null}
+     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null, extensions: array{libraries: list<string>, schemas: array<string, string>}}
      */
     public function toArray(): array
     {
@@ -47,6 +49,7 @@ final readonly class DatabaseSettings
             'config' => $this->config,
             'persistence' => $this->persistence->value,
             'restore' => $this->restore?->toArray(),
+            'extensions' => $this->extensions->toArray(),
         ];
     }
 
@@ -122,6 +125,11 @@ final readonly class DatabaseSettings
     public function withConfig(array $config): self
     {
         return clone ($this, ['config' => $config]);
+    }
+
+    public function withExtensions(ExtensionLibraries $extensions): self
+    {
+        return clone ($this, ['extensions' => $extensions]);
     }
 
     public function withPersistence(Persistence $persistence): self

@@ -13,6 +13,7 @@ use App\Engines\Contracts\Accounts;
 use App\Engines\Contracts\Archive;
 use App\Engines\Contracts\Cluster;
 use App\Engines\Contracts\Config;
+use App\Engines\Contracts\Extensions;
 use App\Engines\Contracts\Migration;
 use App\Engines\Contracts\Nodes;
 use App\Engines\Contracts\Pools;
@@ -29,6 +30,7 @@ use App\Engines\Data\Secrets;
 use App\Engines\Data\Storage;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Postgres\PostgresDriver;
+use App\Engines\Drivers\Postgres\PostgresExtensionCatalog;
 use App\Engines\EngineCatalog;
 use App\Enums\Databases\PasswordEncryption;
 use Carbon\CarbonImmutable;
@@ -304,6 +306,54 @@ final readonly class RecordingDriver extends AbstractEngineDriver
             }
 
             public function delete(string $name): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+        };
+    }
+
+    public function extensions(): Extensions
+    {
+        return new class($this->node) extends RecordingGroup implements Extensions
+        {
+            protected string $group = 'extensions';
+
+            public function available(): array
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function catalog(): array
+            {
+                return PostgresExtensionCatalog::entries();
+            }
+
+            public function list(string $schema): array
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function enable(string $schema, string $name): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function update(string $schema, string $name): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function disable(string $schema, string $name): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function usedIn(string $name): array
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function allowInstalls(): void
             {
                 $this->record(__FUNCTION__, func_get_args());
             }

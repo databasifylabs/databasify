@@ -12,13 +12,14 @@ use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Scripts\PostgresSql;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
+use App\Support\Images\ImageCache;
 
 final readonly class PostgresDriver extends AbstractEngineDriver
 {
     public static function facts(string $line): EngineFacts
     {
         return new EngineFacts(
-            features: [Feature::Accounts, Feature::Archive, Feature::Migration, Feature::Pools],
+            features: [Feature::Accounts, Feature::Archive, Feature::Migration, Feature::Pools, Feature::Extensions],
             reservedUsers: PostgresAccounts::RESERVED_USERS,
             reservedDatabases: PostgresAccounts::RESERVED_DATABASES,
             ports: new Ports(ClientPorts::CLIENT, ClientPorts::POOL, [8008, 2379, 2380]),
@@ -61,6 +62,11 @@ final readonly class PostgresDriver extends AbstractEngineDriver
     public function pools(): PostgresPools
     {
         return new PostgresPools($this, $this->accounts());
+    }
+
+    public function extensions(): PostgresExtensions
+    {
+        return new PostgresExtensions($this, resolve(ImageCache::class));
     }
 
     protected function queryRunner(): string
