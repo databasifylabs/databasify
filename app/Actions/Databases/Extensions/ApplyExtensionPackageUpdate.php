@@ -85,7 +85,8 @@ final readonly class ApplyExtensionPackageUpdate
         }
 
         $database->update(['settings' => $database->settings
-            ->withPackages(array_map(fn (ExtensionPackage $package): ExtensionPackage => $package->id === $old->id ? $new : $package, $database->settings->packages))]);
+            ->withPackages(array_map(fn (ExtensionPackage $package): ExtensionPackage => $package->id === $old->id ? $new : $package, $database->settings->packages))
+            ->withNextPackages(null)]);
         $database->driver()->extensions()->allowInstalls();
         collect($enabled)->each(fn (EnabledExtension $extension) => $this->cache->forget($database, $extension->schema));
         $this->prune->handle($database);

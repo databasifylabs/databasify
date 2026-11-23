@@ -29,6 +29,11 @@ interface Extensions
     public function packageDirectory(): string;
 
     /**
+     * @param  list<string>  $fileNames
+     */
+    public function packageTrialScript(?PackageFetch $fetch, array $fileNames): string;
+
+    /**
      * @return list<InstalledExtension>
      */
     public function list(string $schema): array;

@@ -7,6 +7,7 @@ namespace App\Actions\Databases\Upgrades;
 use App\DTOs\Databases\EngineImage;
 use App\Events\DatabaseAlertRaised;
 use App\Exceptions\Images\ImageUnavailable;
+use App\Jobs\Databases\PrepareExtensionPackagesJob;
 use App\Models\Database;
 use App\Services\Images\ImageResolver;
 use App\Support\Databases\UpgradeCache;
@@ -41,6 +42,17 @@ final readonly class CheckDatabaseUpgrade
         }
 
         $image = $images->supported->replaces($database->image()) ? $images->supported : null;
+
+        if ($image !== null && ! $database->settings->packagesPreparedFor($image->digest)) {
+            $database->recordAvailableImage(null);
+
+            if (! $this->cache->preparationFailed($database, $image->digest)) {
+                dispatch(new PrepareExtensionPackagesJob($database, $image));
+            }
+
+            return null;
+        }
+
         $database->recordAvailableImage($image);
 
         return $image;

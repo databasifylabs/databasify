@@ -24,6 +24,7 @@ final readonly class DatabaseSettings
         public ?RecoverySource $restore = null,
         public ExtensionLibraries $extensions = new ExtensionLibraries,
         public array $packages = [],
+        public ?PreparedPackages $nextPackages = null,
     ) {}
 
     /**
@@ -39,11 +40,12 @@ final readonly class DatabaseSettings
             restore: is_array($data['restore'] ?? null) ? RecoverySource::fromArray($data['restore']) : null,
             extensions: is_array($data['extensions'] ?? null) ? ExtensionLibraries::fromArray($data['extensions']) : new ExtensionLibraries,
             packages: array_map(ExtensionPackage::fromPayload(...), (new Payload($data))->optionalObjects('packages')),
+            nextPackages: is_array($data['next_packages'] ?? null) ? PreparedPackages::fromPayload(new Payload($data['next_packages'])) : null,
         );
     }
 
     /**
-     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null, extensions: array{libraries: list<string>, schemas: array<string, string>}, packages: list<array<string, mixed>>}
+     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null, extensions: array{libraries: list<string>, schemas: array<string, string>}, packages: list<array<string, mixed>>, next_packages: array{imageDigest: string, packages: list<array<string, mixed>>, preparedFrom: list<string>}|null}
      */
     public function toArray(): array
     {
@@ -55,6 +57,7 @@ final readonly class DatabaseSettings
             'restore' => $this->restore?->toArray(),
             'extensions' => $this->extensions->toArray(),
             'packages' => array_map(fn (ExtensionPackage $package): array => $package->toArray(), $this->packages),
+            'next_packages' => $this->nextPackages?->toArray(),
         ];
     }
 
@@ -150,15 +153,25 @@ final readonly class DatabaseSettings
         return collect($this->packages)->first(fn (ExtensionPackage $package): bool => $package->id === $id);
     }
 
+    public function packagesPreparedFor(string $imageDigest): bool
+    {
+        return $this->packages === [] || $this->nextPackages?->isFor($imageDigest, $this->packages) === true;
+    }
+
     /**
      * @return list<PackageFile>
      */
     public function packageFiles(): array
     {
-        return array_values(collect($this->packages)
+        return array_values(collect([...$this->packages, ...$this->nextPackages->packages ?? []])
             ->flatMap(fn (ExtensionPackage $package): array => $package->files)
             ->unique(fn (PackageFile $file): string => $file->sha256)
             ->all());
+    }
+
+    public function withNextPackages(?PreparedPackages $nextPackages): self
+    {
+        return clone ($this, ['nextPackages' => $nextPackages]);
     }
 
     public function withPersistence(Persistence $persistence): self

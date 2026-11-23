@@ -342,6 +342,11 @@ final readonly class RecordingDriver extends AbstractEngineDriver
                 return '/srv/postgres/packages';
             }
 
+            public function packageTrialScript(?PackageFetch $fetch, array $fileNames): string
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
             public function list(string $schema): array
             {
                 return $this->read(__FUNCTION__, func_get_args());

@@ -61,6 +61,15 @@ final readonly class ExtensionPackage
      * @param  list<self>  $packages
      * @return list<string>
      */
+    public static function fingerprintsOf(array $packages): array
+    {
+        return array_values(collect($packages)->map(fn (self $package): string => "{$package->id}:".implode(',', $package->packages))->sort()->all());
+    }
+
+    /**
+     * @param  list<self>  $packages
+     * @return list<string>
+     */
     public static function extensionNamesOf(array $packages): array
     {
         return array_values(collect($packages)->flatMap(fn (self $package): array => $package->extensionNames())->all());

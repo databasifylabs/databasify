@@ -67,6 +67,11 @@ final readonly class PostgresExtensions implements Extensions
         return self::PACKAGE_DIRECTORY;
     }
 
+    public function packageTrialScript(?PackageFetch $fetch, array $fileNames): string
+    {
+        return $this->driver->script('engines.postgres.extensions.packages.prepare', ['fetch' => $fetch, 'directory' => self::PACKAGE_DIRECTORY, 'fileNames' => $fileNames]);
+    }
+
     public function list(string $schema): array
     {
         return array_map(InstalledExtension::fromPayload(...), $this->driver->queryJson('engines.postgres.extensions.list', ['schema' => $schema])->objects('extensions'));
