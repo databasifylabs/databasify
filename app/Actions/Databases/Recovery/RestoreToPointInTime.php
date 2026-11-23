@@ -41,6 +41,7 @@ final readonly class RestoreToPointInTime
             image: $source->runsSupportedSdk() ? $source->image() : null,
             accountsFrom: $source,
             recovery: $source->facts()->restoreNeedsOwnArchive ? $recovery->settings() : null,
+            extensions: $source->settings->extensions,
         ));
     }
 }

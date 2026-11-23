@@ -24,7 +24,7 @@ final readonly class PostgresMigration implements Migration
 
     public function check(MigrationSource $source, array $databases): SourceReport
     {
-        $facts = $this->driver->read('engines.postgres.migration.check', ['databases' => $databases], $this->sourceEnv($source), timeout: self::CHECK_TIMEOUT);
+        $facts = $this->driver->read('engines.postgres.migration.check', ['databases' => $databases, 'offered' => PostgresExtensionCatalog::offeredFor($this->driver->node->database)], $this->sourceEnv($source), timeout: self::CHECK_TIMEOUT);
 
         if ($facts->has('error')) {
             return SourceReport::unreachable($facts->string('error'));
@@ -41,6 +41,8 @@ final readonly class PostgresMigration implements Migration
             unowned: $facts->strings('unowned'),
             occupied: $facts->strings('occupied'),
             walLevel: $walLevel,
+            unavailableExtensions: $facts->strings('missing'),
+            unsupportedExtensions: $facts->strings('unsupported'),
         );
     }
 
@@ -55,6 +57,7 @@ final readonly class PostgresMigration implements Migration
             'owner' => $start->owner,
             'continuous' => $start->continuous,
             'publication' => $this->publicationName(),
+            'offered' => PostgresExtensionCatalog::offeredFor($this->driver->node->database),
         ]);
 
         $this->driver->run('engines.postgres.migration.start', ['copyScript' => $copyScript], $this->sourceEnv($start->source));

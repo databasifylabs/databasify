@@ -4,6 +4,7 @@ set -euo pipefail
 STATE=/srv/postgres/migration/state
 OWNER={!! $sh->arg($owner) !!}
 PUBLICATION={!! $sh->arg($publication) !!}
+OFFERED_LIST={!! $sh->arg(implode(',', $offered)) !!}
 set -a
 . "$STATE/copy.env"
 set +a
@@ -50,7 +51,7 @@ dump_and_restore() {
     dump_errors=$(mktemp)
     restore_errors=$(mktemp)
     if ! as_source "$database" timeout 259200 pg_dump "${dump_args[@]}" 2> "$dump_errors" \
-        | as_postgres timeout 259200 pg_restore -h /srv/postgres/run -p "$PG_PORT" -U postgres "--role=$OWNER" -d "$database" --no-owner --no-acl --exit-on-error > /dev/null 2> "$restore_errors"; then
+        | PGOPTIONS="-c extwlist.extensions=$OFFERED_LIST" as_postgres timeout 259200 pg_restore -h /srv/postgres/run -p "$PG_PORT" -U postgres "--role=$OWNER" -d "$database" --no-owner --no-acl --exit-on-error > /dev/null 2> "$restore_errors"; then
         if [ -s "$restore_errors" ]; then
             echo "$database: pg_restore: $(tail -n 3 "$restore_errors")"
         else
@@ -75,7 +76,7 @@ conninfo_of() {
 
 subscribe() {
     local database=$1 tables
-    if ! tables=$(on_source "$database" "SELECT string_agg(format('%I.%I', schemaname, tablename), ', ') FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')"); then
+    if ! tables=$(on_source "$database" "SELECT string_agg(format('%I.%I', schemaname, tablename), ', ') FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND NOT EXISTS (SELECT FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = format('%I.%I', schemaname, tablename)::regclass AND d.deptype = 'e')"); then
         echo "$database: $SOURCE_ERROR"
         exit 1
     fi

@@ -30,6 +30,7 @@ final readonly class NewDatabase
         public ?EngineImage $image = null,
         public ?Database $accountsFrom = null,
         public ?RecoverySettings $recovery = null,
+        public ExtensionLibraries $extensions = new ExtensionLibraries,
     ) {}
 
     /**

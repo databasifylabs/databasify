@@ -151,6 +151,17 @@ final readonly class PostgresExtensionCatalog
         return collect(self::entries())->first(fn (CatalogExtension $entry): bool => $entry->name === $name);
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function offeredFor(Database $database): array
+    {
+        return array_values(collect(self::entries())
+            ->filter(fn (CatalogExtension $entry): bool => $entry->library === null || $database->settings->extensions->has($entry->library))
+            ->map(fn (CatalogExtension $entry): string => $entry->name)
+            ->all());
+    }
+
     public static function allowlistFor(Database $database): string
     {
         return collect(self::entries())
