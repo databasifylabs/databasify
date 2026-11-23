@@ -68,7 +68,7 @@ use Throwable;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'public_ip', 'private_ip', 'network_id', 'server_provider_id', 'provider_server_id', 'region', 'plan', 'image', 'wireguard_public_key', 'network_status', 'network_issue', 'network_checked_at', 'ssh_port', 'ssh_user', 'ssh_password', 'host_key_fingerprint', 'status', 'os', 'cpus', 'memory_mb', 'disk_gb', 'interface_subnets'])]
+#[Fillable(['project_id', 'name', 'public_ip', 'private_ip', 'network_id', 'server_provider_id', 'provider_server_id', 'region', 'plan', 'image', 'wireguard_public_key', 'network_status', 'network_issue', 'network_checked_at', 'ssh_port', 'ssh_user', 'ssh_password', 'host_key_fingerprint', 'status', 'os', 'architecture', 'cpus', 'memory_mb', 'disk_gb', 'interface_subnets'])]
 #[Hidden(['ssh_password'])]
 #[UseFactory(ServerFactory::class)]
 #[ObservedBy(ServerObserver::class)]

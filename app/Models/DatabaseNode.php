@@ -49,6 +49,7 @@ use LogicException;
  * @property string|null $certificate_fingerprint
  * @property int $missed_status_reads
  * @property string|null $task_key
+ * @property string|null $architecture
  * @property DatabaseStatus|null $status
  * @property array<string, string>|null $config
  * @property-read Database $database
@@ -57,7 +58,7 @@ use LogicException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key', 'status', 'config'])]
+#[Fillable(['server_id', 'name', 'position', 'kind', 'role', 'engine_version', 'certificate_fingerprint', 'missed_status_reads', 'task_key', 'architecture', 'status', 'config'])]
 #[CollectedBy(DatabaseNodeCollection::class)]
 #[UseFactory(DatabaseNodeFactory::class)]
 #[ObservedBy(DatabaseNodeObserver::class)]

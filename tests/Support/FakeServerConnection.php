@@ -7,6 +7,8 @@ namespace Tests\Support;
 use App\Contracts\Ssh\ServerConnection;
 use App\Models\Server;
 use Closure;
+use Illuminate\Support\Collection;
+use LogicException;
 use Throwable;
 
 final class FakeServerConnection implements ServerConnection
@@ -16,6 +18,12 @@ final class FakeServerConnection implements ServerConnection
 
     /** @var list<array{needle: string, turns: list<array{output: string, exit: int, failure: Throwable|null}>}> */
     private array $replies = [];
+
+    /** @var list<array{server: string, local: string, remote: string}> */
+    private array $puts = [];
+
+    /** @var array<string, string> */
+    private array $served = [];
 
     public function replyTo(string $needle, string $output, int $exit = 0): self
     {
@@ -71,5 +79,30 @@ final class FakeServerConnection implements ServerConnection
     public function ranNothing(): bool
     {
         return $this->runs === [];
+    }
+
+    public function putFile(Server $server, string $localPath, string $remotePath): void
+    {
+        $this->puts[] = ['server' => $server->name, 'local' => $localPath, 'remote' => $remotePath];
+    }
+
+    public function getFile(Server $server, string $remotePath, string $localPath): void
+    {
+        file_put_contents($localPath, $this->served[$remotePath] ?? throw new LogicException("No served file at {$remotePath}."));
+    }
+
+    public function serveFile(string $remotePath, string $contents): self
+    {
+        $this->served[$remotePath] = $contents;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, array{server: string, local: string, remote: string}>
+     */
+    public function putFiles(): Collection
+    {
+        return collect($this->puts);
     }
 }
