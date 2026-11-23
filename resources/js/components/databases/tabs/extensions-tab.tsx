@@ -11,6 +11,7 @@ import DatabaseExtensionController from '@/actions/App/Http/Controllers/Database
 import ConfirmDialog from '@/components/confirm-dialog';
 import DeleteButton from '@/components/delete-button';
 import EmptyState from '@/components/empty-state';
+import ExtensionPackages from '@/components/databases/tabs/extension-packages';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -478,6 +479,7 @@ export default function ExtensionsTab({
                     </Table>
                 </Card>
             )}
+            <ExtensionPackages database={database} busy={busy} />
         </div>
     );
 }

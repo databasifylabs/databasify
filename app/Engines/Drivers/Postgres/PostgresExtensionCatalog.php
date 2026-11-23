@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\DTOs\Databases\ExtensionPackage;
 use App\Engines\Data\CatalogExtension;
 use App\Enums\Engines\ExtensionGroup;
 use App\Models\Database;
@@ -159,6 +160,7 @@ final readonly class PostgresExtensionCatalog
         return array_values(collect(self::entries())
             ->filter(fn (CatalogExtension $entry): bool => $entry->library === null || $database->settings->extensions->has($entry->library))
             ->map(fn (CatalogExtension $entry): string => $entry->name)
+            ->merge(ExtensionPackage::extensionNamesOf($database->settings->packages))
             ->all());
     }
 
@@ -167,6 +169,7 @@ final readonly class PostgresExtensionCatalog
         return collect(self::entries())
             ->reject(fn (CatalogExtension $entry): bool => $entry->needsRestart())
             ->map(fn (CatalogExtension $entry): string => $entry->name)
+            ->merge(ExtensionPackage::extensionNamesOf($database->settings->packages))
             ->implode(',');
     }
 }

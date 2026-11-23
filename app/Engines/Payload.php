@@ -41,6 +41,13 @@ final readonly class Payload
         return is_string($value) ? $value : throw $this->unexpected($key);
     }
 
+    public function matching(string $key, string $pattern): string
+    {
+        $value = $this->string($key);
+
+        return preg_match($pattern, $value) === 1 ? $value : throw $this->unexpected($key);
+    }
+
     public function nullableString(string $key): ?string
     {
         $value = $this->valueOf($key);

@@ -28,4 +28,12 @@ final readonly class ImageCache
     {
         return Cache::rememberForever("image-extensions.{$digest}", $read);
     }
+
+    /**
+     * @param  Closure(): string  $read
+     */
+    public function operatingSystemOf(string $digest, Closure $read): string
+    {
+        return Cache::rememberForever("image-os.{$digest}", $read);
+    }
 }

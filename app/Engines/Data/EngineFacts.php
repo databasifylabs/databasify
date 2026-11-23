@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Data;
 
+use App\Enums\Databases\PackageFormat;
 use App\Enums\Databases\PasswordEncryption;
 use App\Enums\Engines\Feature;
 
@@ -27,6 +28,7 @@ final readonly class EngineFacts
         public bool $restoreNeedsOwnArchive = false,
         public array $passwordEncryptions = [],
         public ?PasswordEncryption $defaultPasswordEncryption = null,
+        public ?PackageFormat $packageFormat = null,
     ) {}
 
     public function offers(Feature $feature): bool

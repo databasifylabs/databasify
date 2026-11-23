@@ -19,6 +19,7 @@ enum ExtensionGroup: string
     case Audit = 'audit';
     case Development = 'development';
     case Languages = 'languages';
+    case Custom = 'custom';
 
     public function label(): string
     {
@@ -36,6 +37,7 @@ enum ExtensionGroup: string
             self::Audit => 'Audit',
             self::Development => 'Development and testing',
             self::Languages => 'Languages',
+            self::Custom => 'Custom',
         };
     }
 }

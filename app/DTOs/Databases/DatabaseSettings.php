@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs\Databases;
 
 use App\DTOs\Recovery\RecoverySource;
+use App\Engines\Payload;
 use App\Enums\Databases\Persistence;
 
 final readonly class DatabaseSettings
@@ -13,6 +14,7 @@ final readonly class DatabaseSettings
      * @param  array<string, string>  $secrets
      * @param  array<string, string>  $certificates
      * @param  array<string, string>  $config
+     * @param  list<ExtensionPackage>  $packages
      */
     public function __construct(
         public array $secrets,
@@ -21,6 +23,7 @@ final readonly class DatabaseSettings
         public Persistence $persistence = Persistence::Snapshots,
         public ?RecoverySource $restore = null,
         public ExtensionLibraries $extensions = new ExtensionLibraries,
+        public array $packages = [],
     ) {}
 
     /**
@@ -35,11 +38,12 @@ final readonly class DatabaseSettings
             persistence: Persistence::tryFrom(self::stringOrNull($data['persistence'] ?? null) ?? '') ?? Persistence::Snapshots,
             restore: is_array($data['restore'] ?? null) ? RecoverySource::fromArray($data['restore']) : null,
             extensions: is_array($data['extensions'] ?? null) ? ExtensionLibraries::fromArray($data['extensions']) : new ExtensionLibraries,
+            packages: array_map(ExtensionPackage::fromPayload(...), (new Payload($data))->optionalObjects('packages')),
         );
     }
 
     /**
-     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null, extensions: array{libraries: list<string>, schemas: array<string, string>}}
+     * @return array{secrets: array<string, string>, certificates: array<string, string>, config: array<string, string>, persistence: string, restore: array{database: string, storage_provider_id: string, path: string, target: string}|null, extensions: array{libraries: list<string>, schemas: array<string, string>}, packages: list<array<string, mixed>>}
      */
     public function toArray(): array
     {
@@ -50,6 +54,7 @@ final readonly class DatabaseSettings
             'persistence' => $this->persistence->value,
             'restore' => $this->restore?->toArray(),
             'extensions' => $this->extensions->toArray(),
+            'packages' => array_map(fn (ExtensionPackage $package): array => $package->toArray(), $this->packages),
         ];
     }
 
@@ -130,6 +135,30 @@ final readonly class DatabaseSettings
     public function withExtensions(ExtensionLibraries $extensions): self
     {
         return clone ($this, ['extensions' => $extensions]);
+    }
+
+    /**
+     * @param  list<ExtensionPackage>  $packages
+     */
+    public function withPackages(array $packages): self
+    {
+        return clone ($this, ['packages' => $packages]);
+    }
+
+    public function package(string $id): ?ExtensionPackage
+    {
+        return collect($this->packages)->first(fn (ExtensionPackage $package): bool => $package->id === $id);
+    }
+
+    /**
+     * @return list<PackageFile>
+     */
+    public function packageFiles(): array
+    {
+        return array_values(collect($this->packages)
+            ->flatMap(fn (ExtensionPackage $package): array => $package->files)
+            ->unique(fn (PackageFile $file): string => $file->sha256)
+            ->all());
     }
 
     public function withPersistence(Persistence $persistence): self

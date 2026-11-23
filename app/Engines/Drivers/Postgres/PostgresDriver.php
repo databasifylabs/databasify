@@ -10,6 +10,7 @@ use App\Engines\Data\Ports;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Scripts\PostgresSql;
+use App\Enums\Databases\PackageFormat;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
 use App\Support\Images\ImageCache;
@@ -26,6 +27,7 @@ final readonly class PostgresDriver extends AbstractEngineDriver
             hostProfile: new HostProfile(['net.core.somaxconn' => '4096', 'net.ipv4.tcp_keepalive_intvl' => '10', 'net.ipv4.tcp_keepalive_probes' => '6', 'net.ipv4.tcp_keepalive_time' => '60', 'vm.swappiness' => '1']),
             primaryControlledSettings: PostgresFiles::CLUSTER_WIDE_KEYS,
             seedClustersFirst: true,
+            packageFormat: PackageFormat::Deb,
         );
     }
 

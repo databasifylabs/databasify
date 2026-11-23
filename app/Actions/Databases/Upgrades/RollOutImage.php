@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Databases\Upgrades;
 
 use App\Actions\Databases\Accounts\GrantMigrationSourceRoles;
+use App\Actions\Databases\Extensions\PruneExtensionPackageFiles;
 use App\Actions\Databases\Lifecycle\RefreshDatabaseStatus;
 use App\Actions\Databases\Nodes\BuildNodeConfig;
 use App\Actions\Databases\Nodes\DeployNode;
@@ -27,6 +28,7 @@ final readonly class RollOutImage
         private LearnLogUnits $logUnits,
         private RefreshDatabaseStatus $refresh,
         private GrantMigrationSourceRoles $grantSourceRoles,
+        private PruneExtensionPackageFiles $prune,
         private ExtensionCache $cache,
     ) {}
 
@@ -45,6 +47,7 @@ final readonly class RollOutImage
 
         if ($database->offers(Feature::Extensions)) {
             $database->driver()->extensions()->allowInstalls();
+            $this->prune->handle($database);
             $database->schemas()->get()->each(fn (Schema $schema) => $this->cache->forget($database, $schema->name));
         }
 

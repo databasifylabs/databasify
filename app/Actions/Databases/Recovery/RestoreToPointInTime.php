@@ -42,6 +42,7 @@ final readonly class RestoreToPointInTime
             accountsFrom: $source,
             recovery: $source->facts()->restoreNeedsOwnArchive ? $recovery->settings() : null,
             extensions: $source->settings->extensions,
+            packages: $source->settings->packages,
         ));
     }
 }

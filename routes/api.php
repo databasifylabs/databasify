@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\DatabaseRecoveryController;
 use App\Http\Controllers\Api\V1\DatabaseSettingsController;
 use App\Http\Controllers\Api\V1\DatabaseUserController;
 use App\Http\Controllers\Api\V1\DnsProviderController;
+use App\Http\Controllers\Api\V1\ExtensionPackageController;
 use App\Http\Controllers\Api\V1\MoveController;
 use App\Http\Controllers\Api\V1\NetworkController;
 use App\Http\Controllers\Api\V1\ProjectController;
@@ -136,6 +137,8 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
             Route::get('databases/{database}/logs/{log}', [DatabaseLogController::class, 'show'])->whereUuid('log')->name('databases.logs.show');
             Route::get('databases/{database}/pools', [ConnectionPoolController::class, 'index'])->name('databases.pools.index');
             Route::get('databases/{database}/extensions', [DatabaseExtensionController::class, 'available'])->name('databases.extensions.available');
+            Route::get('databases/{database}/extension-packages', [ExtensionPackageController::class, 'index'])->name('databases.extension-packages.index');
+            Route::get('databases/{database}/extension-packages/{package}/candidate', [ExtensionPackageController::class, 'candidate'])->name('databases.extension-packages.candidate');
             Route::get('databases/{database}/schemas/{schema}/extensions', [DatabaseExtensionController::class, 'index'])->scopeBindings()->name('databases.schemas.extensions.index');
             Route::get('databases/{database}/nodes/{node}/pools', [ConnectionPoolController::class, 'nodeIndex'])->name('databases.nodes.pools.index');
             Route::get('databases/{database}/trusted-sources', [TrustedSourceController::class, 'index'])->name('databases.trusted-sources.index');
@@ -187,6 +190,12 @@ Route::middleware(['auth:api', 'throttle:api'])->name('api.v1.')->group(function
             Route::delete('databases/{database}/pools/{connectionPool}', 'destroy')->name('databases.pools.destroy');
             Route::post('databases/{database}/nodes/{node}/pools', 'nodeStore')->name('databases.nodes.pools.store');
             Route::delete('databases/{database}/nodes/{node}/pools/{connectionPool}', 'nodeDestroy')->name('databases.nodes.pools.destroy');
+        });
+
+        Route::controller(ExtensionPackageController::class)->whereUuid(['database'])->group(function () {
+            Route::post('databases/{database}/extension-packages', 'store')->name('databases.extension-packages.store');
+            Route::delete('databases/{database}/extension-packages/{package}', 'destroy')->name('databases.extension-packages.destroy');
+            Route::post('databases/{database}/extension-packages/{package}/versions', 'update')->name('databases.extension-packages.versions');
         });
 
         Route::controller(DatabaseExtensionController::class)->whereUuid(['database', 'schema'])->scopeBindings()->group(function () {

@@ -75,6 +75,35 @@ export type ExtensionChange = {
     target_version: string | null;
 };
 
+export type PackagePlatform = {
+    os: string;
+    engine: string;
+    repository: string;
+    repository_host: string;
+    package_format: 'deb' | 'rpm';
+    repository_label: string;
+    repository_example: string;
+    example_package: string;
+    architectures: string[];
+};
+
+export type PackageCandidate = {
+    package: string;
+    installed: string | null;
+    candidate: string | null;
+};
+
+export type ExtensionPackage = {
+    id: string;
+    source: 'official' | 'repository' | 'upload';
+    source_label: string;
+    request: string;
+    repository: string | null;
+    packages: string[];
+    extensions: string[];
+    architectures: string[];
+};
+
 export type InstalledExtension = {
     name: string;
     version: string;

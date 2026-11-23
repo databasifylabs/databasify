@@ -6,8 +6,10 @@ namespace App\Actions\Databases\Nodes;
 
 use App\Actions\Databases\Certificates\InstallNodeCertificate;
 use App\Actions\Databases\Certificates\IssueNodeCertificates;
+use App\Actions\Databases\Extensions\InstallExtensionPackages;
 use App\Actions\Dns\EnsureZoneCertificate;
 use App\Engines\Runtime\Runtime;
+use App\Enums\Engines\Feature;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Models\Database;
 use App\Models\DatabaseNode;
@@ -21,6 +23,7 @@ final readonly class DeployNode
         private Runtime $runtime,
         private InstallNodeCertificate $certificate,
         private EnsureZoneCertificate $zoneCertificate,
+        private InstallExtensionPackages $packages,
     ) {}
 
     public function handle(Database $database, DatabaseNode $node): void
@@ -46,6 +49,10 @@ final readonly class DeployNode
             if (! SdkRange::allows($sdk)) {
                 throw ImageUnavailable::unsupportedSdk($database->engine()->label, $database->image(), $sdk);
             }
+        }
+
+        if ($database->offers(Feature::Extensions) && $database->settings->packages !== []) {
+            $this->packages->handle($database, $node, $database->settings->packages);
         }
 
         $this->certificate->handle($database->refresh(), $node);

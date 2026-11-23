@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\DTOs\Databases\FetchedPackages;
 use App\DTOs\Databases\NodeStatus;
+use App\DTOs\Databases\PackageCandidate;
+use App\DTOs\Databases\PackageFetch;
+use App\DTOs\Databases\PackageRepository;
 use App\DTOs\Databases\QuorumCount;
 use App\DTOs\Migrations\MigrationProgress;
 use App\DTOs\Migrations\SourceReport;
@@ -328,6 +332,16 @@ final readonly class RecordingDriver extends AbstractEngineDriver
                 return PostgresExtensionCatalog::entries();
             }
 
+            public function officialRepository(): PackageRepository
+            {
+                return new PackageRepository('PGDG', 'apt.postgresql.org', 'postgresql-18-http');
+            }
+
+            public function packageDirectory(): string
+            {
+                return '/srv/postgres/packages';
+            }
+
             public function list(string $schema): array
             {
                 return $this->read(__FUNCTION__, func_get_args());
@@ -354,6 +368,51 @@ final readonly class RecordingDriver extends AbstractEngineDriver
             }
 
             public function allowInstalls(): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function architecture(): string
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function operatingSystem(): string
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function fetchPackages(PackageFetch $fetch): FetchedPackages
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function packageCandidate(PackageFetch $fetch): PackageCandidate
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function uploadedPackageNames(string $run): array
+            {
+                return $this->read(__FUNCTION__, func_get_args());
+            }
+
+            public function installPackages(array $fileNames, bool $allowDowngrades = false): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function removePackages(array $packageNames): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function discardFetch(string $run): void
+            {
+                $this->record(__FUNCTION__, func_get_args());
+            }
+
+            public function keepPackageFiles(array $fileNames): void
             {
                 $this->record(__FUNCTION__, func_get_args());
             }

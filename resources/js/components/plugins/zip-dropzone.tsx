@@ -1,13 +1,8 @@
 import { FileArchive, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
+import { formatFileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-function sizeOf(bytes: number): string {
-    return bytes < 1024 * 1024
-        ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-        : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export default function ZipDropzone({
     id,
@@ -69,7 +64,7 @@ export default function ZipDropzone({
                             {file.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                            {sizeOf(file.size)}
+                            {formatFileSize(file.size)}
                         </div>
                     </div>
                     <button
