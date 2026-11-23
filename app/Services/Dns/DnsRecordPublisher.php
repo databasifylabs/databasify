@@ -8,17 +8,14 @@ use App\DTOs\Dns\DnsRecord;
 use App\DTOs\Dns\ServiceTarget;
 use App\Enums\Dns\DnsRecordType;
 use App\Models\DnsZone;
+use App\Support\Dns\DnsCache;
 use Closure;
-use Illuminate\Contracts\Cache\Lock;
-use Illuminate\Support\Facades\Cache;
 
 final readonly class DnsRecordPublisher
 {
-    private const int RECHECK_SECONDS = 3600;
-
-    private const int LOCK_SECONDS = 120;
-
     private const int WAIT_SECONDS = 30;
+
+    public function __construct(private DnsCache $cache) {}
 
     /**
      * @param  list<string>  $addresses
@@ -48,11 +45,9 @@ final readonly class DnsRecordPublisher
 
     public function clear(DnsZone $zone, DnsRecordType $type, string $name): void
     {
-        $key = $this->cacheKeyOf($type, $name);
-
-        $this->lockOn($key)->block(self::WAIT_SECONDS, function () use ($zone, $type, $name, $key): void {
+        $this->cache->recordLock($type, $name)->block(self::WAIT_SECONDS, function () use ($zone, $type, $name): void {
             $this->sync($zone, $type, $name, []);
-            Cache::put($key, [], self::RECHECK_SECONDS);
+            $this->cache->markPublished($type, $name, []);
         });
     }
 
@@ -92,29 +87,13 @@ final readonly class DnsRecordPublisher
      */
     private function onceChanged(DnsRecordType $type, string $name, array $wanted, Closure $apply): void
     {
-        $key = $this->cacheKeyOf($type, $name);
-
-        $this->lockOn($key)->block(self::WAIT_SECONDS, function () use ($key, $wanted, $apply): void {
-            if (Cache::get($key) === $wanted) {
+        $this->cache->recordLock($type, $name)->block(self::WAIT_SECONDS, function () use ($type, $name, $wanted, $apply): void {
+            if ($this->cache->published($type, $name, $wanted)) {
                 return;
             }
 
             $apply();
-            Cache::put($key, $wanted, self::RECHECK_SECONDS);
+            $this->cache->markPublished($type, $name, $wanted);
         });
-    }
-
-    private function lockOn(string $key): Lock
-    {
-        return Cache::lock("{$key}:lock", self::LOCK_SECONDS);
-    }
-
-    private function cacheKeyOf(DnsRecordType $type, string $name): string
-    {
-        return match ($type) {
-            DnsRecordType::A => "dns:{$name}",
-            DnsRecordType::Srv => "dns-srv:{$name}",
-            DnsRecordType::Txt => "dns-txt:{$name}",
-        };
     }
 }

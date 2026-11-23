@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Jobs\Servers\RunTerminalSessionJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Ssh\TerminalSession;
+use App\Support\Ssh\TerminalSession;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 

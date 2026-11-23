@@ -55,7 +55,6 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Database\Factories\DatabaseFactory;
-use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -71,7 +70,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection as SupportCollection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -105,8 +103,6 @@ class Database extends Model implements Movable
 {
     /** @use HasFactory<DatabaseFactory> */
     use BelongsToProject, HasFactory, HasUuids, MatchesText, MovesBetweenProjects, RunsOperations;
-
-    private const int DNS_LOCK_SECONDS = 300;
 
     public const string CERTIFICATE_AUTHORITY = 'ca.crt';
 
@@ -319,11 +315,6 @@ class Database extends Model implements Movable
         $host = $this->hostnamesUnder($zone)->primary->public;
 
         return new ServiceRecords($zone, $host, "{$record->prefix}.{$host}", $record->options, $this->name, $this->clientPort());
-    }
-
-    public function dnsLock(): Lock
-    {
-        return Cache::lock("database-dns:{$this->id}", self::DNS_LOCK_SECONDS);
     }
 
     public function moveToZone(?DnsZone $zone): void

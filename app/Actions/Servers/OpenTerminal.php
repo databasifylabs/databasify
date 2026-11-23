@@ -7,7 +7,7 @@ namespace App\Actions\Servers;
 use App\Jobs\Servers\RunTerminalSessionJob;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Ssh\TerminalSession;
+use App\Support\Ssh\TerminalSession;
 use Illuminate\Validation\ValidationException;
 
 final readonly class OpenTerminal

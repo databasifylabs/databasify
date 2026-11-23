@@ -43,5 +43,5 @@ Databasify manages database clusters on servers the user owns or orders from a c
 - `app/Actions/Providers/LaunchProviderServer.php`
 - `app/Services/Providers/ProviderHttp.php`
 - `app/Services/Http/TransientFailure.php`
-- `app/Services/Ssh/TerminalSession.php`
+- `app/Support/Ssh/TerminalSession.php`
 - `app/Jobs/Servers/RunTerminalSessionJob.php`

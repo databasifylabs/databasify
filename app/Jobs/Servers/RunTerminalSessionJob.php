@@ -7,7 +7,7 @@ namespace App\Jobs\Servers;
 use App\Actions\Servers\RunTerminalSession;
 use App\Enums\Queues\QueueGroup;
 use App\Models\Server;
-use App\Services\Ssh\TerminalSession;
+use App\Support\Ssh\TerminalSession;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Connection;

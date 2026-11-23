@@ -8,6 +8,7 @@ use App\Actions\Databases\Lifecycle\RedeployDatabase;
 use App\Exceptions\Providers\ProviderRequestFailed;
 use App\Models\Database;
 use App\Models\DnsZone;
+use App\Support\Dns\DnsCache;
 use Illuminate\Validation\ValidationException;
 
 final readonly class AssignDatabaseZone
@@ -18,6 +19,7 @@ final readonly class AssignDatabaseZone
         private ClearDatabaseDns $clear,
         private RedeployDatabase $redeploy,
         private EnsureHostnamesFree $free,
+        private DnsCache $cache,
     ) {}
 
     public function handle(Database $database, ?DnsZone $zone): void
@@ -32,7 +34,7 @@ final readonly class AssignDatabaseZone
             $this->free->handle($zone, $database->hostnamesClaimedUnder($zone), 'dns_zone_id');
         }
 
-        $database->dnsLock()->block(self::DNS_WAIT_SECONDS, function () use ($database, $zone): void {
+        $this->cache->databaseLock($database)->block(self::DNS_WAIT_SECONDS, function () use ($database, $zone): void {
             try {
                 $this->clear->handle($database);
             } catch (ProviderRequestFailed $failure) {

@@ -8,22 +8,23 @@ use App\Contracts\Images\ImageRegistry;
 use App\DTOs\Images\HostBinaryImage;
 use App\Exceptions\Images\ImageUnavailable;
 use App\Support\Engines\SdkRange;
+use App\Support\Images\ImageCache;
 use Closure;
-use Illuminate\Support\Facades\Cache;
 
 final readonly class HostBinaryResolver
 {
-    private const int CACHE_SECONDS = 600;
-
     private const string RELEASE = '/^\d+\.\d+\.\d+$/';
 
-    public function __construct(private ImageRegistry $registry) {}
+    public function __construct(
+        private ImageRegistry $registry,
+        private ImageCache $cache,
+    ) {}
 
     public function pinned(): HostBinaryImage
     {
         $constraint = SdkRange::constraint();
 
-        return Cache::remember("host-binary.{$constraint}", self::CACHE_SECONDS, fn (): HostBinaryImage => $this->newestIn($constraint));
+        return $this->cache->hostBinary($constraint, fn (): HostBinaryImage => $this->newestIn($constraint));
     }
 
     private function newestIn(string $constraint): HostBinaryImage

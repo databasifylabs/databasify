@@ -7,15 +7,16 @@ namespace App\Actions\Dns;
 use App\Actions\Databases\Certificates\QueueCertificateRenewal;
 use App\Models\Database;
 use App\Models\DnsZone;
-use Illuminate\Support\Facades\Cache;
+use App\Support\Dns\DnsCache;
 
 final readonly class EnsureZoneCertificate
 {
-    private const int LOCK_SECONDS = 600;
+    private const int WAIT_SECONDS = 600;
 
     public function __construct(
         private IssueZoneCertificate $issue,
         private QueueCertificateRenewal $renewal,
+        private DnsCache $cache,
     ) {}
 
     public function handle(DnsZone $zone): void
@@ -24,7 +25,7 @@ final readonly class EnsureZoneCertificate
             return;
         }
 
-        Cache::lock("zone-certificate:{$zone->id}", self::LOCK_SECONDS)->block(self::LOCK_SECONDS, function () use ($zone): void {
+        $this->cache->zoneCertificateLock($zone)->block(self::WAIT_SECONDS, function () use ($zone): void {
             $zone->refresh();
 
             if ($zone->hasCurrentCertificate()) {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Ssh;
+namespace App\Support\Ssh;
 
 use App\Models\Server;
 use App\Models\User;

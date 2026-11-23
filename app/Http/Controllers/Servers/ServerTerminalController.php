@@ -10,7 +10,7 @@ use App\Http\Requests\Servers\OpenTerminalRequest;
 use App\Http\Requests\Servers\TerminalInputRequest;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\Ssh\TerminalSession;
+use App\Support\Ssh\TerminalSession;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;

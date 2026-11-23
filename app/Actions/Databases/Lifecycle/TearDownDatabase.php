@@ -10,6 +10,7 @@ use App\Actions\Databases\Recovery\DeleteArchive;
 use App\Engines\Runtime\Runtime;
 use App\Models\Database;
 use App\Models\DatabaseNode;
+use App\Support\Dns\DnsCache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -22,6 +23,7 @@ final readonly class TearDownDatabase
         private ClearDatabaseDns $dns,
         private DeleteArchive $archive,
         private Runtime $runtime,
+        private DnsCache $cache,
     ) {}
 
     public function handle(Database $database, bool $eraseData, bool $force, bool $deleteBackups = false): void
@@ -49,7 +51,7 @@ final readonly class TearDownDatabase
             }
         }
 
-        $database->dnsLock()->block(self::DNS_WAIT_SECONDS, function () use ($database): void {
+        $this->cache->databaseLock($database)->block(self::DNS_WAIT_SECONDS, function () use ($database): void {
             try {
                 $this->dns->handle($database);
             } catch (Throwable $exception) {

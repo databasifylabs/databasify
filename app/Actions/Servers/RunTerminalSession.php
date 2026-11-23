@@ -7,7 +7,7 @@ namespace App\Actions\Servers;
 use App\Contracts\Ssh\ServerConnection;
 use App\Events\TerminalOutputReceived;
 use App\Models\Server;
-use App\Services\Ssh\TerminalSession;
+use App\Support\Ssh\TerminalSession;
 use Throwable;
 
 final readonly class RunTerminalSession

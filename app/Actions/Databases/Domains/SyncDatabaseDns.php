@@ -10,25 +10,24 @@ use App\Models\Database;
 use App\Models\DatabaseNode;
 use App\Models\DnsZone;
 use App\Services\Dns\DnsRecordPublisher;
+use App\Support\Dns\DnsCache;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 final readonly class SyncDatabaseDns
 {
-    private const int REMIND_SECONDS = 86400;
-
     private const int WAIT_SECONDS = 10;
 
     public function __construct(
         private DnsRecordPublisher $dns,
         private PublishServiceRecords $services,
+        private DnsCache $cache,
     ) {}
 
     public function handle(Database $loaded): void
     {
         try {
-            $loaded->dnsLock()->block(self::WAIT_SECONDS, function () use ($loaded): void {
+            $this->cache->databaseLock($loaded)->block(self::WAIT_SECONDS, function () use ($loaded): void {
                 $database = $loaded->fresh();
                 $zone = $database?->dnsZone;
                 $hostnames = $database?->hostnames();
@@ -36,8 +35,6 @@ final readonly class SyncDatabaseDns
                 if ($database === null || $zone === null || $hostnames === null) {
                     return;
                 }
-
-                $failureKey = "dns-sync-failed:{$database->id}";
 
                 try {
                     $nodes = $database->nodesWithServers()->each(fn (DatabaseNode $node) => $node->setRelation('database', $database));
@@ -63,9 +60,9 @@ final readonly class SyncDatabaseDns
                         $this->services->handle($records, $nodes);
                     }
 
-                    Cache::forget($failureKey);
+                    $this->cache->clearSyncFailure($database);
                 } catch (ProviderRequestFailed $failure) {
-                    if (Cache::add($failureKey, true, self::REMIND_SECONDS)) {
+                    if ($this->cache->firstSyncFailure($database)) {
                         $database->seed()->server->logFailure('Sync DNS records', "Could not update the DNS records of {$database->name}: {$failure->getMessage()}", $database);
                     }
                 }
