@@ -33,10 +33,8 @@ final readonly class MySqlFamilyArchive implements Archive
         $reply = $this->scripts->read($this->driver, 'engines.mysql-family.archive.status', env: FamilyFiles::storageEnvOf($archive->storage), timeout: 900);
 
         $bases = $this->basesIn($reply->objects('base'), $engine->baseSuffix());
-        $shipped = $this->latestOf(array_values(collect($reply->objects('binlogs'))
-            ->reject(fn (Payload $entry): bool => $entry->bool('IsDir'))
-            ->map(fn (Payload $entry): string => $entry->string('ModTime'))
-            ->all()));
+        $latestBinlog = $reply->nullableString('latestBinlog');
+        $shipped = $latestBinlog === null ? null : CarbonImmutable::parse($latestBinlog)->utc();
         $failure = in_array($reply->string('backupResult'), ['', 'success'], true) ? null : "The last base backup failed, see the {$backupUnit} log.";
 
         if ($backUpNow || ($bases === [] && $failure === null)) {
@@ -104,24 +102,6 @@ final readonly class MySqlFamilyArchive implements Archive
         $stamp = CarbonImmutable::createFromFormat(self::STAMP_FORMAT, $name, 'UTC');
 
         return $stamp instanceof CarbonImmutable ? $stamp : null;
-    }
-
-    /**
-     * @param  list<string>  $times
-     */
-    private function latestOf(array $times): ?CarbonImmutable
-    {
-        $latest = null;
-
-        foreach ($times as $time) {
-            $parsed = CarbonImmutable::parse($time)->utc();
-
-            if ($latest === null || $parsed->greaterThan($latest)) {
-                $latest = $parsed;
-            }
-        }
-
-        return $latest;
     }
 
     private function timeOf(CarbonImmutable $time): string
