@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "published_at": "2026-11-23T03:38:30Z",
-  "url": "https://github.com/databasifylabs/databasify/releases/tag/0.3.0",
-  "notes": "## What's Changed\r\n* feat(api): add a rest api with passport api keys by @rtraselbd in https://github.com/databasifylabs/databasify/pull/22\r\n* chore(deps): bump docker/login-action from 4.7.0 to 4.8.0 in the github-actions group by @dependabot[bot] in https://github.com/databasifylabs/databasify/pull/23\r\n* feat(mcp): add an mcp server with oauth connected apps by @rtraselbd in https://github.com/databasifylabs/databasify/pull/24\r\n\r\n\r\n**Full Changelog**: https://github.com/databasifylabs/databasify/compare/0.2.5...0.3.0"
+    "version": "0.3.0",
+    "published_at": "2026-11-23T03:38:30Z",
+    "url": "https://github.com/databasifylabs/databasify/releases/tag/0.3.0",
+    "notes": "## What's Changed\r\n* feat(api): add a rest api with passport api keys by @rtraselbd in https://github.com/databasifylabs/databasify/pull/22\r\n* chore(deps): bump docker/login-action from 4.7.0 to 4.8.0 in the github-actions group by @dependabot[bot] in https://github.com/databasifylabs/databasify/pull/23\r\n* feat(mcp): add an mcp server with oauth connected apps by @rtraselbd in https://github.com/databasifylabs/databasify/pull/24\r\n\r\n\r\n**Full Changelog**: https://github.com/databasifylabs/databasify/compare/0.2.5...0.3.0"
 }
