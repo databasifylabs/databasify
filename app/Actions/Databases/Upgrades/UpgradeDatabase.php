@@ -23,7 +23,16 @@ final readonly class UpgradeDatabase
             throw ValidationException::withMessages(['version' => $image->sdkRefusalFor($label)]);
         }
 
-        $database->markBusyWithReadOnly(DatabaseStatus::Upgrading, fn (Database $locked) => $locked->recordInstalledImage($image));
+        $database->markBusyWithReadOnly(DatabaseStatus::Upgrading, function (Database $locked) use ($image): void {
+            $settings = $locked->settings;
+
+            if (! $settings->packagesPreparedFor($image->digest)) {
+                throw ValidationException::withMessages(['version' => "Custom packages are being prepared for {$image->release}. Try again in a few minutes."]);
+            }
+
+            $locked->recordInstalledImage($image);
+            $locked->update(['settings' => $settings->withPackages($settings->packages === [] ? [] : $settings->nextPackages->packages ?? [])->withNextPackages(null)]);
+        });
         dispatch(new UpgradeDatabaseJob($database->refresh()));
     }
 }

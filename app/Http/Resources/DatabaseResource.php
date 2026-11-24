@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\DTOs\Databases\ConfigField;
 use App\Engines\Engine;
 use App\Enums\Databases\PasswordEncryption;
+use App\Enums\Engines\Feature;
 use App\Models\Database;
 use App\Models\DatabaseNode;
 use Illuminate\Http\Request;
@@ -44,6 +45,7 @@ class DatabaseResource extends DatabaseListResource
             'port' => $this->clientPort(),
             'pool_port' => $this->facts()->ports->pool,
             'supports_users' => $this->managesAccounts(),
+            'supports_extensions' => $this->offers(Feature::Extensions),
             'password_encryptions' => $this->encryptionChoicesOf($this->passwordEncryptions()),
             'migration_source' => $engine->migrationSource?->toArray(),
             'connection' => $this->connectionProfile()->toArray(),

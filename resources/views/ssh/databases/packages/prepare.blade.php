@@ -1,0 +1,1 @@
+docker pull -q {!! $sh->arg($reference) !!} > /dev/null && docker run --rm --network host --security-opt label=disable --user 0 --entrypoint bash -v {!! $sh->arg("{$directory}:{$directory}") !!} {!! $sh->arg($reference) !!} -c {!! $sh->arg($script) !!} 2>&1

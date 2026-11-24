@@ -23,6 +23,7 @@ final readonly class ServerFacts
         public ?OperatingSystem $system = null,
         public SelinuxMode $selinux = SelinuxMode::Disabled,
         public array $subnets = [],
+        public ?string $architecture = null,
     ) {}
 
     public static function fromJson(string $output): self
@@ -37,6 +38,11 @@ final readonly class ServerFacts
             system: OperatingSystem::fromRelease(self::stringIn($data, 'id') ?? '', self::stringIn($data, 'version_id') ?? ''),
             selinux: SelinuxMode::fromGetenforce(self::stringIn($data, 'selinux') ?? ''),
             subnets: self::subnetsIn($data),
+            architecture: match (self::stringIn($data, 'architecture')) {
+                'x86_64', 'amd64' => 'amd64',
+                'aarch64', 'arm64' => 'arm64',
+                default => null,
+            },
         );
     }
 
@@ -46,11 +52,11 @@ final readonly class ServerFacts
     }
 
     /**
-     * @return array{os: string, cpus: int, memory_mb: int, disk_gb: int, interface_subnets: list<string>}
+     * @return array{os: string, architecture: string|null, cpus: int, memory_mb: int, disk_gb: int, interface_subnets: list<string>}
      */
     public function toRow(): array
     {
-        return ['os' => $this->os, 'cpus' => $this->cpus, 'memory_mb' => $this->memoryMb, 'disk_gb' => $this->diskGb, 'interface_subnets' => $this->subnets];
+        return ['os' => $this->os, 'architecture' => $this->architecture, 'cpus' => $this->cpus, 'memory_mb' => $this->memoryMb, 'disk_gb' => $this->diskGb, 'interface_subnets' => $this->subnets];
     }
 
     /**

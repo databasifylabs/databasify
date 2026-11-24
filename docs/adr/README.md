@@ -58,5 +58,6 @@ Options that were tried or rejected, and why.
 | [0011](0011-app-code-structure.md)               | Application code structure                                                              | Accepted |
 | [0012](0012-projects-as-a-global-scope.md)       | Projects as a global scope                                                              | Accepted |
 | [0013](0013-install-state-and-updates.md)        | One-container install, app state, settings and self-update                              | Accepted |
+| [0014](0014-postgres-extensions.md)              | PostgreSQL extensions: a curated set in the image, enabled per schema                   | Accepted |
 
 On 2026-11-15, before 1.0, the 39 ADRs were consolidated into 0001 to 0013: superseded decisions were removed, related decisions were merged, and every fact was checked against the code, which won wherever the two differed. This was a one-time exception to the rule that accepted ADRs are not rewritten; from now on a changed decision gets a new ADR that supersedes the old one. Commits, pull requests and notes from before that date use the earlier numbers, and the old texts live in the git history of `docs/adr/`.

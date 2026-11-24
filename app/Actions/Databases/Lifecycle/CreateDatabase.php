@@ -41,6 +41,8 @@ final readonly class CreateDatabase
             config: $data->config,
             persistence: $data->persistence,
             restore: $data->restore,
+            extensions: $data->extensions,
+            packages: $data->packages,
         );
 
         $database = DB::transaction(function () use ($data, $line, $image, $settings): Database {

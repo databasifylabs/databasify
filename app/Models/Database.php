@@ -15,6 +15,7 @@ use App\DTOs\Databases\DatabaseEndpoints;
 use App\DTOs\Databases\DatabaseHostnames;
 use App\DTOs\Databases\DatabaseSettings;
 use App\DTOs\Databases\EngineImage;
+use App\DTOs\Databases\ExtensionPackage;
 use App\DTOs\Databases\IssuedCertificate;
 use App\DTOs\Databases\LastFailure;
 use App\DTOs\Databases\MaintenanceWindow;
@@ -618,6 +619,55 @@ class Database extends Model implements Movable
             NodeKind::Member => "{$this->name} already has a primary and ".($limit - 1).' standby nodes, the most it can have.',
             NodeKind::ReadOnly => "{$this->name} already has {$limit} read-only nodes, the most it can have.",
         }]);
+    }
+
+    public function extensionPackage(string $id): ExtensionPackage
+    {
+        return $this->settings->package($id) ?? throw ValidationException::withMessages(['package' => "{$this->name} has no such extension package."]);
+    }
+
+    public function ensureAcceptsPackages(): void
+    {
+        $this->ensureIdle();
+
+        if (! $this->offers(Feature::Extensions)) {
+            throw ValidationException::withMessages(['source' => "{$this->engine()->label} databases have no extension packages."]);
+        }
+
+        $architectures = $this->nodeArchitectures();
+
+        if (count($architectures) > 1) {
+            throw ValidationException::withMessages(['source' => "Custom packages need every node of {$this->name} on one CPU type, but it runs on ".implode(' and ', $architectures).'.']);
+        }
+    }
+
+    /**
+     * @param  list<ExtensionPackage>  $packages
+     */
+    public function ensurePackagesRunOn(array $packages, ?string $architecture, string $serverName): void
+    {
+        $built = ExtensionPackage::architecturesOf($packages);
+
+        if ($architecture === null || $built === [] || in_array($architecture, $built, true)) {
+            return;
+        }
+
+        $cpus = implode(' and ', $built);
+
+        throw ValidationException::withMessages(['server_id' => "{$this->name} has custom packages built for {$cpus}, so all its nodes need {$cpus} servers. {$serverName} is {$architecture}."]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function nodeArchitectures(): array
+    {
+        return array_values($this->nodes()->with('server')->get()
+            ->map(fn (DatabaseNode $node): ?string => $node->architecture ?? $node->server->architecture)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->all());
     }
 
     public function nextNodePosition(): int

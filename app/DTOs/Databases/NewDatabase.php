@@ -16,6 +16,7 @@ final readonly class NewDatabase
      * @param  list<string>  $standbyServerIds
      * @param  array<string, string>|null  $secrets
      * @param  array<string, string>  $config
+     * @param  list<ExtensionPackage>  $packages
      */
     public function __construct(
         public string $name,
@@ -30,6 +31,8 @@ final readonly class NewDatabase
         public ?EngineImage $image = null,
         public ?Database $accountsFrom = null,
         public ?RecoverySettings $recovery = null,
+        public ExtensionLibraries $extensions = new ExtensionLibraries,
+        public array $packages = [],
     ) {}
 
     /**

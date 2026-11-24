@@ -10,4 +10,5 @@ enum Feature: string
     case Archive = 'archive';
     case Migration = 'migration';
     case Pools = 'pools';
+    case Extensions = 'extensions';
 }

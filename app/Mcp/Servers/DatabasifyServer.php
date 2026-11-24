@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\Databases\AddDatabaseNodeTool;
+use App\Mcp\Tools\Databases\AddExtensionPackageTool;
 use App\Mcp\Tools\Databases\AddTrustedSourceTool;
 use App\Mcp\Tools\Databases\CancelMigrationTool;
 use App\Mcp\Tools\Databases\CheckDatabaseUpgradeTool;
+use App\Mcp\Tools\Databases\CheckExtensionPackageVersionTool;
 use App\Mcp\Tools\Databases\CheckMigrationTool;
 use App\Mcp\Tools\Databases\CheckRecoveryTool;
 use App\Mcp\Tools\Databases\CreateConnectionPoolTool;
@@ -20,7 +22,9 @@ use App\Mcp\Tools\Databases\DeleteDatabaseTool;
 use App\Mcp\Tools\Databases\DeleteDatabaseUserTool;
 use App\Mcp\Tools\Databases\DeleteSchemaTool;
 use App\Mcp\Tools\Databases\DeleteTrustedSourceTool;
+use App\Mcp\Tools\Databases\DisableDatabaseExtensionTool;
 use App\Mcp\Tools\Databases\DisableRecoveryTool;
+use App\Mcp\Tools\Databases\EnableDatabaseExtensionTool;
 use App\Mcp\Tools\Databases\EnableRecoveryTool;
 use App\Mcp\Tools\Databases\FailoverDatabaseTool;
 use App\Mcp\Tools\Databases\FinishMigrationTool;
@@ -33,10 +37,12 @@ use App\Mcp\Tools\Databases\GetNodeLogsTool;
 use App\Mcp\Tools\Databases\GetRecoveryTool;
 use App\Mcp\Tools\Databases\ListConnectionPoolsTool;
 use App\Mcp\Tools\Databases\ListDatabaseEnginesTool;
+use App\Mcp\Tools\Databases\ListDatabaseExtensionsTool;
 use App\Mcp\Tools\Databases\ListDatabaseLogsTool;
 use App\Mcp\Tools\Databases\ListDatabaseNodesTool;
 use App\Mcp\Tools\Databases\ListDatabasesTool;
 use App\Mcp\Tools\Databases\ListDatabaseUsersTool;
+use App\Mcp\Tools\Databases\ListExtensionPackagesTool;
 use App\Mcp\Tools\Databases\ListMigrationsTool;
 use App\Mcp\Tools\Databases\ListSchemasTool;
 use App\Mcp\Tools\Databases\ListTrustedSourcesTool;
@@ -44,6 +50,7 @@ use App\Mcp\Tools\Databases\RebootDatabaseNodeTool;
 use App\Mcp\Tools\Databases\RebootDatabaseTool;
 use App\Mcp\Tools\Databases\RecoverDatabaseTool;
 use App\Mcp\Tools\Databases\RefreshDatabaseTool;
+use App\Mcp\Tools\Databases\RemoveExtensionPackageTool;
 use App\Mcp\Tools\Databases\ResetDatabaseUserPasswordTool;
 use App\Mcp\Tools\Databases\RestoreDatabaseTool;
 use App\Mcp\Tools\Databases\RetryDatabaseSetupTool;
@@ -55,7 +62,9 @@ use App\Mcp\Tools\Databases\StopDatabaseOperationTool;
 use App\Mcp\Tools\Databases\StopNodeOperationTool;
 use App\Mcp\Tools\Databases\UpdateDatabaseConfigTool;
 use App\Mcp\Tools\Databases\UpdateDatabaseDomainTool;
+use App\Mcp\Tools\Databases\UpdateDatabaseExtensionTool;
 use App\Mcp\Tools\Databases\UpdateDatabaseNodeTool;
+use App\Mcp\Tools\Databases\UpdateExtensionPackageTool;
 use App\Mcp\Tools\Databases\UpdateMaintenanceWindowTool;
 use App\Mcp\Tools\Databases\UpdateNodeConfigTool;
 use App\Mcp\Tools\Databases\UpdatePersistenceTool;
@@ -126,9 +135,11 @@ class DatabasifyServer extends Server
         GetDatabaseTool::class,
         ToolSearch::class => [
             AddDatabaseNodeTool::class,
+            AddExtensionPackageTool::class,
             AddTrustedSourceTool::class,
             CancelMigrationTool::class,
             CheckDatabaseUpgradeTool::class,
+            CheckExtensionPackageVersionTool::class,
             CheckMigrationTool::class,
             CheckRecoveryTool::class,
             CreateConnectionPoolTool::class,
@@ -141,7 +152,9 @@ class DatabasifyServer extends Server
             DeleteDatabaseUserTool::class,
             DeleteSchemaTool::class,
             DeleteTrustedSourceTool::class,
+            DisableDatabaseExtensionTool::class,
             DisableRecoveryTool::class,
+            EnableDatabaseExtensionTool::class,
             EnableRecoveryTool::class,
             FailoverDatabaseTool::class,
             FinishMigrationTool::class,
@@ -153,15 +166,18 @@ class DatabasifyServer extends Server
             GetRecoveryTool::class,
             ListConnectionPoolsTool::class,
             ListDatabaseEnginesTool::class,
+            ListDatabaseExtensionsTool::class,
             ListDatabaseLogsTool::class,
             ListDatabaseNodesTool::class,
             ListDatabaseUsersTool::class,
+            ListExtensionPackagesTool::class,
             ListMigrationsTool::class,
             ListSchemasTool::class,
             ListTrustedSourcesTool::class,
             RebootDatabaseNodeTool::class,
             RebootDatabaseTool::class,
             RecoverDatabaseTool::class,
+            RemoveExtensionPackageTool::class,
             RefreshDatabaseTool::class,
             ResetDatabaseUserPasswordTool::class,
             RestoreDatabaseTool::class,
@@ -173,6 +189,8 @@ class DatabasifyServer extends Server
             StopDatabaseOperationTool::class,
             StopNodeOperationTool::class,
             UpdateDatabaseConfigTool::class,
+            UpdateExtensionPackageTool::class,
+            UpdateDatabaseExtensionTool::class,
             UpdateDatabaseDomainTool::class,
             UpdateDatabaseNodeTool::class,
             UpdateMaintenanceWindowTool::class,

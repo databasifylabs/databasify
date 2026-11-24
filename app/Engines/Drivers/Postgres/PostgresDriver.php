@@ -10,21 +10,24 @@ use App\Engines\Data\Ports;
 use App\Engines\Drivers\AbstractEngineDriver;
 use App\Engines\Drivers\Support\NodeState;
 use App\Engines\Scripts\PostgresSql;
+use App\Enums\Databases\PackageFormat;
 use App\Enums\Engines\Feature;
 use App\Support\Databases\ClientPorts;
+use App\Support\Images\ImageCache;
 
 final readonly class PostgresDriver extends AbstractEngineDriver
 {
     public static function facts(string $line): EngineFacts
     {
         return new EngineFacts(
-            features: [Feature::Accounts, Feature::Archive, Feature::Migration, Feature::Pools],
+            features: [Feature::Accounts, Feature::Archive, Feature::Migration, Feature::Pools, Feature::Extensions],
             reservedUsers: PostgresAccounts::RESERVED_USERS,
             reservedDatabases: PostgresAccounts::RESERVED_DATABASES,
             ports: new Ports(ClientPorts::CLIENT, ClientPorts::POOL, [8008, 2379, 2380]),
             hostProfile: new HostProfile(['net.core.somaxconn' => '4096', 'net.ipv4.tcp_keepalive_intvl' => '10', 'net.ipv4.tcp_keepalive_probes' => '6', 'net.ipv4.tcp_keepalive_time' => '60', 'vm.swappiness' => '1']),
             primaryControlledSettings: PostgresFiles::CLUSTER_WIDE_KEYS,
             seedClustersFirst: true,
+            packageFormat: PackageFormat::Deb,
         );
     }
 
@@ -61,6 +64,11 @@ final readonly class PostgresDriver extends AbstractEngineDriver
     public function pools(): PostgresPools
     {
         return new PostgresPools($this, $this->accounts());
+    }
+
+    public function extensions(): PostgresExtensions
+    {
+        return new PostgresExtensions($this, resolve(ImageCache::class));
     }
 
     protected function queryRunner(): string

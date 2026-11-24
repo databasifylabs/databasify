@@ -59,6 +59,12 @@ export function formatMemory(megabytes: number | null): string {
         : `${megabytes} MB`;
 }
 
+export function formatFileSize(bytes: number): string {
+    return bytes < 1024 * 1024
+        ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+        : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function formatUsableMemory(megabytes: number): string {
     return `${(megabytes / 1024).toFixed(1)} GB usable`;
 }

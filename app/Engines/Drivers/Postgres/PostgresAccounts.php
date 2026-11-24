@@ -65,13 +65,13 @@ final readonly class PostgresAccounts implements Accounts
 
     /**
      * @param  list<Grant>  $grants
-     * @return array{name: string, grants: list<Grant>, managed: list<string>}
+     * @return array{name: string, grants: list<Grant>, managed: list<string>, allowlist: string}
      */
     private function grantData(string $name, array $grants): array
     {
         $this->refuseReservedAccount($name, $grants);
 
-        return ['name' => $name, 'grants' => $grants, 'managed' => $this->driver->node->database->schemaNames()];
+        return ['name' => $name, 'grants' => $grants, 'managed' => $this->driver->node->database->schemaNames(), 'allowlist' => PostgresExtensionCatalog::allowlistFor($this->driver->node->database)];
     }
 
     /**

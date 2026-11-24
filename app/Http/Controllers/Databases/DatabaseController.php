@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Databases;
 
+use App\Actions\Databases\Extensions\CountExtensionUpdates;
 use App\Actions\Databases\Lifecycle\CreateDatabase;
 use App\Actions\Databases\Lifecycle\DeleteDatabase;
 use App\DTOs\Databases\DatabaseFilters;
@@ -54,9 +55,10 @@ class DatabaseController extends Controller
         return to_route('databases.show', $createDatabase->handle($request->toDatabase()));
     }
 
-    public function show(Request $request, Database $database): Response
+    public function show(Request $request, Database $database, CountExtensionUpdates $extensionUpdates): Response
     {
         return Inertia::render('databases/show', [
+            'extensionUpdates' => Inertia::defer(fn (): int => $extensionUpdates->handle($database)),
             'clientIp' => $request->ip(),
             'database' => new DatabaseResource($database->load(DatabaseResource::RELATIONS)),
             'appEnv' => $database->environment($database->endpoints()),

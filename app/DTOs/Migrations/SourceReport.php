@@ -45,6 +45,8 @@ final readonly class SourceReport
             warnings: $payload->strings('warnings'),
             problems: $payload->strings('problems'),
             walLevel: $payload->nullableString('walLevel'),
+            unavailableExtensions: $payload->strings('unavailableExtensions'),
+            unsupportedExtensions: $payload->strings('unsupportedExtensions'),
         );
     }
 
@@ -55,8 +57,10 @@ final readonly class SourceReport
      * @param  list<string>  $occupied
      * @param  list<string>  $warnings
      * @param  list<string>  $problems
+     * @param  list<string>  $unavailableExtensions
+     * @param  list<string>  $unsupportedExtensions
      */
-    public static function checked(?string $version, bool $canReplicate, ?int $sizeMb, array $databases, array $unreadable = [], array $unowned = [], array $occupied = [], array $warnings = [], array $problems = [], ?string $walLevel = null): self
+    public static function checked(?string $version, bool $canReplicate, ?int $sizeMb, array $databases, array $unreadable = [], array $unowned = [], array $occupied = [], array $warnings = [], array $problems = [], ?string $walLevel = null, array $unavailableExtensions = [], array $unsupportedExtensions = []): self
     {
         return new self(
             reachable: true,
@@ -66,6 +70,8 @@ final readonly class SourceReport
             problems: [
                 ...array_map(fn (string $database): string => "Databasify cannot read {$database} on the source.", $unreadable),
                 ...array_map(fn (string $database): string => "{$database} is not owned by the source user.", $unowned),
+                ...array_map(fn (string $extension): string => "{$extension} isn't available on this database. Enable it here first, or pick a source without it.", $unavailableExtensions),
+                ...array_map(fn (string $extension): string => "{$extension} can't be migrated in yet. Copy that database another way.", $unsupportedExtensions),
                 ...$problems,
             ],
             warnings: $warnings,

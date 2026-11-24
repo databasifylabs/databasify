@@ -65,5 +65,6 @@ final class EngineRecording
         'config.apply', 'config.sync',
         'accounts.createDatabase', 'accounts.dropDatabase', 'accounts.createUser', 'accounts.setPassword', 'accounts.grant', 'accounts.dropUser',
         'archive.restore', 'migration.start', 'migration.stop', 'pools.create', 'pools.update', 'pools.delete',
+        'extensions.enable', 'extensions.update', 'extensions.disable', 'extensions.allowInstalls', 'extensions.installPackages', 'extensions.removePackages',
     ];
 }

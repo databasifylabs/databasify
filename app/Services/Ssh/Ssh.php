@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ssh;
 
 use App\Contracts\Ssh\ServerConnection;
+use App\Engines\Scripts\Shell;
 use App\Exceptions\Ssh\RemoteScriptFailed;
 use App\Models\Database;
 use App\Models\Server;
@@ -69,7 +70,7 @@ final readonly class Ssh
      */
     private function render(string $view, array $data): string
     {
-        $variables = ['aptTimeout' => self::APT_LOCK_TIMEOUT];
+        $variables = ['aptTimeout' => self::APT_LOCK_TIMEOUT, 'sh' => new Shell];
 
         return "set -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\n"
             .view('ssh.servers.os.apt', $variables)->render()

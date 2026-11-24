@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engines\Drivers\Postgres;
 
+use App\DTOs\Databases\ExtensionLibraries;
 use App\Engines\Data\ConfigFile;
 use App\Engines\Data\ConfigFiles;
 use App\Engines\Data\Member;
@@ -42,8 +43,10 @@ final readonly class PostgresFiles
     private const array REPLICATION_PARAMETERS = [
         'wal_level' => 'replica', 'hot_standby' => 'on', 'wal_log_hints' => 'on', 'max_wal_senders' => '20',
         'max_replication_slots' => '20', 'wal_keep_size' => '1GB', 'password_encryption' => 'scram-sha-256',
-        'shared_preload_libraries' => 'pg_stat_statements', 'pg_stat_statements.track' => 'top', 'compute_query_id' => 'auto',
+        'pg_stat_statements.track' => 'top', 'compute_query_id' => 'auto',
     ];
+
+    private const string ALLOWLIST_LIBRARY = '$libdir/plugins/pgextwlist';
 
     private const array LOCAL_PARAMETERS = [
         'ssl' => 'on', 'ssl_cert_file' => '/srv/postgres/tls/server.crt', 'ssl_key_file' => '/srv/postgres/tls/server.key',
@@ -57,9 +60,9 @@ final readonly class PostgresFiles
 
     public function __construct(private Factory $views) {}
 
-    public function of(NodeConfig $config, string $line, string $defaultPoolSize): ConfigFiles
+    public function of(NodeConfig $config, string $line, string $defaultPoolSize, ExtensionLibraries $extensions, bool $allowlist): ConfigFiles
     {
-        $data = self::viewDataOf($config, $line, $defaultPoolSize);
+        $data = self::viewDataOf($config, $line, $defaultPoolSize, $extensions, $allowlist);
         $files = [];
 
         foreach (self::modesOf($config) as $name => $mode) {
@@ -80,9 +83,9 @@ final readonly class PostgresFiles
     /**
      * @return array<string, mixed>
      */
-    private static function viewDataOf(NodeConfig $config, string $line, string $defaultPoolSize): array
+    private static function viewDataOf(NodeConfig $config, string $line, string $defaultPoolSize, ExtensionLibraries $extensions, bool $allowlist): array
     {
-        [$clusterWide, $local] = self::parametersOf($config);
+        [$clusterWide, $local] = self::parametersOf($config, $extensions, $allowlist);
         [$initialCluster, $clusterState] = self::initialClusterOf($config);
         $archive = $config->archive;
 
@@ -158,11 +161,18 @@ final readonly class PostgresFiles
     /**
      * @return array{array<string, string>, array<string, string>}
      */
-    public static function parametersOf(NodeConfig $request): array
+    public static function parametersOf(NodeConfig $request, ExtensionLibraries $extensions, bool $allowlist): array
     {
         $slots = (string) max(20, count($request->members) * 2 + 4);
         $clusterWide = [...self::REPLICATION_PARAMETERS, 'max_wal_senders' => $slots, 'max_replication_slots' => $slots];
-        $local = $request->archive === null ? self::LOCAL_PARAMETERS : [...self::LOCAL_PARAMETERS, ...self::ARCHIVE_PARAMETERS];
+        $local = [
+            ...self::LOCAL_PARAMETERS,
+            ...($request->archive === null ? [] : self::ARCHIVE_PARAMETERS),
+            'shared_preload_libraries' => implode(',', ['pg_stat_statements', ...$extensions->libraries]),
+            ...($allowlist ? ['local_preload_libraries' => self::ALLOWLIST_LIBRARY] : []),
+            ...($extensions->has('pg_cron') && $extensions->schemaOf('pg_cron') !== null ? ['cron.database_name' => $extensions->schemaOf('pg_cron'), 'cron.use_background_workers' => 'on'] : []),
+            ...($extensions->has('timescaledb') ? ['timescaledb.telemetry_level' => 'off'] : []),
+        ];
 
         foreach ($request->settings as $key => $value) {
             if (in_array($key, self::CLUSTER_WIDE_KEYS, true)) {

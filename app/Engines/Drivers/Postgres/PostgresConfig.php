@@ -38,7 +38,7 @@ final readonly class PostgresConfig implements Config
             return;
         }
 
-        [$clusterParameters] = PostgresFiles::parametersOf($this->configuration->effectiveOf($request, $this->tunedOf($request)));
+        [$clusterParameters] = PostgresFiles::parametersOf($this->configuration->effectiveOf($request, $this->tunedOf($request)), $this->configuration->extensionLibraries(), false);
         $live = $this->driver->queryJson('engines.postgres.config.limits', ['names' => self::HOT_STANDBY_SETTINGS]);
         $current = $live->stringMap('current');
         $defaults = $live->stringMap('defaults');
@@ -49,7 +49,7 @@ final readonly class PostgresConfig implements Config
 
     public function pendingRestart(): array
     {
-        $keys = array_map(fn (EngineField $field): string => $field->key, $this->configuration->catalog()->fields);
+        $keys = [...array_map(fn (EngineField $field): string => $field->key, $this->configuration->catalog()->fields), 'shared_preload_libraries'];
         $values = $this->driver->queryJson('engines.postgres.config.show', ['keys' => $keys])->objects('values');
 
         return array_values(array_map(fn (Payload $value): string => $value->string('key'), array_filter($values, fn (Payload $value): bool => $value->bool('pendingRestart'))));

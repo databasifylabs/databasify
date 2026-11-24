@@ -22,4 +22,8 @@ interface ServerConnection
      * @param  Closure(): ?string  $nextInput
      */
     public function shell(Server $server, int $columns, int $rows, Closure $onOutput, Closure $nextInput): void;
+
+    public function putFile(Server $server, string $localPath, string $remotePath): void;
+
+    public function getFile(Server $server, string $remotePath, string $localPath): void;
 }

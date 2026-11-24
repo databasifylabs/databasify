@@ -23,4 +23,6 @@ interface EngineDriver
     public function migration(): Migration;
 
     public function pools(): Pools;
+
+    public function extensions(): Extensions;
 }

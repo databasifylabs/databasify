@@ -1,4 +1,5 @@
-import { Head, Link, usePoll } from '@inertiajs/react';
+import { Head, Link, router, usePoll } from '@inertiajs/react';
+import { useEffect, useRef } from 'react';
 import { databaseOperation, databaseStatus } from '@/lib/status';
 import {
     ArchiveRestore,
@@ -7,6 +8,7 @@ import {
     History,
     Info,
     LayoutDashboard,
+    Puzzle,
     ScrollText,
     Settings,
     ShieldCheck,
@@ -43,6 +45,7 @@ import LogsTab from '@/components/databases/tabs/logs-tab';
 import MigrationsTab from '@/components/databases/tabs/migrations-tab';
 import NetworkTab from '@/components/databases/tabs/network-tab';
 import OverviewTab from '@/components/databases/tabs/overview-tab';
+import ExtensionsTab from '@/components/databases/tabs/extensions-tab';
 import PoolsTab from '@/components/databases/tabs/pools-tab';
 import SettingsTab from '@/components/databases/tabs/settings-tab';
 import UsersTab from '@/components/databases/tabs/users-tab';
@@ -70,9 +73,10 @@ type Props = {
     latestLogId: string | null;
     clientIp: string | null;
     sdkUnsupported: UnsupportedSdk | null;
+    extensionUpdates?: number;
 };
 
-function tabsFor(database: Database): TabSpec[] {
+function tabsFor(database: Database, extensionUpdates: number): TabSpec[] {
     return [
         { value: 'overview', label: 'Overview', icon: LayoutDashboard },
         { value: 'insights', label: 'Insights', icon: ChartLine },
@@ -83,6 +87,19 @@ function tabsFor(database: Database): TabSpec[] {
         },
         ...(database.pool_port !== null
             ? [{ value: 'pools', label: 'Connection Pools', icon: Waypoints }]
+            : []),
+        ...(database.supports_extensions
+            ? [
+                  {
+                      value: 'extensions',
+                      label: 'Extensions',
+                      icon: Puzzle,
+                      count: {
+                          value: extensionUpdates,
+                          label: `${extensionUpdates} extension ${extensionUpdates === 1 ? 'update' : 'updates'} available`,
+                      },
+                  },
+              ]
             : []),
         { value: 'network', label: 'Network Access', icon: ShieldCheck },
         ...(database.supports_point_in_time_recovery ||
@@ -107,14 +124,25 @@ export default function ShowDatabase({
     latestLogId,
     clientIp,
     sdkUnsupported,
+    extensionUpdates = 0,
 }: Props) {
-    const tabs = tabsFor(database);
+    const tabs = tabsFor(database, extensionUpdates);
     const [tab, navigate] = useQueryTab(
         tabs.map((entry) => entry.value),
         'overview',
     );
     const operation = databaseOperation(database);
     const busy = operation !== null;
+
+    const wasBusy = useRef(busy);
+
+    useEffect(() => {
+        if (wasBusy.current && !busy) {
+            router.reload({ only: ['extensionUpdates'] });
+        }
+
+        wasBusy.current = busy;
+    }, [busy]);
 
     usePoll(5000, () => ({
         only: ['database', 'availableServers', ...liveLogProps(logs, log)],
@@ -231,6 +259,9 @@ export default function ShowDatabase({
                     </TabsContent>
                     <TabsContent value="users">
                         <UsersTab database={database} appEnv={appEnv} />
+                    </TabsContent>
+                    <TabsContent value="extensions">
+                        <ExtensionsTab database={database} busy={busy} />
                     </TabsContent>
                     <TabsContent value="pools" className="space-y-6">
                         {database.nodes.some(

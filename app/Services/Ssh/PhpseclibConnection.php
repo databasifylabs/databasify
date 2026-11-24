@@ -98,6 +98,60 @@ final readonly class PhpseclibConnection implements ServerConnection
         $ssh->disconnect();
     }
 
+    public function putFile(Server $server, string $localPath, string $remotePath): void
+    {
+        $staging = $this->retrying(function () use ($server, $localPath): string {
+            [$sftp, $staging] = $this->connectAndUpload($server, '');
+
+            try {
+                $this->transferring($server, fn () => $sftp->put($staging, $localPath, SFTP::SOURCE_LOCAL_FILE));
+            } catch (Throwable $failure) {
+                rescue(fn () => $sftp->delete($staging), report: false);
+
+                throw $failure;
+            }
+
+            return $staging;
+        });
+        $this->runOrFail($server, view('ssh.servers.files.place', ['sh' => new Shell, 'staging' => $staging, 'remotePath' => $remotePath])->render());
+    }
+
+    public function getFile(Server $server, string $remotePath, string $localPath): void
+    {
+        $this->retrying(function () use ($server, $remotePath, $localPath): void {
+            [$sftp, $staging] = $this->connectAndUpload($server, '');
+            try {
+                $this->runOrFail($server, view('ssh.servers.files.stage', ['sh' => new Shell, 'remotePath' => $remotePath, 'staging' => $staging, 'user' => $server->ssh_user])->render());
+                $this->transferring($server, fn () => $sftp->get($staging, $localPath));
+            } finally {
+                rescue(fn () => $sftp->delete($staging), report: false);
+            }
+        });
+    }
+
+    private function transferring(Server $server, Closure $transfer): void
+    {
+        try {
+            $transfer();
+        } catch (ConnectionClosedException|TimeoutException $exception) {
+            $this->sessions->forget($server);
+
+            throw SshConnectionFailed::onServer($server, "Lost the connection to {$server->address()} during a file transfer: {$exception->getMessage()}");
+        }
+    }
+
+    private function runOrFail(Server $server, string $command): void
+    {
+        $output = '';
+        $exit = $this->run($server, $command, function (string $chunk) use (&$output): void {
+            $output .= $chunk;
+        });
+
+        if ($exit !== 0) {
+            throw SshConnectionFailed::onServer($server, trim($output) !== '' ? trim($output) : "{$command} failed on {$server->address()}.");
+        }
+    }
+
     private function pollShellOf(SFTP $ssh): string
     {
         try {

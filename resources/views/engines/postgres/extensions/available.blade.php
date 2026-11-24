@@ -1,0 +1,1 @@
+SELECT json_build_object('extensions', (SELECT COALESCE(json_agg(json_build_object('name', name, 'defaultVersion', default_version) ORDER BY name), '[]') FROM pg_available_extensions WHERE name = ANY (ARRAY[{!! implode(', ', array_map($sql->string(...), $names)) !!}])));
