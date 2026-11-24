@@ -60,6 +60,8 @@ type Props = {
 
 const automaticFailoverMembers = 3;
 
+const builtInCategories = ['Application', 'Caching'];
+
 function EngineList({
     engines,
     engine,
@@ -73,7 +75,14 @@ function EngineList({
     onEngine: (value: string) => void;
     onLine: (value: string, line: string) => void;
 }) {
-    const categories = [...new Set(engines.map((option) => option.category))];
+    const categories = [
+        ...new Set([
+            ...builtInCategories.filter((category) =>
+                engines.some((option) => option.category === category),
+            ),
+            ...engines.map((option) => option.category),
+        ]),
+    ];
 
     return (
         <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
