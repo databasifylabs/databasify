@@ -18,7 +18,7 @@ final readonly class SearchEverything
      */
     public function handle(string $term): Collection
     {
-        $databases = Database::query()->matching($term)->orderBy('name')->limit(self::LIMIT)->get()->map(SearchResult::fromDatabase(...));
+        $databases = Database::query()->withRegisteredEngine()->matching($term)->orderBy('name')->limit(self::LIMIT)->get()->map(SearchResult::fromDatabase(...));
         $servers = Server::query()->matching($term)->byName()->limit(self::LIMIT)->get()->map(SearchResult::fromServer(...));
 
         return $databases->toBase()->concat($servers);

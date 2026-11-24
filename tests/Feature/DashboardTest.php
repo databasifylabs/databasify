@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Database;
+use App\Models\DatabaseNode;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -28,6 +31,21 @@ test('authenticated users can visit the project dashboard', function () {
         ->get(route('dashboard', $project))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('dashboard'));
+});
+
+test('the dashboard hides databases whose engine plugin is gone but keeps their servers in use', function () {
+    $project = Project::factory()->create();
+    $server = Server::factory()->for($project)->ready()->create();
+    DatabaseNode::factory()->for(Database::factory()->for($project)->create(['name' => 'events', 'engine' => 'clickhouse']))->for($server)->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('dashboard', $project))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('summary.databases.total', 0)
+            ->has('databases.data', 0)
+            ->where('servers.data.0.database.name', 'events')
+            ->where('servers.data.0.database.engine_icon', null));
 });
 
 test('visiting a project dashboard remembers it as the last project', function () {

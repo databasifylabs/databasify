@@ -422,6 +422,15 @@ class Database extends Model implements Movable
      * @param  Builder<self>  $query
      */
     #[Scope]
+    protected function withRegisteredEngine(Builder $query): void
+    {
+        $query->whereIn('engine', EngineCatalog::ids());
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
     protected function ready(Builder $query): void
     {
         $query->where('status', DatabaseStatus::Ready);

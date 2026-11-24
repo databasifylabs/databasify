@@ -31,6 +31,17 @@ test('databases page is displayed', function () {
         ->assertInertia(fn (Assert $page) => $page->component('databases/index')->has('databases.data', 1));
 });
 
+test('databases whose engine plugin is gone are hidden from the list', function () {
+    $project = Project::factory()->create();
+    Database::factory()->for($project)->create(['name' => 'orders']);
+    Database::factory()->for($project)->create(['name' => 'events', 'engine' => 'clickhouse']);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('databases.index', $project))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('databases.data', 1)->where('databases.data.0.name', 'orders'));
+});
+
 test('databases can be filtered by engine and status', function () {
     $project = Project::factory()->create();
     Database::factory()->for($project)->create(['name' => 'orders']);

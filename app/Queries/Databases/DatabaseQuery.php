@@ -24,7 +24,7 @@ final class DatabaseQuery extends Query
 
     public function builder(): Builder
     {
-        $query = Database::query()->with(DatabaseListResource::RELATIONS)->latest('id');
+        $query = Database::query()->withRegisteredEngine()->with(DatabaseListResource::RELATIONS)->latest('id');
 
         if ($this->filters->search !== '') {
             $query->matching($this->filters->search);

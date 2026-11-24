@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Engines\EngineCatalog;
 use App\Enums\Servers\OperatingSystem;
 use App\Models\DatabaseNode;
 use App\Models\Server;
@@ -61,7 +62,7 @@ class ServerResource extends JsonResource
             'id' => $node->database->id,
             'name' => $node->database->name,
             'engine' => $node->database->engine,
-            'engine_icon' => $node->database->engine()->icon,
+            'engine_icon' => in_array($node->database->engine, EngineCatalog::ids(), true) ? $node->database->engine()->icon : null,
             'kind' => $node->kind->value,
             'node_id' => $node->id,
         ];

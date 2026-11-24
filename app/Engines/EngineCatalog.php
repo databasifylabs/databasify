@@ -22,9 +22,15 @@ final readonly class EngineCatalog
      */
     public static function all(): Collection
     {
-        return collect(array_keys(config()->array(self::CONFIG, [])))
-            ->filter(fn (int|string $id): bool => is_string($id))
-            ->mapWithKeys(fn (string $id): array => [$id => self::find($id)]);
+        return collect(self::ids())->mapWithKeys(fn (string $id): array => [$id => self::find($id)]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function ids(): array
+    {
+        return array_values(array_filter(array_keys(config()->array(self::CONFIG, [])), is_string(...)));
     }
 
     public static function find(string $id): Engine
