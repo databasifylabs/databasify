@@ -14,10 +14,15 @@ final readonly class ScriptResult
     public function __construct(
         public string $script,
         public string $stdout,
+        public bool $truncated = false,
     ) {}
 
     public function json(): Payload
     {
+        if ($this->truncated) {
+            throw new EngineScriptFailed("{$this->script} printed more than the engine returns, so its result was cut off.");
+        }
+
         $lines = array_filter(explode("\n", $this->stdout), fn (string $line): bool => str_starts_with($line, self::RESULT));
 
         if ($lines === []) {

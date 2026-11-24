@@ -41,7 +41,7 @@ final readonly class ScriptRunner implements EngineScripts
         $serverLog?->write($reply->stdout);
         $serverLog?->finish(0);
 
-        return new ScriptResult($script, $reply->stdout);
+        return new ScriptResult($script, $reply->stdout, $reply->truncated);
     }
 
     public function start(DatabaseNode $node, string $key, string $script, array $data = [], ?string $user = null, array $env = []): Operation
