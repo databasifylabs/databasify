@@ -1,6 +1,6 @@
 {
-  "version": "0.4.0",
-  "published_at": "2026-11-24T09:51:15Z",
-  "url": "https://github.com/databasifylabs/databasify/releases/tag/0.4.0",
-  "notes": "## What's Changed\r\n* feat(extensions): postgresql extensions per schema and custom packages by @rtraselbd in https://github.com/databasifylabs/databasify/pull/26\r\n\r\n\r\n**Full Changelog**: https://github.com/databasifylabs/databasify/compare/0.3.0...0.4.0"
+    "version": "0.4.0",
+    "published_at": "2026-11-24T09:51:15Z",
+    "url": "https://github.com/databasifylabs/databasify/releases/tag/0.4.0",
+    "notes": "## What's Changed\r\n* feat(extensions): postgresql extensions per schema and custom packages by @rtraselbd in https://github.com/databasifylabs/databasify/pull/26\r\n\r\n\r\n**Full Changelog**: https://github.com/databasifylabs/databasify/compare/0.3.0...0.4.0"
 }

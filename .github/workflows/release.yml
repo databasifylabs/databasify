@@ -129,7 +129,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" --json body,publishedAt,url \
-            | jq --arg version "$GITHUB_REF_NAME" '{version: $version, published_at: .publishedAt, url: .url, notes: .body}' > scripts/version.json
+            | jq --indent 4 --arg version "$GITHUB_REF_NAME" '{version: $version, published_at: .publishedAt, url: .url, notes: .body}' > scripts/version.json
           sed -i "s/'version' => '[^']*'/'version' => '${GITHUB_REF_NAME}'/" config/app.php
 
       - uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7.2.1
